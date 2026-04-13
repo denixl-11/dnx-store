@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFT Store</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .nft-card {
+            background-color: var(--tg-theme-secondary-bg-color);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 20px;
+            width: 90%;
+            max-width: 300px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .nft-card img {
+            width: 100%;
+            border-radius: 10px;
+        }
+        .buy-btn {
+            background-color: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h2>Магазин NFT</h2>
+
+    <div class="nft-card">
+        <img src="https://t.me/nft/LolPop-274631" alt="NFT">
+        <h3>NFT Blue Rabbit</h3>
+        <p>Цена: 500 руб.</p>
+        <button class="buy-btn" onclick="buyItem('NFT Blue Rabbit')">Купить</button>
+    </div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand(); // Расширяем на весь экран
+
+        function buyItem(name) {
+            // Отправляем данные боту и закрываем окно
+            tg.sendData("buy_" + name);
+            tg.close();
+        }
+    </script>
+</body>
+</html>
