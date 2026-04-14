@@ -6,9 +6,8 @@
     <title>DNX STORE — Premium NFT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Стиль "Dark Luxury" */
         body {
-            background-color: #0f0f0f; /* Почти черный */
+            background-color: #0f0f0f;
             color: #ffffff;
             font-family: 'Inter', sans-serif;
             margin: 0;
@@ -58,19 +57,6 @@
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
-        }
-
-        .item-card::before {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle at top right, rgba(212, 175, 55, 0.1), transparent);
-            pointer-events: none;
-        }
-
-        .item-card:hover {
-            transform: translateY(-5px);
-            border-color: #d4af37;
         }
 
         .item-name {
@@ -131,31 +117,52 @@
     </header>
 
     <div id="catalog">
-        <div class="item-card">
-            <div class="status-badge">Доступен</div>
-            <div class="item-name">NFT Golden Rabbit</div>
-            <div class="item-price-tag">Цена</div>
-            <div class="item-price-value">1 500 TON</div>
-            <button onclick="Telegram.WebApp.close()">Купить сейчас</button>
-        </div>
-        
-        <div class="item-card" style="opacity: 0.6;">
-            <div class="status-badge" style="color: #666; border-color: #333;">Продано</div>
-            <div class="item-name">Rare Pixel Sun</div>
-            <div class="item-price-tag">Цена</div>
-            <div class="item-price-value">500 TON</div>
-            <button disabled style="background: #333; color: #666;">Недоступно</button>
-        </div>
+        <div style="text-align:center; color: #888;">Загрузка товаров из базы...</div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // Инициализация Telegram WebApp
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Разворачиваем на весь экран
+        tg.expand();
         
-        // Тут в будущем будет функция loadItems(), 
-        // которая заберет данные из твоей базы PostgreSQL
+        // Твоя активная ссылка из LocalTunnel
+        const API_URL = 'https://eleven-toys-wink.loca.lt/items';
+
+        async function loadItems() {
+            const container = document.getElementById('catalog');
+            try {
+                // Пытаемся получить данные из твоей базы
+                const response = await fetch(API_URL);
+                const items = await response.json();
+                
+                if (items.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; color:#888;">Товаров пока нет</div>';
+                    return;
+                }
+
+                // Отрисовываем карточки из базы
+                container.innerHTML = items.map(item => `
+                    <div class="item-card">
+                        <div class="status-badge">${item.status || 'Без статуса'}</div>
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-price-tag">Цена</div>
+                        <div class="item-price-value">${item.price} TON</div>
+                        <button onclick="buyItem('${item.name}')">Купить сейчас</button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = '<div style="text-align:center; color:#d4af37;">Не удалось подключиться к базе данных. Проверьте терминал.</div>';
+                console.error(e);
+            }
+        }
+
+        function buyItem(name) {
+            tg.sendData("Покупка: " + name); 
+            tg.close();
+        }
+
+        // Запуск функции при загрузке страницы
+        loadItems();
     </script>
 </body>
 </html>
