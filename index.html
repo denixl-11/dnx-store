@@ -2,106 +2,160 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DNX Store</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNX STORE — Premium NFT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg-color: var(--tg-theme-bg-color, #1a1a1a);
-            --text-color: var(--tg-theme-text-color, #ffffff);
-            --hint-color: var(--tg-theme-hint-color, #aaaaaa);
-            --button-color: var(--tg-theme-button-color, #248bcf);
-            --secondary-bg: var(--tg-theme-secondary-bg-color, #242424);
-        }
-
+        /* Стиль "Dark Luxury" */
         body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            background-color: #0f0f0f; /* Почти черный */
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
             margin: 0;
-            padding: 15px;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            -webkit-font-smoothing: antialiased;
         }
 
-        h2 { margin-bottom: 20px; font-weight: 600; letter-spacing: 1px; }
-
-        .container {
-            display: grid;
-            grid-template-columns: 1fr 1fr; /* Две колонки */
-            gap: 15px;
-            width: 100%;
-            max-width: 500px;
-        }
-
-        .nft-card {
-            background-color: var(--secondary-bg);
-            border-radius: 16px;
-            padding: 10px;
+        header {
             text-align: center;
-            transition: transform 0.2s, box-shadow 0.2s;
-            border: 1px solid rgba(255,255,255,0.05);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            margin-bottom: 30px;
+            padding-top: 20px;
         }
 
-        .nft-card:active { transform: scale(0.97); }
+        h1 {
+            font-size: 1.8rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin: 0;
+            background: linear-gradient(45deg, #d4af37, #f4d03f);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-        .nft-card img {
+        .subtitle {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        #catalog {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
             width: 100%;
-            aspect-ratio: 1 / 1;
-            object-fit: cover;
-            border-radius: 12px;
-            margin-bottom: 10px;
-            background: #333; /* Заглушка, пока грузится фото */
+            max-width: 450px;
         }
 
-        .nft-title { font-size: 14px; font-weight: bold; margin: 5px 0; }
-        .nft-price { color: var(--button-color); font-weight: 700; font-size: 16px; margin-bottom: 10px; }
+        .item-card {
+            background: linear-gradient(145deg, #1a1a1a, #141414);
+            border: 1px solid #2a2a2a;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
 
-        .buy-btn {
-            background-color: var(--button-color);
+        .item-card::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at top right, rgba(212, 175, 55, 0.1), transparent);
+            pointer-events: none;
+        }
+
+        .item-card:hover {
+            transform: translateY(-5px);
+            border-color: #d4af37;
+        }
+
+        .item-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 8px;
             color: #fff;
+        }
+
+        .item-price-tag {
+            font-size: 0.8rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .item-price-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #d4af37;
+            margin-bottom: 15px;
+        }
+
+        button {
+            background: linear-gradient(45deg, #d4af37, #b8860b);
+            color: #000;
             border: none;
-            padding: 8px;
-            border-radius: 10px;
+            border-radius: 12px;
+            padding: 12px;
             width: 100%;
-            font-weight: bold;
+            font-weight: 700;
+            font-size: 1rem;
             cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            background: rgba(212, 175, 55, 0.1);
+            color: #d4af37;
+            margin-bottom: 10px;
+            border: 1px solid rgba(212, 175, 55, 0.3);
         }
     </style>
 </head>
 <body>
-    <h2>DNX STORE</h2>
-    
-    <div class="container">
-        <div class="nft-card">
-            <img src="https://i.ibb.co/Lhy6fC8/blue-rabbit.jpg" alt="NFT">
-            <div class="nft-title">Blue Rabbit</div>
-            <div class="nft-price">500 ₽</div>
-            <button class="buy-btn" onclick="buyItem('NFT Blue Rabbit')">Купить</button>
-        </div>
 
-        <div class="nft-card">
-            <img src="https://i.ibb.co/VvYp0qG/gold-star.jpg" alt="NFT">
-            <div class="nft-title">Golden Star</div>
-            <div class="nft-price">1500 ₽</div>
-            <button class="buy-btn" onclick="buyItem('NFT Golden Star')">Купить</button>
-        </div>
+    <header>
+        <h1>DNX Store</h1>
+        <div class="subtitle">Exclusive Digital Assets</div>
+    </header>
 
+    <div id="catalog">
+        <div class="item-card">
+            <div class="status-badge">Доступен</div>
+            <div class="item-name">NFT Golden Rabbit</div>
+            <div class="item-price-tag">Цена</div>
+            <div class="item-price-value">1 500 TON</div>
+            <button onclick="Telegram.WebApp.close()">Купить сейчас</button>
         </div>
+        
+        <div class="item-card" style="opacity: 0.6;">
+            <div class="status-badge" style="color: #666; border-color: #333;">Продано</div>
+            <div class="item-name">Rare Pixel Sun</div>
+            <div class="item-price-tag">Цена</div>
+            <div class="item-price-value">500 TON</div>
+            <button disabled style="background: #333; color: #666;">Недоступно</button>
+        </div>
+    </div>
 
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        let tg = window.Telegram.WebApp;
-        tg.expand(); // Открываем сразу на весь экран
-        tg.headerColor = 'secondary_bg_color';
-
-        function buyItem(name) {
-            tg.sendData("buy_" + name);
-            tg.close();
-        }
+        // Инициализация Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Разворачиваем на весь экран
+        
+        // Тут в будущем будет функция loadItems(), 
+        // которая заберет данные из твоей базы PostgreSQL
     </script>
 </body>
 </html>
