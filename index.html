@@ -15,6 +15,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            overflow-x: hidden;
         }
 
         header {
@@ -56,7 +57,6 @@
             border-radius: 20px;
             padding: 10px;
             position: relative;
-            /* Плавность для возврата эффектов */
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
@@ -64,18 +64,15 @@
             cursor: pointer;
         }
 
-        /* ВОЗВРАЩАЕМ ПОДСВЕТКУ И ПОДЪЕМ КАРТОЧКИ */
-        @media (hover: hover) {
-            .item-card:hover {
-                transform: translateY(-5px);
-                border-color: rgba(212, 175, 55, 0.5);
-                box-shadow: 0 8px 25px rgba(212, 175, 55, 0.15);
-            }
+        /* ЭФФЕКТ ПОДСВЕТКИ ПРИ НАВЕДЕНИИ */
+        .item-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(212, 175, 55, 0.4);
+            box-shadow: 0 8px 25px rgba(212, 175, 55, 0.1);
         }
 
         .item-card:active {
             transform: scale(0.96);
-            border-color: #d4af37;
         }
 
         .item-image {
@@ -87,36 +84,34 @@
             background: #1a1a1a;
         }
 
-        /* ДЕЛАЕМ ПОМЕТКИ ПРОЗРАЧНЫМИ С ЭФФЕКТОМ СТЕКЛА */
+        /* ПОЧТИ ПРОЗРАЧНЫЕ ФЛАЖКИ */
         .status-badge {
             position: absolute;
             top: 18px;
             left: 18px;
             padding: 4px 10px;
             border-radius: 8px;
-            font-size: 0.6rem;
+            font-size: 0.55rem;
             font-weight: 700;
             text-transform: uppercase;
-            /* Эффект матового стекла */
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.05);
             z-index: 2;
         }
 
-        .status-available { background: rgba(0, 255, 100, 0.25); color: #00ff64; }
-        .status-sold { background: rgba(255, 50, 50, 0.35); color: #ff9d9d; }
-        .status-booked { background: rgba(212, 175, 55, 0.35); color: #f4d03f; }
+        .status-available { background: rgba(0, 255, 100, 0.12); color: rgba(0, 255, 100, 0.8); }
+        .status-sold { background: rgba(255, 50, 50, 0.15); color: rgba(255, 157, 157, 0.8); }
+        .status-booked { background: rgba(212, 175, 55, 0.15); color: rgba(244, 208, 63, 0.8); }
 
         .item-info {
-            padding: 0 2px;
             display: flex;
             flex-direction: column;
             flex-grow: 1;
         }
 
         .item-name {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: 700;
             margin-bottom: 4px;
             white-space: nowrap;
@@ -125,13 +120,13 @@
         }
 
         .item-price-tag {
-            font-size: 0.65rem;
-            color: #666;
+            font-size: 0.6rem;
+            color: #555;
             text-transform: uppercase;
         }
 
         .item-price-value {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 700;
             color: #d4af37;
             margin-bottom: 10px;
@@ -141,14 +136,45 @@
             background: linear-gradient(45deg, #d4af37, #f4d03f);
             color: #000;
             border: none;
-            border-radius: 12px;
-            padding: 10px;
+            border-radius: 10px;
+            padding: 8px;
             width: 100%;
             font-weight: 700;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             cursor: pointer;
-            transition: all 0.2s;
             margin-top: auto;
+        }
+
+        /* СТИЛИ ДЛЯ ПРОСМОТРА ФОТО */
+        #image-viewer {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.92);
+            backdrop-filter: blur(10px);
+            justify-content: center;
+            align-items: center;
+        }
+
+        #full-image {
+            max-width: 90%;
+            max-height: 80%;
+            border-radius: 15px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+        }
+
+        .close-viewer {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            font-size: 35px;
+            color: #fff;
+            cursor: pointer;
+            opacity: 0.7;
         }
 
         @keyframes fadeIn {
@@ -165,7 +191,12 @@
     </header>
 
     <div id="catalog">
-        <div style="grid-column: span 2; text-align:center; color: #666; padding: 40px;">Подключение к блокчейну...</div>
+        <div style="grid-column: span 2; text-align:center; color: #666; padding: 40px;">Загрузка активов...</div>
+    </div>
+
+    <div id="image-viewer" onclick="closeImage()">
+        <span class="close-viewer">&times;</span>
+        <img id="full-image" src="">
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -175,6 +206,19 @@
         tg.headerColor = '#080808';
 
         const API_URL = 'https://dnx-shop.onrender.com/items';
+
+        // Функция просмотра фото
+        function openImage(event, url) {
+            event.stopPropagation();
+            const viewer = document.getElementById('image-viewer');
+            const fullImg = document.getElementById('full-image');
+            fullImg.src = url;
+            viewer.style.display = 'flex';
+        }
+
+        function closeImage() {
+            document.getElementById('image-viewer').style.display = 'none';
+        }
 
         async function loadItems() {
             const container = document.getElementById('catalog');
@@ -194,9 +238,11 @@
                     if (item.status?.toLowerCase().includes('продан')) statusClass = 'status-sold';
                     if (item.status?.toLowerCase().includes('забронирован')) statusClass = 'status-booked';
 
+                    const imgUrl = item.image_url || 'https://via.placeholder.com/400x400?text=NFT';
+
                     return `
-                        <div class="item-card">
-                            <img src="${item.image_url || 'https://via.placeholder.com/400x400?text=NFT'}" class="item-image" onerror="this.src='https://via.placeholder.com/400x400?text=No+Image'">
+                        <div class="item-card" onclick="openImage(event, '${imgUrl}')">
+                            <img src="${imgUrl}" class="item-image" onerror="this.src='https://via.placeholder.com/400x400?text=No+Image'">
                             <div class="status-badge ${statusClass}">${statusText}</div>
                             <div class="item-info">
                                 <div class="item-name">${item.name}</div>
@@ -213,7 +259,7 @@
         }
 
         function buyItem(event, name) {
-            event.stopPropagation(); // Чтобы не срабатывал клик по карточке
+            event.stopPropagation();
             tg.sendData("buy:" + name); 
             tg.HapticFeedback.notificationOccurred('success');
             tg.close();
