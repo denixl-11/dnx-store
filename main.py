@@ -177,20 +177,21 @@ app = web.Application()
 app.router.add_get('/items', handle_get_items)
 app.router.add_options('/items', handle_options)
 
+
 async def main():
     # Настройка порта для Render
     port = int(os.environ.get("PORT", 8080))
 
-    # Запуск сервера сайта
+    # Запуск веб-сервера (это то, что ждет Render)
     runner = web.AppRunner(app)
     await runner.setup()
+    # КРИТИЧЕСКИ ВАЖНО: именно '0.0.0.0', а не 'localhost' или '127.0.0.1'
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
 
     print(f"🚀 Веб-сервер запущен на порту {port}")
-    print("🤖 Бот запущен!")
 
-    # Запуск бота
+    # Запуск самого бота
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
