@@ -43,7 +43,6 @@
 
         #catalog {
             display: grid;
-            /* Сетка в 2 колонки */
             grid-template-columns: 1fr 1fr;
             gap: 12px;
             width: 100%;
@@ -57,14 +56,25 @@
             border-radius: 20px;
             padding: 10px;
             position: relative;
+            /* Плавность для возврата эффектов */
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
             animation: fadeIn 0.5s ease forwards;
+            cursor: pointer;
+        }
+
+        /* ВОЗВРАЩАЕМ ПОДСВЕТКУ И ПОДЪЕМ КАРТОЧКИ */
+        @media (hover: hover) {
+            .item-card:hover {
+                transform: translateY(-5px);
+                border-color: rgba(212, 175, 55, 0.5);
+                box-shadow: 0 8px 25px rgba(212, 175, 55, 0.15);
+            }
         }
 
         .item-card:active {
-            transform: scale(0.98);
+            transform: scale(0.96);
             border-color: #d4af37;
         }
 
@@ -77,23 +87,26 @@
             background: #1a1a1a;
         }
 
+        /* ДЕЛАЕМ ПОМЕТКИ ПРОЗРАЧНЫМИ С ЭФФЕКТОМ СТЕКЛА */
         .status-badge {
             position: absolute;
             top: 18px;
             left: 18px;
-            padding: 4px 8px;
+            padding: 4px 10px;
             border-radius: 8px;
-            font-size: 0.55rem;
+            font-size: 0.6rem;
             font-weight: 700;
             text-transform: uppercase;
-            backdrop-filter: blur(10px);
+            /* Эффект матового стекла */
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             border: 1px solid rgba(255,255,255,0.1);
             z-index: 2;
         }
 
-        .status-available { background: rgba(0, 255, 100, 0.2); color: #00ff64; }
-        .status-sold { background: rgba(255, 50, 50, 0.2); color: #ff3232; }
-        .status-booked { background: rgba(212, 175, 55, 0.2); color: #d4af37; }
+        .status-available { background: rgba(0, 255, 100, 0.25); color: #00ff64; }
+        .status-sold { background: rgba(255, 50, 50, 0.35); color: #ff9d9d; }
+        .status-booked { background: rgba(212, 175, 55, 0.35); color: #f4d03f; }
 
         .item-info {
             padding: 0 2px;
@@ -189,7 +202,7 @@
                                 <div class="item-name">${item.name}</div>
                                 <div class="item-price-tag">Стоимость</div>
                                 <div class="item-price-value">${item.price} TON</div>
-                                <button onclick="buyItem('${item.name}')">Купить</button>
+                                <button onclick="buyItem(event, '${item.name}')">Купить</button>
                             </div>
                         </div>
                     `;
@@ -199,16 +212,12 @@
             }
         }
 
-        function buyItem(name) {
+        function buyItem(event, name) {
+            event.stopPropagation(); // Чтобы не срабатывал клик по карточке
             tg.sendData("buy:" + name); 
             tg.HapticFeedback.notificationOccurred('success');
             tg.close();
         }
-
-        loadItems();
-    </script>
-</body>
-</html>
 
         loadItems();
     </script>
