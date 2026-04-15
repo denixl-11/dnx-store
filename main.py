@@ -42,7 +42,7 @@ async def handle_get_items(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT id, name, price, status FROM items")
+                cur.execute("SELECT id, name, price, status, image_url FROM items")
                 items = cur.fetchall()
                 return web.json_response(items, headers={
                     "Access-Control-Allow-Origin": "*",
