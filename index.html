@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
-            background-color: #0f0f0f;
+            background-color: #080808;
             color: #ffffff;
             font-family: 'Inter', sans-serif;
             margin: 0;
@@ -15,98 +15,132 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            -webkit-font-smoothing: antialiased;
         }
 
         header {
             text-align: center;
             margin-bottom: 30px;
-            padding-top: 20px;
+            padding-top: 10px;
         }
 
         h1 {
             font-size: 1.8rem;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
             text-transform: uppercase;
             margin: 0;
             background: linear-gradient(45deg, #d4af37, #f4d03f);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
         }
 
         .subtitle {
-            font-size: 0.9rem;
-            color: #666;
+            font-size: 0.85rem;
+            color: #888;
             margin-top: 5px;
+            letter-spacing: 1px;
         }
 
         #catalog {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 20px;
+            gap: 25px;
             width: 100%;
-            max-width: 450px;
+            max-width: 400px;
         }
 
         .item-card {
-            background: linear-gradient(145deg, #1a1a1a, #141414);
-            border: 1px solid #2a2a2a;
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transition: all 0.3s ease;
+            background: #121212;
+            border: 1px solid #222;
+            border-radius: 24px;
+            padding: 15px;
             position: relative;
-            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Эффект при наведении/нажатии */
+        .item-card:active, .item-card:hover {
+            transform: translateY(-5px);
+            border-color: #d4af37;
+            box-shadow: 0 10px 30px rgba(212, 175, 55, 0.15);
+        }
+
+        .item-image {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border-radius: 18px;
+            margin-bottom: 15px;
+            background: #1a1a1a; /* Заглушка, пока грузится */
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .status-available { background: rgba(0, 255, 100, 0.2); color: #00ff64; }
+        .status-sold { background: rgba(255, 50, 50, 0.2); color: #ff3232; }
+        .status-booked { background: rgba(212, 175, 55, 0.2); color: #d4af37; }
+
+        .item-info {
+            padding: 0 5px;
         }
 
         .item-name {
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             font-weight: 700;
-            margin-bottom: 8px;
-            color: #fff;
+            margin-bottom: 5px;
         }
 
         .item-price-tag {
-            font-size: 0.8rem;
-            color: #888;
+            font-size: 0.75rem;
+            color: #666;
             text-transform: uppercase;
-            margin-bottom: 2px;
         }
 
         .item-price-value {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: 700;
             color: #d4af37;
             margin-bottom: 15px;
         }
 
         button {
-            background: linear-gradient(45deg, #d4af37, #b8860b);
+            background: linear-gradient(45deg, #d4af37, #f4d03f);
             color: #000;
             border: none;
-            border-radius: 12px;
-            padding: 12px;
+            border-radius: 16px;
+            padding: 14px;
             width: 100%;
             font-weight: 700;
             font-size: 1rem;
             cursor: pointer;
-            transition: transform 0.1s;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.2);
         }
 
         button:active {
-            transform: scale(0.98);
+            transform: scale(0.95);
+            filter: brightness(0.9);
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            background: rgba(212, 175, 55, 0.1);
-            color: #d4af37;
-            margin-bottom: 10px;
-            border: 1px solid rgba(212, 175, 55, 0.3);
+        /* Анимация появления */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
+        .item-card { animation: fadeIn 0.5s ease forwards; }
     </style>
 </head>
 <body>
@@ -117,51 +151,59 @@
     </header>
 
     <div id="catalog">
-        <div style="text-align:center; color: #888;">Загрузка товаров из базы...</div>
+        <div style="text-align:center; color: #666; padding: 40px;">Подключение к блокчейну...</div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        
-        // Твоя активная ссылка из LocalTunnel
+        tg.headerColor = '#080808';
+
         const API_URL = 'https://dnx-shop.onrender.com/items';
 
         async function loadItems() {
             const container = document.getElementById('catalog');
             try {
-                // Пытаемся получить данные из твоей базы
                 const response = await fetch(API_URL);
                 const items = await response.json();
                 
-                if (items.length === 0) {
-                    container.innerHTML = '<div style="text-align:center; color:#888;">Товаров пока нет</div>';
+                if (!items || items.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; color:#666;">Витрина пуста</div>';
                     return;
                 }
 
-                // Отрисовываем карточки из базы
-                container.innerHTML = items.map(item => `
-                    <div class="item-card">
-                        <div class="status-badge">${item.status || 'Без статуса'}</div>
-                        <div class="item-name">${item.name}</div>
-                        <div class="item-price-tag">Цена</div>
-                        <div class="item-price-value">${item.price} TON</div>
-                        <button onclick="buyItem('${item.name}')">Купить сейчас</button>
-                    </div>
-                `).join('');
+                container.innerHTML = items.map(item => {
+                    // Определяем стиль бейджа по тексту статуса
+                    let statusClass = 'status-available';
+                    if (item.status?.toLowerCase().includes('продан')) statusClass = 'status-sold';
+                    if (item.status?.toLowerCase().includes('забронирован')) statusClass = 'status-booked';
+
+                    return `
+                        <div class="item-card">
+                            <img src="${item.image_url || 'https://via.placeholder.com/400x400?text=NFT'}" class="item-image" onerror="this.src='https://via.placeholder.com/400x400?text=No+Image'">
+                            <div class="status-badge ${statusClass}">${item.status || 'В наличии'}</div>
+                            <div class="item-info">
+                                <div class="item-name">${item.name}</div>
+                                <div class="item-price-tag">Стоимость</div>
+                                <div class="item-price-value">${item.price} TON</div>
+                                <button onclick="buyItem('${item.name}')">Купить сейчас</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             } catch (e) {
-                container.innerHTML = '<div style="text-align:center; color:#d4af37;">Не удалось подключиться к базе данных. Проверьте терминал.</div>';
+                container.innerHTML = '<div style="text-align:center; color:#d4af37;">Ошибка связи с сервером. Попробуйте позже.</div>';
                 console.error(e);
             }
         }
 
         function buyItem(name) {
-            tg.sendData("Покупка: " + name); 
+            tg.sendData("buy:" + name); 
+            tg.HapticFeedback.notificationOccurred('success');
             tg.close();
         }
 
-        // Запуск функции при загрузке страницы
         loadItems();
     </script>
 </body>
