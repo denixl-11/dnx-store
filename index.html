@@ -6,7 +6,7 @@
     <title>DNX STORE — Premium NFT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- ОБНОВЛЕННЫЕ СТИЛИ ЗАГОЛОВКА (УМЕРЕННОЕ СВЕЧЕНИЕ) --- */
+        /* --- ОБНОВЛЕННЫЕ СТИЛИ ЗАГОЛОВКА (БЕЗ ДЫХАНИЯ, УМЕНЬШЕННАЯ ЯРКОСТЬ) --- */
         body {
             background-color: #080808;
             color: #ffffff;
@@ -30,13 +30,17 @@
             letter-spacing: 3px;
             text-transform: uppercase;
             margin: 0;
-            /* Возвращаем золотой цвет самому тексту для мягкости */
-            color: #f4d03f; 
-            /* Облегченное свечение: убрали лишние слои и уменьшили разброс */
+            /* Белый цвет текста для эффекта раскаленной нити неона */
+            color: #fff; 
+            /* Статичное мощное свечение (радиусы уменьшены для снижения яркости) */
             text-shadow: 
-                0 0 8px rgba(244, 208, 63, 0.6),
-                0 0 20px rgba(244, 208, 63, 0.3);
-            /* Анимация по-прежнему отсутствует */
+                0 0 5px #fff,
+                0 0 8px #f4d03f,
+                0 0 18px #f4d03f,
+                0 0 35px #f4d03f,
+                0 0 70px #f4d03f,
+                0 0 80px #f4d03f;
+            /* Анимация удалена */
         }
 
         .subtitle { font-size: 0.75rem; color: #888; margin-top: 5px; letter-spacing: 1px; }
