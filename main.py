@@ -42,19 +42,14 @@ async def handle_get_items(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Достаем все нужные поля для фронтенда
                 cur.execute("SELECT id, name, price, status, image_url, nft_link FROM items")
                 items = cur.fetchall()
-                return web.json_response(items, headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, OPTIONS"
-                })
+                return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         logging.error(f"Ошибка API GET: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
-# 1. Бронирование товара
 async def handle_reserve(request):
     try:
         data = await request.json()
@@ -64,39 +59,32 @@ async def handle_reserve(request):
 
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Запрашиваем доп. данные: цену и ссылку
                 cur.execute("SELECT name, price, nft_link FROM items WHERE id = %s AND status = 'Доступен'", (item_id,))
                 item = cur.fetchone()
 
                 if item:
                     cur.execute(
-                        "UPDATE items SET status = 'Забронирован', buyer_id = %s, reserved_at = %s WHERE id = %s",
+                        "UPDATE items SET status = 'Забронирован', buyer_id = %s, reserved_at = %s, last_event = NULL WHERE id = %s",
                         (user_id, datetime.now(), item_id))
                     conn.commit()
 
-                    # Подробное уведомление админу
                     admin_msg = (
                         f"⏳ **Новая бронь из Web App!**\n\n"
                         f"👤 Пользователь: @{username}\n"
                         f"📦 Товар: {item['name']}\n"
                         f"💰 Цена: {item['price']} TON\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
-                        f""
-                        f""
-
+                        f" "  # Отступ после ссылки
                     )
                     await bot.send_message(ADMIN_ID, admin_msg, parse_mode="Markdown")
-
                     return web.json_response({"success": True, "requisites": PAYMENT_REQUISITES},
                                              headers={"Access-Control-Allow-Origin": "*"})
                 return web.json_response({"success": False, "error": "Товар уже занят"},
                                          headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
-        logging.error(f"Ошибка брони: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
-# 2. Подтверждение факта оплаты пользователем
 async def handle_check_payment(request):
     try:
         data = await request.json()
@@ -115,23 +103,48 @@ async def handle_check_payment(request):
                             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"pay_no_{item_id}_{user_id}")
                         ]
                     ])
-
                     admin_msg = (
                         f"💰 **Пользователь заявляет об оплате!**\n\n"
                         f"👤 Пользователь: @{username}\n"
                         f"📦 Товар: {item['name']}\n"
                         f"💰 Цена: {item['price']} TON\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
-                        f""
-                        f""
+                        f" "
                     )
-
                     await bot.send_message(ADMIN_ID, admin_msg, reply_markup=admin_kb, parse_mode="Markdown")
                     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
-                return web.json_response({"success": False}, status=404, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
-        logging.error(f"Ошибка API Payment: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+
+
+# --- НОВЫЕ МЕТОДЫ ДЛЯ СТАТУСА (ДЛЯ УВЕДОМЛЕНИЙ В МАРКЕТЕ) ---
+
+async def handle_get_status(request):
+    user_id = request.query.get('user_id')
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Ищем последнее событие для этого пользователя
+                cur.execute("SELECT last_event FROM items WHERE buyer_id = %s AND last_event IS NOT NULL LIMIT 1",
+                            (user_id,))
+                res = cur.fetchone()
+                return web.json_response({"last_event": res['last_event'] if res else None},
+                                         headers={"Access-Control-Allow-Origin": "*"})
+    except:
+        return web.json_response({"last_event": None}, headers={"Access-Control-Allow-Origin": "*"})
+
+
+async def handle_clear_event(request):
+    try:
+        data = await request.json()
+        user_id = data.get('user_id')
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE items SET last_event = NULL WHERE buyer_id = %s", (user_id,))
+                conn.commit()
+        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+    except:
+        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
 
 
 async def handle_options(request):
@@ -148,12 +161,23 @@ async def handle_options(request):
 async def admin_pay_confirm(callback: types.CallbackQuery):
     _, _, item_id, uid = callback.data.split("_")
     with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE items SET status = 'Продан' WHERE id = %s", (item_id,))
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT name, nft_link FROM items WHERE id = %s", (item_id,))
+            item = cur.fetchone()
+
+            cur.execute("UPDATE items SET status = 'Продан', last_event = 'approved' WHERE id = %s", (item_id,))
             conn.commit()
+
             await callback.message.edit_text(f"✅ Оплата подтверждена. Товар #{item_id} продан.")
+
+            msg = (
+                f"✅ **Платёж подтверждён!**\n\n"
+                f"📦 Товар: {item['name']}\n"
+                f"🔗 Ссылка на актив: {item.get('nft_link', 'будет отправлена позже')}\n\n"
+                f"🎉 Спасибо за покупку!"
+            )
             try:
-                await bot.send_message(uid, "🎉 Ваш платёж подтверждён! Спасибо за покупку.")
+                await bot.send_message(uid, msg, parse_mode="Markdown")
             except:
                 pass
     await callback.answer()
@@ -163,13 +187,24 @@ async def admin_pay_confirm(callback: types.CallbackQuery):
 async def admin_pay_reject(callback: types.CallbackQuery):
     _, _, item_id, uid = callback.data.split("_")
     with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE items SET status = 'Доступен', buyer_id = NULL, reserved_at = NULL WHERE id = %s",
-                        (item_id,))
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT name FROM items WHERE id = %s", (item_id,))
+            item = cur.fetchone()
+
+            cur.execute(
+                "UPDATE items SET status = 'Доступен', buyer_id = %s, last_event = 'rejected', reserved_at = NULL WHERE id = %s",
+                (uid, item_id))
             conn.commit()
-            await callback.message.edit_text(f"❌ Оплата отклонена. Товар #{item_id} снова доступен.")
+
+            await callback.message.edit_text(f"❌ Оплата отклонена. Товар #{item_id} возвращен в каталог.")
+
+            msg = (
+                f"❌ **Платеж не выполнен**\n\n"
+                f"К сожалению, ваш платеж за {item['name']} не был подтвержден.\n"
+                f"Подарок возвращен в общий каталог."
+            )
             try:
-                await bot.send_message(uid, "⚠️ Транзакция не удалась или отклонена. Попробуйте снова.")
+                await bot.send_message(uid, msg, parse_mode="Markdown")
             except:
                 pass
     await callback.answer()
@@ -187,15 +222,10 @@ async def cmd_start(message: types.Message):
     await message.answer("Привет! 🎁 Добро пожаловать в DNX Store.", reply_markup=kb)
 
 
-# Остальные методы (show_catalog, my_inventory) оставляем как есть, они работают корректно.
 @dp.callback_query(F.data == "show_catalog")
 async def callback_catalog(callback: types.CallbackQuery):
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Очистка старых броней (30 мин)
-            cur.execute(
-                "UPDATE items SET status = 'Доступен', buyer_id = NULL, reserved_at = NULL WHERE status = 'Забронирован' AND reserved_at < NOW() - INTERVAL '30 minutes'")
-            conn.commit()
             cur.execute("SELECT * FROM items WHERE status = 'Доступен'")
             items = cur.fetchall()
 
@@ -232,6 +262,8 @@ app = web.Application()
 app.router.add_get('/items', handle_get_items)
 app.router.add_post('/reserve', handle_reserve)
 app.router.add_post('/check_payment', handle_check_payment)
+app.router.add_get('/get_status', handle_get_status)
+app.router.add_post('/clear_event', handle_clear_event)
 app.router.add_options('/{tail:.*}', handle_options)
 
 
