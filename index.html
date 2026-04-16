@@ -6,7 +6,7 @@
     <title>DNX STORE — Premium NFT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- ТВОИ ИСХОДНЫЕ СТИЛИ (ПОЛНОСТЬЮ СОХРАНЕНЫ) --- */
+        /* --- ТВОИ ИСХОДНЫЕ СТИЛИ --- */
         body {
             background-color: #080808;
             color: #ffffff;
@@ -38,22 +38,11 @@
         }
 
         @keyframes permanentGlow {
-            from {
-                text-shadow: 0 0 10px rgba(212, 175, 55, 0.4), 0 0 20px rgba(212, 175, 55, 0.2);
-                transform: scale(1);
-            }
-            to {
-                text-shadow: 0 0 20px rgba(212, 175, 55, 0.8), 0 0 40px rgba(212, 175, 55, 0.4);
-                transform: scale(1.03);
-            }
+            from { text-shadow: 0 0 10px rgba(212, 175, 55, 0.4); transform: scale(1); }
+            to { text-shadow: 0 0 20px rgba(212, 175, 55, 0.8); transform: scale(1.03); }
         }
 
-        .subtitle {
-            font-size: 0.75rem;
-            color: #888;
-            margin-top: 5px;
-            letter-spacing: 1px;
-        }
+        .subtitle { font-size: 0.75rem; color: #888; margin-top: 5px; letter-spacing: 1px; }
 
         #catalog {
             display: grid;
@@ -73,18 +62,7 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
-            animation: fadeIn 0.5s ease forwards;
             cursor: pointer;
-        }
-
-        .item-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(212, 175, 55, 0.4);
-            box-shadow: 0 8px 25px rgba(212, 175, 55, 0.1);
-        }
-
-        .item-card:active {
-            transform: scale(0.96);
         }
 
         .item-image {
@@ -106,8 +84,6 @@
             font-weight: 700;
             text-transform: uppercase;
             backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.05);
             z-index: 2;
         }
 
@@ -115,33 +91,8 @@
         .status-sold { background: rgba(255, 50, 50, 0.15); color: rgba(255, 157, 157, 0.8); }
         .status-booked { background: rgba(212, 175, 55, 0.15); color: rgba(244, 208, 63, 0.8); }
 
-        .item-info {
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1;
-        }
-
-        .item-name {
-            font-size: 0.85rem;
-            font-weight: 700;
-            margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .item-price-tag {
-            font-size: 0.6rem;
-            color: #555;
-            text-transform: uppercase;
-        }
-
-        .item-price-value {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #d4af37;
-            margin-bottom: 10px;
-        }
+        .item-name { font-size: 0.85rem; font-weight: 700; margin-bottom: 4px; }
+        .item-price-value { font-size: 1rem; font-weight: 700; color: #d4af37; margin-bottom: 10px; }
 
         button {
             background: linear-gradient(45deg, #d4af37, #f4d03f);
@@ -151,47 +102,40 @@
             padding: 10px;
             width: 100%;
             font-weight: 700;
-            font-size: 0.75rem;
             cursor: pointer;
-            margin-top: auto;
-            transition: 0.2s;
         }
 
-        button:active { transform: scale(0.98); opacity: 0.9; }
-
-        #payment-screen {
-            display: none;
-            width: 100%;
-            max-width: 400px;
-            animation: fadeIn 0.4s ease-out;
+        /* --- НОВЫЕ СТИЛИ УВЕДОМЛЕНИЙ --- */
+        .notification {
+            position: fixed;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 300px;
+            padding: 15px;
+            border-radius: 15px;
+            color: white;
             text-align: center;
+            font-size: 0.85rem;
+            font-weight: 700;
+            z-index: 10001;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        .notif-success { background: #28a745; border: 1px solid #34ce57; }
+        .notif-error { background: #dc3545; border: 1px solid #f8d7da; }
+        .notif-show { top: 20px; }
 
+        /* --- ОСТАЛЬНЫЕ ЭКРАНЫ --- */
+        #payment-screen { display: none; width: 100%; max-width: 400px; text-align: center; }
         .pay-card {
             background: #111;
             border: 2px solid #d4af37;
             border-radius: 25px;
             padding: 25px;
-            box-shadow: 0 0 30px rgba(212, 175, 55, 0.15);
             margin-top: 20px;
         }
-
-        .pay-title {
-            color: #d4af37;
-            font-size: 1.2rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            margin-bottom: 20px;
-        }
-
-        .pay-row {
-            margin: 15px 0;
-            font-size: 0.9rem;
-            color: #888;
-        }
-
-        .pay-row b { color: #fff; }
-
         .requisites-container {
             background: #1a1a1a;
             border: 1px dashed #d4af37;
@@ -202,75 +146,15 @@
             font-size: 0.85rem;
             color: #f4d03f;
             white-space: pre-line;
-            word-break: break-all;
         }
-
-        .btn-check {
-            height: 45px;
-            font-size: 0.9rem;
-            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
-        }
+        .btn-check:disabled { background: #222 !important; color: #555 !important; }
+        .close-hint { font-size: 0.65rem; color: #444; margin-top: 12px; display: none; }
         
-        /* Стиль для заблокированной кнопки */
-        .btn-check:disabled {
-            background: #222 !important;
-            color: #555 !important;
-            cursor: not-allowed;
-            box-shadow: none;
-        }
-
-        /* Стиль для подсказки снизу */
-        .close-hint {
-            font-size: 0.65rem;
-            color: #444;
-            margin-top: 12px;
-            font-weight: 400;
-            display: none;
-            animation: fadeIn 0.5s ease forwards;
-        }
-
-        .btn-back {
-            background: none;
-            color: #555;
-            border: 1px solid #333;
-            margin-top: 15px;
-        }
-
         #image-viewer {
-            display: none;
-            position: fixed;
-            z-index: 9999;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.92);
-            backdrop-filter: blur(10px);
-            justify-content: center;
-            align-items: center;
+            display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92); backdrop-filter: blur(10px); justify-content: center; align-items: center;
         }
-
-        #full-image {
-            max-width: 90%;
-            max-height: 80%;
-            border-radius: 15px;
-            box-shadow: 0 0 40px rgba(0,0,0,0.8);
-        }
-
-        .close-viewer {
-            position: absolute;
-            top: 30px;
-            right: 30px;
-            font-size: 35px;
-            color: #fff;
-            cursor: pointer;
-            opacity: 0.7;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        #full-image { max-width: 90%; max-height: 80%; border-radius: 15px; }
     </style>
 </head>
 <body>
@@ -286,23 +170,19 @@
 
     <div id="payment-screen">
         <div class="pay-card">
-            <div class="pay-title">Оформление заказа</div>
-            <div class="pay-row">Ассет: <b id="pay-name">---</b></div>
-            <div class="pay-row">Сумма: <b id="pay-price" style="color: #d4af37; font-size: 1.1rem;">---</b></div>
+            <div class="pay-title" style="color:#d4af37; font-weight:700; margin-bottom:15px;">Оформление заказа</div>
+            <div id="pay-name">---</div>
+            <div id="pay-price" style="color: #d4af37; font-size: 1.1rem; margin-top:10px;">---</div>
             
-            <div style="font-size: 0.75rem; color: #666; margin-top: 10px;">Переведите средства по реквизитам:</div>
-            <div class="requisites-container" id="pay-requisites">
-                Загрузка реквизитов...
-            </div>
+            <div class="requisites-container" id="pay-requisites">Загрузка...</div>
 
             <button class="btn-check" id="btn-check-pay" onclick="checkPayment()">Проверить оплату</button>
             <div id="close-hint" class="close-hint">Вы можете закрыть окно, пока идет проверка транзакции</div>
         </div>
-        <button class="btn-back" onclick="window.location.reload()">Вернуться в каталог</button>
+        <button style="background:none; color:#555; border:1px solid #333; margin-top:15px;" onclick="window.location.reload()">Вернуться в каталог</button>
     </div>
 
     <div id="image-viewer" onclick="closeImage()">
-        <span class="close-viewer">&times;</span>
         <img id="full-image" src="">
     </div>
 
@@ -313,19 +193,69 @@
         tg.headerColor = '#080808';
 
         const API_BASE = 'https://dnx-shop.onrender.com';
-        let currentPendingItemId = null; 
+        let currentPendingItemId = null;
+        let isPolling = false;
+
+        // Функция показа цветного уведомления
+        function showStatusNotif(text, type) {
+            const notif = document.createElement('div');
+            notif.className = `notification ${type === 'success' ? 'notif-success' : 'notif-error'}`;
+            notif.innerText = text;
+            document.body.appendChild(notif);
+            
+            setTimeout(() => notif.classList.add('notif-show'), 100);
+            
+            setTimeout(() => {
+                notif.classList.remove('notif-show');
+                setTimeout(() => notif.remove(), 500);
+            }, 5000);
+        }
+
+        // Фоновая проверка статуса (Polling)
+        async function startStatusPolling() {
+            if (isPolling) return;
+            isPolling = true;
+
+            const pollInterval = setInterval(async () => {
+                const userId = tg.initDataUnsafe.user?.id;
+                if (!userId) return;
+
+                try {
+                    const response = await fetch(`${API_BASE}/get_status?user_id=${userId}`);
+                    const data = await response.json();
+
+                    if (data.last_event === 'approved') {
+                        showStatusNotif("Успешная покупка!", "success");
+                        tg.HapticFeedback.notificationOccurred('success');
+                        await clearServerEvent(userId);
+                        // Если пользователь был на экране оплаты - вернуть в каталог через 3 сек
+                        setTimeout(() => window.location.reload(), 3000);
+                    } 
+                    else if (data.last_event === 'rejected') {
+                        showStatusNotif("Платеж не выполнен, подарок возвращен в каталог", "error");
+                        tg.HapticFeedback.notificationOccurred('error');
+                        await clearServerEvent(userId);
+                        setTimeout(() => window.location.reload(), 3000);
+                    }
+                } catch (e) { console.error("Polling error", e); }
+            }, 4000);
+        }
+
+        async function clearServerEvent(userId) {
+            await fetch(`${API_BASE}/clear_event`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ user_id: userId })
+            });
+        }
 
         function openImage(event, url) {
             event.stopPropagation();
-            const viewer = document.getElementById('image-viewer');
-            const fullImg = document.getElementById('full-image');
-            fullImg.src = url;
-            viewer.style.display = 'flex';
+            document.getElementById('full-image').src = url;
+            document.getElementById('image-viewer').style.display = 'flex';
         }
 
-        function closeImage() {
-            document.getElementById('image-viewer').style.display = 'none';
-        }
+        function closeImage() { document.getElementById('image-viewer').style.display = 'none'; }
 
         async function loadItems() {
             const container = document.getElementById('catalog');
@@ -333,33 +263,22 @@
                 const response = await fetch(`${API_BASE}/items`);
                 const items = await response.json();
                 
-                if (!items || items.length === 0) {
-                    container.innerHTML = '<div style="grid-column: span 2; text-align:center; color:#666;">Витрина пуста</div>';
-                    return;
-                }
-
                 container.innerHTML = items.map(item => {
                     let statusClass = 'status-available';
                     let statusText = item.status || 'В наличии';
-                    let isAvailable = true;
+                    let isAvailable = (item.status === 'Доступен' || !item.status);
                     
-                    if (item.status === 'Продан') {
-                        statusClass = 'status-sold';
-                        isAvailable = false;
-                    } else if (item.status === 'Забронирован') {
-                        statusClass = 'status-booked';
-                        isAvailable = false;
-                    }
+                    if (item.status === 'Продан') statusClass = 'status-sold';
+                    else if (item.status === 'Забронирован') statusClass = 'status-booked';
 
                     const imgUrl = item.image_url || 'https://via.placeholder.com/400x400?text=NFT';
 
                     return `
                         <div class="item-card" onclick="openImage(event, '${imgUrl}')">
-                            <img src="${imgUrl}" class="item-image" onerror="this.src='https://via.placeholder.com/400x400?text=No+Image'">
+                            <img src="${imgUrl}" class="item-image">
                             <div class="status-badge ${statusClass}">${statusText}</div>
                             <div class="item-info">
                                 <div class="item-name">${item.name}</div>
-                                <div class="item-price-tag">Стоимость</div>
                                 <div class="item-price-value">${item.price} TON</div>
                                 ${isAvailable ? 
                                     `<button onclick="buyItem(event, ${item.id}, '${item.name}', '${item.price}')">Купить</button>` : 
@@ -369,15 +288,12 @@
                         </div>
                     `;
                 }).join('');
-            } catch (e) {
-                container.innerHTML = '<div style="grid-column: span 2; text-align:center; color:#d4af37;">Ошибка связи</div>';
-            }
+            } catch (e) { container.innerHTML = 'Ошибка связи'; }
         }
 
         async function buyItem(event, id, name, price) {
             event.stopPropagation();
             tg.HapticFeedback.impactOccurred('medium');
-
             try {
                 const response = await fetch(`${API_BASE}/reserve`, {
                     method: 'POST',
@@ -388,74 +304,44 @@
                         username: tg.initDataUnsafe.user?.username || 'Guest'
                     })
                 });
-
                 const result = await response.json();
-
                 if (result.success) {
-                    currentPendingItemId = id; 
+                    currentPendingItemId = id;
                     document.getElementById('catalog').style.display = 'none';
                     document.getElementById('main-header').style.display = 'none';
                     document.getElementById('payment-screen').style.display = 'block';
-
                     document.getElementById('pay-name').innerText = name;
                     document.getElementById('pay-price').innerText = price + ' TON';
-                    document.getElementById('pay-requisites').innerText = result.requisites || "Реквизиты загружаются...";
-                } else {
-                    tg.showAlert(result.error || "Товар уже занят");
-                }
-            } catch (e) {
-                tg.showAlert("Ошибка при связи с сервером.");
-            }
+                    document.getElementById('pay-requisites').innerText = result.requisites;
+                } else { tg.showAlert(result.error); }
+            } catch (e) { tg.showAlert("Ошибка сервера"); }
         }
 
         async function checkPayment() {
             if (!currentPendingItemId) return;
-
-            tg.HapticFeedback.notificationOccurred('success');
-            
-            tg.showConfirm("Вы точно совершили оплату? Администратор проверит транзакцию.", async (confirmed) => {
+            tg.showConfirm("Вы точно совершили оплату?", async (confirmed) => {
                 if (confirmed) {
                     const btn = document.getElementById('btn-check-pay');
-                    const hint = document.getElementById('close-hint');
-                    
-                    // Блокируем кнопку и меняем текст
                     btn.disabled = true;
                     btn.innerText = "Ожидайте подтверждения...";
+                    document.getElementById('close-hint').style.display = 'block';
                     
-                    // Показываем подсказку
-                    hint.style.display = 'block';
-                    
-                    try {
-                        const response = await fetch(`${API_BASE}/check_payment`, {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                item_id: currentPendingItemId,
-                                user_id: tg.initDataUnsafe.user?.id || 0,
-                                username: tg.initDataUnsafe.user?.username || 'Guest'
-                            })
-                        });
-
-                        if (response.ok) {
-                            tg.showAlert("Заявка отправлена! Администратор проверяет оплату. Вы можете закрыть это окно.");
-                            // Окно НЕ закрываем принудительно, чтобы пользователь видел статус
-                        } else {
-                            btn.disabled = false;
-                            btn.innerText = "Проверить оплату";
-                            hint.style.display = 'none';
-                            tg.showAlert("Ошибка отправки заявки.");
-                        }
-                    } catch (e) {
-                        tg.showAlert("Сервер не отвечает.");
-                        btn.disabled = false;
-                        btn.innerText = "Проверить оплату";
-                        hint.style.display = 'none';
-                    }
+                    await fetch(`${API_BASE}/check_payment`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            item_id: currentPendingItemId,
+                            user_id: tg.initDataUnsafe.user?.id,
+                            username: tg.initDataUnsafe.user?.username
+                        })
+                    });
                 }
             });
         }
 
+        // Запуск
         loadItems();
+        startStatusPolling();
     </script>
 </body>
 </html>
