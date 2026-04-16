@@ -24,6 +24,7 @@
             padding-top: 10px;
         }
 
+        /* --- ОБНОВЛЕННЫЙ ЗАГОЛОВОК СО СВЕЧЕНИЕМ --- */
         h1 {
             font-size: 1.5rem;
             letter-spacing: 2px;
@@ -32,7 +33,21 @@
             background: linear-gradient(45deg, #d4af37, #f4d03f);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            /* Базовая тень */
             text-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+            /* Анимация свечения */
+            animation: permanentGlow 2s infinite alternate ease-in-out;
+        }
+
+        @keyframes permanentGlow {
+            from {
+                text-shadow: 0 0 10px rgba(212, 175, 55, 0.4), 0 0 20px rgba(212, 175, 55, 0.2);
+                transform: scale(1);
+            }
+            to {
+                text-shadow: 0 0 20px rgba(212, 175, 55, 0.8), 0 0 40px rgba(212, 175, 55, 0.4);
+                transform: scale(1.03); /* Легкий эффект пульсации для красоты */
+            }
         }
 
         .subtitle {
@@ -64,7 +79,6 @@
             cursor: pointer;
         }
 
-        /* ЭФФЕКТ ПОДСВЕТКИ ПРИ НАВЕДЕНИИ */
         .item-card:hover {
             transform: translateY(-5px);
             border-color: rgba(212, 175, 55, 0.4);
@@ -84,7 +98,6 @@
             background: #1a1a1a;
         }
 
-        /* ПОЧТИ ПРОЗРАЧНЫЕ ФЛАЖКИ */
         .status-badge {
             position: absolute;
             top: 18px;
@@ -145,7 +158,6 @@
             margin-top: auto;
         }
 
-        /* СТИЛИ ДЛЯ ПРОСМОТРА ФОТО */
         #image-viewer {
             display: none;
             position: fixed;
@@ -207,7 +219,6 @@
 
         const API_URL = 'https://dnx-shop.onrender.com/items';
 
-        // Функция просмотра фото
         function openImage(event, url) {
             event.stopPropagation();
             const viewer = document.getElementById('image-viewer');
