@@ -6,7 +6,7 @@
     <title>DNX STORE — Premium NFT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- ТВОИ ИСХОДНЫЕ СТИЛИ --- */
+        /* --- ОБНОВЛЕННЫЕ СТИЛИ ЗАГОЛОВКА --- */
         body {
             background-color: #080808;
             color: #ffffff;
@@ -26,24 +26,33 @@
         }
 
         h1 {
-            font-size: 1.5rem;
-            letter-spacing: 2px;
+            font-size: 1.8rem; /* Чуть увеличил размер */
+            letter-spacing: 3px;
             text-transform: uppercase;
             margin: 0;
-            background: linear-gradient(45deg, #d4af37, #f4d03f);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
-            animation: permanentGlow 2s infinite alternate ease-in-out;
+            color: #f4d03f; /* Чистый золотой цвет для лучшего свечения */
+            /* Мощное многослойное свечение */
+            text-shadow: 
+                0 0 10px rgba(244, 208, 63, 0.8),
+                0 0 20px rgba(244, 208, 63, 0.5),
+                0 0 35px rgba(212, 175, 55, 0.3);
+            animation: permanentGlow 1.5s infinite alternate ease-in-out;
         }
 
         @keyframes permanentGlow {
-            from { text-shadow: 0 0 10px rgba(212, 175, 55, 0.4); transform: scale(1); }
-            to { text-shadow: 0 0 20px rgba(212, 175, 55, 0.8); transform: scale(1.03); }
+            from { 
+                text-shadow: 0 0 10px rgba(244, 208, 63, 0.7), 0 0 20px rgba(244, 208, 63, 0.4); 
+                transform: scale(1); 
+            }
+            to { 
+                text-shadow: 0 0 20px rgba(244, 208, 63, 1), 0 0 40px rgba(244, 208, 63, 0.6), 0 0 60px rgba(212, 175, 55, 0.3); 
+                transform: scale(1.05); 
+            }
         }
 
         .subtitle { font-size: 0.75rem; color: #888; margin-top: 5px; letter-spacing: 1px; }
 
+        /* --- КАТАЛОГ --- */
         #catalog {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -92,7 +101,8 @@
         .status-booked { background: rgba(212, 175, 55, 0.15); color: rgba(244, 208, 63, 0.8); }
 
         .item-name { font-size: 0.85rem; font-weight: 700; margin-bottom: 4px; }
-        .item-price-value { font-size: 1rem; font-weight: 700; color: #d4af37; margin-bottom: 10px; }
+        /* Золотой цвет для цены в рублях */
+        .item-price-value { font-size: 1rem; font-weight: 700; color: #f4d03f; margin-bottom: 10px; }
 
         button {
             background: linear-gradient(45deg, #d4af37, #f4d03f);
@@ -105,7 +115,7 @@
             cursor: pointer;
         }
 
-        /* --- НОВЫЕ СТИЛИ УВЕДОМЛЕНИЙ --- */
+        /* --- УВЕДОМЛЕНИЯ --- */
         .notification {
             position: fixed;
             top: -100px;
@@ -127,7 +137,7 @@
         .notif-error { background: #dc3545; border: 1px solid #f8d7da; }
         .notif-show { top: 20px; }
 
-        /* --- ОСТАЛЬНЫЕ ЭКРАНЫ --- */
+        /* --- ЭКРАН ОПЛАТЫ --- */
         #payment-screen { display: none; width: 100%; max-width: 400px; text-align: center; }
         .pay-card {
             background: #111;
@@ -196,7 +206,6 @@
         let currentPendingItemId = null;
         let isPolling = false;
 
-        // Функция показа цветного уведомления
         function showStatusNotif(text, type) {
             const notif = document.createElement('div');
             notif.className = `notification ${type === 'success' ? 'notif-success' : 'notif-error'}`;
@@ -211,7 +220,6 @@
             }, 5000);
         }
 
-        // Фоновая проверка статуса (Polling)
         async function startStatusPolling() {
             if (isPolling) return;
             isPolling = true;
@@ -228,11 +236,10 @@
                         showStatusNotif("Успешная покупка!", "success");
                         tg.HapticFeedback.notificationOccurred('success');
                         await clearServerEvent(userId);
-                        // Если пользователь был на экране оплаты - вернуть в каталог через 3 сек
                         setTimeout(() => window.location.reload(), 3000);
                     } 
                     else if (data.last_event === 'rejected') {
-                        showStatusNotif("Платеж не выполнен, подарок возвращен в каталог", "error");
+                        showStatusNotif("Платеж не выполнен, товар возвращен в каталог", "error");
                         tg.HapticFeedback.notificationOccurred('error');
                         await clearServerEvent(userId);
                         setTimeout(() => window.location.reload(), 3000);
@@ -279,7 +286,7 @@
                             <div class="status-badge ${statusClass}">${statusText}</div>
                             <div class="item-info">
                                 <div class="item-name">${item.name}</div>
-                                <div class="item-price-value">${item.price} TON</div>
+                                <div class="item-price-value">${Number(item.price).toLocaleString()} ₽</div>
                                 ${isAvailable ? 
                                     `<button onclick="buyItem(event, ${item.id}, '${item.name}', '${item.price}')">Купить</button>` : 
                                     `<button style="background: #222; color: #555; cursor: default;" onclick="event.stopPropagation()">Недоступен</button>`
@@ -311,7 +318,8 @@
                     document.getElementById('main-header').style.display = 'none';
                     document.getElementById('payment-screen').style.display = 'block';
                     document.getElementById('pay-name').innerText = name;
-                    document.getElementById('pay-price').innerText = price + ' TON';
+                    // ЗАМЕНА TON НА РУБЛИ НА ЭКРАНЕ ОПЛАТЫ
+                    document.getElementById('pay-price').innerText = Number(price).toLocaleString() + ' ₽';
                     document.getElementById('pay-requisites').innerText = result.requisites;
                 } else { tg.showAlert(result.error); }
             } catch (e) { tg.showAlert("Ошибка сервера"); }
@@ -339,7 +347,6 @@
             });
         }
 
-        // Запуск
         loadItems();
         startStatusPolling();
     </script>
