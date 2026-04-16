@@ -81,6 +81,9 @@ async def handle_reserve(request):
                         f"📦 Товар: {item['name']}\n"
                         f"💰 Цена: {item['price']} TON\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
+                        f""
+                        f""
+
                     )
                     await bot.send_message(ADMIN_ID, admin_msg, parse_mode="Markdown")
 
@@ -119,6 +122,8 @@ async def handle_check_payment(request):
                         f"📦 Товар: {item['name']}\n"
                         f"💰 Цена: {item['price']} TON\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
+                        f""
+                        f""
                     )
 
                     await bot.send_message(ADMIN_ID, admin_msg, reply_markup=admin_kb, parse_mode="Markdown")
