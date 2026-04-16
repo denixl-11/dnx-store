@@ -6,6 +6,7 @@
     <title>DNX STORE — Premium NFT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        /* --- ТВОИ ИСХОДНЫЕ СТИЛИ (ПОЛНОСТЬЮ СОХРАНЕНЫ) --- */
         body {
             background-color: #080808;
             color: #ffffff;
@@ -24,7 +25,6 @@
             padding-top: 10px;
         }
 
-        /* --- ОБНОВЛЕННЫЙ ЗАГОЛОВОК СО СВЕЧЕНИЕМ --- */
         h1 {
             font-size: 1.5rem;
             letter-spacing: 2px;
@@ -33,9 +33,7 @@
             background: linear-gradient(45deg, #d4af37, #f4d03f);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            /* Базовая тень */
             text-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
-            /* Анимация свечения */
             animation: permanentGlow 2s infinite alternate ease-in-out;
         }
 
@@ -46,7 +44,7 @@
             }
             to {
                 text-shadow: 0 0 20px rgba(212, 175, 55, 0.8), 0 0 40px rgba(212, 175, 55, 0.4);
-                transform: scale(1.03); /* Легкий эффект пульсации для красоты */
+                transform: scale(1.03);
             }
         }
 
@@ -150,12 +148,74 @@
             color: #000;
             border: none;
             border-radius: 10px;
-            padding: 8px;
+            padding: 10px;
             width: 100%;
             font-weight: 700;
             font-size: 0.75rem;
             cursor: pointer;
             margin-top: auto;
+            transition: 0.2s;
+        }
+
+        button:active { transform: scale(0.98); opacity: 0.9; }
+
+        /* --- НОВЫЕ СТИЛИ ЭКРАНА ОПЛАТЫ (В ТВОЕМ СТИЛЕ) --- */
+        #payment-screen {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            animation: fadeIn 0.4s ease-out;
+            text-align: center;
+        }
+
+        .pay-card {
+            background: #111;
+            border: 2px solid #d4af37;
+            border-radius: 25px;
+            padding: 25px;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.15);
+            margin-top: 20px;
+        }
+
+        .pay-title {
+            color: #d4af37;
+            font-size: 1.2rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .pay-row {
+            margin: 15px 0;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .pay-row b { color: #fff; }
+
+        .requisites-container {
+            background: #1a1a1a;
+            border: 1px dashed #d4af37;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #f4d03f;
+            word-break: break-all;
+        }
+
+        .btn-check {
+            height: 45px;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+        }
+
+        .btn-back {
+            background: none;
+            color: #555;
+            border: 1px solid #333;
+            margin-top: 15px;
         }
 
         #image-viewer {
@@ -197,13 +257,29 @@
 </head>
 <body>
 
-    <header>
+    <header id="main-header">
         <h1>DNX Store</h1>
         <div class="subtitle">Exclusive Digital Assets</div>
     </header>
 
     <div id="catalog">
         <div style="grid-column: span 2; text-align:center; color: #666; padding: 40px;">Загрузка активов...</div>
+    </div>
+
+    <div id="payment-screen">
+        <div class="pay-card">
+            <div class="pay-title">Оформление заказа</div>
+            <div class="pay-row">Ассет: <b id="pay-name">---</b></div>
+            <div class="pay-row">Сумма: <b id="pay-price" style="color: #d4af37; font-size: 1.1rem;">---</b></div>
+            
+            <div style="font-size: 0.75rem; color: #666; margin-top: 10px;">Переведите средства по реквизитам:</div>
+            <div class="requisites-container" id="pay-requisites">
+                Загрузка реквизитов...
+            </div>
+
+            <button class="btn-check" onclick="checkPayment()">Проверить оплату</button>
+        </div>
+        <button class="btn-back" onclick="window.location.reload()">Вернуться в каталог</button>
     </div>
 
     <div id="image-viewer" onclick="closeImage()">
@@ -217,7 +293,8 @@
         tg.expand();
         tg.headerColor = '#080808';
 
-        const API_URL = 'https://dnx-shop.onrender.com/items';
+        // Базовый URL твоего API
+        const API_BASE = 'https://dnx-shop.onrender.com';
 
         function openImage(event, url) {
             event.stopPropagation();
@@ -234,7 +311,7 @@
         async function loadItems() {
             const container = document.getElementById('catalog');
             try {
-                const response = await fetch(API_URL);
+                const response = await fetch(`${API_BASE}/items`);
                 const items = await response.json();
                 
                 if (!items || items.length === 0) {
@@ -259,7 +336,7 @@
                                 <div class="item-name">${item.name}</div>
                                 <div class="item-price-tag">Стоимость</div>
                                 <div class="item-price-value">${item.price} TON</div>
-                                <button onclick="buyItem(event, '${item.name}')">Купить</button>
+                                <button onclick="buyItem(event, ${item.id}, '${item.name}', '${item.price}')">Купить</button>
                             </div>
                         </div>
                     `;
@@ -269,11 +346,49 @@
             }
         }
 
-        function buyItem(event, name) {
+        async function buyItem(event, id, name, price) {
             event.stopPropagation();
-            tg.sendData("buy:" + name); 
+            tg.HapticFeedback.impactOccurred('medium');
+
+            try {
+                // Вызываем бронирование на сервере
+                const response = await fetch(`${API_BASE}/reserve`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        item_id: id,
+                        user_id: tg.initDataUnsafe.user?.id || 0,
+                        username: tg.initDataUnsafe.user?.username || 'Guest'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Если бронь прошла успешно, переключаем экран
+                    document.getElementById('catalog').style.display = 'none';
+                    document.getElementById('main-header').style.display = 'none';
+                    document.getElementById('payment-screen').style.display = 'block';
+
+                    document.getElementById('pay-name').innerText = name;
+                    document.getElementById('pay-price').innerText = price + ' TON';
+                    document.getElementById('pay-requisites').innerText = result.requisites || "Карта: **** **** **** 0000";
+                } else {
+                    tg.showAlert("Упс! " + (result.error || "Товар уже занят"));
+                }
+            } catch (e) {
+                tg.showAlert("Ошибка при связи с сервером. Попробуйте позже.");
+            }
+        }
+
+        function checkPayment() {
             tg.HapticFeedback.notificationOccurred('success');
-            tg.close();
+            tg.showConfirm("Вы точно совершили оплату? После подтверждения администратор проверит транзакцию.", (confirmed) => {
+                if (confirmed) {
+                    tg.showAlert("Заявка отправлена! Ожидайте уведомления в боте.");
+                    tg.close();
+                }
+            });
         }
 
         loadItems();
