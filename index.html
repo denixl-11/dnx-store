@@ -6,7 +6,6 @@
     <title>DNX STORE — Premium NFT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- ФИНАЛЬНЫЕ СТИЛИ ЗАГОЛОВКА (МИНИМАЛИЗМ) --- */
         body {
             background-color: #080808;
             color: #ffffff;
@@ -30,15 +29,12 @@
             letter-spacing: 3px;
             text-transform: uppercase;
             margin: 0;
-            /* Более насыщенный золотой, чтобы текст читался идеально */
-            color: #d4af37; 
-            /* Минимальное, почти невидимое свечение для объема */
-            text-shadow: 0 0 5px rgba(212, 175, 55, 0.4);
+            color: #f4d03f; 
+            text-shadow: 0 0 3px rgba(244, 208, 63, 0.3);
         }
 
         .subtitle { font-size: 0.75rem; color: #888; margin-top: 5px; letter-spacing: 1px; }
 
-        /* --- КАТАЛОГ --- */
         #catalog {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -100,7 +96,6 @@
             cursor: pointer;
         }
 
-        /* --- УВЕДОМЛЕНИЯ --- */
         .notification {
             position: fixed;
             top: -100px;
@@ -122,7 +117,6 @@
         .notif-error { background: #dc3545; border: 1px solid #f8d7da; }
         .notif-show { top: 20px; }
 
-        /* --- ЭКРАН ОПЛАТЫ --- */
         #payment-screen { display: none; width: 100%; max-width: 400px; text-align: center; }
         .pay-card {
             background: #111;
