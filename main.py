@@ -77,7 +77,7 @@ async def handle_reserve(request):
                     # Подробное уведомление админу
                     admin_msg = (
                         f"⏳ **Новая бронь из Web App!**\n\n"
-                        f"👤 Юзер: @{username}\n"
+                        f"👤 Пользователь: @{username}\n"
                         f"📦 Товар: {item['name']}\n"
                         f"💰 Цена: {item['price']} TON\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
@@ -117,8 +117,8 @@ async def handle_check_payment(request):
                     ])
 
                     admin_msg = (
-                        f"💰 **Юзер заявляет об оплате!**\n\n"
-                        f"👤 Юзер: @{username}\n"
+                        f"💰 **Пользователь заявляет об оплате!**\n\n"
+                        f"👤 Пользователь: @{username}\n"
                         f"📦 Товар: {item['name']}\n"
                         f"💰 Цена: {item['price']} TON\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
