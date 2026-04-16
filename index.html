@@ -6,7 +6,7 @@
     <title>DNX STORE — Premium NFT</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- ОБНОВЛЕННЫЕ СТИЛИ ЗАГОЛОВКА --- */
+        /* --- ОБНОВЛЕННЫЕ СТИЛИ ЗАГОЛОВКА (БЕЗ ДЫХАНИЯ) --- */
         body {
             background-color: #080808;
             color: #ffffff;
@@ -26,28 +26,21 @@
         }
 
         h1 {
-            font-size: 1.8rem; /* Чуть увеличил размер */
+            font-size: 1.8rem;
             letter-spacing: 3px;
             text-transform: uppercase;
             margin: 0;
-            color: #f4d03f; /* Чистый золотой цвет для лучшего свечения */
-            /* Мощное многослойное свечение */
+            /* Белый цвет текста для эффекта раскаленной нити неона */
+            color: #fff; 
+            /* Статичное мощное свечение (6 слоев) */
             text-shadow: 
-                0 0 10px rgba(244, 208, 63, 0.8),
-                0 0 20px rgba(244, 208, 63, 0.5),
-                0 0 35px rgba(212, 175, 55, 0.3);
-            animation: permanentGlow 1.5s infinite alternate ease-in-out;
-        }
-
-        @keyframes permanentGlow {
-            from { 
-                text-shadow: 0 0 10px rgba(244, 208, 63, 0.7), 0 0 20px rgba(244, 208, 63, 0.4); 
-                transform: scale(1); 
-            }
-            to { 
-                text-shadow: 0 0 20px rgba(244, 208, 63, 1), 0 0 40px rgba(244, 208, 63, 0.6), 0 0 60px rgba(212, 175, 55, 0.3); 
-                transform: scale(1.05); 
-            }
+                0 0 7px #fff,
+                0 0 10px #f4d03f,
+                0 0 21px #f4d03f,
+                0 0 42px #f4d03f,
+                0 0 82px #f4d03f,
+                0 0 92px #f4d03f;
+            /* Анимация удалена */
         }
 
         .subtitle { font-size: 0.75rem; color: #888; margin-top: 5px; letter-spacing: 1px; }
@@ -101,7 +94,6 @@
         .status-booked { background: rgba(212, 175, 55, 0.15); color: rgba(244, 208, 63, 0.8); }
 
         .item-name { font-size: 0.85rem; font-weight: 700; margin-bottom: 4px; }
-        /* Золотой цвет для цены в рублях */
         .item-price-value { font-size: 1rem; font-weight: 700; color: #f4d03f; margin-bottom: 10px; }
 
         button {
@@ -318,7 +310,6 @@
                     document.getElementById('main-header').style.display = 'none';
                     document.getElementById('payment-screen').style.display = 'block';
                     document.getElementById('pay-name').innerText = name;
-                    // ЗАМЕНА TON НА РУБЛИ НА ЭКРАНЕ ОПЛАТЫ
                     document.getElementById('pay-price').innerText = Number(price).toLocaleString() + ' ₽';
                     document.getElementById('pay-requisites').innerText = result.requisites;
                 } else { tg.showAlert(result.error); }
