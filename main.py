@@ -15,6 +15,7 @@ BOT_TOKEN = "8701376578:AAGqehQYFf3ePE61lDhWhCnR7Q2lthnR3Oc"
 ADMIN_ID = 7106612591
 WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
 
+# ЗАМЕНА ВАЛЮТЫ В РЕКВИЗИТАХ (если нужно)
 PAYMENT_REQUISITES = "💳 Карта: **** **** **** 0000 (Т-Банк)\n👤 Получатель: Твое Имя"
 
 DB_CONFIG = {
@@ -68,13 +69,14 @@ async def handle_reserve(request):
                         (user_id, datetime.now(), item_id))
                     conn.commit()
 
+                    # ЗАМЕНА TON НА ₽ В УВЕДОМЛЕНИИ АДМИНУ
                     admin_msg = (
                         f"⏳ **Новая бронь из Web App!**\n\n"
                         f"👤 Пользователь: @{username}\n"
                         f"📦 Товар: {item['name']}\n"
-                        f"💰 Цена: {item['price']} TON\n"
+                        f"💰 Цена: {item['price']} ₽\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
-                        f" "  # Отступ после ссылки
+                        f" "
                     )
                     await bot.send_message(ADMIN_ID, admin_msg, parse_mode="Markdown")
                     return web.json_response({"success": True, "requisites": PAYMENT_REQUISITES},
@@ -97,17 +99,19 @@ async def handle_check_payment(request):
                 cur.execute("SELECT name, price, nft_link FROM items WHERE id = %s", (item_id,))
                 item = cur.fetchone()
                 if item:
+                    # ПОРЯДОК КНОПОК: ОТКЛОНИТЬ СЛЕВА, ПОДТВЕРДИТЬ СПРАВА
                     admin_kb = InlineKeyboardMarkup(inline_keyboard=[
                         [
                             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"pay_no_{item_id}_{user_id}"),
                             InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"pay_yes_{item_id}_{user_id}")
                         ]
                     ])
+                    # ЗАМЕНА TON НА ₽
                     admin_msg = (
                         f"💰 **Пользователь заявляет об оплате!**\n\n"
                         f"👤 Пользователь: @{username}\n"
                         f"📦 Товар: {item['name']}\n"
-                        f"💰 Цена: {item['price']} TON\n"
+                        f"💰 Цена: {item['price']} ₽\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
                         f" "
                     )
@@ -117,14 +121,13 @@ async def handle_check_payment(request):
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
-# --- НОВЫЕ МЕТОДЫ ДЛЯ СТАТУСА (ДЛЯ УВЕДОМЛЕНИЙ В МАРКЕТЕ) ---
+# --- МЕТОДЫ СТАТУСА ---
 
 async def handle_get_status(request):
     user_id = request.query.get('user_id')
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Ищем последнее событие для этого пользователя
                 cur.execute("SELECT last_event FROM items WHERE buyer_id = %s AND last_event IS NOT NULL LIMIT 1",
                             (user_id,))
                 res = cur.fetchone()
@@ -191,9 +194,10 @@ async def admin_pay_reject(callback: types.CallbackQuery):
             cur.execute("SELECT name FROM items WHERE id = %s", (item_id,))
             item = cur.fetchone()
 
+            # Здесь buyer_id оставляем для уведомления в WebApp, чтобы Polling сработал
             cur.execute(
-                "UPDATE items SET status = 'Доступен', buyer_id = %s, last_event = 'rejected', reserved_at = NULL WHERE id = %s",
-                (uid, item_id))
+                "UPDATE items SET status = 'Доступен', last_event = 'rejected', reserved_at = NULL WHERE id = %s",
+                (item_id,))
             conn.commit()
 
             await callback.message.edit_text(f"❌ Оплата отклонена. Товар #{item_id} возвращен в каталог.")
@@ -201,7 +205,7 @@ async def admin_pay_reject(callback: types.CallbackQuery):
             msg = (
                 f"❌ **Платеж не выполнен**\n\n"
                 f"К сожалению, ваш платеж за {item['name']} не был подтвержден.\n"
-                f"Подарок возвращен в общий каталог."
+                f"Товар возвращен в общий каталог."
             )
             try:
                 await bot.send_message(uid, msg, parse_mode="Markdown")
@@ -235,9 +239,10 @@ async def callback_catalog(callback: types.CallbackQuery):
         for item in items:
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🔗 Посмотреть NFT", url=item.get('nft_link', WEBAPP_URL))],
-                [InlineKeyboardButton(text=f"💳 Купить за {item['price']} TON", callback_data=f"buy_{item['id']}")]
+                # ЗАМЕНА TON НА ₽ В ТЕКСТОВОМ КАТАЛОГЕ
+                [InlineKeyboardButton(text=f"💳 Купить за {item['price']} ₽", callback_data=f"buy_{item['id']}")]
             ])
-            await callback.message.answer(f"🎁 **{item['name']}**\n💰 Цена: {item['price']} TON", reply_markup=kb,
+            await callback.message.answer(f"🎁 **{item['name']}**\n💰 Цена: {item['price']} ₽", reply_markup=kb,
                                           parse_mode="Markdown")
     await callback.answer()
 
