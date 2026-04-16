@@ -38,7 +38,6 @@ def get_db_connection():
 # --- ЛОГИКА ДЛЯ WEB APP (HTTP СЕРВЕР) ---
 
 async def handle_get_items(request):
-    """Отдает список товаров в формате JSON для сайта на GitHub"""
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -53,8 +52,8 @@ async def handle_get_items(request):
         logging.error(f"Ошибка API: {e}")
         return web.json_response([], status=500)
 
+
 async def handle_options(request):
-    """Обязательная функция для обхода блокировки CORS браузером"""
     return web.Response(headers={
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -62,12 +61,11 @@ async def handle_options(request):
     })
 
 
-# --- ЛОГИКА БОТА (ТВОЯ СТАРАЯ) ---
+# --- ЛОГИКА БОТА ---
 
 def get_catalog_items():
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Авто-возврат брони (30 мин)
             cur.execute("""
                 UPDATE items SET status = 'Доступен', buyer_id = NULL, reserved_at = NULL
                 WHERE status = 'Забронирован' AND reserved_at < NOW() - INTERVAL '30 minutes'
@@ -94,8 +92,10 @@ async def callback_catalog(callback: types.CallbackQuery):
         await callback.message.answer("😔 В каталоге пока пусто.")
     else:
         for item in items:
+            # Используем .get() для безопасности
+            nft_url = item.get('nft_link', 'https://t.me/your_bot')
             kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔗 Посмотреть NFT", url=item['nft_link'])],
+                [InlineKeyboardButton(text="🔗 Посмотреть NFT", url=nft_url)],
                 [InlineKeyboardButton(text=f"💳 Купить за {item['price']}₽", callback_data=f"buy_{item['id']}")]
             ])
             await callback.message.answer(f"🎁 **{item['name']}**\n💰 Цена: {item['price']} руб.",
@@ -106,7 +106,7 @@ async def callback_catalog(callback: types.CallbackQuery):
 @dp.callback_query(F.data.startswith("buy_"))
 async def callback_buy(callback: types.CallbackQuery):
     item_id = int(callback.data.replace("buy_", ""))
-    user = callback.fromuser
+    user = callback.from_user  # ИСПРАВЛЕНО: добавлено нижнее подчеркивание
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("SELECT * FROM items WHERE id = %s AND status = 'Доступен'", (item_id,))
@@ -133,7 +133,11 @@ async def callback_buy(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("adm_"))
 async def admin_confirm(callback: types.CallbackQuery):
-    _, item_id, uid = callback.data.split("_")
+    # Исправлен разбор параметров
+    data_parts = callback.data.split("_")
+    item_id = data_parts[1]
+    uid = data_parts[2]
+
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("UPDATE items SET status = 'Продан' WHERE id = %s", (item_id,))
@@ -162,40 +166,31 @@ async def inventory_handler(callback: types.CallbackQuery):
 
 @dp.message(F.web_app_data)
 async def web_app_receive(message: types.Message):
-    """Срабатывает, когда пользователь жмет 'Купить' на сайте"""
     data = message.web_app_data.data
     await message.answer(
         f"🛒 **Получен сигнал из Web App!**\n\n{data}\n\nЧтобы завершить покупку, используй текстовый каталог или дождись сообщения от админа.")
 
 
-# --- ЗАПУСК СЕРВЕРА И БОТА ---
+# --- ЗАПУСК ---
 
-# 1. Создаем объект приложения
 app = web.Application()
-
-# 2. Указываем пути (Имена функций теперь совпадают с теми, что написаны выше)
 app.router.add_get('/items', handle_get_items)
 app.router.add_options('/items', handle_options)
 
 
 async def main():
-    # Настройка порта для Render
     port = int(os.environ.get("PORT", 8080))
-
-    # Запуск веб-сервера (это то, что ждет Render)
     runner = web.AppRunner(app)
     await runner.setup()
-    # КРИТИЧЕСКИ ВАЖНО: именно '0.0.0.0', а не 'localhost' или '127.0.0.1'
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
 
     print(f"🚀 Веб-сервер запущен на порту {port}")
-
-    # Запуск самого бота
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, SystemExit):
         print("Бот выключен")
