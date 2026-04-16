@@ -159,7 +159,6 @@
 
         button:active { transform: scale(0.98); opacity: 0.9; }
 
-        /* --- НОВЫЕ СТИЛИ ЭКРАНА ОПЛАТЫ (В ТВОЕМ СТИЛЕ) --- */
         #payment-screen {
             display: none;
             width: 100%;
@@ -202,6 +201,7 @@
             font-family: monospace;
             font-size: 0.85rem;
             color: #f4d03f;
+            white-space: pre-line;
             word-break: break-all;
         }
 
@@ -209,6 +209,14 @@
             height: 45px;
             font-size: 0.9rem;
             box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+        }
+        
+        /* Стиль для заблокированной кнопки */
+        .btn-check:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            box-shadow: none;
         }
 
         .btn-back {
@@ -277,7 +285,7 @@
                 Загрузка реквизитов...
             </div>
 
-            <button class="btn-check" onclick="checkPayment()">Проверить оплату</button>
+            <button class="btn-check" id="btn-check-pay" onclick="checkPayment()">Проверить оплату</button>
         </div>
         <button class="btn-back" onclick="window.location.reload()">Вернуться в каталог</button>
     </div>
@@ -293,8 +301,8 @@
         tg.expand();
         tg.headerColor = '#080808';
 
-        // Базовый URL твоего API
         const API_BASE = 'https://dnx-shop.onrender.com';
+        let currentPendingItemId = null; // ID товара, который сейчас оформляется
 
         function openImage(event, url) {
             event.stopPropagation();
@@ -322,9 +330,15 @@
                 container.innerHTML = items.map(item => {
                     let statusClass = 'status-available';
                     let statusText = item.status || 'В наличии';
+                    let isAvailable = true;
                     
-                    if (item.status?.toLowerCase().includes('продан')) statusClass = 'status-sold';
-                    if (item.status?.toLowerCase().includes('забронирован')) statusClass = 'status-booked';
+                    if (item.status === 'Продан') {
+                        statusClass = 'status-sold';
+                        isAvailable = false;
+                    } else if (item.status === 'Забронирован') {
+                        statusClass = 'status-booked';
+                        isAvailable = false;
+                    }
 
                     const imgUrl = item.image_url || 'https://via.placeholder.com/400x400?text=NFT';
 
@@ -336,7 +350,10 @@
                                 <div class="item-name">${item.name}</div>
                                 <div class="item-price-tag">Стоимость</div>
                                 <div class="item-price-value">${item.price} TON</div>
-                                <button onclick="buyItem(event, ${item.id}, '${item.name}', '${item.price}')">Купить</button>
+                                ${isAvailable ? 
+                                    `<button onclick="buyItem(event, ${item.id}, '${item.name}', '${item.price}')">Купить</button>` : 
+                                    `<button style="background: #222; color: #555; cursor: default;" onclick="event.stopPropagation()">Недоступен</button>`
+                                }
                             </div>
                         </div>
                     `;
@@ -351,7 +368,6 @@
             tg.HapticFeedback.impactOccurred('medium');
 
             try {
-                // Вызываем бронирование на сервере
                 const response = await fetch(`${API_BASE}/reserve`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -365,28 +381,58 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    // Если бронь прошла успешно, переключаем экран
+                    currentPendingItemId = id; // Запоминаем ID
                     document.getElementById('catalog').style.display = 'none';
                     document.getElementById('main-header').style.display = 'none';
                     document.getElementById('payment-screen').style.display = 'block';
 
                     document.getElementById('pay-name').innerText = name;
                     document.getElementById('pay-price').innerText = price + ' TON';
-                    document.getElementById('pay-requisites').innerText = result.requisites || "Карта: **** **** **** 0000";
+                    document.getElementById('pay-requisites').innerText = result.requisites || "Реквизиты загружаются...";
                 } else {
-                    tg.showAlert("Упс! " + (result.error || "Товар уже занят"));
+                    tg.showAlert(result.error || "Товар уже занят");
                 }
             } catch (e) {
-                tg.showAlert("Ошибка при связи с сервером. Попробуйте позже.");
+                tg.showAlert("Ошибка при связи с сервером.");
             }
         }
 
-        function checkPayment() {
+        async function checkPayment() {
+            if (!currentPendingItemId) return;
+
             tg.HapticFeedback.notificationOccurred('success');
-            tg.showConfirm("Вы точно совершили оплату? После подтверждения администратор проверит транзакцию.", (confirmed) => {
+            
+            tg.showConfirm("Вы точно совершили оплату? Администратор проверит транзакцию.", async (confirmed) => {
                 if (confirmed) {
-                    tg.showAlert("Заявка отправлена! Ожидайте уведомления в боте.");
-                    tg.close();
+                    const btn = document.getElementById('btn-check-pay');
+                    btn.disabled = true;
+                    btn.innerText = "Ожидайте подтверждения...";
+                    
+                    try {
+                        // Отправляем запрос на сервер, чтобы уведомить админа
+                        const response = await fetch(`${API_BASE}/check_payment`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                item_id: currentPendingItemId,
+                                user_id: tg.initDataUnsafe.user?.id || 0,
+                                username: tg.initDataUnsafe.user?.username || 'Guest'
+                            })
+                        });
+
+                        if (response.ok) {
+                            tg.showAlert("Заявка отправлена! Ожидайте уведомления в боте. Это окно можно закрыть.");
+                            setTimeout(() => tg.close(), 3000);
+                        } else {
+                            btn.disabled = false;
+                            btn.innerText = "Проверить оплату";
+                            tg.showAlert("Ошибка отправки заявки.");
+                        }
+                    } catch (e) {
+                        tg.showAlert("Сервер не отвечает.");
+                        btn.disabled = false;
+                        btn.innerText = "Проверить оплату";
+                    }
                 }
             });
         }
