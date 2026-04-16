@@ -75,7 +75,6 @@ async def handle_reserve(request):
                         f"💰 Цена: {item['price']} TON\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
                         f" "  # Отступ после ссылки
-                        f" "
                     )
                     await bot.send_message(ADMIN_ID, admin_msg, parse_mode="Markdown")
                     return web.json_response({"success": True, "requisites": PAYMENT_REQUISITES},
@@ -100,8 +99,8 @@ async def handle_check_payment(request):
                 if item:
                     admin_kb = InlineKeyboardMarkup(inline_keyboard=[
                         [
-                            InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"pay_yes_{item_id}_{user_id}"),
-                            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"pay_no_{item_id}_{user_id}")
+                            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"pay_no_{item_id}_{user_id}"),
+                            InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"pay_yes_{item_id}_{user_id}")
                         ]
                     ])
                     admin_msg = (
@@ -110,7 +109,6 @@ async def handle_check_payment(request):
                         f"📦 Товар: {item['name']}\n"
                         f"💰 Цена: {item['price']} TON\n"
                         f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
-                        f" "
                         f" "
                     )
                     await bot.send_message(ADMIN_ID, admin_msg, reply_markup=admin_kb, parse_mode="Markdown")
