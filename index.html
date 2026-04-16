@@ -213,10 +213,20 @@
         
         /* Стиль для заблокированной кнопки */
         .btn-check:disabled {
-            background: #333;
-            color: #666;
+            background: #222 !important;
+            color: #555 !important;
             cursor: not-allowed;
             box-shadow: none;
+        }
+
+        /* Стиль для подсказки снизу */
+        .close-hint {
+            font-size: 0.65rem;
+            color: #444;
+            margin-top: 12px;
+            font-weight: 400;
+            display: none;
+            animation: fadeIn 0.5s ease forwards;
         }
 
         .btn-back {
@@ -286,6 +296,7 @@
             </div>
 
             <button class="btn-check" id="btn-check-pay" onclick="checkPayment()">Проверить оплату</button>
+            <div id="close-hint" class="close-hint">Вы можете закрыть окно, пока идет проверка транзакции</div>
         </div>
         <button class="btn-back" onclick="window.location.reload()">Вернуться в каталог</button>
     </div>
@@ -302,7 +313,7 @@
         tg.headerColor = '#080808';
 
         const API_BASE = 'https://dnx-shop.onrender.com';
-        let currentPendingItemId = null; // ID товара, который сейчас оформляется
+        let currentPendingItemId = null; 
 
         function openImage(event, url) {
             event.stopPropagation();
@@ -381,7 +392,7 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    currentPendingItemId = id; // Запоминаем ID
+                    currentPendingItemId = id; 
                     document.getElementById('catalog').style.display = 'none';
                     document.getElementById('main-header').style.display = 'none';
                     document.getElementById('payment-screen').style.display = 'block';
@@ -405,11 +416,16 @@
             tg.showConfirm("Вы точно совершили оплату? Администратор проверит транзакцию.", async (confirmed) => {
                 if (confirmed) {
                     const btn = document.getElementById('btn-check-pay');
+                    const hint = document.getElementById('close-hint');
+                    
+                    // Блокируем кнопку и меняем текст
                     btn.disabled = true;
                     btn.innerText = "Ожидайте подтверждения...";
                     
+                    // Показываем подсказку
+                    hint.style.display = 'block';
+                    
                     try {
-                        // Отправляем запрос на сервер, чтобы уведомить админа
                         const response = await fetch(`${API_BASE}/check_payment`, {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
@@ -421,17 +437,19 @@
                         });
 
                         if (response.ok) {
-                            tg.showAlert("Заявка отправлена! Ожидайте уведомления в боте. Это окно можно закрыть.");
-                            setTimeout(() => tg.close(), 3000);
+                            tg.showAlert("Заявка отправлена! Администратор проверяет оплату. Вы можете закрыть это окно.");
+                            // Окно НЕ закрываем принудительно, чтобы пользователь видел статус
                         } else {
                             btn.disabled = false;
                             btn.innerText = "Проверить оплату";
+                            hint.style.display = 'none';
                             tg.showAlert("Ошибка отправки заявки.");
                         }
                     } catch (e) {
                         tg.showAlert("Сервер не отвечает.");
                         btn.disabled = false;
                         btn.innerText = "Проверить оплату";
+                        hint.style.display = 'none';
                     }
                 }
             });
