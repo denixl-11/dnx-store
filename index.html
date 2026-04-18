@@ -3,51 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DNX STORE — Premium NFT</title>
+    <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* --- ОБНОВЛЕННЫЕ СТИЛИ ЗАГОЛОВКА (МИНИМАЛЬНОЕ СВЕЧЕНИЕ) --- */
         body {
             background-color: #080808;
             color: #ffffff;
             font-family: 'Inter', sans-serif;
             margin: 0;
-            padding: 15px 10px;
+            padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            overflow-x: hidden;
+            min-height: 100vh;
+            padding-bottom: 80px; /* место под таб-бар */
         }
 
+        /* --- ШАПКА --- */
         header {
+            width: 100%;
+            padding: 20px 0;
             text-align: center;
-            margin-bottom: 20px;
-            padding-top: 10px;
+            position: relative;
+            background: #080808;
         }
 
         h1 {
-            font-size: 1.8rem;
-            letter-spacing: 3px;
+            font-size: 1.5rem;
+            letter-spacing: 2px;
             text-transform: uppercase;
             margin: 0;
-            color: #fff; 
-            text-shadow: 
-                0 0 4px #fff,
-                0 0 7px #f4d03f,
-                0 0 12px #f4d03f,
-                0 0 25px #f4d03f;
+            text-shadow: 0 0 10px #f4d03f;
         }
 
-        .subtitle { font-size: 0.75rem; color: #888; margin-top: 5px; letter-spacing: 1px; }
+        .cart-btn-header {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            padding: 8px 12px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
 
-        /* --- КАТАЛОГ --- */
-        #catalog {
+        .cart-count {
+            background: #f4d03f;
+            color: #000;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 50%;
+            margin-left: 5px;
+            font-weight: bold;
+        }
+
+        /* --- СТРАНИЦЫ --- */
+        .page { display: none; width: 100%; max-width: 500px; padding: 15px; box-sizing: border-box; }
+        .page-active { display: block; }
+
+        /* --- СЕТКА ТОВАРОВ --- */
+        .catalog-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            width: 100%;
-            max-width: 500px;
-            box-sizing: border-box;
         }
 
         .item-card {
@@ -55,307 +73,291 @@
             border: 1px solid #222;
             border-radius: 20px;
             padding: 10px;
-            position: relative;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
-            cursor: pointer;
         }
 
         .item-image {
             width: 100%;
-            aspect-ratio: 1 / 1;
-            object-fit: cover;
+            aspect-ratio: 1/1;
             border-radius: 14px;
+            object-fit: cover;
             margin-bottom: 10px;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 5px;
+        }
+
+        .btn-add-cart {
             background: #1a1a1a;
-        }
-
-        .status-badge {
-            position: absolute;
-            top: 18px;
-            left: 18px;
-            padding: 4px 10px;
-            border-radius: 8px;
-            font-size: 0.55rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            backdrop-filter: blur(10px);
-            z-index: 2;
-        }
-
-        .status-available { background: rgba(0, 255, 100, 0.12); color: rgba(0, 255, 100, 0.8); }
-        .status-sold { background: rgba(255, 50, 50, 0.15); color: rgba(255, 157, 157, 0.8); }
-        .status-booked { background: rgba(212, 175, 55, 0.15); color: rgba(244, 208, 63, 0.8); }
-
-        .item-name { font-size: 0.85rem; font-weight: 700; margin-bottom: 4px; }
-        .item-price-value { font-size: 1rem; font-weight: 700; color: #f4d03f; margin-bottom: 10px; }
-
-        button {
-            background: linear-gradient(45deg, #d4af37, #f4d03f);
-            color: #000;
-            border: none;
+            border: 1px solid #f4d03f;
+            color: #f4d03f;
+            padding: 5px 10px;
             border-radius: 10px;
-            padding: 10px;
-            width: 100%;
-            font-weight: 700;
+            font-size: 1rem;
             cursor: pointer;
         }
 
-        /* --- УВЕДОМЛЕНИЯ --- */
-        .notification {
+        /* --- НИЖНЯЯ ПАНЕЛЬ (TAB BAR) --- */
+        .tab-bar {
             position: fixed;
-            top: -100px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80%;
-            max-width: 300px;
+            bottom: 0;
+            width: 100%;
+            background: #111;
+            border-top: 1px solid #222;
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            z-index: 1000;
+        }
+
+        .tab-item {
+            color: #555;
+            font-size: 0.75rem;
+            text-align: center;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .tab-item.active { color: #f4d03f; }
+
+        /* --- КОРЗИНА И ИНВЕНТАРЬ --- */
+        .cart-item, .inv-item {
+            background: #121212;
+            margin-bottom: 10px;
             padding: 15px;
             border-radius: 15px;
-            color: white;
-            text-align: center;
-            font-size: 0.85rem;
-            font-weight: 700;
-            z-index: 10001;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #222;
         }
-        .notif-success { background: #28a745; border: 1px solid #34ce57; }
-        .notif-error { background: #dc3545; border: 1px solid #f8d7da; }
-        .notif-show { top: 20px; }
 
-        /* --- ЭКРАН ОПЛАТЫ --- */
-        #payment-screen { display: none; width: 100%; max-width: 400px; text-align: center; }
-        .pay-card {
-            background: #111;
-            border: 2px solid #d4af37;
-            border-radius: 25px;
-            padding: 25px;
+        .main-btn {
+            background: linear-gradient(45deg, #d4af37, #f4d03f);
+            color: #000;
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            width: 100%;
+            font-weight: bold;
+            font-size: 1rem;
             margin-top: 20px;
         }
-        .requisites-container {
+
+        #payment-screen { text-align: center; }
+        .requisites {
             background: #1a1a1a;
-            border: 1px dashed #d4af37;
-            border-radius: 12px;
+            border: 1px dashed #f4d03f;
             padding: 15px;
-            margin: 20px 0;
-            font-family: monospace;
-            font-size: 0.85rem;
             color: #f4d03f;
-            white-space: pre-line;
+            margin: 15px 0;
+            font-family: monospace;
+            border-radius: 10px;
         }
-        .btn-check:disabled { background: #222 !important; color: #555 !important; }
-        .close-hint { font-size: 0.65rem; color: #444; margin-top: 12px; display: none; }
-        
-        #image-viewer {
-            display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.92); backdrop-filter: blur(10px); justify-content: center; align-items: center;
-        }
-        #full-image { max-width: 90%; max-height: 80%; border-radius: 15px; }
     </style>
 </head>
 <body>
 
-    <header id="main-header">
-        <h1>DNX Store</h1>
-        <div class="subtitle">Exclusive Digital Assets</div>
+    <header>
+        <h1 id="header-title">DNX Store</h1>
+        <div class="cart-btn-header" onclick="showPage('cart')">
+            🛒<span class="cart-count" id="cart-counter">0</span>
+        </div>
     </header>
 
-    <div id="catalog">
-        <div style="grid-column: span 2; text-align:center; color: #666; padding: 40px;">Загрузка активов...</div>
-    </div>
-
-    <div id="payment-screen">
-        <div class="pay-card">
-            <div class="pay-title" style="color:#d4af37; font-weight:700; margin-bottom:15px;">Оформление заказа</div>
-            <div id="pay-name">---</div>
-            <div id="pay-price" style="color: #d4af37; font-size: 1.1rem; margin-top:10px;">---</div>
-            
-            <div class="requisites-container" id="pay-requisites">Загрузка...</div>
-
-            <button class="btn-check" id="btn-check-pay" onclick="checkPayment()">Проверить оплату</button>
-            <div id="close-hint" class="close-hint">Вы можете закрыть окно, пока идет проверка транзакции</div>
+    <div id="page-catalog" class="page page-active">
+        <div id="catalog-list" class="catalog-grid">
+            <div style="grid-column: span 2; text-align:center; padding:50px;">Загрузка...</div>
         </div>
-        <button style="background:none; color:#555; border:1px solid #333; margin-top:15px;" onclick="cancelReservation()">Вернуться в каталог</button>
     </div>
 
-    <div id="image-viewer" onclick="closeImage()">
-        <img id="full-image" src="">
+    <div id="page-inventory" class="page">
+        <h2 style="text-align:center;">Мои активы</h2>
+        <div id="inventory-list"></div>
+    </div>
+
+    <div id="page-cart" class="page">
+        <h2 style="text-align:center;">Корзина</h2>
+        <div id="cart-items-list"></div>
+        <div id="cart-total" style="text-align:right; font-weight:bold; font-size:1.2rem; margin:15px;"></div>
+        <button class="main-btn" id="btn-pay-cart" onclick="buyCart()">Оплатить заказ</button>
+        <button style="background:none; border:none; color:#555; width:100%; margin-top:10px;" onclick="showPage('catalog')">Назад в каталог</button>
+    </div>
+
+    <div id="page-payment" class="page">
+        <div style="background:#111; border:2px solid #d4af37; padding:25px; border-radius:25px; text-align:center;">
+            <h3>Оплата</h3>
+            <div id="pay-info"></div>
+            <div class="requisites" id="pay-requisites"></div>
+            <button class="main-btn" onclick="confirmPayment()">Я оплатил</button>
+        </div>
+    </div>
+
+    <div class="tab-bar">
+        <div class="tab-item active" id="tab-catalog" onclick="showPage('catalog')">🏠 Магазин</div>
+        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">📦 Инвентарь</div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        tg.headerColor = '#080808';
-
+        
         const API_BASE = 'https://dnx-shop.onrender.com';
-        let currentPendingItemId = null;
-        let isPolling = false;
+        let allItems = [];
+        let cart = [];
 
-        // --- НОВАЯ ФУНКЦИЯ ОТМЕНЫ БРОНИ ---
-        async function cancelReservation() {
-            if (currentPendingItemId) {
-                try {
-                    // Отправляем запрос на сервер для снятия брони
-                    await fetch(`${API_BASE}/cancel_reserve`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            item_id: currentPendingItemId,
-                            user_id: tg.initDataUnsafe.user?.id || 0
-                        })
-                    });
-                } catch (e) {
-                    console.error("Ошибка при отмене брони:", e);
-                }
+        // Переключение страниц
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
+            document.getElementById('page-' + pageId).classList.add('page-active');
+            
+            // Активные табы
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            if(pageId === 'catalog') document.getElementById('tab-catalog').classList.add('active');
+            if(pageId === 'inventory') {
+                document.getElementById('tab-inventory').classList.add('active');
+                loadInventory();
             }
-            // После запроса (или если его не было) возвращаем пользователя в начало
-            window.location.reload();
+            if(pageId === 'cart') renderCart();
         }
 
-        function showStatusNotif(text, type) {
-            const notif = document.createElement('div');
-            notif.className = `notification ${type === 'success' ? 'notif-success' : 'notif-error'}`;
-            notif.innerText = text;
-            document.body.appendChild(notif);
-            
-            setTimeout(() => notif.classList.add('notif-show'), 100);
-            
-            setTimeout(() => {
-                notif.classList.remove('notif-show');
-                setTimeout(() => notif.remove(), 500);
-            }, 5000);
-        }
-
-        async function startStatusPolling() {
-            if (isPolling) return;
-            isPolling = true;
-
-            const pollInterval = setInterval(async () => {
-                const userId = tg.initDataUnsafe.user?.id;
-                if (!userId) return;
-
-                try {
-                    const response = await fetch(`${API_BASE}/get_status?user_id=${userId}`);
-                    const data = await response.json();
-
-                    if (data.last_event === 'approved') {
-                        showStatusNotif("Успешная покупка!", "success");
-                        tg.HapticFeedback.notificationOccurred('success');
-                        await clearServerEvent(userId);
-                        setTimeout(() => window.location.reload(), 3000);
-                    } 
-                    else if (data.last_event === 'rejected') {
-                        showStatusNotif("Платеж не выполнен, товар возвращен в каталог", "error");
-                        tg.HapticFeedback.notificationOccurred('error');
-                        await clearServerEvent(userId);
-                        setTimeout(() => window.location.reload(), 3000);
-                    }
-                } catch (e) { console.error("Polling error", e); }
-            }, 4000);
-        }
-
-        async function clearServerEvent(userId) {
-            await fetch(`${API_BASE}/clear_event`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: userId })
-            });
-        }
-
-        function openImage(event, url) {
-            event.stopPropagation();
-            document.getElementById('full-image').src = url;
-            document.getElementById('image-viewer').style.display = 'flex';
-        }
-
-        function closeImage() { document.getElementById('image-viewer').style.display = 'none'; }
-
-        async function loadItems() {
-            const container = document.getElementById('catalog');
+        // Загрузка каталога
+        async function loadCatalog() {
             try {
-                const response = await fetch(`${API_BASE}/items`);
-                const items = await response.json();
-                
-                container.innerHTML = items.map(item => {
-                    let statusClass = 'status-available';
-                    let statusText = item.status || 'В наличии';
-                    let isAvailable = (item.status === 'Доступен' || !item.status);
-                    
-                    if (item.status === 'Продан') statusClass = 'status-sold';
-                    else if (item.status === 'Забронирован') statusClass = 'status-booked';
-
-                    const imgUrl = item.image_url || 'https://via.placeholder.com/400x400?text=NFT';
-
-                    return `
-                        <div class="item-card" onclick="openImage(event, '${imgUrl}')">
-                            <img src="${imgUrl}" class="item-image">
-                            <div class="status-badge ${statusClass}">${statusText}</div>
-                            <div class="item-info">
-                                <div class="item-name">${item.name}</div>
-                                <div class="item-price-value">${Number(item.price).toLocaleString()} ₽</div>
-                                ${isAvailable ? 
-                                    `<button onclick="buyItem(event, ${item.id}, '${item.name}', '${item.price}')">Купить</button>` : 
-                                    `<button style="background: #222; color: #555; cursor: default;" onclick="event.stopPropagation()">Недоступен</button>`
-                                }
-                            </div>
+                const res = await fetch(`${API_BASE}/items`);
+                allItems = await res.json();
+                const container = document.getElementById('catalog-list');
+                container.innerHTML = allItems.filter(i => i.status === 'Доступен').map(item => `
+                    <div class="item-card">
+                        <img src="${item.image_url}" class="item-image">
+                        <div style="font-weight:bold; font-size:0.9rem;">${item.name}</div>
+                        <div class="price-row">
+                            <span style="color:#f4d03f">${item.price} ₽</span>
+                            <button class="btn-add-cart" onclick="addToCart(${item.id})">🛒+</button>
                         </div>
-                    `;
-                }).join('');
-            } catch (e) { container.innerHTML = 'Ошибка связи'; }
+                    </div>
+                `).join('');
+            } catch (e) { console.error(e); }
         }
 
-        async function buyItem(event, id, name, price) {
-            event.stopPropagation();
-            tg.HapticFeedback.impactOccurred('medium');
-            try {
-                const response = await fetch(`${API_BASE}/reserve`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        item_id: id,
-                        user_id: tg.initDataUnsafe.user?.id || 0,
-                        username: tg.initDataUnsafe.user?.username || 'Guest'
-                    })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    currentPendingItemId = id;
-                    document.getElementById('catalog').style.display = 'none';
-                    document.getElementById('main-header').style.display = 'none';
-                    document.getElementById('payment-screen').style.display = 'block';
-                    document.getElementById('pay-name').innerText = name;
-                    document.getElementById('pay-price').innerText = Number(price).toLocaleString() + ' ₽';
-                    document.getElementById('pay-requisites').innerText = result.requisites;
-                } else { tg.showAlert(result.error); }
-            } catch (e) { tg.showAlert("Ошибка сервера"); }
+        // Работа с корзиной
+        function addToCart(id) {
+            const item = allItems.find(i => i.id === id);
+            if (!cart.find(i => i.id === id)) {
+                cart.push(item);
+                tg.HapticFeedback.notificationOccurred('success');
+                updateCartCounter();
+            } else {
+                tg.showAlert("Товар уже в корзине");
+            }
         }
 
-        async function checkPayment() {
-            if (!currentPendingItemId) return;
-            tg.showConfirm("Вы точно совершили оплату?", async (confirmed) => {
-                if (confirmed) {
-                    const btn = document.getElementById('btn-check-pay');
-                    btn.disabled = true;
-                    btn.innerText = "Ожидайте подтверждения...";
-                    document.getElementById('close-hint').style.display = 'block';
-                    
-                    await fetch(`${API_BASE}/check_payment`, {
+        function updateCartCounter() {
+            document.getElementById('cart-counter').innerText = cart.length;
+        }
+
+        function renderCart() {
+            const list = document.getElementById('cart-items-list');
+            let total = 0;
+            if(cart.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:40px; color:#555;">Корзина пуста</div>';
+                document.getElementById('cart-total').innerText = "";
+                document.getElementById('btn-pay-cart').style.display = "none";
+                return;
+            }
+            
+            document.getElementById('btn-pay-cart').style.display = "block";
+            list.innerHTML = cart.map((item, idx) => {
+                total += Number(item.price);
+                return `
+                    <div class="cart-item">
+                        <span>${item.name}</span>
+                        <div>
+                            <b style="color:#f4d03f">${item.price} ₽</b>
+                            <button onclick="removeFromCart(${idx})" style="background:none; border:none; color:red; margin-left:10px;">✕</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('cart-total').innerText = `Итого: ${total} ₽`;
+        }
+
+        function removeFromCart(idx) {
+            cart.splice(idx, 1);
+            updateCartCounter();
+            renderCart();
+        }
+
+        // Оплата корзины
+        async function buyCart() {
+            tg.showConfirm(`Оплатить ${cart.length} товаров?`, async (ok) => {
+                if(!ok) return;
+                
+                try {
+                    const res = await fetch(`${API_BASE}/reserve`, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
-                            item_id: currentPendingItemId,
-                            user_id: tg.initDataUnsafe.user?.id,
-                            username: tg.initDataUnsafe.user?.username
+                            item_ids: cart.map(i => i.id),
+                            user_id: tg.initDataUnsafe.user?.id || 0,
+                            username: tg.initDataUnsafe.user?.username || 'Guest'
                         })
                     });
-                }
+                    const result = await res.json();
+                    if(result.success) {
+                        showPage('payment');
+                        document.getElementById('pay-info').innerText = `К оплате: ${document.getElementById('cart-total').innerText}`;
+                        document.getElementById('pay-requisites').innerText = result.requisites;
+                    } else {
+                        tg.showAlert(result.error);
+                    }
+                } catch(e) { tg.showAlert("Ошибка связи с сервером"); }
             });
         }
 
-        loadItems();
-        startStatusPolling();
+        async function confirmPayment() {
+            tg.showConfirm("Вы подтверждаете оплату?", async (ok) => {
+                if(!ok) return;
+                // Здесь можно вызвать /check_payment для каждого или для группы
+                tg.showAlert("Запрос отправлен админу. Ожидайте подтверждения!");
+                cart = [];
+                updateCartCounter();
+                showPage('catalog');
+            });
+        }
+
+        // Инвентарь
+        async function loadInventory() {
+            const container = document.getElementById('inventory-list');
+            container.innerHTML = "Загрузка ваших покупок...";
+            try {
+                const res = await fetch(`${API_BASE}/inventory?user_id=${tg.initDataUnsafe.user?.id || 0}`);
+                const items = await res.json();
+                if(items.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding:40px; color:#555;">У вас пока нет купленных NFT</div>';
+                } else {
+                    container.innerHTML = items.map(item => `
+                        <div class="inv-item">
+                            <div style="display:flex; align-items:center;">
+                                <img src="${item.image_url}" style="width:40px; height:40px; border-radius:5px; margin-right:10px;">
+                                <span>${item.name}</span>
+                            </div>
+                            <a href="${item.nft_link}" style="color:#f4d03f; text-decoration:none; font-weight:bold;">ОТКРЫТЬ</a>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) { container.innerHTML = "Ошибка загрузки"; }
+        }
+
+        // Инициализация
+        loadCatalog();
     </script>
 </body>
 </html>
