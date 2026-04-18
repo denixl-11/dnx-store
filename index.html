@@ -27,18 +27,17 @@
         }
 
         h1 {
-            /* Жирность ровно 650 (через 600 в Inter для баланса) */
             font-weight: 650; 
             font-size: 1.85rem;
             text-transform: uppercase;
             margin: 0;
             letter-spacing: 1px;
             color: #fff;
-            /* Свечение увеличено на +0.1 */
+            /* Свечение +0.1 */
             text-shadow: 
                 0 0 12px rgba(255, 255, 255, 0.8), 
                 0 0 28px rgba(244, 208, 63, 1),
-                0 0 40px rgba(244, 208, 63, 0.4);
+                0 0 45px rgba(244, 208, 63, 0.5);
         }
 
         .subtitle {
@@ -90,14 +89,15 @@
         }
 
         .item-name {
-            font-size: 0.9rem;
+            /* Шрифт чуть-чуть больше, не жирный, ширина как у картинки */
+            font-size: 1rem;
             font-weight: 700;
             margin-bottom: 12px;
             color: #fff;
             text-align: left;
-            width: 100%;
+            width: 100%; 
+            display: block;
             box-sizing: border-box;
-            /* Защита от вылета текста */
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
