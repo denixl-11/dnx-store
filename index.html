@@ -25,20 +25,25 @@
             padding: 40px 0 20px 0;
             text-align: center;
             position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         h1 {
+            /* Жирность уменьшена на 0.03 (визуально до 800) */
+            font-weight: 800; 
             font-size: 1.8rem;
-            letter-spacing: 4px;
             text-transform: uppercase;
             margin: 0;
             color: #fff;
-            /* Увеличена жирность и свечение на 0.05 */
-            font-weight: 800; 
+            /* Растягиваем заголовок по ширине картинки (примерно 170-180px на мобайле) */
+            letter-spacing: 0.35em; 
+            text-indent: 0.35em; /* Компенсация отступа последнего символа для точной центровки */
             text-shadow: 
-                0 0 5.05px #fff, 
-                0 0 15.05px #f4d03f,
-                0 0 20px rgba(244, 208, 63, 0.5);
+                0 0 5.02px rgba(255, 255, 255, 0.8), 
+                0 0 15.02px rgba(244, 208, 63, 0.9);
+            width: 90%; /* Ограничиваем контейнер, чтобы соответствовать сетке */
         }
 
         .subtitle {
@@ -98,7 +103,6 @@
             text-align: center;
         }
 
-        /* КНОПКИ: РАЗМЕР СТРОГО ПРЕЖНИЙ, МЕНЯЕМ ТОЛЬКО ТЕКСТ ВНУТРИ */
         .card-buttons {
             display: flex;
             width: 100%;
@@ -112,11 +116,10 @@
             color: #000;
             border: none;
             border-radius: 8px;
-            height: 32px; /* ВЫСОТА БЕЗ ИЗМЕНЕНИЙ */
+            height: 32px; 
             font-weight: 800;
-            /* УВЕЛИЧЕННЫЙ РАЗМЕР ЦЕНЫ И РАСТЯЖКА */
-            font-size: 0.9rem; 
-            letter-spacing: 1px; 
+            font-size: 0.95rem; 
+            letter-spacing: 1.2px; 
             text-transform: uppercase;
             cursor: pointer;
             display: flex;
@@ -129,7 +132,7 @@
             background: #000;
             border: 1.5px solid #f4d03f;
             border-radius: 8px;
-            height: 32px; /* ВЫСОТА БЕЗ ИЗМЕНЕНИЙ */
+            height: 32px; 
             display: flex;
             align-items: center;
             justify-content: center;
@@ -139,11 +142,11 @@
         .btn-icon-svg { width: 14px; height: 14px; fill: none; stroke: #f4d03f; stroke-width: 2.5; }
 
         /* --- ИНВЕНТАРЬ --- */
-        .empty-inventory {
+        .empty-inventory-msg {
+            margin-top: 180px;
             text-align: center;
-            margin-top: 150px;
-            color: #2a2a2a;
-            font-size: 0.9rem;
+            color: #555;
+            font-size: 0.85rem;
             font-weight: 500;
         }
 
@@ -185,12 +188,14 @@
     <div id="page-cart" class="page" style="padding: 20px;">
         <h2 style="text-align:center; font-size:1rem;">КОРЗИНА</h2>
         <div id="cart-items-list"></div>
-        <div id="cart-total" style="text-align:right; font-weight:700; color:#f4d03f; margin: 20px 0;"></div>
-        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:15px; border-radius:12px; font-weight:800;">ОПЛАТИТЬ</button>
+        <div id="cart-total" style="text-align:right; font-weight:800; color:#f4d03f; margin: 20px 0; font-size: 1.2rem;"></div>
+        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:16px; border-radius:12px; font-weight:800;">ОПЛАТИТЬ</button>
     </div>
 
     <div id="page-inventory" class="page">
-        <div id="inventory-list"></div>
+        <div id="inventory-list">
+            <div class="empty-inventory-msg">В вашем инвентаре сейчас нет предметов</div>
+        </div>
     </div>
 
     <div class="tab-bar">
@@ -237,7 +242,7 @@
             if(!cart.includes(id)) {
                 cart.push(id);
                 document.getElementById('cart-counter').innerText = cart.length;
-                tg.HapticFeedback.impactOccurred('light');
+                tg.HapticFeedback.impactOccurred('medium');
             }
         }
 
@@ -250,11 +255,16 @@
             const list = document.getElementById('cart-items-list');
             const selected = allItems.filter(i => cart.includes(i.id));
             let total = 0;
+            if(selected.length === 0) {
+                list.innerHTML = `<div style="text-align:center; color:#444; margin-top:50px;">Корзина пуста</div>`;
+                document.getElementById('cart-total').innerText = "";
+                return;
+            }
             list.innerHTML = selected.map(i => {
                 total += i.price;
-                return `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #222;">
+                return `<div style="display:flex; justify-content:space-between; padding:15px 0; border-bottom:1px solid #1a1a1a;">
                             <span>${i.name}</span>
-                            <span style="color:#f4d03f">${i.price} ₽</span>
+                            <span style="color:#f4d03f; font-weight:800;">${i.price} ₽</span>
                         </div>`;
             }).join('');
             document.getElementById('cart-total').innerText = `ИТОГО: ${total} ₽`;
@@ -268,7 +278,7 @@
                 body: JSON.stringify({ user_id: tg.initDataUnsafe?.user?.id || 12345, item_ids: cart })
             });
             if(res.ok) {
-                tg.showAlert("Успешно!");
+                tg.showAlert("Оплачено!");
                 cart = [];
                 document.getElementById('cart-counter').innerText = '0';
                 showPage('inventory');
@@ -276,18 +286,23 @@
         }
 
         async function loadInventory() {
-            const userId = tg.initDataUnsafe?.user?.id || 12345;
-            const res = await fetch(`${API_BASE}/inventory/${userId}`);
-            const data = await res.json();
             const container = document.getElementById('inventory-list');
-            if (data.length === 0) {
-                container.innerHTML = `<div class="empty-inventory">твой инвентарь сейчас пустой</div>`;
-            } else {
-                container.innerHTML = data.map(i => `
-                    <div style="background:#111; padding:15px; border-radius:12px; margin: 15px; border:1px solid #222; text-align:center;">
-                        <strong>${i.name}</strong>
-                    </div>
-                `).join('');
+            const userId = tg.initDataUnsafe?.user?.id || 12345;
+            try {
+                const res = await fetch(`${API_BASE}/inventory/${userId}`);
+                const data = await res.json();
+                if (!data || data.length === 0) {
+                    container.innerHTML = `<div class="empty-inventory-msg">В вашем инвентаре сейчас нет предметов</div>`;
+                } else {
+                    container.innerHTML = data.map(i => `
+                        <div style="background:#111; padding:20px; border-radius:16px; margin-bottom:12px; border:1px solid #1a1a1a; display:flex; justify-content:space-between;">
+                            <span style="font-weight:700;">${i.name}</span>
+                            <span style="color:#f4d03f; font-size:0.7rem;">ACTIVE</span>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                container.innerHTML = `<div class="empty-inventory-msg">В вашем инвентаре сейчас нет предметов</div>`;
             }
         }
 
