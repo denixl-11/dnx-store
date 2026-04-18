@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DNX STORE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             background-color: #080808;
@@ -19,73 +19,66 @@
             padding-bottom: 100px;
         }
 
-        /* --- ШАПКА: УБАВЛЕННАЯ ЯРКОСТЬ И ЖИРНОСТЬ --- */
+        /* --- БЛАГОРОДНЫЙ ЗАГОЛОВОК --- */
         header {
             width: 100%;
-            padding: 30px 0 10px 0;
+            padding: 35px 0 15px 0;
             text-align: center;
             position: relative;
         }
 
         h1 {
-            font-size: 1.75rem;
-            letter-spacing: 2px;
+            font-size: 1.6rem;
+            letter-spacing: 3px;
             text-transform: uppercase;
             margin: 0;
             color: #fff;
-            font-weight: 800; /* Чуть менее жирный (был 900) */
-            /* Капельку убавил яркость свечения */
+            font-weight: 700; /* Благородная жирность */
+            /* Среднее свечение: заметное, но не слепящее */
             text-shadow: 
-                0 0 4px rgba(255, 255, 255, 0.9),
-                0 0 8px rgba(244, 208, 63, 0.7),
-                0 0 15px rgba(244, 208, 63, 0.5),
-                0 0 30px rgba(244, 208, 63, 0.3);
+                0 0 5px rgba(255, 255, 255, 0.4),
+                0 0 10px rgba(212, 175, 55, 0.6),
+                0 0 20px rgba(212, 175, 55, 0.2);
         }
 
         .subtitle {
-            font-size: 0.65rem;
-            color: #777;
-            margin-top: 4px;
-            letter-spacing: 1.2px;
+            font-size: 0.6rem;
+            color: #666;
+            margin-top: 6px;
+            letter-spacing: 2px;
             text-transform: uppercase;
         }
 
         .cart-btn-header {
             position: absolute;
-            right: 15px;
-            top: 62px;
-            background: rgba(25, 25, 25, 0.95);
+            right: 20px;
+            top: 70px; /* Позиция в выделенной зоне */
+            background: rgba(20, 20, 20, 0.8);
             border: 1px solid #333;
-            padding: 4px 10px;
-            border-radius: 10px;
+            padding: 5px 10px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             cursor: pointer;
         }
 
-        .cart-icon-svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2; }
-        .cart-count {
-            color: #f4d03f;
-            font-size: 0.75rem;
-            margin-left: 6px;
-            font-weight: 800;
-        }
+        .cart-count { color: #f4d03f; font-size: 0.7rem; margin-left: 5px; font-weight: 700; }
 
-        /* --- КАРТОЧКИ: ПРОДОЛЬНЫЕ КНОПКИ --- */
+        /* --- КАРТОЧКИ И ПРОДОЛЬНЫЕ КНОПКИ --- */
         .catalog-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            gap: 15px;
             width: 100%;
-            padding: 15px 12px;
+            padding: 10px 15px;
             box-sizing: border-box;
         }
 
         .item-card {
             background: #111;
-            border: 1px solid #222;
+            border: 1px solid #1a1a1a;
             border-radius: 20px;
-            padding: 12px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
         }
@@ -95,50 +88,52 @@
             aspect-ratio: 1/1;
             border-radius: 14px;
             object-fit: cover;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .item-name {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             font-weight: 600;
-            margin-bottom: 15px;
-            color: #ddd;
+            margin-bottom: 12px;
+            color: #bbb;
+            padding: 0 4px;
         }
 
+        /* Контейнер кнопок 3/4 и 1/4 */
         .card-buttons {
             display: flex;
-            gap: 8px;
+            width: 100%;
+            gap: 6px;
             margin-top: auto;
         }
 
-        /* Более продольная кнопка купить */
         .btn-buy-now {
-            flex: 2; /* Занимает больше места */
-            background: linear-gradient(45deg, #d4af37, #f4d03f);
+            flex: 3; /* 75% ширины */
+            background: linear-gradient(180deg, #f4d03f, #d4af37);
             color: #000;
             border: none;
-            border-radius: 8px;
-            padding: 10px 4px; /* Узкая по вертикали, широкая по горизонтали */
-            font-weight: 800;
+            border-radius: 7px;
+            padding: 8px 0;
+            font-weight: 700;
             font-size: 0.8rem;
             cursor: pointer;
+            text-transform: uppercase;
         }
 
-        /* Более продольная кнопка корзины */
         .btn-add-cart {
-            flex: 1; /* Тоже вытянутая */
-            background: #1a1a1a;
-            border: 1px solid #f4d03f;
-            border-radius: 8px;
+            flex: 1; /* 25% ширины */
+            background: #000;
+            border: 1px solid #d4af37;
+            border-radius: 7px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
         }
 
-        .btn-icon-svg { width: 16px; height: 16px; fill: none; stroke: #f4d03f; stroke-width: 2; }
+        .btn-icon-svg { width: 14px; height: 14px; fill: none; stroke: #d4af37; stroke-width: 2.5; }
 
-        /* --- ОСТАЛЬНОЕ --- */
+        /* --- НИЖНЯЯ ПАНЕЛЬ --- */
         .tab-bar {
             position: fixed;
             bottom: 0;
@@ -147,11 +142,11 @@
             border-top: 1px solid #1a1a1a;
             display: flex;
             justify-content: space-around;
-            padding: 18px 0;
+            padding: 20px 0;
             z-index: 1000;
         }
 
-        .tab-item { color: #444; font-size: 0.7rem; font-weight: 700; cursor: pointer; letter-spacing: 0.5px; }
+        .tab-item { color: #333; font-size: 0.65rem; font-weight: 700; cursor: pointer; letter-spacing: 1px; }
         .tab-item.active { color: #f4d03f; }
 
         .page { display: none; width: 100%; }
@@ -164,25 +159,21 @@
         <h1>DNX Store</h1>
         <div class="subtitle">Exclusive Digital Assets</div>
         <div class="cart-btn-header" onclick="showPage('cart')">
-            <svg class="cart-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+            <svg style="width:14px; height:14px; fill:none; stroke:#fff; stroke-width:2;" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
             <span class="cart-count" id="cart-counter">0</span>
         </div>
     </header>
 
     <div id="page-catalog" class="page page-active">
-        <div id="catalog-list" class="catalog-grid"></div>
+        <div id="catalog-list" class="catalog-grid">
+            </div>
     </div>
 
     <div id="page-cart" class="page" style="padding: 20px;">
-        <h2 style="text-align:center; font-size:1.1rem;">КОРЗИНА</h2>
+        <h2 style="text-align:center; font-size: 1rem;">ОФОРМЛЕНИЕ</h2>
         <div id="cart-items-list"></div>
-        <div id="cart-total" style="text-align:right; font-weight:800; font-size:1.2rem; color:#f4d03f; margin: 20px 0;"></div>
-        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:16px; border-radius:12px; font-weight:800;">ОФОРМИТЬ ЗАКАЗ</button>
-    </div>
-
-    <div id="page-inventory" class="page" style="padding: 20px;">
-        <h2 style="text-align:center; font-size:1.1rem;">ИНВЕНТАРЬ</h2>
-        <div id="inventory-list"></div>
+        <div id="cart-total" style="text-align:right; font-weight:700; font-size:1.1rem; color:#f4d03f; margin: 15px 0;"></div>
+        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:15px; border-radius:10px; font-weight:700;">КУПИТЬ</button>
     </div>
 
     <div class="tab-bar">
@@ -201,8 +192,6 @@
             document.getElementById('page-' + pageId).classList.add('page-active');
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
             document.getElementById('tab-' + pageId)?.classList.add('active');
-            if(pageId === 'inventory') loadInventory();
-            if(pageId === 'cart') renderCart();
         }
 
         async function loadCatalog() {
@@ -228,7 +217,7 @@
             if(!cart.includes(id)) {
                 cart.push(id);
                 document.getElementById('cart-counter').innerText = cart.length;
-                tg.HapticFeedback.impactOccurred('medium');
+                tg.HapticFeedback.impactOccurred('light');
             }
         }
 
