@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DNX STORE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         body {
             background-color: #080808;
@@ -19,7 +19,7 @@
             padding-bottom: 100px;
         }
 
-        /* --- ШАПКА: СВЕЧЕНИЕ И ПОЗИЦИЯ КОРЗИНЫ --- */
+        /* --- ШАПКА: УБАВЛЕННАЯ ЯРКОСТЬ И ЖИРНОСТЬ --- */
         header {
             width: 100%;
             padding: 30px 0 10px 0;
@@ -28,60 +28,56 @@
         }
 
         h1 {
-            font-size: 1.8rem;
+            font-size: 1.75rem;
             letter-spacing: 2px;
             text-transform: uppercase;
             margin: 0;
             color: #fff;
-            font-weight: 900;
+            font-weight: 800; /* Чуть менее жирный (был 900) */
+            /* Капельку убавил яркость свечения */
             text-shadow: 
-                0 0 5px #fff,
-                0 0 10px #f4d03f,
-                0 0 20px #f4d03f,
-                0 0 40px #f4d03f;
+                0 0 4px rgba(255, 255, 255, 0.9),
+                0 0 8px rgba(244, 208, 63, 0.7),
+                0 0 15px rgba(244, 208, 63, 0.5),
+                0 0 30px rgba(244, 208, 63, 0.3);
         }
 
         .subtitle {
-            font-size: 0.7rem;
-            color: #888;
-            margin-top: 5px;
-            letter-spacing: 1.5px;
+            font-size: 0.65rem;
+            color: #777;
+            margin-top: 4px;
+            letter-spacing: 1.2px;
             text-transform: uppercase;
         }
 
-        /* Кнопка корзины опущена в выделенную зону */
         .cart-btn-header {
             position: absolute;
             right: 15px;
-            top: 65px; /* Опустил ниже, чтобы была напротив subtitle */
-            background: rgba(30, 30, 30, 0.9);
-            border: 1px solid #444;
-            padding: 5px 10px;
+            top: 62px;
+            background: rgba(25, 25, 25, 0.95);
+            border: 1px solid #333;
+            padding: 4px 10px;
             border-radius: 10px;
             display: flex;
             align-items: center;
             cursor: pointer;
-            backdrop-filter: blur(5px);
         }
 
-        .cart-icon-svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; }
+        .cart-icon-svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2; }
         .cart-count {
-            background: #f4d03f;
-            color: #000;
-            font-size: 0.7rem;
-            padding: 1px 6px;
-            border-radius: 50%;
+            color: #f4d03f;
+            font-size: 0.75rem;
             margin-left: 6px;
-            font-weight: 900;
+            font-weight: 800;
         }
 
-        /* --- СЕТКА ТОВАРОВ --- */
+        /* --- КАРТОЧКИ: ПРОДОЛЬНЫЕ КНОПКИ --- */
         .catalog-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
             width: 100%;
-            padding: 15px 10px;
+            padding: 15px 12px;
             box-sizing: border-box;
         }
 
@@ -89,7 +85,7 @@
             background: #111;
             border: 1px solid #222;
             border-radius: 20px;
-            padding: 10px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
         }
@@ -99,63 +95,63 @@
             aspect-ratio: 1/1;
             border-radius: 14px;
             object-fit: cover;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .item-name {
             font-size: 0.8rem;
-            font-weight: 700;
-            margin-bottom: 12px;
-            color: #eee;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #ddd;
         }
 
-        /* КНОПКИ КАРТОЧКИ */
         .card-buttons {
             display: flex;
-            gap: 6px;
+            gap: 8px;
             margin-top: auto;
         }
 
+        /* Более продольная кнопка купить */
         .btn-buy-now {
-            flex: 1;
+            flex: 2; /* Занимает больше места */
             background: linear-gradient(45deg, #d4af37, #f4d03f);
             color: #000;
             border: none;
-            border-radius: 10px;
-            padding: 10px 5px;
-            font-weight: 900;
-            font-size: 0.85rem;
+            border-radius: 8px;
+            padding: 10px 4px; /* Узкая по вертикали, широкая по горизонтали */
+            font-weight: 800;
+            font-size: 0.8rem;
             cursor: pointer;
-            text-transform: uppercase;
         }
 
+        /* Более продольная кнопка корзины */
         .btn-add-cart {
-            width: 42px;
+            flex: 1; /* Тоже вытянутая */
             background: #1a1a1a;
             border: 1px solid #f4d03f;
-            border-radius: 10px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
         }
 
-        .btn-icon-svg { width: 18px; height: 18px; fill: none; stroke: #f4d03f; stroke-width: 2; }
+        .btn-icon-svg { width: 16px; height: 16px; fill: none; stroke: #f4d03f; stroke-width: 2; }
 
-        /* --- ТАБ-БАР --- */
+        /* --- ОСТАЛЬНОЕ --- */
         .tab-bar {
             position: fixed;
             bottom: 0;
             width: 100%;
-            background: #000;
-            border-top: 1px solid #222;
+            background: #080808;
+            border-top: 1px solid #1a1a1a;
             display: flex;
             justify-content: space-around;
-            padding: 15px 0;
+            padding: 18px 0;
             z-index: 1000;
         }
 
-        .tab-item { color: #555; font-size: 0.75rem; font-weight: 800; cursor: pointer; }
+        .tab-item { color: #444; font-size: 0.7rem; font-weight: 700; cursor: pointer; letter-spacing: 0.5px; }
         .tab-item.active { color: #f4d03f; }
 
         .page { display: none; width: 100%; }
@@ -178,14 +174,14 @@
     </div>
 
     <div id="page-cart" class="page" style="padding: 20px;">
-        <h2 style="text-align:center;">Корзина</h2>
+        <h2 style="text-align:center; font-size:1.1rem;">КОРЗИНА</h2>
         <div id="cart-items-list"></div>
-        <div id="cart-total" style="text-align:right; font-weight:900; font-size:1.3rem; color:#f4d03f; margin: 20px 0;"></div>
-        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:18px; border-radius:15px; font-weight:900; font-size:1rem;">ОПЛАТИТЬ</button>
+        <div id="cart-total" style="text-align:right; font-weight:800; font-size:1.2rem; color:#f4d03f; margin: 20px 0;"></div>
+        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:16px; border-radius:12px; font-weight:800;">ОФОРМИТЬ ЗАКАЗ</button>
     </div>
 
     <div id="page-inventory" class="page" style="padding: 20px;">
-        <h2 style="text-align:center;">ИНВЕНТАРЬ</h2>
+        <h2 style="text-align:center; font-size:1.1rem;">ИНВЕНТАРЬ</h2>
         <div id="inventory-list"></div>
     </div>
 
@@ -238,7 +234,6 @@
 
         function buyNow(id) {
             cart = [id];
-            document.getElementById('cart-counter').innerText = cart.length;
             showPage('cart');
         }
 
