@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DNX STORE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body {
             background-color: #080808;
@@ -16,55 +16,39 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
-            padding-bottom: 100px;
         }
 
-        /* --- БЛАГОРОДНЫЙ ЗАГОЛОВОК --- */
+        /* --- ЧЕСТНЫЙ НЕОН --- */
         header {
             width: 100%;
-            padding: 35px 0 15px 0;
+            padding: 40px 0 20px 0;
             text-align: center;
-            position: relative;
         }
 
         h1 {
-            font-size: 1.6rem;
-            letter-spacing: 3px;
+            font-size: 1.8rem;
+            letter-spacing: 4px;
             text-transform: uppercase;
             margin: 0;
             color: #fff;
-            font-weight: 700; /* Благородная жирность */
-            /* Среднее свечение: заметное, но не слепящее */
+            font-weight: 900;
+            /* Многослойный неон: белый центр + золотое свечение */
             text-shadow: 
-                0 0 5px rgba(255, 255, 255, 0.4),
-                0 0 10px rgba(212, 175, 55, 0.6),
-                0 0 20px rgba(212, 175, 55, 0.2);
+                0 0 5px #fff,
+                0 0 10px #f4d03f,
+                0 0 20px #f4d03f,
+                0 0 40px rgba(244, 208, 63, 0.5);
         }
 
         .subtitle {
-            font-size: 0.6rem;
-            color: #666;
-            margin-top: 6px;
+            font-size: 0.65rem;
+            color: #888;
+            margin-top: 8px;
             letter-spacing: 2px;
             text-transform: uppercase;
         }
 
-        .cart-btn-header {
-            position: absolute;
-            right: 20px;
-            top: 70px; /* Позиция в выделенной зоне */
-            background: rgba(20, 20, 20, 0.8);
-            border: 1px solid #333;
-            padding: 5px 10px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-
-        .cart-count { color: #f4d03f; font-size: 0.7rem; margin-left: 5px; font-weight: 700; }
-
-        /* --- КАРТОЧКИ И ПРОДОЛЬНЫЕ КНОПКИ --- */
+        /* --- КНОПКИ 4:1 --- */
         .catalog-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -77,8 +61,8 @@
         .item-card {
             background: #111;
             border: 1px solid #1a1a1a;
-            border-radius: 20px;
-            padding: 10px;
+            border-radius: 22px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
         }
@@ -86,71 +70,74 @@
         .item-image {
             width: 100%;
             aspect-ratio: 1/1;
-            border-radius: 14px;
+            border-radius: 16px;
             object-fit: cover;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .item-name {
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: #bbb;
-            padding: 0 4px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #fff;
         }
 
-        /* Контейнер кнопок 3/4 и 1/4 */
         .card-buttons {
             display: flex;
             width: 100%;
-            gap: 6px;
-            margin-top: auto;
+            gap: 8px;
         }
 
+        /* Кнопка с ценой (80% ширины) */
         .btn-buy-now {
-            flex: 3; /* 75% ширины */
-            background: linear-gradient(180deg, #f4d03f, #d4af37);
+            flex: 4; 
+            background: #f4d03f;
             color: #000;
             border: none;
-            border-radius: 7px;
-            padding: 8px 0;
-            font-weight: 700;
-            font-size: 0.8rem;
-            cursor: pointer;
+            border-radius: 10px;
+            padding: 12px 0;
+            font-weight: 900;
+            font-size: 0.9rem;
             text-transform: uppercase;
+            /* Продольная надпись */
+            letter-spacing: 1.5px; 
+            cursor: pointer;
         }
 
+        /* Кнопка корзины (20% ширины) */
         .btn-add-cart {
-            flex: 1; /* 25% ширины */
-            background: #000;
-            border: 1px solid #d4af37;
-            border-radius: 7px;
+            flex: 1;
+            background: #1a1a1a;
+            border: 1.5px solid #f4d03f;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
         }
 
-        .btn-icon-svg { width: 14px; height: 14px; fill: none; stroke: #d4af37; stroke-width: 2.5; }
+        .btn-icon-svg { 
+            width: 18px; 
+            height: 18px; 
+            fill: none; 
+            stroke: #f4d03f; 
+            stroke-width: 2.5; 
+        }
 
-        /* --- НИЖНЯЯ ПАНЕЛЬ --- */
+        /* --- ТАБ-БАР --- */
         .tab-bar {
             position: fixed;
             bottom: 0;
             width: 100%;
-            background: #080808;
-            border-top: 1px solid #1a1a1a;
+            background: #000;
+            border-top: 1px solid #222;
             display: flex;
             justify-content: space-around;
             padding: 20px 0;
-            z-index: 1000;
         }
 
-        .tab-item { color: #333; font-size: 0.65rem; font-weight: 700; cursor: pointer; letter-spacing: 1px; }
+        .tab-item { color: #555; font-size: 0.7rem; font-weight: 800; cursor: pointer; }
         .tab-item.active { color: #f4d03f; }
-
-        .page { display: none; width: 100%; }
-        .page-active { display: block; }
     </style>
 </head>
 <body>
@@ -158,75 +145,36 @@
     <header>
         <h1>DNX Store</h1>
         <div class="subtitle">Exclusive Digital Assets</div>
-        <div class="cart-btn-header" onclick="showPage('cart')">
-            <svg style="width:14px; height:14px; fill:none; stroke:#fff; stroke-width:2;" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
-            <span class="cart-count" id="cart-counter">0</span>
-        </div>
     </header>
 
-    <div id="page-catalog" class="page page-active">
-        <div id="catalog-list" class="catalog-grid">
+    <div class="catalog-grid">
+        <div class="item-card">
+            <img src="https://via.placeholder.com/150" class="item-image">
+            <div class="item-name">NFT Golden Star</div>
+            <div class="card-buttons">
+                <button class="btn-buy-now">1500 ₽</button>
+                <button class="btn-add-cart">
+                    <svg class="btn-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+                </button>
             </div>
-    </div>
-
-    <div id="page-cart" class="page" style="padding: 20px;">
-        <h2 style="text-align:center; font-size: 1rem;">ОФОРМЛЕНИЕ</h2>
-        <div id="cart-items-list"></div>
-        <div id="cart-total" style="text-align:right; font-weight:700; font-size:1.1rem; color:#f4d03f; margin: 15px 0;"></div>
-        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:15px; border-radius:10px; font-weight:700;">КУПИТЬ</button>
+        </div>
+        
+        <div class="item-card">
+            <img src="https://via.placeholder.com/150" class="item-image">
+            <div class="item-name">NFT Blue Rabbit</div>
+            <div class="card-buttons">
+                <button class="btn-buy-now">500 ₽</button>
+                <button class="btn-add-cart">
+                    <svg class="btn-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+                </button>
+            </div>
+        </div>
     </div>
 
     <div class="tab-bar">
-        <div class="tab-item active" id="tab-catalog" onclick="showPage('catalog')">МАГАЗИН</div>
-        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
+        <div class="tab-item active">МАГАЗИН</div>
+        <div class="tab-item">ИНВЕНТАРЬ</div>
     </div>
 
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script>
-        const tg = window.Telegram.WebApp;
-        const API_BASE = 'https://dnx-shop.onrender.com';
-        let cart = [];
-
-        function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
-            document.getElementById('page-' + pageId).classList.add('page-active');
-            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            document.getElementById('tab-' + pageId)?.classList.add('active');
-        }
-
-        async function loadCatalog() {
-            try {
-                const res = await fetch(`${API_BASE}/items`);
-                const items = await res.json();
-                document.getElementById('catalog-list').innerHTML = items.map(item => `
-                    <div class="item-card">
-                        <img src="${item.image_url}" class="item-image">
-                        <div class="item-name">${item.name}</div>
-                        <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="buyNow(${item.id})">${item.price} ₽</button>
-                            <button class="btn-add-cart" onclick="addToCart(${item.id})">
-                                <svg class="btn-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
-            } catch (e) { console.error(e); }
-        }
-
-        function addToCart(id) {
-            if(!cart.includes(id)) {
-                cart.push(id);
-                document.getElementById('cart-counter').innerText = cart.length;
-                tg.HapticFeedback.impactOccurred('light');
-            }
-        }
-
-        function buyNow(id) {
-            cart = [id];
-            showPage('cart');
-        }
-
-        loadCatalog();
-    </script>
 </body>
 </html>
