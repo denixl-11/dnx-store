@@ -31,7 +31,6 @@
             text-transform: uppercase;
             margin: 0;
             color: #fff; 
-            /* Свечение уменьшено: меньше слоев и радиус */
             text-shadow: 
                 0 0 4px #fff,
                 0 0 7px #f4d03f,
@@ -177,7 +176,7 @@
             <button class="btn-check" id="btn-check-pay" onclick="checkPayment()">Проверить оплату</button>
             <div id="close-hint" class="close-hint">Вы можете закрыть окно, пока идет проверка транзакции</div>
         </div>
-        <button style="background:none; color:#555; border:1px solid #333; margin-top:15px;" onclick="window.location.reload()">Вернуться в каталог</button>
+        <button style="background:none; color:#555; border:1px solid #333; margin-top:15px;" onclick="cancelReservation()">Вернуться в каталог</button>
     </div>
 
     <div id="image-viewer" onclick="closeImage()">
@@ -193,6 +192,27 @@
         const API_BASE = 'https://dnx-shop.onrender.com';
         let currentPendingItemId = null;
         let isPolling = false;
+
+        // --- НОВАЯ ФУНКЦИЯ ОТМЕНЫ БРОНИ ---
+        async function cancelReservation() {
+            if (currentPendingItemId) {
+                try {
+                    // Отправляем запрос на сервер для снятия брони
+                    await fetch(`${API_BASE}/cancel_reserve`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            item_id: currentPendingItemId,
+                            user_id: tg.initDataUnsafe.user?.id || 0
+                        })
+                    });
+                } catch (e) {
+                    console.error("Ошибка при отмене брони:", e);
+                }
+            }
+            // После запроса (или если его не было) возвращаем пользователя в начало
+            window.location.reload();
+        }
 
         function showStatusNotif(text, type) {
             const notif = document.createElement('div');
