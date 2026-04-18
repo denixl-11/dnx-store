@@ -21,19 +21,12 @@
 
         /* --- ШАПКА --- */
         header {
-            width: 100%;
-            padding: 40px 0 20px 0;
-            text-align: center;
-            position: relative;
+            width: 100%; padding: 40px 0 20px 0; text-align: center; position: relative;
         }
 
         h1 {
-            font-weight: 650; 
-            font-size: 1.85rem;
-            text-transform: uppercase;
-            margin: 0;
-            letter-spacing: 1px;
-            color: #fff;
+            font-weight: 650; font-size: 1.85rem; text-transform: uppercase; margin: 0;
+            letter-spacing: 1px; color: #fff;
             text-shadow: 0 0 10px rgba(255, 255, 255, 0.2), 0 0 25px rgba(244, 208, 63, 0.8), 0 0 50px rgba(244, 208, 63, 0.6), 0 0 90px rgba(244, 208, 63, 0.3);
         }
 
@@ -75,22 +68,39 @@
             height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;
         }
 
-        /* --- СТРАНИЦА КОРЗИНЫ --- */
+        /* --- КОРЗИНА И ОПЛАТА --- */
         .cart-list { padding: 15px; width: 100%; box-sizing: border-box; }
         .cart-item {
             display: flex; align-items: center; background: #111; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #1a1a1a;
         }
-        .cart-item img { width: 50px; height: 50px; border-radius: 8px; margin-right: 15px; }
+        .cart-item img { width: 50px; height: 50px; border-radius: 8px; margin-right: 15px; object-fit: cover; }
         .cart-item-info { flex-grow: 1; }
         .cart-item-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
         .cart-item-price { color: #f4d03f; font-weight: 700; font-size: 0.85rem; }
 
-        .pay-footer {
-            position: fixed; bottom: 80px; width: 100%; padding: 15px; box-sizing: border-box; background: #080808;
+        .fixed-footer {
+            position: fixed; bottom: 80px; width: 100%; padding: 15px; box-sizing: border-box; background: #080808; z-index: 90;
         }
-        .btn-pay-all {
+        .btn-main-action {
             width: 100%; background: #f4d03f; color: #000; border: none; border-radius: 12px;
             height: 50px; font-weight: 900; font-size: 1rem; text-transform: uppercase; cursor: pointer;
+        }
+        .btn-secondary {
+            width: 100%; background: transparent; color: #888; border: 1px solid #333; border-radius: 12px;
+            height: 50px; font-weight: 600; font-size: 1rem; margin-top: 10px; cursor: pointer;
+        }
+
+        .payment-box {
+            background: #111; padding: 20px; border-radius: 16px; border: 1px solid #1a1a1a; margin-top: 20px;
+        }
+        .req-input-group {
+            display: flex; gap: 10px; margin-top: 10px;
+        }
+        .req-input {
+            flex-grow: 1; background: #000; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; font-family: inherit; font-size: 1rem;
+        }
+        .btn-copy {
+            background: #222; border: 1px solid #444; color: #fff; padding: 0 15px; border-radius: 8px; cursor: pointer; font-weight: 600;
         }
 
         /* --- СТРАНИЦЫ --- */
@@ -125,8 +135,31 @@
 
     <div id="page-cart" class="page">
         <div id="cart-items-list" class="cart-list"></div>
-        <div class="pay-footer" id="pay-footer" style="display: none;">
-            <button class="btn-pay-all" onclick="processPayment('корзины')">Перейти к оплате</button>
+        <div class="fixed-footer" id="pay-footer" style="display: none;">
+            <button class="btn-main-action" onclick="goToPayment('cart')">Перейти к оплате</button>
+        </div>
+    </div>
+
+    <div id="page-payment" class="page">
+        <div style="padding: 20px;">
+            <h2 style="text-align: center; color: #f4d03f; margin-top: 0;">ОФОРМЛЕНИЕ ЗАКАЗА</h2>
+            <p style="text-align: center; color: #888; font-size: 0.9rem;">Переведите точную сумму по реквизитам ниже</p>
+            
+            <div class="payment-box">
+                <div style="color: #666; font-size: 0.8rem; margin-bottom: 5px; text-transform: uppercase;">Сумма к оплате:</div>
+                <div id="payment-amount" style="font-size: 1.8rem; font-weight: 900; color: #fff; margin-bottom: 20px;">0 ₽</div>
+                
+                <div style="color: #666; font-size: 0.8rem; text-transform: uppercase;">Реквизиты (СБП / Карта):</div>
+                <div class="req-input-group">
+                    <input type="text" id="req-card" class="req-input" value="1111 2222 3333 4444" readonly>
+                    <button class="btn-copy" onclick="copyReq()">Копия</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <button class="btn-main-action" onclick="checkPayment()">Проверить оплату</button>
+                <button class="btn-secondary" onclick="showPage('store')">Отмена</button>
+            </div>
         </div>
     </div>
 
@@ -150,16 +183,20 @@
             document.getElementById('page-' + pageId).classList.add('page-active');
             
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            if(pageId !== 'cart') document.getElementById('tab-' + pageId).classList.add('active');
+            
+            // Подсветка таб-бара (если мы в оплате или корзине, не светим Инвентарь)
+            if(pageId === 'store') document.getElementById('tab-store').classList.add('active');
+            if(pageId === 'inventory') document.getElementById('tab-inventory').classList.add('active');
             
             if(pageId === 'cart') renderCart();
-            tg.HapticFeedback.impactOccurred('medium');
+            tg.HapticFeedback.impactOccurred('light');
         }
 
         function addToCart(item) {
             cart.push(item);
             document.getElementById('cart-counter').innerText = cart.length;
             tg.HapticFeedback.notificationOccurred('success');
+            tg.showAlert(`Добавлено в корзину: ${item.name}`);
         }
 
         function renderCart() {
@@ -169,22 +206,53 @@
                 list.innerHTML = '<div style="text-align:center; padding: 50px; color:#555;">Корзина пуста</div>';
                 footer.style.display = 'none';
             } else {
-                list.innerHTML = cart.map(item => `
+                list.innerHTML = cart.map((item, index) => `
                     <div class="cart-item">
                         <img src="${item.image_url}">
                         <div class="cart-item-info">
                             <div class="cart-item-name">${item.name}</div>
                             <div class="cart-item-price">${item.price} ₽</div>
                         </div>
+                        <div style="color: #444; font-size: 1.2rem; padding: 0 10px; cursor: pointer;" onclick="removeFromCart(${index})">×</div>
                     </div>
                 `).join('');
                 footer.style.display = 'block';
             }
         }
 
-        function processPayment(type) {
-            tg.showConfirm(`Вы переходите к оплате ${type}. Продолжить?`, (ok) => {
-                if(ok) tg.showAlert("Окно оплаты открыто!");
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            document.getElementById('cart-counter').innerText = cart.length;
+            renderCart();
+            tg.HapticFeedback.impactOccurred('medium');
+        }
+
+        function goToPayment(type, price = 0) {
+            let total = 0;
+            if (type === 'cart') {
+                total = cart.reduce((sum, item) => sum + parseInt(item.price), 0);
+            } else {
+                total = parseInt(price);
+            }
+            document.getElementById('payment-amount').innerText = total + ' ₽';
+            showPage('payment');
+        }
+
+        function copyReq() {
+            const reqInput = document.getElementById('req-card');
+            reqInput.select();
+            document.execCommand('copy');
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.showAlert('Реквизиты скопированы!');
+        }
+
+        function checkPayment() {
+            tg.showConfirm('Проверка платежа... Если вы перевели средства, нажмите ОК и ожидайте зачисления NFT в инвентарь.', (ok) => {
+                if(ok) {
+                    cart = []; // Очищаем корзину после предполагаемой успешной оплаты
+                    document.getElementById('cart-counter').innerText = '0';
+                    showPage('store');
+                }
             });
         }
 
@@ -197,7 +265,7 @@
                         <img src="${item.image_url}" class="item-image">
                         <div class="item-name">${item.name}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="processPayment('${item.name}')">${item.price} ₽</button>
+                            <button class="btn-buy-now" onclick="goToPayment('item', ${item.price})">${item.price} ₽</button>
                             <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f4d03f" stroke-width="2.5">
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
@@ -206,7 +274,9 @@
                         </div>
                     </div>
                 `).join('');
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                document.getElementById('catalog-list').innerHTML = '<p style="text-align:center;width:100%;color:#555;">Ошибка загрузки товаров</p>';
+            }
         }
 
         loadCatalog();
