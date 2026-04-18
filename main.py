@@ -15,7 +15,6 @@ BOT_TOKEN = "8701376578:AAGqehQYFf3ePE61lDhWhCnR7Q2lthnR3Oc"
 ADMIN_ID = 7106612591
 WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
 
-# ЗАМЕНА ВАЛЮТЫ В РЕКВИЗИТАХ (если нужно)
 PAYMENT_REQUISITES = "💳 Карта: **** **** **** 0000 (Т-Банк)\n👤 Получатель: Твое Имя"
 
 DB_CONFIG = {
@@ -32,10 +31,8 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
-
 
 # --- API МЕТОДЫ ДЛЯ WEB APP ---
 
@@ -49,7 +46,6 @@ async def handle_get_items(request):
     except Exception as e:
         logging.error(f"Ошибка API GET: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": "*"})
-
 
 async def handle_reserve(request):
     try:
@@ -69,14 +65,12 @@ async def handle_reserve(request):
                         (user_id, datetime.now(), item_id))
                     conn.commit()
 
-                    # ЗАМЕНА TON НА ₽ В УВЕДОМЛЕНИИ АДМИНУ
                     admin_msg = (
                         f"⏳ **Новая бронь из Web App!**\n\n"
                         f"👤 Пользователь: @{username}\n"
                         f"📦 Товар: {item['name']}\n"
                         f"💰 Цена: {item['price']} ₽\n"
-                        f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
-                        f" "
+                        f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}"
                     )
                     await bot.send_message(ADMIN_ID, admin_msg, parse_mode="Markdown")
                     return web.json_response({"success": True, "requisites": PAYMENT_REQUISITES},
@@ -86,6 +80,26 @@ async def handle_reserve(request):
     except Exception as e:
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
+# --- НОВЫЙ МЕТОД: ОТМЕНА БРОНИ ПОЛЬЗОВАТЕЛЕМ ---
+async def handle_cancel_reserve(request):
+    try:
+        data = await request.json()
+        item_id = data.get('item_id')
+        user_id = data.get('user_id')
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Отменяем бронь только если товар забронирован этим пользователем
+                cur.execute(
+                    "UPDATE items SET status = 'Доступен', buyer_id = NULL, reserved_at = NULL, last_event = NULL "
+                    "WHERE id = %s AND buyer_id = %s AND status = 'Забронирован'",
+                    (item_id, user_id)
+                )
+                conn.commit()
+                return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+    except Exception as e:
+        logging.error(f"Error in cancel_reserve: {e}")
+        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 async def handle_check_payment(request):
     try:
@@ -99,27 +113,23 @@ async def handle_check_payment(request):
                 cur.execute("SELECT name, price, nft_link FROM items WHERE id = %s", (item_id,))
                 item = cur.fetchone()
                 if item:
-                    # ПОРЯДОК КНОПОК: ОТКЛОНИТЬ СЛЕВА, ПОДТВЕРДИТЬ СПРАВА
                     admin_kb = InlineKeyboardMarkup(inline_keyboard=[
                         [
                             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"pay_no_{item_id}_{user_id}"),
                             InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"pay_yes_{item_id}_{user_id}")
                         ]
                     ])
-                    # ЗАМЕНА TON НА ₽
                     admin_msg = (
                         f"💰 **Пользователь заявляет об оплате!**\n\n"
                         f"👤 Пользователь: @{username}\n"
                         f"📦 Товар: {item['name']}\n"
                         f"💰 Цена: {item['price']} ₽\n"
-                        f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}\n\n"
-                        f" "
+                        f"🔗 Ссылка: {item.get('nft_link', 'нет ссылки')}"
                     )
                     await bot.send_message(ADMIN_ID, admin_msg, reply_markup=admin_kb, parse_mode="Markdown")
                     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
-
 
 # --- МЕТОДЫ СТАТУСА ---
 
@@ -136,7 +146,6 @@ async def handle_get_status(request):
     except:
         return web.json_response({"last_event": None}, headers={"Access-Control-Allow-Origin": "*"})
 
-
 async def handle_clear_event(request):
     try:
         data = await request.json()
@@ -149,14 +158,12 @@ async def handle_clear_event(request):
     except:
         return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
 
-
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
     })
-
 
 # --- ОБРАБОТКА CALLBACK КНОПОК АДМИНА ---
 
@@ -185,7 +192,6 @@ async def admin_pay_confirm(callback: types.CallbackQuery):
                 pass
     await callback.answer()
 
-
 @dp.callback_query(F.data.startswith("pay_no_"))
 async def admin_pay_reject(callback: types.CallbackQuery):
     _, _, item_id, uid = callback.data.split("_")
@@ -194,9 +200,9 @@ async def admin_pay_reject(callback: types.CallbackQuery):
             cur.execute("SELECT name FROM items WHERE id = %s", (item_id,))
             item = cur.fetchone()
 
-            # Здесь buyer_id оставляем для уведомления в WebApp, чтобы Polling сработал
+            # Очищаем buyer_id, чтобы товар стал доступен всем
             cur.execute(
-                "UPDATE items SET status = 'Доступен', last_event = 'rejected', reserved_at = NULL WHERE id = %s",
+                "UPDATE items SET status = 'Доступен', last_event = 'rejected', reserved_at = NULL, buyer_id = NULL WHERE id = %s",
                 (item_id,))
             conn.commit()
 
@@ -213,7 +219,6 @@ async def admin_pay_reject(callback: types.CallbackQuery):
                 pass
     await callback.answer()
 
-
 # --- ЛОГИКА БОТА ---
 
 @dp.message(Command("start"))
@@ -224,7 +229,6 @@ async def cmd_start(message: types.Message):
         [InlineKeyboardButton(text="📦 Мои покупки", callback_data="my_inventory")]
     ])
     await message.answer("Привет! 🎁 Добро пожаловать в DNX Store.", reply_markup=kb)
-
 
 @dp.callback_query(F.data == "show_catalog")
 async def callback_catalog(callback: types.CallbackQuery):
@@ -239,13 +243,11 @@ async def callback_catalog(callback: types.CallbackQuery):
         for item in items:
             kb = InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🔗 Посмотреть NFT", url=item.get('nft_link', WEBAPP_URL))],
-                # ЗАМЕНА TON НА ₽ В ТЕКСТОВОМ КАТАЛОГЕ
                 [InlineKeyboardButton(text=f"💳 Купить за {item['price']} ₽", callback_data=f"buy_{item['id']}")]
             ])
             await callback.message.answer(f"🎁 **{item['name']}**\n💰 Цена: {item['price']} ₽", reply_markup=kb,
                                           parse_mode="Markdown")
     await callback.answer()
-
 
 @dp.callback_query(F.data == "my_inventory")
 async def callback_inventory(callback: types.CallbackQuery):
@@ -260,17 +262,16 @@ async def callback_inventory(callback: types.CallbackQuery):
                 await callback.message.answer(res)
     await callback.answer()
 
-
 # --- ЗАПУСК ---
 
 app = web.Application()
 app.router.add_get('/items', handle_get_items)
 app.router.add_post('/reserve', handle_reserve)
+app.router.add_post('/cancel_reserve', handle_cancel_reserve) # Новый маршрут
 app.router.add_post('/check_payment', handle_check_payment)
 app.router.add_get('/get_status', handle_get_status)
 app.router.add_post('/clear_event', handle_clear_event)
 app.router.add_options('/{tail:.*}', handle_options)
-
 
 async def main():
     port = int(os.environ.get("PORT", 8080))
@@ -279,7 +280,6 @@ async def main():
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
