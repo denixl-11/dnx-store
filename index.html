@@ -17,10 +17,9 @@
             align-items: center;
             min-height: 100vh;
             padding-bottom: 100px;
-            overflow-x: hidden;
         }
 
-        /* --- ШАПКА: МЕНЕЕ ЖИРНЫЙ НЕОН --- */
+        /* --- ШАПКА --- */
         header {
             width: 100%;
             padding: 40px 0 20px 0;
@@ -34,8 +33,7 @@
             text-transform: uppercase;
             margin: 0;
             color: #fff;
-            font-weight: 500; /* Уменьшена жирность (было 900) */
-            /* Мощное неоновое свечение сохранено */
+            font-weight: 500;
             text-shadow: 
                 0 0 5px #fff,
                 0 0 10px #f4d03f,
@@ -44,32 +42,29 @@
         }
 
         .subtitle {
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             color: #888;
             margin-top: 8px;
             letter-spacing: 2px;
             text-transform: uppercase;
         }
 
-        /* Узкая кнопка корзины в шапке */
         .cart-btn-header {
             position: absolute;
             right: 20px;
             top: 75px;
             background: rgba(25, 25, 25, 0.9);
             border: 1px solid #333;
-            padding: 4px 8px; /* Сужена */
+            padding: 6px 10px;
             border-radius: 8px;
             display: flex;
             align-items: center;
             cursor: pointer;
-            backdrop-filter: blur(5px);
         }
 
-        .cart-icon-svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; }
-        .cart-count { color: #f4d03f; font-size: 0.75rem; margin-left: 6px; font-weight: 700; }
+        .cart-count { color: #f4d03f; font-size: 0.8rem; margin-left: 6px; font-weight: 700; }
 
-        /* --- КАРТОЧКИ И УЗКИЕ КНОПКИ --- */
+        /* --- КАТАЛОГ --- */
         .catalog-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -86,7 +81,6 @@
             padding: 12px;
             display: flex;
             flex-direction: column;
-            align-items: center; /* Центрирование для узких кнопок */
         }
 
         .item-image {
@@ -98,48 +92,58 @@
         }
 
         .item-name {
-            width: 100%;
             font-size: 0.8rem;
             font-weight: 700;
             margin-bottom: 15px;
             color: #fff;
-            text-align: left;
+            text-align: center; /* Название по центру */
+            width: 100%;
         }
 
         .card-buttons {
             display: flex;
-            width: 100%; /* Контейнер на всю ширину */
-            justify-content: center; /* Кнопки по центру */
+            width: 100%;
             gap: 6px;
+            margin-top: auto;
         }
 
-        /* Кнопки сделаны в 2 раза уже */
         .btn-buy-now {
-            width: 55%; /* В два раза уже относительно контейнера */
+            flex: 4; 
             background: #f4d03f;
             color: #000;
             border: none;
-            border-radius: 8px;
-            padding: 8px 0; /* Уменьшена высота */
+            border-radius: 10px;
+            padding: 12px 0;
             font-weight: 700;
-            font-size: 0.75rem;
+            font-size: 0.85rem;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
             cursor: pointer;
         }
 
         .btn-add-cart {
-            width: 20%; /* В два раза уже */
+            flex: 1;
             background: #000;
             border: 1.5px solid #f4d03f;
-            border-radius: 8px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
         }
 
-        .btn-icon-svg { width: 16px; height: 16px; fill: none; stroke: #f4d03f; stroke-width: 2.5; }
+        .btn-icon-svg { width: 18px; height: 18px; fill: none; stroke: #f4d03f; stroke-width: 2.5; }
+
+        /* --- ИНВЕНТАРЬ --- */
+        .empty-inventory {
+            text-align: center;
+            margin-top: 100px;
+            color: #444; /* Темный подходящий цвет */
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            font-weight: 500;
+            padding: 0 40px;
+        }
 
         /* --- ТАБ-БАР --- */
         .tab-bar {
@@ -154,25 +158,11 @@
             z-index: 1000;
         }
 
-        .tab-item { color: #444; font-size: 0.7rem; font-weight: 700; cursor: pointer; text-transform: uppercase; }
+        .tab-item { color: #444; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-transform: uppercase; }
         .tab-item.active { color: #f4d03f; }
 
         .page { display: none; width: 100%; }
         .page-active { display: block; }
-
-        /* Узкая кнопка оплаты в корзине */
-        .btn-pay {
-            display: block;
-            margin: 0 auto;
-            width: 50%; /* В 2 раза уже */
-            background: #f4d03f;
-            color: #000;
-            border: none;
-            padding: 12px;
-            border-radius: 10px;
-            font-weight: 700;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
@@ -181,7 +171,7 @@
         <h1>DNX Store</h1>
         <div class="subtitle">Exclusive Digital Assets</div>
         <div class="cart-btn-header" onclick="showPage('cart')">
-            <svg class="cart-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+            <svg style="width:14px; height:14px; fill:none; stroke:#fff; stroke-width:2;" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
             <span class="cart-count" id="cart-counter">0</span>
         </div>
     </header>
@@ -190,15 +180,14 @@
         <div id="catalog-list" class="catalog-grid"></div>
     </div>
 
-    <div id="page-cart" class="page" style="padding: 20px; box-sizing: border-box;">
-        <h2 style="text-align:center; font-weight: 700; font-size: 1rem;">КОРЗИНА</h2>
+    <div id="page-cart" class="page" style="padding: 20px;">
+        <h2 style="text-align:center; font-size:1rem; font-weight: 700;">КОРЗИНА</h2>
         <div id="cart-items-list"></div>
-        <div id="cart-total" style="text-align:center; font-weight:700; font-size:1.1rem; color:#f4d03f; margin: 20px 0;"></div>
-        <button class="btn-pay" onclick="buyCart()">ОПЛАТИТЬ</button>
+        <div id="cart-total" style="text-align:right; font-weight:700; color:#f4d03f; margin: 15px 0;"></div>
+        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:15px; border-radius:10px; font-weight:700;">КУПИТЬ</button>
     </div>
 
-    <div id="page-inventory" class="page" style="padding: 20px;">
-        <h2 style="text-align:center; font-weight: 700; font-size: 1rem;">ИНВЕНТАРЬ</h2>
+    <div id="page-inventory" class="page">
         <div id="inventory-list"></div>
     </div>
 
@@ -228,8 +217,7 @@
             try {
                 const res = await fetch(`${API_BASE}/items`);
                 allItems = await res.json();
-                const container = document.getElementById('catalog-list');
-                container.innerHTML = allItems.map(item => `
+                document.getElementById('catalog-list').innerHTML = allItems.map(item => `
                     <div class="item-card">
                         <img src="${item.image_url}" class="item-image">
                         <div class="item-name">${item.name}</div>
@@ -241,7 +229,7 @@
                         </div>
                     </div>
                 `).join('');
-            } catch (e) { console.error("Ошибка загрузки:", e); }
+            } catch (e) { console.error(e); }
         }
 
         function addToCart(id) {
@@ -254,7 +242,6 @@
 
         function buyNow(id) {
             cart = [id];
-            renderCart();
             showPage('cart');
         }
 
@@ -264,7 +251,7 @@
             let total = 0;
             list.innerHTML = selected.map(i => {
                 total += i.price;
-                return `<div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #222; font-size:0.85rem;">
+                return `<div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #222;">
                             <span>${i.name}</span>
                             <span style="color:#f4d03f">${i.price} ₽</span>
                         </div>`;
@@ -280,7 +267,7 @@
                 body: JSON.stringify({ user_id: tg.initDataUnsafe?.user?.id || 12345, item_ids: cart })
             });
             if(res.ok) {
-                tg.showAlert("Готово!");
+                tg.showAlert("Успешно!");
                 cart = [];
                 document.getElementById('cart-counter').innerText = '0';
                 showPage('inventory');
@@ -291,11 +278,17 @@
             const userId = tg.initDataUnsafe?.user?.id || 12345;
             const res = await fetch(`${API_BASE}/inventory/${userId}`);
             const data = await res.json();
-            document.getElementById('inventory-list').innerHTML = data.map(i => `
-                <div style="background:#111; padding:12px; border-radius:12px; margin-bottom:8px; border:1px solid #222; font-size:0.8rem;">
-                    <strong>${i.name}</strong><br><small style="color:#555">ID: ${i.id}</small>
-                </div>
-            `).join('');
+            const container = document.getElementById('inventory-list');
+            
+            if (data.length === 0) {
+                container.innerHTML = `<div class="empty-inventory">твой инвентарь сейчас пустой</div>`;
+            } else {
+                container.innerHTML = data.map(i => `
+                    <div style="background:#111; padding:15px; border-radius:12px; margin: 15px; border:1px solid #222;">
+                        <strong style="display:block; text-align:center;">${i.name}</strong>
+                    </div>
+                `).join('');
+            }
         }
 
         loadCatalog();
