@@ -6,6 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        /* --- ВОССТАНОВЛЕННЫЕ СТИЛИ DNX STORE (ЗОЛОТОЕ СВЕЧЕНИЕ) --- */
         body {
             background-color: #080808;
             color: #ffffff;
@@ -16,56 +17,76 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
-            padding-bottom: 80px; /* место под таб-бар */
+            padding-bottom: 80px; 
+            overflow-x: hidden;
         }
 
-        /* --- ШАПКА --- */
         header {
             width: 100%;
-            padding: 20px 0;
+            padding: 25px 0 15px 0;
             text-align: center;
             position: relative;
             background: #080808;
         }
 
         h1 {
-            font-size: 1.5rem;
-            letter-spacing: 2px;
+            font-size: 1.8rem;
+            letter-spacing: 3px;
             text-transform: uppercase;
             margin: 0;
-            text-shadow: 0 0 10px #f4d03f;
+            color: #fff; 
+            /* Тот самый эффект свечения */
+            text-shadow: 
+                0 0 4px #fff,
+                0 0 7px #f4d03f,
+                0 0 12px #f4d03f,
+                0 0 25px #f4d03f;
+        }
+
+        .subtitle { 
+            font-size: 0.75rem; 
+            color: #888; 
+            margin-top: 5px; 
+            letter-spacing: 1px; 
+            text-transform: uppercase;
         }
 
         .cart-btn-header {
             position: absolute;
             right: 20px;
-            top: 20px;
-            background: #1a1a1a;
+            top: 25px;
+            background: rgba(26, 26, 26, 0.8);
             border: 1px solid #333;
             padding: 8px 12px;
             border-radius: 12px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            backdrop-filter: blur(5px);
         }
 
         .cart-count {
             background: #f4d03f;
             color: #000;
-            font-size: 0.7rem;
-            padding: 2px 6px;
+            font-size: 0.75rem;
+            padding: 2px 7px;
             border-radius: 50%;
-            margin-left: 5px;
+            margin-left: 8px;
             font-weight: bold;
         }
 
         /* --- СТРАНИЦЫ --- */
         .page { display: none; width: 100%; max-width: 500px; padding: 15px; box-sizing: border-box; }
-        .page-active { display: block; }
+        .page-active { display: block; animation: fadeIn 0.3s ease; }
 
-        /* --- СЕТКА ТОВАРОВ --- */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* --- КАТАЛОГ --- */
         .catalog-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
+            gap: 15px;
+            width: 100%;
         }
 
         .item-card {
@@ -75,7 +96,10 @@
             padding: 10px;
             display: flex;
             flex-direction: column;
+            transition: transform 0.2s;
         }
+
+        .item-card:active { transform: scale(0.97); }
 
         .item-image {
             width: 100%;
@@ -83,55 +107,68 @@
             border-radius: 14px;
             object-fit: cover;
             margin-bottom: 10px;
+            background: #1a1a1a;
         }
+
+        .item-name { font-size: 0.85rem; font-weight: 700; margin-bottom: 5px; }
 
         .price-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 5px;
+            margin-top: auto;
         }
+
+        .price-value { color: #f4d03f; font-weight: 700; font-size: 1rem; }
 
         .btn-add-cart {
             background: #1a1a1a;
             border: 1px solid #f4d03f;
             color: #f4d03f;
-            padding: 5px 10px;
+            width: 40px;
+            height: 35px;
             border-radius: 10px;
-            font-size: 1rem;
+            font-size: 1.1rem;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        /* --- НИЖНЯЯ ПАНЕЛЬ (TAB BAR) --- */
+        /* --- ТАБ-БАР --- */
         .tab-bar {
             position: fixed;
             bottom: 0;
             width: 100%;
-            background: #111;
+            background: rgba(17, 17, 17, 0.95);
             border-top: 1px solid #222;
             display: flex;
             justify-content: space-around;
             padding: 15px 0;
             z-index: 1000;
+            backdrop-filter: blur(10px);
         }
 
         .tab-item {
             color: #555;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             text-align: center;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: color 0.3s;
         }
 
         .tab-item.active { color: #f4d03f; }
+        .tab-icon { font-size: 1.2rem; display: block; margin-bottom: 4px; }
 
-        /* --- КОРЗИНА И ИНВЕНТАРЬ --- */
-        .cart-item, .inv-item {
+        /* --- КОРЗИНА / ОПЛАТА --- */
+        .cart-item {
             background: #121212;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             padding: 15px;
-            border-radius: 15px;
+            border-radius: 18px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -142,83 +179,91 @@
             background: linear-gradient(45deg, #d4af37, #f4d03f);
             color: #000;
             border: none;
-            padding: 15px;
-            border-radius: 12px;
+            padding: 16px;
+            border-radius: 15px;
             width: 100%;
-            font-weight: bold;
+            font-weight: 800;
             font-size: 1rem;
             margin-top: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
         }
 
-        #payment-screen { text-align: center; }
         .requisites {
             background: #1a1a1a;
             border: 1px dashed #f4d03f;
-            padding: 15px;
+            padding: 20px;
             color: #f4d03f;
-            margin: 15px 0;
+            margin: 20px 0;
             font-family: monospace;
-            border-radius: 10px;
+            border-radius: 12px;
+            white-space: pre-line;
+            font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1 id="header-title">DNX Store</h1>
+    <header id="main-header">
+        <h1>DNX Store</h1>
+        <div class="subtitle">Exclusive Digital Assets</div>
         <div class="cart-btn-header" onclick="showPage('cart')">
-            🛒<span class="cart-count" id="cart-counter">0</span>
+            🛒 <span class="cart-count" id="cart-counter">0</span>
         </div>
     </header>
 
     <div id="page-catalog" class="page page-active">
         <div id="catalog-list" class="catalog-grid">
-            <div style="grid-column: span 2; text-align:center; padding:50px;">Загрузка...</div>
+            <div style="grid-column: span 2; text-align:center; padding:50px; color:#555;">Загрузка...</div>
         </div>
     </div>
 
     <div id="page-inventory" class="page">
-        <h2 style="text-align:center;">Мои активы</h2>
+        <h2 style="text-align:center; font-size:1.2rem; color:#f4d03f;">МОИ АКТИВЫ</h2>
         <div id="inventory-list"></div>
     </div>
 
     <div id="page-cart" class="page">
-        <h2 style="text-align:center;">Корзина</h2>
+        <h2 style="text-align:center; font-size:1.2rem;">КОРЗИНА</h2>
         <div id="cart-items-list"></div>
-        <div id="cart-total" style="text-align:right; font-weight:bold; font-size:1.2rem; margin:15px;"></div>
+        <div id="cart-total" style="text-align:right; font-weight:700; font-size:1.3rem; margin:20px 10px; color:#f4d03f;"></div>
         <button class="main-btn" id="btn-pay-cart" onclick="buyCart()">Оплатить заказ</button>
-        <button style="background:none; border:none; color:#555; width:100%; margin-top:10px;" onclick="showPage('catalog')">Назад в каталог</button>
+        <button style="background:none; border:none; color:#555; width:100%; margin-top:15px; cursor:pointer;" onclick="showPage('catalog')">Вернуться назад</button>
     </div>
 
     <div id="page-payment" class="page">
         <div style="background:#111; border:2px solid #d4af37; padding:25px; border-radius:25px; text-align:center;">
-            <h3>Оплата</h3>
-            <div id="pay-info"></div>
+            <h3 style="margin-top:0;">Оформление</h3>
+            <div id="pay-info" style="font-size:1.1rem; margin-bottom:10px;"></div>
             <div class="requisites" id="pay-requisites"></div>
             <button class="main-btn" onclick="confirmPayment()">Я оплатил</button>
         </div>
     </div>
 
     <div class="tab-bar">
-        <div class="tab-item active" id="tab-catalog" onclick="showPage('catalog')">🏠 Магазин</div>
-        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">📦 Инвентарь</div>
+        <div class="tab-item active" id="tab-catalog" onclick="showPage('catalog')">
+            <span class="tab-icon">🏠</span>МАГАЗИН
+        </div>
+        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">
+            <span class="tab-icon">📦</span>ИНВЕНТАРЬ
+        </div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        tg.headerColor = '#080808';
         
         const API_BASE = 'https://dnx-shop.onrender.com';
         let allItems = [];
         let cart = [];
 
-        // Переключение страниц
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.getElementById('page-' + pageId).classList.add('page-active');
             
-            // Активные табы
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
             if(pageId === 'catalog') document.getElementById('tab-catalog').classList.add('active');
             if(pageId === 'inventory') {
@@ -228,18 +273,17 @@
             if(pageId === 'cart') renderCart();
         }
 
-        // Загрузка каталога
         async function loadCatalog() {
             try {
                 const res = await fetch(`${API_BASE}/items`);
                 allItems = await res.json();
                 const container = document.getElementById('catalog-list');
-                container.innerHTML = allItems.filter(i => i.status === 'Доступен').map(item => `
+                container.innerHTML = allItems.map(item => `
                     <div class="item-card">
                         <img src="${item.image_url}" class="item-image">
-                        <div style="font-weight:bold; font-size:0.9rem;">${item.name}</div>
+                        <div class="item-name">${item.name}</div>
                         <div class="price-row">
-                            <span style="color:#f4d03f">${item.price} ₽</span>
+                            <span class="price-value">${Number(item.price).toLocaleString()} ₽</span>
                             <button class="btn-add-cart" onclick="addToCart(${item.id})">🛒+</button>
                         </div>
                     </div>
@@ -247,12 +291,11 @@
             } catch (e) { console.error(e); }
         }
 
-        // Работа с корзиной
         function addToCart(id) {
             const item = allItems.find(i => i.id === id);
             if (!cart.find(i => i.id === id)) {
                 cart.push(item);
-                tg.HapticFeedback.notificationOccurred('success');
+                tg.HapticFeedback.impactOccurred('medium');
                 updateCartCounter();
             } else {
                 tg.showAlert("Товар уже в корзине");
@@ -280,13 +323,13 @@
                     <div class="cart-item">
                         <span>${item.name}</span>
                         <div>
-                            <b style="color:#f4d03f">${item.price} ₽</b>
-                            <button onclick="removeFromCart(${idx})" style="background:none; border:none; color:red; margin-left:10px;">✕</button>
+                            <b style="color:#f4d03f">${Number(item.price).toLocaleString()} ₽</b>
+                            <button onclick="removeFromCart(${idx})" style="background:none; border:none; color:#ff4d4d; margin-left:15px; font-size:1.2rem; cursor:pointer;">✕</button>
                         </div>
                     </div>
                 `;
             }).join('');
-            document.getElementById('cart-total').innerText = `Итого: ${total} ₽`;
+            document.getElementById('cart-total').innerText = `Итого: ${total.toLocaleString()} ₽`;
         }
 
         function removeFromCart(idx) {
@@ -295,68 +338,70 @@
             renderCart();
         }
 
-        // Оплата корзины
         async function buyCart() {
-            tg.showConfirm(`Оплатить ${cart.length} товаров?`, async (ok) => {
-                if(!ok) return;
-                
-                try {
-                    const res = await fetch(`${API_BASE}/reserve`, {
+            if(cart.length === 0) return;
+            try {
+                const res = await fetch(`${API_BASE}/reserve`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        item_ids: cart.map(i => i.id),
+                        user_id: tg.initDataUnsafe.user?.id || 0,
+                        username: tg.initDataUnsafe.user?.username || 'Guest'
+                    })
+                });
+                const result = await res.json();
+                if(result.success) {
+                    showPage('payment');
+                    document.getElementById('pay-info').innerText = `К оплате: ${document.getElementById('cart-total').innerText}`;
+                    document.getElementById('pay-requisites').innerText = result.requisites;
+                } else {
+                    tg.showAlert(result.error);
+                }
+            } catch(e) { tg.showAlert("Ошибка сервера"); }
+        }
+
+        function confirmPayment() {
+            tg.showConfirm("Вы точно совершили оплату?", async (ok) => {
+                if(ok) {
+                    await fetch(`${API_BASE}/check_payment`, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
-                            item_ids: cart.map(i => i.id),
-                            user_id: tg.initDataUnsafe.user?.id || 0,
-                            username: tg.initDataUnsafe.user?.username || 'Guest'
+                            user_id: tg.initDataUnsafe.user?.id,
+                            username: tg.initDataUnsafe.user?.username
                         })
                     });
-                    const result = await res.json();
-                    if(result.success) {
-                        showPage('payment');
-                        document.getElementById('pay-info').innerText = `К оплате: ${document.getElementById('cart-total').innerText}`;
-                        document.getElementById('pay-requisites').innerText = result.requisites;
-                    } else {
-                        tg.showAlert(result.error);
-                    }
-                } catch(e) { tg.showAlert("Ошибка связи с сервером"); }
+                    tg.showAlert("Запрос отправлен! Ожидайте подтверждения.");
+                    cart = [];
+                    updateCartCounter();
+                    showPage('catalog');
+                }
             });
         }
 
-        async function confirmPayment() {
-            tg.showConfirm("Вы подтверждаете оплату?", async (ok) => {
-                if(!ok) return;
-                // Здесь можно вызвать /check_payment для каждого или для группы
-                tg.showAlert("Запрос отправлен админу. Ожидайте подтверждения!");
-                cart = [];
-                updateCartCounter();
-                showPage('catalog');
-            });
-        }
-
-        // Инвентарь
         async function loadInventory() {
             const container = document.getElementById('inventory-list');
-            container.innerHTML = "Загрузка ваших покупок...";
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:#555;">Загрузка...</div>';
             try {
                 const res = await fetch(`${API_BASE}/inventory?user_id=${tg.initDataUnsafe.user?.id || 0}`);
                 const items = await res.json();
                 if(items.length === 0) {
-                    container.innerHTML = '<div style="text-align:center; padding:40px; color:#555;">У вас пока нет купленных NFT</div>';
+                    container.innerHTML = '<div style="text-align:center; padding:40px; color:#555;">Нет купленных NFT</div>';
                 } else {
                     container.innerHTML = items.map(item => `
-                        <div class="inv-item">
+                        <div class="cart-item">
                             <div style="display:flex; align-items:center;">
-                                <img src="${item.image_url}" style="width:40px; height:40px; border-radius:5px; margin-right:10px;">
+                                <img src="${item.image_url}" style="width:45px; height:45px; border-radius:10px; margin-right:15px; object-fit:cover;">
                                 <span>${item.name}</span>
                             </div>
-                            <a href="${item.nft_link}" style="color:#f4d03f; text-decoration:none; font-weight:bold;">ОТКРЫТЬ</a>
+                            <button onclick="window.open('${item.nft_link}')" style="background:#f4d03f; color:#000; border:none; padding:8px 12px; border-radius:8px; font-weight:bold; font-size:0.7rem; cursor:pointer;">ОТКРЫТЬ</button>
                         </div>
                     `).join('');
                 }
             } catch (e) { container.innerHTML = "Ошибка загрузки"; }
         }
 
-        // Инициализация
         loadCatalog();
     </script>
 </body>
