@@ -34,11 +34,7 @@
             margin: 0;
             color: #fff;
             font-weight: 500;
-            text-shadow: 
-                0 0 5px #fff,
-                0 0 10px #f4d03f,
-                0 0 25px #f4d03f,
-                0 0 45px rgba(244, 208, 63, 0.4);
+            text-shadow: 0 0 5px #fff, 0 0 15px #f4d03f;
         }
 
         .subtitle {
@@ -49,6 +45,7 @@
             text-transform: uppercase;
         }
 
+        /* Кнопка корзины в шапке */
         .cart-btn-header {
             position: absolute;
             right: 20px;
@@ -61,7 +58,6 @@
             align-items: center;
             cursor: pointer;
         }
-
         .cart-count { color: #f4d03f; font-size: 0.8rem; margin-left: 6px; font-weight: 700; }
 
         /* --- КАТАЛОГ --- */
@@ -94,12 +90,13 @@
         .item-name {
             font-size: 0.8rem;
             font-weight: 700;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             color: #fff;
-            text-align: center; /* Название по центру */
+            text-align: center; /* Центровка названия */
             width: 100%;
         }
 
+        /* ГЕОМЕТРИЯ КНОПОК: СТРОГО 4:1 И В 2 РАЗА ТОНЬШЕ */
         .card-buttons {
             display: flex;
             width: 100%;
@@ -112,37 +109,39 @@
             background: #f4d03f;
             color: #000;
             border: none;
-            border-radius: 10px;
-            padding: 12px 0;
+            border-radius: 8px;
+            height: 32px; /* Уменьшенная в 2 раза высота */
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .btn-add-cart {
             flex: 1;
             background: #000;
             border: 1.5px solid #f4d03f;
-            border-radius: 10px;
+            border-radius: 8px;
+            height: 32px; /* Уменьшенная в 2 раза высота */
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
         }
 
-        .btn-icon-svg { width: 18px; height: 18px; fill: none; stroke: #f4d03f; stroke-width: 2.5; }
+        .btn-icon-svg { width: 14px; height: 14px; fill: none; stroke: #f4d03f; stroke-width: 2.5; }
 
         /* --- ИНВЕНТАРЬ --- */
         .empty-inventory {
             text-align: center;
-            margin-top: 100px;
-            color: #444; /* Темный подходящий цвет */
+            margin-top: 150px;
+            color: #2a2a2a; /* Темный подходящий цвет */
             font-size: 0.9rem;
-            letter-spacing: 1px;
             font-weight: 500;
-            padding: 0 40px;
+            letter-spacing: 0.5px;
         }
 
         /* --- ТАБ-БАР --- */
@@ -161,8 +160,12 @@
         .tab-item { color: #444; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-transform: uppercase; }
         .tab-item.active { color: #f4d03f; }
 
+        /* СТРАНИЦЫ */
         .page { display: none; width: 100%; }
         .page-active { display: block; }
+
+        /* КОРЗИНА */
+        .cart-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #222; }
     </style>
 </head>
 <body>
@@ -181,10 +184,10 @@
     </div>
 
     <div id="page-cart" class="page" style="padding: 20px;">
-        <h2 style="text-align:center; font-size:1rem; font-weight: 700;">КОРЗИНА</h2>
+        <h2 style="text-align:center; font-size:1rem; letter-spacing: 2px;">КОРЗИНА</h2>
         <div id="cart-items-list"></div>
-        <div id="cart-total" style="text-align:right; font-weight:700; color:#f4d03f; margin: 15px 0;"></div>
-        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:15px; border-radius:10px; font-weight:700;">КУПИТЬ</button>
+        <div id="cart-total" style="text-align:right; font-weight:700; color:#f4d03f; margin: 20px 0; font-size: 1.1rem;"></div>
+        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:15px; border-radius:12px; font-weight:700; text-transform:uppercase;">Оплатить заказ</button>
     </div>
 
     <div id="page-inventory" class="page">
@@ -251,7 +254,7 @@
             let total = 0;
             list.innerHTML = selected.map(i => {
                 total += i.price;
-                return `<div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #222;">
+                return `<div class="cart-item">
                             <span>${i.name}</span>
                             <span style="color:#f4d03f">${i.price} ₽</span>
                         </div>`;
@@ -264,10 +267,13 @@
             const res = await fetch(`${API_BASE}/buy`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: tg.initDataUnsafe?.user?.id || 12345, item_ids: cart })
+                body: JSON.stringify({ 
+                    user_id: tg.initDataUnsafe?.user?.id || 12345, 
+                    item_ids: cart 
+                })
             });
             if(res.ok) {
-                tg.showAlert("Успешно!");
+                tg.showAlert("Покупка прошла успешно!");
                 cart = [];
                 document.getElementById('cart-counter').innerText = '0';
                 showPage('inventory');
@@ -284,8 +290,8 @@
                 container.innerHTML = `<div class="empty-inventory">твой инвентарь сейчас пустой</div>`;
             } else {
                 container.innerHTML = data.map(i => `
-                    <div style="background:#111; padding:15px; border-radius:12px; margin: 15px; border:1px solid #222;">
-                        <strong style="display:block; text-align:center;">${i.name}</strong>
+                    <div style="background:#111; padding:15px; border-radius:12px; margin: 15px; border:1px solid #222; text-align:center;">
+                        <strong>${i.name}</strong>
                     </div>
                 `).join('');
             }
