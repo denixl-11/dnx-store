@@ -4,14 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DNX STORE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
     <style>
         body {
             background-color: #080808;
             color: #ffffff;
             font-family: 'Inter', sans-serif;
             margin: 0;
-            padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -25,25 +24,19 @@
             padding: 40px 0 20px 0;
             text-align: center;
             position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
         }
 
         h1 {
-            /* Жирность уменьшена на 0.03 (визуально до 800) */
-            font-weight: 800; 
             font-size: 1.8rem;
             text-transform: uppercase;
             margin: 0;
             color: #fff;
-            /* Растягиваем заголовок по ширине картинки (примерно 170-180px на мобайле) */
-            letter-spacing: 0.35em; 
-            text-indent: 0.35em; /* Компенсация отступа последнего символа для точной центровки */
+            /* Жирность уменьшена на 0.03, свечение увеличено на 0.05 */
+            font-weight: 700; 
+            letter-spacing: 1px;
             text-shadow: 
-                0 0 5.02px rgba(255, 255, 255, 0.8), 
-                0 0 15.02px rgba(244, 208, 63, 0.9);
-            width: 90%; /* Ограничиваем контейнер, чтобы соответствовать сетке */
+                0 0 5.05px rgba(255, 255, 255, 0.8), 
+                0 0 20.05px rgba(244, 208, 63, 1);
         }
 
         .subtitle {
@@ -57,16 +50,15 @@
         .cart-btn-header {
             position: absolute;
             right: 20px;
-            top: 75px;
+            top: 50%;
+            transform: translateY(-50%);
             background: rgba(25, 25, 25, 0.9);
             border: 1px solid #333;
             padding: 6px 10px;
             border-radius: 8px;
             display: flex;
             align-items: center;
-            cursor: pointer;
         }
-        .cart-count { color: #f4d03f; font-size: 0.8rem; margin-left: 6px; font-weight: 700; }
 
         /* --- КАТАЛОГ --- */
         .catalog-grid {
@@ -96,18 +88,19 @@
         }
 
         .item-name {
-            font-size: 0.8rem;
+            /* Шрифт увеличен, ширина как у картинки */
+            font-size: 1.1rem;
             font-weight: 700;
             margin-bottom: 12px;
             color: #fff;
-            text-align: center;
+            text-align: left;
+            width: 100%;
         }
 
         .card-buttons {
             display: flex;
             width: 100%;
             gap: 6px;
-            margin-top: auto;
         }
 
         .btn-buy-now {
@@ -116,15 +109,13 @@
             color: #000;
             border: none;
             border-radius: 8px;
-            height: 32px; 
-            font-weight: 800;
+            height: 32px; /* Размер кнопок строго не меняется */
+            font-weight: 900;
+            /* Цена увеличена и растянута */
             font-size: 0.95rem; 
             letter-spacing: 1.2px; 
             text-transform: uppercase;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         .btn-add-cart {
@@ -132,14 +123,11 @@
             background: #000;
             border: 1.5px solid #f4d03f;
             border-radius: 8px;
-            height: 32px; 
+            height: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
         }
-
-        .btn-icon-svg { width: 14px; height: 14px; fill: none; stroke: #f4d03f; stroke-width: 2.5; }
 
         /* --- ИНВЕНТАРЬ --- */
         .empty-inventory-msg {
@@ -147,7 +135,6 @@
             text-align: center;
             color: #555;
             font-size: 0.85rem;
-            font-weight: 500;
         }
 
         /* --- ТАБ-БАР --- */
@@ -160,10 +147,9 @@
             display: flex;
             justify-content: space-around;
             padding: 20px 0;
-            z-index: 1000;
         }
 
-        .tab-item { color: #444; font-size: 0.75rem; font-weight: 700; cursor: pointer; text-transform: uppercase; }
+        .tab-item { color: #444; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
         .tab-item.active { color: #f4d03f; }
 
         .page { display: none; width: 100%; }
@@ -173,23 +159,15 @@
 <body>
 
     <header>
-        <h1>DNX Store</h1>
+        <h1>DNX STORE</h1>
         <div class="subtitle">Exclusive Digital Assets</div>
-        <div class="cart-btn-header" onclick="showPage('cart')">
-            <svg style="width:14px; height:14px; fill:none; stroke:#fff; stroke-width:2;" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
-            <span class="cart-count" id="cart-counter">0</span>
+        <div class="cart-btn-header">
+            <span id="cart-counter" style="color:#f4d03f; font-weight:900;">0</span>
         </div>
     </header>
 
     <div id="page-catalog" class="page page-active">
         <div id="catalog-list" class="catalog-grid"></div>
-    </div>
-
-    <div id="page-cart" class="page" style="padding: 20px;">
-        <h2 style="text-align:center; font-size:1rem;">КОРЗИНА</h2>
-        <div id="cart-items-list"></div>
-        <div id="cart-total" style="text-align:right; font-weight:800; color:#f4d03f; margin: 20px 0; font-size: 1.2rem;"></div>
-        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:16px; border-radius:12px; font-weight:800;">ОПЛАТИТЬ</button>
     </div>
 
     <div id="page-inventory" class="page">
@@ -199,8 +177,8 @@
     </div>
 
     <div class="tab-bar">
-        <div class="tab-item active" id="tab-catalog" onclick="showPage('catalog')">МАГАЗИН</div>
-        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
+        <div class="tab-item active" onclick="showPage('catalog')">МАГАЗИН</div>
+        <div class="tab-item" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -213,10 +191,7 @@
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.getElementById('page-' + pageId).classList.add('page-active');
-            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            document.getElementById('tab-' + pageId)?.classList.add('active');
             if(pageId === 'inventory') loadInventory();
-            if(pageId === 'cart') renderCart();
         }
 
         async function loadCatalog() {
@@ -228,9 +203,11 @@
                         <img src="${item.image_url}" class="item-image">
                         <div class="item-name">${item.name}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="buyNow(${item.id})">${item.price} ₽</button>
+                            <button class="btn-buy-now">${item.price} ₽</button>
                             <button class="btn-add-cart" onclick="addToCart(${item.id})">
-                                <svg class="btn-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f4d03f" stroke-width="2.5">
+                                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
+                                </svg>
                             </button>
                         </div>
                     </div>
@@ -246,45 +223,6 @@
             }
         }
 
-        function buyNow(id) {
-            cart = [id];
-            showPage('cart');
-        }
-
-        function renderCart() {
-            const list = document.getElementById('cart-items-list');
-            const selected = allItems.filter(i => cart.includes(i.id));
-            let total = 0;
-            if(selected.length === 0) {
-                list.innerHTML = `<div style="text-align:center; color:#444; margin-top:50px;">Корзина пуста</div>`;
-                document.getElementById('cart-total').innerText = "";
-                return;
-            }
-            list.innerHTML = selected.map(i => {
-                total += i.price;
-                return `<div style="display:flex; justify-content:space-between; padding:15px 0; border-bottom:1px solid #1a1a1a;">
-                            <span>${i.name}</span>
-                            <span style="color:#f4d03f; font-weight:800;">${i.price} ₽</span>
-                        </div>`;
-            }).join('');
-            document.getElementById('cart-total').innerText = `ИТОГО: ${total} ₽`;
-        }
-
-        async function buyCart() {
-            if(cart.length === 0) return;
-            const res = await fetch(`${API_BASE}/buy`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: tg.initDataUnsafe?.user?.id || 12345, item_ids: cart })
-            });
-            if(res.ok) {
-                tg.showAlert("Оплачено!");
-                cart = [];
-                document.getElementById('cart-counter').innerText = '0';
-                showPage('inventory');
-            }
-        }
-
         async function loadInventory() {
             const container = document.getElementById('inventory-list');
             const userId = tg.initDataUnsafe?.user?.id || 12345;
@@ -294,12 +232,7 @@
                 if (!data || data.length === 0) {
                     container.innerHTML = `<div class="empty-inventory-msg">В вашем инвентаре сейчас нет предметов</div>`;
                 } else {
-                    container.innerHTML = data.map(i => `
-                        <div style="background:#111; padding:20px; border-radius:16px; margin-bottom:12px; border:1px solid #1a1a1a; display:flex; justify-content:space-between;">
-                            <span style="font-weight:700;">${i.name}</span>
-                            <span style="color:#f4d03f; font-size:0.7rem;">ACTIVE</span>
-                        </div>
-                    `).join('');
+                    container.innerHTML = data.map(i => `<div style="padding:20px; border-bottom:1px solid #222;">${i.name}</div>`).join('');
                 }
             } catch (e) {
                 container.innerHTML = `<div class="empty-inventory-msg">В вашем инвентаре сейчас нет предметов</div>`;
