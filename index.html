@@ -16,6 +16,9 @@
             align-items: center;
             min-height: 100vh;
             padding-bottom: 100px;
+            /* Максимальное сглаживание шрифтов для гладкости букв */
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         /* --- ШАПКА --- */
@@ -27,17 +30,19 @@
         }
 
         h1 {
+            /* Жирность строго 650 */
             font-weight: 650; 
             font-size: 1.85rem;
             text-transform: uppercase;
             margin: 0;
             letter-spacing: 1px;
             color: #fff;
-            /* Свечение +0.1 */
+            /* Свечение с увеличенной дальностью и интенсивностью (+0.1) */
             text-shadow: 
-                0 0 12px rgba(255, 255, 255, 0.8), 
-                0 0 28px rgba(244, 208, 63, 1),
-                0 0 45px rgba(244, 208, 63, 0.5);
+                0 0 10px rgba(255, 255, 255, 0.4),
+                0 0 25px rgba(244, 208, 63, 0.9), 
+                0 0 50px rgba(244, 208, 63, 0.7),
+                0 0 85px rgba(244, 208, 63, 0.4);
         }
 
         .subtitle {
@@ -89,18 +94,18 @@
         }
 
         .item-name {
-            /* Шрифт чуть-чуть больше, не жирный, ширина как у картинки */
-            font-size: 1rem;
-            font-weight: 700;
+            /* Слегка увеличенный шрифт, не жирный */
+            font-size: 1.05rem;
+            font-weight: 600; 
             margin-bottom: 12px;
             color: #fff;
-            text-align: left;
-            width: 100%; 
+            
+            /* Растягивание текста строго от левого до правого края картинки */
+            width: 100%;
             display: block;
+            text-align: justify;
+            text-align-last: justify;
             box-sizing: border-box;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
         .card-buttons {
@@ -187,20 +192,18 @@
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
         let cart = [];
-        let allItems = [];
 
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.getElementById('page-' + pageId).classList.add('page-active');
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
             document.getElementById('tab-' + pageId).classList.add('active');
-            if(pageId === 'inventory') loadInventory();
         }
 
         async function loadCatalog() {
             try {
                 const res = await fetch(`${API_BASE}/items`);
-                allItems = await res.json();
+                const allItems = await res.json();
                 document.getElementById('catalog-list').innerHTML = allItems.map(item => `
                     <div class="item-card">
                         <img src="${item.image_url}" class="item-image">
@@ -215,7 +218,9 @@
                         </div>
                     </div>
                 `).join('');
-            } catch (e) { console.error("Ошибка загрузки"); }
+            } catch (e) { 
+                console.error("Ошибка загрузки данных"); 
+            }
         }
 
         function addToCart(id) {
@@ -224,18 +229,6 @@
                 document.getElementById('cart-counter').innerText = cart.length;
                 tg.HapticFeedback.impactOccurred('medium');
             }
-        }
-
-        async function loadInventory() {
-            const container = document.getElementById('inventory-list');
-            const userId = tg.initDataUnsafe?.user?.id || 12345;
-            try {
-                const res = await fetch(`${API_BASE}/inventory/${userId}`);
-                const data = await res.json();
-                if (data && data.length > 0) {
-                    container.innerHTML = data.map(i => `<div style="padding:15px; border-bottom:1px solid #222;">${i.name}</div>`).join('');
-                }
-            } catch (e) { console.error("Ошибка инвентаря"); }
         }
 
         loadCatalog();
