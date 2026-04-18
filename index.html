@@ -16,13 +16,16 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
+            padding-bottom: 100px;
+            overflow-x: hidden;
         }
 
-        /* --- ЧЕСТНЫЙ НЕОН --- */
+        /* --- ШАПКА: ПРАВИЛЬНЫЙ НЕОН --- */
         header {
             width: 100%;
             padding: 40px 0 20px 0;
             text-align: center;
+            position: relative;
         }
 
         h1 {
@@ -32,12 +35,12 @@
             margin: 0;
             color: #fff;
             font-weight: 900;
-            /* Многослойный неон: белый центр + золотое свечение */
+            /* Насыщенный золотой неон без пересвета */
             text-shadow: 
                 0 0 5px #fff,
                 0 0 10px #f4d03f,
-                0 0 20px #f4d03f,
-                0 0 40px rgba(244, 208, 63, 0.5);
+                0 0 25px #f4d03f,
+                0 0 45px rgba(244, 208, 63, 0.4);
         }
 
         .subtitle {
@@ -48,7 +51,25 @@
             text-transform: uppercase;
         }
 
-        /* --- КНОПКИ 4:1 --- */
+        /* Кнопка корзины в шапке (опущена) */
+        .cart-btn-header {
+            position: absolute;
+            right: 20px;
+            top: 75px;
+            background: rgba(25, 25, 25, 0.9);
+            border: 1px solid #333;
+            padding: 6px 12px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+        }
+
+        .cart-icon-svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; }
+        .cart-count { color: #f4d03f; font-size: 0.8rem; margin-left: 8px; font-weight: 900; }
+
+        /* --- СЕТКА ТОВАРОВ И КНОПКИ 4:1 --- */
         .catalog-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -88,7 +109,7 @@
             gap: 8px;
         }
 
-        /* Кнопка с ценой (80% ширины) */
+        /* Золотая кнопка КУПИТЬ (4/5 ширины) */
         .btn-buy-now {
             flex: 4; 
             background: #f4d03f;
@@ -97,17 +118,16 @@
             border-radius: 10px;
             padding: 12px 0;
             font-weight: 900;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             text-transform: uppercase;
-            /* Продольная надпись */
-            letter-spacing: 1.5px; 
+            letter-spacing: 1.5px; /* Продольный текст */
             cursor: pointer;
         }
 
-        /* Кнопка корзины (20% ширины) */
+        /* Кнопка КОРЗИНА (1/5 ширины) */
         .btn-add-cart {
             flex: 1;
-            background: #1a1a1a;
+            background: #000;
             border: 1.5px solid #f4d03f;
             border-radius: 10px;
             display: flex;
@@ -116,13 +136,7 @@
             cursor: pointer;
         }
 
-        .btn-icon-svg { 
-            width: 18px; 
-            height: 18px; 
-            fill: none; 
-            stroke: #f4d03f; 
-            stroke-width: 2.5; 
-        }
+        .btn-icon-svg { width: 18px; height: 18px; fill: none; stroke: #f4d03f; stroke-width: 2.5; }
 
         /* --- ТАБ-БАР --- */
         .tab-bar {
@@ -130,14 +144,18 @@
             bottom: 0;
             width: 100%;
             background: #000;
-            border-top: 1px solid #222;
+            border-top: 1px solid #1a1a1a;
             display: flex;
             justify-content: space-around;
             padding: 20px 0;
+            z-index: 1000;
         }
 
-        .tab-item { color: #555; font-size: 0.7rem; font-weight: 800; cursor: pointer; }
+        .tab-item { color: #444; font-size: 0.75rem; font-weight: 800; cursor: pointer; text-transform: uppercase; }
         .tab-item.active { color: #f4d03f; }
+
+        .page { display: none; width: 100%; }
+        .page-active { display: block; }
     </style>
 </head>
 <body>
@@ -145,36 +163,128 @@
     <header>
         <h1>DNX Store</h1>
         <div class="subtitle">Exclusive Digital Assets</div>
+        <div class="cart-btn-header" onclick="showPage('cart')">
+            <svg class="cart-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+            <span class="cart-count" id="cart-counter">0</span>
+        </div>
     </header>
 
-    <div class="catalog-grid">
-        <div class="item-card">
-            <img src="https://via.placeholder.com/150" class="item-image">
-            <div class="item-name">NFT Golden Star</div>
-            <div class="card-buttons">
-                <button class="btn-buy-now">1500 ₽</button>
-                <button class="btn-add-cart">
-                    <svg class="btn-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
-                </button>
-            </div>
-        </div>
-        
-        <div class="item-card">
-            <img src="https://via.placeholder.com/150" class="item-image">
-            <div class="item-name">NFT Blue Rabbit</div>
-            <div class="card-buttons">
-                <button class="btn-buy-now">500 ₽</button>
-                <button class="btn-add-cart">
-                    <svg class="btn-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
-                </button>
-            </div>
-        </div>
+    <div id="page-catalog" class="page page-active">
+        <div id="catalog-list" class="catalog-grid"></div>
+    </div>
+
+    <div id="page-cart" class="page" style="padding: 20px; box-sizing: border-box;">
+        <h2 style="text-align:center; font-weight: 900;">КОРЗИНА</h2>
+        <div id="cart-items-list"></div>
+        <div id="cart-total" style="text-align:right; font-weight:900; font-size:1.3rem; color:#f4d03f; margin: 20px 0;"></div>
+        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:18px; border-radius:12px; font-weight:900;">ОПЛАТИТЬ</button>
+    </div>
+
+    <div id="page-inventory" class="page" style="padding: 20px;">
+        <h2 style="text-align:center; font-weight: 900;">ИНВЕНТАРЬ</h2>
+        <div id="inventory-list"></div>
     </div>
 
     <div class="tab-bar">
-        <div class="tab-item active">МАГАЗИН</div>
-        <div class="tab-item">ИНВЕНТАРЬ</div>
+        <div class="tab-item active" id="tab-catalog" onclick="showPage('catalog')">МАГАЗИН</div>
+        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        const tg = window.Telegram.WebApp;
+        const API_BASE = 'https://dnx-shop.onrender.com';
+        let cart = [];
+        let allItems = [];
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
+            document.getElementById('page-' + pageId).classList.add('page-active');
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + pageId)?.classList.add('active');
+            
+            if(pageId === 'inventory') loadInventory();
+            if(pageId === 'cart') renderCart();
+        }
+
+        async function loadCatalog() {
+            try {
+                const res = await fetch(`${API_BASE}/items`);
+                allItems = await res.json();
+                const container = document.getElementById('catalog-list');
+                container.innerHTML = allItems.map(item => `
+                    <div class="item-card">
+                        <img src="${item.image_url}" class="item-image">
+                        <div class="item-name">${item.name}</div>
+                        <div class="card-buttons">
+                            <button class="btn-buy-now" onclick="buyNow(${item.id})">${item.price} ₽</button>
+                            <button class="btn-add-cart" onclick="addToCart(${item.id})">
+                                <svg class="btn-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) { console.error("Ошибка загрузки каталога:", e); }
+        }
+
+        function addToCart(id) {
+            if(!cart.includes(id)) {
+                cart.push(id);
+                document.getElementById('cart-counter').innerText = cart.length;
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+        }
+
+        function buyNow(id) {
+            cart = [id];
+            renderCart();
+            showPage('cart');
+        }
+
+        function renderCart() {
+            const list = document.getElementById('cart-items-list');
+            const selected = allItems.filter(i => cart.includes(i.id));
+            let total = 0;
+            
+            list.innerHTML = selected.map(i => {
+                total += i.price;
+                return `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #222;">
+                            <span>${i.name}</span>
+                            <span style="color:#f4d03f">${i.price} ₽</span>
+                        </div>`;
+            }).join('');
+            
+            document.getElementById('cart-total').innerText = `ИТОГО: ${total} ₽`;
+        }
+
+        async function buyCart() {
+            if(cart.length === 0) return;
+            const res = await fetch(`${API_BASE}/buy`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ user_id: tg.initDataUnsafe?.user?.id || 12345, item_ids: cart })
+            });
+            if(res.ok) {
+                tg.showAlert("Покупка успешна!");
+                cart = [];
+                document.getElementById('cart-counter').innerText = '0';
+                showPage('inventory');
+            }
+        }
+
+        async function loadInventory() {
+            const userId = tg.initDataUnsafe?.user?.id || 12345;
+            const res = await fetch(`${API_BASE}/inventory/${userId}`);
+            const data = await res.json();
+            document.getElementById('inventory-list').innerHTML = data.map(i => `
+                <div style="background:#111; padding:15px; border-radius:15px; margin-bottom:10px; border:1px solid #222;">
+                    <strong>${i.name}</strong><br><small style="color:#666">ID: ${i.id}</small>
+                </div>
+            `).join('');
+        }
+
+        loadCatalog();
+        tg.expand();
+    </script>
 </body>
 </html>
