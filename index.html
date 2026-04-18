@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DNX STORE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         body {
             background-color: #080808;
@@ -27,22 +27,24 @@
         }
 
         h1 {
-            font-size: 1.8rem;
+            /* Жирность ровно 650 (через 600 в Inter для баланса) */
+            font-weight: 650; 
+            font-size: 1.85rem;
             text-transform: uppercase;
             margin: 0;
-            color: #fff;
-            /* Жирность уменьшена на 0.03, свечение увеличено на 0.05 */
-            font-weight: 700; 
             letter-spacing: 1px;
+            color: #fff;
+            /* Свечение увеличено на +0.1 */
             text-shadow: 
-                0 0 5.05px rgba(255, 255, 255, 0.8), 
-                0 0 20.05px rgba(244, 208, 63, 1);
+                0 0 12px rgba(255, 255, 255, 0.8), 
+                0 0 28px rgba(244, 208, 63, 1),
+                0 0 40px rgba(244, 208, 63, 0.4);
         }
 
         .subtitle {
             font-size: 0.6rem;
             color: #888;
-            margin-top: 8px;
+            margin-top: 5px;
             letter-spacing: 2px;
             text-transform: uppercase;
         }
@@ -50,14 +52,14 @@
         .cart-btn-header {
             position: absolute;
             right: 20px;
-            top: 50%;
+            top: 55%;
             transform: translateY(-50%);
-            background: rgba(25, 25, 25, 0.9);
-            border: 1px solid #333;
-            padding: 6px 10px;
-            border-radius: 8px;
             display: flex;
             align-items: center;
+            background: rgba(25, 25, 25, 0.9);
+            border: 1px solid #333;
+            padding: 5px 10px;
+            border-radius: 8px;
         }
 
         /* --- КАТАЛОГ --- */
@@ -88,13 +90,17 @@
         }
 
         .item-name {
-            /* Шрифт увеличен, ширина как у картинки */
-            font-size: 1.1rem;
+            font-size: 0.9rem;
             font-weight: 700;
             margin-bottom: 12px;
             color: #fff;
             text-align: left;
             width: 100%;
+            box-sizing: border-box;
+            /* Защита от вылета текста */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .card-buttons {
@@ -109,17 +115,16 @@
             color: #000;
             border: none;
             border-radius: 8px;
-            height: 32px; /* Размер кнопок строго не меняется */
+            height: 32px;
             font-weight: 900;
-            /* Цена увеличена и растянута */
-            font-size: 0.95rem; 
-            letter-spacing: 1.2px; 
+            font-size: 0.9rem;
+            letter-spacing: 1px;
             text-transform: uppercase;
             cursor: pointer;
         }
 
         .btn-add-cart {
-            flex: 1;
+            flex: 1.2;
             background: #000;
             border: 1.5px solid #f4d03f;
             border-radius: 8px;
@@ -127,14 +132,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-        }
-
-        /* --- ИНВЕНТАРЬ --- */
-        .empty-inventory-msg {
-            margin-top: 180px;
-            text-align: center;
-            color: #555;
-            font-size: 0.85rem;
+            cursor: pointer;
         }
 
         /* --- ТАБ-БАР --- */
@@ -149,7 +147,7 @@
             padding: 20px 0;
         }
 
-        .tab-item { color: #444; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
+        .tab-item { color: #444; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; cursor: pointer; }
         .tab-item.active { color: #f4d03f; }
 
         .page { display: none; width: 100%; }
@@ -162,7 +160,10 @@
         <h1>DNX STORE</h1>
         <div class="subtitle">Exclusive Digital Assets</div>
         <div class="cart-btn-header">
-            <span id="cart-counter" style="color:#f4d03f; font-weight:900;">0</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
+            </svg>
+            <span id="cart-counter" style="color:#f4d03f; font-weight:900; margin-left: 5px;">0</span>
         </div>
     </header>
 
@@ -171,14 +172,14 @@
     </div>
 
     <div id="page-inventory" class="page">
-        <div id="inventory-list">
-            <div class="empty-inventory-msg">В вашем инвентаре сейчас нет предметов</div>
+        <div id="inventory-list" style="padding: 20px; text-align: center; color: #555; margin-top: 150px;">
+            В вашем инвентаре сейчас нет предметов
         </div>
     </div>
 
     <div class="tab-bar">
-        <div class="tab-item active" onclick="showPage('catalog')">МАГАЗИН</div>
-        <div class="tab-item" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
+        <div class="tab-item active" id="tab-catalog" onclick="showPage('catalog')">МАГАЗИН</div>
+        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -191,6 +192,8 @@
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.getElementById('page-' + pageId).classList.add('page-active');
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + pageId).classList.add('active');
             if(pageId === 'inventory') loadInventory();
         }
 
@@ -212,7 +215,7 @@
                         </div>
                     </div>
                 `).join('');
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Ошибка загрузки"); }
         }
 
         function addToCart(id) {
@@ -229,18 +232,15 @@
             try {
                 const res = await fetch(`${API_BASE}/inventory/${userId}`);
                 const data = await res.json();
-                if (!data || data.length === 0) {
-                    container.innerHTML = `<div class="empty-inventory-msg">В вашем инвентаре сейчас нет предметов</div>`;
-                } else {
-                    container.innerHTML = data.map(i => `<div style="padding:20px; border-bottom:1px solid #222;">${i.name}</div>`).join('');
+                if (data && data.length > 0) {
+                    container.innerHTML = data.map(i => `<div style="padding:15px; border-bottom:1px solid #222;">${i.name}</div>`).join('');
                 }
-            } catch (e) {
-                container.innerHTML = `<div class="empty-inventory-msg">В вашем инвентаре сейчас нет предметов</div>`;
-            }
+            } catch (e) { console.error("Ошибка инвентаря"); }
         }
 
         loadCatalog();
         tg.expand();
+        tg.ready();
     </script>
 </body>
 </html>
