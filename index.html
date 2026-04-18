@@ -17,7 +17,6 @@
             min-height: 100vh;
             padding-bottom: 100px;
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
         }
 
         /* --- ШАПКА --- */
@@ -35,114 +34,63 @@
             margin: 0;
             letter-spacing: 1px;
             color: #fff;
-            /* УСИЛЕННОЕ И ГЛАДКОЕ СВЕЧЕНИЕ */
-            text-shadow: 
-                0 0 10px rgba(255, 255, 255, 0.2),
-                0 0 25px rgba(244, 208, 63, 0.8), 
-                0 0 50px rgba(244, 208, 63, 0.6),
-                0 0 90px rgba(244, 208, 63, 0.3);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2), 0 0 25px rgba(244, 208, 63, 0.8), 0 0 50px rgba(244, 208, 63, 0.6), 0 0 90px rgba(244, 208, 63, 0.3);
         }
 
         .subtitle {
-            font-size: 0.6rem;
-            color: #888;
-            margin-top: 5px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+            font-size: 0.6rem; color: #888; margin-top: 5px; letter-spacing: 2px; text-transform: uppercase;
         }
 
         .cart-btn-header {
-            position: absolute;
-            right: 20px;
-            top: 55%;
-            transform: translateY(-50%);
-            display: flex;
-            align-items: center;
-            background: rgba(25, 25, 25, 0.9);
-            border: 1px solid #333;
-            padding: 5px 12px;
-            border-radius: 8px;
+            position: absolute; right: 20px; top: 55%; transform: translateY(-50%);
+            display: flex; align-items: center; background: rgba(25, 25, 25, 0.9);
+            border: 1px solid #333; padding: 5px 12px; border-radius: 8px; cursor: pointer;
         }
 
-        #cart-counter {
-            color: #f4d03f;
-            font-weight: 500; /* Менее жирная цифра */
-            margin-left: 6px;
-            font-size: 0.9rem;
-        }
+        #cart-counter { color: #f4d03f; font-weight: 500; margin-left: 6px; font-size: 0.9rem; }
 
         /* --- КАТАЛОГ --- */
         .catalog-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            width: 100%;
-            padding: 10px 15px;
-            box-sizing: border-box;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; padding: 10px 15px; box-sizing: border-box;
         }
 
-        .item-card {
-            background: #111;
-            border: 1px solid #1a1a1a;
-            border-radius: 22px;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .item-image {
-            width: 100%;
-            aspect-ratio: 1/1;
-            border-radius: 16px;
-            object-fit: cover;
-            margin-bottom: 12px;
-        }
+        .item-card { background: #111; border: 1px solid #1a1a1a; border-radius: 22px; padding: 12px; display: flex; flex-direction: column; }
+        .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 16px; object-fit: cover; margin-bottom: 12px; }
 
         .item-name {
-            font-size: 1.05rem;
-            font-weight: 600; 
-            margin-bottom: 12px;
-            color: #fff;
-            
-            /* СТРОГО В ОДНУ СТРОКУ И ПО КРАЯМ */
-            width: 100%;
-            display: block;
-            white-space: nowrap;
-            text-align: justify;
-            text-align-last: justify;
-            box-sizing: border-box;
+            font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; color: #fff;
+            width: 100%; display: block; white-space: nowrap; text-align: justify; text-align-last: justify;
         }
+        .item-name::after { content: ""; display: inline-block; width: 100%; }
 
-        .card-buttons {
-            display: flex;
-            width: 100%;
-            gap: 6px;
-        }
+        .card-buttons { display: flex; width: 100%; gap: 6px; }
 
         .btn-buy-now {
-            flex: 4; 
-            background: #f4d03f;
-            color: #000;
-            border: none;
-            border-radius: 8px;
-            height: 32px;
-            font-weight: 900;
-            font-size: 0.85rem;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            cursor: pointer;
+            flex: 4; background: #f4d03f; color: #000; border: none; border-radius: 8px;
+            height: 32px; font-weight: 900; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
         }
 
         .btn-add-cart {
-            flex: 1.2;
-            background: #000;
-            border: 1.5px solid #f4d03f;
-            border-radius: 8px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
+            flex: 1.2; background: #000; border: 1.5px solid #f4d03f; border-radius: 8px;
+            height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+
+        /* --- СТРАНИЦА КОРЗИНЫ --- */
+        .cart-list { padding: 15px; width: 100%; box-sizing: border-box; }
+        .cart-item {
+            display: flex; align-items: center; background: #111; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #1a1a1a;
+        }
+        .cart-item img { width: 50px; height: 50px; border-radius: 8px; margin-right: 15px; }
+        .cart-item-info { flex-grow: 1; }
+        .cart-item-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
+        .cart-item-price { color: #f4d03f; font-weight: 700; font-size: 0.85rem; }
+
+        .pay-footer {
+            position: fixed; bottom: 80px; width: 100%; padding: 15px; box-sizing: border-box; background: #080808;
+        }
+        .btn-pay-all {
+            width: 100%; background: #f4d03f; color: #000; border: none; border-radius: 12px;
+            height: 50px; font-weight: 900; font-size: 1rem; text-transform: uppercase; cursor: pointer;
         }
 
         /* --- СТРАНИЦЫ --- */
@@ -151,24 +99,10 @@
 
         /* --- ТАБ-БАР --- */
         .tab-bar {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background: #000;
-            border-top: 1px solid #1a1a1a;
-            display: flex;
-            justify-content: space-around;
-            padding: 20px 0;
-            z-index: 100;
+            position: fixed; bottom: 0; width: 100%; background: #000; border-top: 1px solid #1a1a1a;
+            display: flex; justify-content: space-around; padding: 20px 0; z-index: 100;
         }
-
-        .tab-item { 
-            color: #444; 
-            font-size: 0.75rem; 
-            font-weight: 800; 
-            text-transform: uppercase; 
-            cursor: pointer;
-        }
+        .tab-item { color: #444; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; cursor: pointer; }
         .tab-item.active { color: #f4d03f; }
     </style>
 </head>
@@ -177,7 +111,7 @@
     <header>
         <h1>DNX STORE</h1>
         <div class="subtitle">Exclusive Digital Assets</div>
-        <div class="cart-btn-header">
+        <div class="cart-btn-header" onclick="showPage('cart')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
                 <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
             </svg>
@@ -189,10 +123,15 @@
         <div class="catalog-grid" id="catalog-list"></div>
     </div>
 
-    <div id="page-inventory" class="page">
-        <div style="padding: 50px; text-align: center; color: #555;">
-            Здесь будет ваш инвентарь
+    <div id="page-cart" class="page">
+        <div id="cart-items-list" class="cart-list"></div>
+        <div class="pay-footer" id="pay-footer" style="display: none;">
+            <button class="btn-pay-all" onclick="processPayment('корзины')">Перейти к оплате</button>
         </div>
+    </div>
+
+    <div id="page-inventory" class="page">
+        <div style="padding: 100px 20px; text-align: center; color: #555;">ИНВЕНТАРЬ ПУСТ</div>
     </div>
 
     <div class="tab-bar">
@@ -204,27 +143,51 @@
     <script>
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
-        let cartCount = 0;
+        let cart = [];
 
-        // Переключение страниц
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.getElementById('page-' + pageId).classList.add('page-active');
             
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            document.getElementById('tab-' + pageId).classList.add('active');
+            if(pageId !== 'cart') document.getElementById('tab-' + pageId).classList.add('active');
             
-            tg.HapticFeedback.impactOccurred('light');
+            if(pageId === 'cart') renderCart();
+            tg.HapticFeedback.impactOccurred('medium');
         }
 
-        // Логика корзины
-        function addToCart() {
-            cartCount++;
-            document.getElementById('cart-counter').innerText = cartCount;
+        function addToCart(item) {
+            cart.push(item);
+            document.getElementById('cart-counter').innerText = cart.length;
             tg.HapticFeedback.notificationOccurred('success');
         }
 
-        // Загрузка товаров
+        function renderCart() {
+            const list = document.getElementById('cart-items-list');
+            const footer = document.getElementById('pay-footer');
+            if (cart.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding: 50px; color:#555;">Корзина пуста</div>';
+                footer.style.display = 'none';
+            } else {
+                list.innerHTML = cart.map(item => `
+                    <div class="cart-item">
+                        <img src="${item.image_url}">
+                        <div class="cart-item-info">
+                            <div class="cart-item-name">${item.name}</div>
+                            <div class="cart-item-price">${item.price} ₽</div>
+                        </div>
+                    </div>
+                `).join('');
+                footer.style.display = 'block';
+            }
+        }
+
+        function processPayment(type) {
+            tg.showConfirm(`Вы переходите к оплате ${type}. Продолжить?`, (ok) => {
+                if(ok) tg.showAlert("Окно оплаты открыто!");
+            });
+        }
+
         async function loadCatalog() {
             try {
                 const res = await fetch(`${API_BASE}/items`);
@@ -234,8 +197,8 @@
                         <img src="${item.image_url}" class="item-image">
                         <div class="item-name">${item.name}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="tg.showAlert('Покупка: ${item.name}')">${item.price} ₽</button>
-                            <button class="btn-add-cart" onclick="addToCart()">
+                            <button class="btn-buy-now" onclick="processPayment('${item.name}')">${item.price} ₽</button>
+                            <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f4d03f" stroke-width="2.5">
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                                 </svg>
@@ -243,9 +206,7 @@
                         </div>
                     </div>
                 `).join('');
-            } catch (e) { 
-                document.getElementById('catalog-list').innerHTML = '<p style="text-align:center;width:100%">Ошибка связи с сервером</p>';
-            }
+            } catch (e) { console.error(e); }
         }
 
         loadCatalog();
