@@ -16,7 +16,6 @@
             align-items: center;
             min-height: 100vh;
             padding-bottom: 100px;
-            /* Максимальное сглаживание для гладкости букв */
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
@@ -30,19 +29,18 @@
         }
 
         h1 {
-            /* Жирность ровно 650 */
             font-weight: 650; 
             font-size: 1.85rem;
             text-transform: uppercase;
             margin: 0;
             letter-spacing: 1px;
             color: #fff;
-            /* УВЕЛИЧЕННАЯ ДАЛЬНОСТЬ И МЯГКОСТЬ СВЕЧЕНИЯ */
+            /* УСИЛЕННОЕ И ГЛАДКОЕ СВЕЧЕНИЕ */
             text-shadow: 
-                0 0 15px rgba(255, 255, 255, 0.3),
-                0 0 30px rgba(244, 208, 63, 0.9), 
-                0 0 65px rgba(244, 208, 63, 0.7),
-                0 0 110px rgba(244, 208, 63, 0.4);
+                0 0 10px rgba(255, 255, 255, 0.2),
+                0 0 25px rgba(244, 208, 63, 0.8), 
+                0 0 50px rgba(244, 208, 63, 0.6),
+                0 0 90px rgba(244, 208, 63, 0.3);
         }
 
         .subtitle {
@@ -68,8 +66,7 @@
 
         #cart-counter {
             color: #f4d03f;
-            /* МЕНЕЕ ЖИРНАЯ ЦИФРА */
-            font-weight: 500; 
+            font-weight: 500; /* Менее жирная цифра */
             margin-left: 6px;
             font-size: 0.9rem;
         }
@@ -107,19 +104,13 @@
             margin-bottom: 12px;
             color: #fff;
             
-            /* ТЕКСТ РАСТЯНУТ СТРОГО ОТ КРАЯ ДО КРАЯ КАРТИНКИ */
+            /* СТРОГО В ОДНУ СТРОКУ И ПО КРАЯМ */
             width: 100%;
             display: block;
+            white-space: nowrap;
             text-align: justify;
             text-align-last: justify;
             box-sizing: border-box;
-        }
-
-        /* Чтобы короткие названия тоже растягивались */
-        .item-name::after {
-            content: "";
-            display: inline-block;
-            width: 100%;
         }
 
         .card-buttons {
@@ -139,6 +130,7 @@
             font-size: 0.85rem;
             letter-spacing: 1px;
             text-transform: uppercase;
+            cursor: pointer;
         }
 
         .btn-add-cart {
@@ -150,7 +142,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
         }
+
+        /* --- СТРАНИЦЫ --- */
+        .page { display: none; width: 100%; }
+        .page-active { display: block; }
 
         /* --- ТАБ-БАР --- */
         .tab-bar {
@@ -162,9 +159,16 @@
             display: flex;
             justify-content: space-around;
             padding: 20px 0;
+            z-index: 100;
         }
 
-        .tab-item { color: #444; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
+        .tab-item { 
+            color: #444; 
+            font-size: 0.75rem; 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            cursor: pointer;
+        }
         .tab-item.active { color: #f4d03f; }
     </style>
 </head>
@@ -181,19 +185,46 @@
         </div>
     </header>
 
-    <div class="catalog-grid" id="catalog-list">
+    <div id="page-store" class="page page-active">
+        <div class="catalog-grid" id="catalog-list"></div>
+    </div>
+
+    <div id="page-inventory" class="page">
+        <div style="padding: 50px; text-align: center; color: #555;">
+            Здесь будет ваш инвентарь
         </div>
+    </div>
 
     <div class="tab-bar">
-        <div class="tab-item active">МАГАЗИН</div>
-        <div class="tab-item">ИНВЕНТАРЬ</div>
+        <div class="tab-item active" id="tab-store" onclick="showPage('store')">МАГАЗИН</div>
+        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
+        let cartCount = 0;
 
+        // Переключение страниц
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
+            document.getElementById('page-' + pageId).classList.add('page-active');
+            
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + pageId).classList.add('active');
+            
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // Логика корзины
+        function addToCart() {
+            cartCount++;
+            document.getElementById('cart-counter').innerText = cartCount;
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        // Загрузка товаров
         async function loadCatalog() {
             try {
                 const res = await fetch(`${API_BASE}/items`);
@@ -203,8 +234,8 @@
                         <img src="${item.image_url}" class="item-image">
                         <div class="item-name">${item.name}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now">${item.price} ₽</button>
-                            <button class="btn-add-cart">
+                            <button class="btn-buy-now" onclick="tg.showAlert('Покупка: ${item.name}')">${item.price} ₽</button>
+                            <button class="btn-add-cart" onclick="addToCart()">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f4d03f" stroke-width="2.5">
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                                 </svg>
@@ -213,7 +244,7 @@
                     </div>
                 `).join('');
             } catch (e) { 
-                document.getElementById('catalog-list').innerHTML = '<p style="text-align:center;width:100%">Ошибка загрузки</p>';
+                document.getElementById('catalog-list').innerHTML = '<p style="text-align:center;width:100%">Ошибка связи с сервером</p>';
             }
         }
 
