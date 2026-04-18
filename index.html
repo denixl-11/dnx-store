@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DNX STORE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body {
             background-color: #080808;
@@ -16,59 +16,55 @@
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
-            padding-bottom: 90px;
-            overflow-x: hidden;
+            padding-bottom: 100px;
         }
 
-        /* --- ШАПКА --- */
+        /* --- ШАПКА: СВЕЧЕНИЕ И ПОЗИЦИЯ КОРЗИНЫ --- */
         header {
             width: 100%;
-            padding: 20px 0;
+            padding: 30px 0 10px 0;
             text-align: center;
             position: relative;
-            background: #080808;
         }
 
         h1 {
-            font-size: 1.5rem; /* Чуть уменьшил, чтобы не съезжало */
+            font-size: 1.8rem;
             letter-spacing: 2px;
             text-transform: uppercase;
             margin: 0;
             color: #fff;
-            text-shadow: 0 0 4px #fff, 0 0 8px #f4d03f, 0 0 15px #f4d03f;
+            font-weight: 900;
+            text-shadow: 
+                0 0 5px #fff,
+                0 0 10px #f4d03f,
+                0 0 20px #f4d03f,
+                0 0 40px #f4d03f;
         }
 
         .subtitle {
-            font-size: 0.65rem;
+            font-size: 0.7rem;
             color: #888;
-            margin-top: 4px;
-            letter-spacing: 1px;
+            margin-top: 5px;
+            letter-spacing: 1.5px;
             text-transform: uppercase;
         }
 
-        /* Кнопка корзины сверху (пакет) */
+        /* Кнопка корзины опущена в выделенную зону */
         .cart-btn-header {
             position: absolute;
             right: 15px;
-            top: 50%;
-            transform: translateY(-50%); /* Центрирование по вертикали */
+            top: 65px; /* Опустил ниже, чтобы была напротив subtitle */
             background: rgba(30, 30, 30, 0.9);
-            border: 1px solid #333;
-            padding: 6px 10px;
+            border: 1px solid #444;
+            padding: 5px 10px;
             border-radius: 10px;
             display: flex;
             align-items: center;
             cursor: pointer;
+            backdrop-filter: blur(5px);
         }
 
-        .cart-icon-svg {
-            width: 18px;
-            height: 18px;
-            fill: none;
-            stroke: #fff;
-            stroke-width: 2;
-        }
-
+        .cart-icon-svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; }
         .cart-count {
             background: #f4d03f;
             color: #000;
@@ -76,7 +72,7 @@
             padding: 1px 6px;
             border-radius: 50%;
             margin-left: 6px;
-            font-weight: 800;
+            font-weight: 900;
         }
 
         /* --- СЕТКА ТОВАРОВ --- */
@@ -85,14 +81,14 @@
             grid-template-columns: 1fr 1fr;
             gap: 12px;
             width: 100%;
-            padding: 10px;
+            padding: 15px 10px;
             box-sizing: border-box;
         }
 
         .item-card {
             background: #111;
             border: 1px solid #222;
-            border-radius: 18px;
+            border-radius: 20px;
             padding: 10px;
             display: flex;
             flex-direction: column;
@@ -101,61 +97,65 @@
         .item-image {
             width: 100%;
             aspect-ratio: 1/1;
-            border-radius: 12px;
+            border-radius: 14px;
             object-fit: cover;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
 
         .item-name {
             font-size: 0.8rem;
             font-weight: 700;
-            margin-bottom: 8px;
-            height: 20px;
-            overflow: hidden;
+            margin-bottom: 12px;
+            color: #eee;
         }
 
-        /* Золотая кнопка покупки (цена) */
-        .buy-button-gold {
+        /* КНОПКИ КАРТОЧКИ */
+        .card-buttons {
+            display: flex;
+            gap: 6px;
+            margin-top: auto;
+        }
+
+        .btn-buy-now {
+            flex: 1;
             background: linear-gradient(45deg, #d4af37, #f4d03f);
             color: #000;
             border: none;
             border-radius: 10px;
-            padding: 8px 5px;
-            font-weight: 800;
+            padding: 10px 5px;
+            font-weight: 900;
             font-size: 0.85rem;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
             cursor: pointer;
-            width: 100%;
-            transition: transform 0.1s;
+            text-transform: uppercase;
         }
 
-        .buy-button-gold:active { transform: scale(0.95); }
-
-        .btn-icon-svg {
-            width: 14px;
-            height: 14px;
-            fill: none;
-            stroke: #000;
-            stroke-width: 2.5;
+        .btn-add-cart {
+            width: 42px;
+            background: #1a1a1a;
+            border: 1px solid #f4d03f;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
         }
+
+        .btn-icon-svg { width: 18px; height: 18px; fill: none; stroke: #f4d03f; stroke-width: 2; }
 
         /* --- ТАБ-БАР --- */
         .tab-bar {
             position: fixed;
             bottom: 0;
             width: 100%;
-            background: #111;
+            background: #000;
             border-top: 1px solid #222;
             display: flex;
             justify-content: space-around;
-            padding: 12px 0;
-            z-index: 999;
+            padding: 15px 0;
+            z-index: 1000;
         }
 
-        .tab-item { color: #555; font-size: 0.7rem; font-weight: 800; cursor: pointer; text-align: center; }
+        .tab-item { color: #555; font-size: 0.75rem; font-weight: 800; cursor: pointer; }
         .tab-item.active { color: #f4d03f; }
 
         .page { display: none; width: 100%; }
@@ -177,11 +177,11 @@
         <div id="catalog-list" class="catalog-grid"></div>
     </div>
 
-    <div id="page-cart" class="page" style="padding: 20px; box-sizing: border-box;">
+    <div id="page-cart" class="page" style="padding: 20px;">
         <h2 style="text-align:center;">Корзина</h2>
         <div id="cart-items-list"></div>
-        <div id="cart-total" style="text-align:right; font-weight:800; font-size:1.2rem; color:#f4d03f; margin: 20px 0;"></div>
-        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:15px; border-radius:12px; font-weight:800;">ОПЛАТИТЬ</button>
+        <div id="cart-total" style="text-align:right; font-weight:900; font-size:1.3rem; color:#f4d03f; margin: 20px 0;"></div>
+        <button onclick="buyCart()" style="width:100%; background:#f4d03f; color:#000; border:none; padding:18px; border-radius:15px; font-weight:900; font-size:1rem;">ОПЛАТИТЬ</button>
     </div>
 
     <div id="page-inventory" class="page" style="padding: 20px;">
@@ -206,38 +206,42 @@
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
             document.getElementById('tab-' + pageId)?.classList.add('active');
             if(pageId === 'inventory') loadInventory();
+            if(pageId === 'cart') renderCart();
         }
 
         async function loadCatalog() {
-            const res = await fetch(`${API_BASE}/items`);
-            const items = await res.json();
-            document.getElementById('catalog-list').innerHTML = items.map(item => `
-                <div class="item-card">
-                    <img src="${item.image_url}" class="item-image">
-                    <div class="item-name">${item.name}</div>
-                    <button class="buy-button-gold" onclick="addToCart(${item.id})">
-                        ${item.price} ₽
-                        <svg class="btn-icon-svg" viewBox="0 0 24 24">
-                            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0M12 10v6M9 13h6"/>
-                        </svg>
-                    </button>
-                </div>
-            `).join('');
+            try {
+                const res = await fetch(`${API_BASE}/items`);
+                const items = await res.json();
+                document.getElementById('catalog-list').innerHTML = items.map(item => `
+                    <div class="item-card">
+                        <img src="${item.image_url}" class="item-image">
+                        <div class="item-name">${item.name}</div>
+                        <div class="card-buttons">
+                            <button class="btn-buy-now" onclick="buyNow(${item.id})">${item.price} ₽</button>
+                            <button class="btn-add-cart" onclick="addToCart(${item.id})">
+                                <svg class="btn-icon-svg" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) { console.error(e); }
         }
 
         function addToCart(id) {
-            // В данной логике addToCart работает и как "Купить", добавляя в корзину
-            // Если ты хочешь сразу покупку одного товара, можно сделать редирект в корзину
-            const item = {id}; // Упрощенно
             if(!cart.includes(id)) {
                 cart.push(id);
                 document.getElementById('cart-counter').innerText = cart.length;
-                tg.HapticFeedback.impactOccurred('light');
+                tg.HapticFeedback.impactOccurred('medium');
             }
-            showPage('cart'); // Сразу открываем корзину после нажатия на цену
         }
 
-        // Остальные функции (buyCart, loadInventory) оставь из прошлого кода без изменений
+        function buyNow(id) {
+            cart = [id];
+            document.getElementById('cart-counter').innerText = cart.length;
+            showPage('cart');
+        }
+
         loadCatalog();
     </script>
 </body>
