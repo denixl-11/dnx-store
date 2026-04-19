@@ -17,9 +17,12 @@
         .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 16px; object-fit: cover; margin-bottom: 12px; }
         .item-name { font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; color: #fff; width: 100%; display: block; white-space: nowrap; text-align: justify; text-align-last: justify; }
         .item-name::after { content: ""; display: inline-block; width: 100%; }
+        
         .card-buttons { display: flex; width: 100%; gap: 6px; }
-        .btn-buy-now { flex: 4; background: #f4d03f; color: #000; border: none; border-radius: 8px; height: 32px; font-weight: 900; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
-        .btn-add-cart { flex: 1.2; background: #000; border: 1.5px solid #f4d03f; border-radius: 8px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .btn-buy-now { flex: 6; background: #f4d03f; color: #000; border: none; border-radius: 8px; height: 32px; font-weight: 900; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; padding: 0; }
+        .btn-tg-link { flex: 1; background: #000; border: 1.5px solid #f4d03f; border-radius: 8px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+        .btn-add-cart { flex: 1; background: #000; border: 1.5px solid #f4d03f; border-radius: 8px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+        
         .cart-list { padding: 15px; width: 100%; box-sizing: border-box; }
         .cart-item { display: flex; align-items: center; background: #111; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #1a1a1a; }
         .cart-item img { width: 50px; height: 50px; border-radius: 8px; margin-right: 15px; object-fit: cover; }
@@ -139,7 +142,7 @@
             
             if(pageId === 'inventory') {
                 document.getElementById('tab-inventory').classList.add('active');
-                loadInventory(); // Запрашиваем актуальный инвентарь при переходе
+                loadInventory(); 
             }
             
             tg.HapticFeedback.impactOccurred('light');
@@ -267,6 +270,12 @@
                         <div class="item-name">${item.name}</div>
                         <div class="card-buttons">
                             <button class="btn-buy-now" onclick="goToPayment('item', '${item.id}', ${item.price})">${item.price} ₽</button>
+                            <button class="btn-tg-link" onclick="window.open('${item.nft_link}', '_blank')">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f4d03f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
                             <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f4d03f" stroke-width="2.5">
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
@@ -280,7 +289,6 @@
             }
         }
 
-        // НОВАЯ ФУНКЦИЯ ДЛЯ ЗАГРУЗКИ ИНВЕНТАРЯ
         async function loadInventory() {
             const userId = tg.initDataUnsafe?.user?.id;
             const container = document.getElementById('inventory-container');
