@@ -18,10 +18,26 @@
         .item-name { font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; color: #fff; width: 100%; display: block; white-space: nowrap; text-align: justify; text-align-last: justify; }
         .item-name::after { content: ""; display: inline-block; width: 100%; }
         
+        /* КНОПКИ ВЕРНУЛИ К ОРИГИНАЛУ */
         .card-buttons { display: flex; width: 100%; gap: 6px; }
-        .btn-buy-now { flex: 6; background: #f4d03f; color: #000; border: none; border-radius: 8px; height: 32px; font-weight: 900; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; padding: 0; }
-        .btn-tg-link { flex: 1; background: #000; border: 1.5px solid #f4d03f; border-radius: 8px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
-        .btn-add-cart { flex: 1; background: #000; border: 1.5px solid #f4d03f; border-radius: 8px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+        .btn-buy-now { flex: 4; background: #f4d03f; color: #000; border: none; border-radius: 8px; height: 32px; font-weight: 900; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+        .btn-add-cart { flex: 1.2; background: #000; border: 1.5px solid #f4d03f; border-radius: 8px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        
+        /* НОВАЯ КНОПКА ТЕЛЕГРАМ СНИЗУ */
+        .btn-tg-link-full {
+            width: 100%;
+            background: #000;
+            border: 1.5px solid #f4d03f;
+            border-radius: 8px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            margin-top: 6px; /* Отступ от верхних кнопок */
+            box-sizing: border-box;
+            transition: 0.2s;
+        }
         
         .cart-list { padding: 15px; width: 100%; box-sizing: border-box; }
         .cart-item { display: flex; align-items: center; background: #111; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #1a1a1a; }
@@ -52,7 +68,6 @@
         .tab-item { color: #444; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; cursor: pointer; }
         .tab-item.active { color: #f4d03f; }
         
-        /* Кнопка открытия NFT в инвентаре */
         .btn-open-nft {
             display: flex; justify-content: center; align-items: center; 
             background: #000; color: #f4d03f; border: 1.5px solid #f4d03f; 
@@ -146,6 +161,18 @@
             }
             
             tg.HapticFeedback.impactOccurred('light');
+        }
+
+        // ОТКРЫТИЕ ССЫЛОК ВНУТРИ БОТА (Встроенный браузер)
+        function openInAppBrowser(url) {
+            if (!url) return;
+            // Если это ссылка внутри телеграма
+            if (url.includes('t.me') || url.includes('telegram.me')) {
+                tg.openTelegramLink(url);
+            } else {
+                // Если внешняя ссылка — откроется внутренним браузером без вылета из бота
+                tg.openLink(url); 
+            }
         }
 
         function addToCart(item) {
@@ -268,20 +295,21 @@
                     <div class="item-card">
                         <img src="${item.image_url}" class="item-image">
                         <div class="item-name">${item.name}</div>
+                        
                         <div class="card-buttons">
                             <button class="btn-buy-now" onclick="goToPayment('item', '${item.id}', ${item.price})">${item.price} ₽</button>
-                            <button class="btn-tg-link" onclick="window.open('${item.nft_link}', '_blank')">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f4d03f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                </svg>
-                            </button>
                             <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f4d03f" stroke-width="2.5">
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                                 </svg>
                             </button>
                         </div>
+                        
+                        <button class="btn-tg-link-full" onclick="openInAppBrowser('${item.nft_link}')">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="#f4d03f">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.06-.2-.07-.06-.17-.04-.25-.02-.11.02-1.83 1.16-5.16 3.41-.48.33-.92.5-1.32.49-.44-.01-1.28-.24-1.9-.44-.76-.25-1.36-.38-1.3-.8.03-.22.33-.45.9-.68 3.55-1.54 5.92-2.57 7.11-3.06 3.39-1.4 4.1-1.65 4.56-1.66.11 0 .33.03.47.14.12.1.15.24.16.35-.01.06-.01.17-.02.28z"/>
+                            </svg>
+                        </button>
                     </div>
                 `).join('');
             } catch (e) { 
@@ -309,7 +337,7 @@
                         <div class="item-card">
                             <img src="${item.image_url}" class="item-image" style="margin-bottom: 8px;">
                             <div class="item-name" style="margin-bottom: 8px;">${item.name}</div>
-                            <a href="${item.nft_link}" target="_blank" class="btn-open-nft">Открыть NFT</a>
+                            <button class="btn-open-nft" onclick="openInAppBrowser('${item.nft_link}')">Открыть NFT</button>
                         </div>
                     `).join('');
                 }
