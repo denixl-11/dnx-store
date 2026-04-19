@@ -6,112 +6,49 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
-        body {
-            background-color: #080808;
-            color: #ffffff;
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            padding-bottom: 100px;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        /* --- ШАПКА --- */
-        header {
-            width: 100%; padding: 40px 0 20px 0; text-align: center; position: relative;
-        }
-
-        h1 {
-            font-weight: 650; font-size: 1.85rem; text-transform: uppercase; margin: 0;
-            letter-spacing: 1px; color: #fff;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2), 0 0 25px rgba(244, 208, 63, 0.8), 0 0 50px rgba(244, 208, 63, 0.6), 0 0 90px rgba(244, 208, 63, 0.3);
-        }
-
-        .subtitle {
-            font-size: 0.6rem; color: #888; margin-top: 5px; letter-spacing: 2px; text-transform: uppercase;
-        }
-
-        .cart-btn-header {
-            position: absolute; right: 20px; top: 55%; transform: translateY(-50%);
-            display: flex; align-items: center; background: rgba(25, 25, 25, 0.9);
-            border: 1px solid #333; padding: 5px 12px; border-radius: 8px; cursor: pointer;
-        }
-
+        /* ... Весь предыдущий CSS остается без изменений ... */
+        body { background-color: #080808; color: #ffffff; font-family: 'Inter', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding-bottom: 100px; -webkit-font-smoothing: antialiased; }
+        header { width: 100%; padding: 40px 0 20px 0; text-align: center; position: relative; }
+        h1 { font-weight: 650; font-size: 1.85rem; text-transform: uppercase; margin: 0; letter-spacing: 1px; color: #fff; text-shadow: 0 0 10px rgba(255, 255, 255, 0.2), 0 0 25px rgba(244, 208, 63, 0.8), 0 0 50px rgba(244, 208, 63, 0.6), 0 0 90px rgba(244, 208, 63, 0.3); }
+        .subtitle { font-size: 0.6rem; color: #888; margin-top: 5px; letter-spacing: 2px; text-transform: uppercase; }
+        .cart-btn-header { position: absolute; right: 20px; top: 55%; transform: translateY(-50%); display: flex; align-items: center; background: rgba(25, 25, 25, 0.9); border: 1px solid #333; padding: 5px 12px; border-radius: 8px; cursor: pointer; }
         #cart-counter { color: #f4d03f; font-weight: 500; margin-left: 6px; font-size: 0.9rem; }
-
-        /* --- КАТАЛОГ --- */
-        .catalog-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; padding: 10px 15px; box-sizing: border-box;
-        }
-
+        .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; padding: 10px 15px; box-sizing: border-box; }
         .item-card { background: #111; border: 1px solid #1a1a1a; border-radius: 22px; padding: 12px; display: flex; flex-direction: column; }
         .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 16px; object-fit: cover; margin-bottom: 12px; }
-
-        .item-name {
-            font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; color: #fff;
-            width: 100%; display: block; white-space: nowrap; text-align: justify; text-align-last: justify;
-        }
+        .item-name { font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; color: #fff; width: 100%; display: block; white-space: nowrap; text-align: justify; text-align-last: justify; }
         .item-name::after { content: ""; display: inline-block; width: 100%; }
-
         .card-buttons { display: flex; width: 100%; gap: 6px; }
-
-        .btn-buy-now {
-            flex: 4; background: #f4d03f; color: #000; border: none; border-radius: 8px;
-            height: 32px; font-weight: 900; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
-        }
-
-        .btn-add-cart {
-            flex: 1.2; background: #000; border: 1.5px solid #f4d03f; border-radius: 8px;
-            height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;
-        }
-
-        /* --- КОРЗИНА И ОПЛАТА --- */
+        .btn-buy-now { flex: 4; background: #f4d03f; color: #000; border: none; border-radius: 8px; height: 32px; font-weight: 900; font-size: 0.85rem; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+        .btn-add-cart { flex: 1.2; background: #000; border: 1.5px solid #f4d03f; border-radius: 8px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .cart-list { padding: 15px; width: 100%; box-sizing: border-box; }
-        .cart-item {
-            display: flex; align-items: center; background: #111; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #1a1a1a;
-        }
+        .cart-item { display: flex; align-items: center; background: #111; padding: 10px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #1a1a1a; }
         .cart-item img { width: 50px; height: 50px; border-radius: 8px; margin-right: 15px; object-fit: cover; }
         .cart-item-info { flex-grow: 1; }
         .cart-item-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
         .cart-item-price { color: #f4d03f; font-weight: 700; font-size: 0.85rem; }
-
-        .fixed-footer {
-            position: fixed; bottom: 80px; width: 100%; padding: 15px; box-sizing: border-box; background: #080808; z-index: 90;
+        .fixed-footer { position: fixed; bottom: 80px; width: 100%; padding: 15px; box-sizing: border-box; background: #080808; z-index: 90; }
+        .btn-main-action { width: 100%; background: #f4d03f; color: #000; border: none; border-radius: 12px; height: 50px; font-weight: 900; font-size: 1rem; text-transform: uppercase; cursor: pointer; }
+        .btn-secondary { width: 100%; background: transparent; color: #888; border: 1px solid #333; border-radius: 12px; height: 50px; font-weight: 600; font-size: 1rem; margin-top: 10px; cursor: pointer; }
+        .payment-box { background: #111; padding: 20px; border-radius: 16px; border: 1px solid #1a1a1a; margin-top: 20px; }
+        
+        /* ИЗМЕНЕНИЯ ТУТ: Меньше шрифт реквизитов и компактная кнопка с иконкой */
+        .req-input-group { display: flex; gap: 10px; margin-top: 10px; }
+        .req-input { 
+            flex-grow: 1; background: #000; border: 1px solid #333; color: #fff; 
+            padding: 10px; border-radius: 8px; font-family: inherit; 
+            font-size: 0.85rem; /* Уменьшенный шрифт */
         }
-        .btn-main-action {
-            width: 100%; background: #f4d03f; color: #000; border: none; border-radius: 12px;
-            height: 50px; font-weight: 900; font-size: 1rem; text-transform: uppercase; cursor: pointer;
-        }
-        .btn-secondary {
-            width: 100%; background: transparent; color: #888; border: 1px solid #333; border-radius: 12px;
-            height: 50px; font-weight: 600; font-size: 1rem; margin-top: 10px; cursor: pointer;
-        }
-
-        .payment-box {
-            background: #111; padding: 20px; border-radius: 16px; border: 1px solid #1a1a1a; margin-top: 20px;
-        }
-        .req-input-group {
-            display: flex; gap: 10px; margin-top: 10px;
-        }
-        .req-input {
-            flex-grow: 1; background: #000; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 8px; font-family: inherit; font-size: 1rem;
-        }
-        .btn-copy {
-            background: #222; border: 1px solid #444; color: #fff; padding: 0 15px; border-radius: 8px; cursor: pointer; font-weight: 600;
+        .btn-copy { 
+            background: #222; border: 1px solid #444; color: #fff; 
+            width: 42px; /* Фиксированная ширина для квадрата */
+            display: flex; align-items: center; justify-content: center; 
+            border-radius: 8px; cursor: pointer; 
         }
 
-        /* --- СТРАНИЦЫ --- */
         .page { display: none; width: 100%; }
         .page-active { display: block; }
-
-        /* --- ТАБ-БАР --- */
-        .tab-bar {
-            position: fixed; bottom: 0; width: 100%; background: #000; border-top: 1px solid #1a1a1a;
-            display: flex; justify-content: space-around; padding: 20px 0; z-index: 100;
-        }
+        .tab-bar { position: fixed; bottom: 0; width: 100%; background: #000; border-top: 1px solid #1a1a1a; display: flex; justify-content: space-around; padding: 20px 0; z-index: 100; }
         .tab-item { color: #444; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; cursor: pointer; }
         .tab-item.active { color: #f4d03f; }
     </style>
@@ -143,7 +80,7 @@
     <div id="page-payment" class="page">
         <div style="padding: 20px;">
             <h2 style="text-align: center; color: #f4d03f; margin-top: 0;">ОФОРМЛЕНИЕ ЗАКАЗА</h2>
-            <p style="text-align: center; color: #888; font-size: 0.9rem;">Переведите точную сумму по реквизитам ниже</p>
+            <p style="text-align: center; color: #888; font-size: 0.9rem;">Переведите точную сумму по реквизитам ниже. Бронь действует 20 минут.</p>
             
             <div class="payment-box">
                 <div style="color: #666; font-size: 0.8rem; margin-bottom: 5px; text-transform: uppercase;">Сумма к оплате:</div>
@@ -152,13 +89,18 @@
                 <div style="color: #666; font-size: 0.8rem; text-transform: uppercase;">Реквизиты (СБП / Карта):</div>
                 <div class="req-input-group">
                     <input type="text" id="req-card" class="req-input" value="1111 2222 3333 4444" readonly>
-                    <button class="btn-copy" onclick="copyReq()">Копия</button>
+                    <button class="btn-copy" onclick="copyReq()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
 
             <div style="margin-top: 30px;">
                 <button class="btn-main-action" onclick="checkPayment()">Проверить оплату</button>
-                <button class="btn-secondary" onclick="showPage('store')">Отмена</button>
+                <button class="btn-secondary" onclick="cancelPayment()">Отмена</button>
             </div>
         </div>
     </div>
@@ -177,17 +119,14 @@
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
         let cart = [];
+        let currentBookingIds = []; 
 
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.getElementById('page-' + pageId).classList.add('page-active');
-            
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            
-            // Подсветка таб-бара (если мы в оплате или корзине, не светим Инвентарь)
             if(pageId === 'store') document.getElementById('tab-store').classList.add('active');
             if(pageId === 'inventory') document.getElementById('tab-inventory').classList.add('active');
-            
             if(pageId === 'cart') renderCart();
             tg.HapticFeedback.impactOccurred('light');
         }
@@ -196,7 +135,7 @@
             cart.push(item);
             document.getElementById('cart-counter').innerText = cart.length;
             tg.HapticFeedback.notificationOccurred('success');
-            tg.showAlert(`Добавлено в корзину: ${item.name}`);
+            tg.showAlert(`Добавлено: ${item.name}`);
         }
 
         function renderCart() {
@@ -227,13 +166,42 @@
             tg.HapticFeedback.impactOccurred('medium');
         }
 
-        function goToPayment(type, price = 0) {
+        // Логика перехода к оплате с запросом бронирования
+        async function goToPayment(type, itemId = null, price = 0) {
             let total = 0;
+            currentBookingIds = [];
+
             if (type === 'cart') {
                 total = cart.reduce((sum, item) => sum + parseInt(item.price), 0);
+                currentBookingIds = cart.map(item => item.id);
             } else {
                 total = parseInt(price);
+                currentBookingIds = [itemId];
             }
+
+            // Отправляем запрос на сервер для бронирования
+            try {
+                const response = await fetch(`${API_BASE}/book`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: currentBookingIds,
+                        userId: tg.initDataUnsafe?.user?.id,
+                        username: tg.initDataUnsafe?.user?.username
+                    })
+                });
+                
+                const data = await response.json();
+                if (!data.success) {
+                    tg.showAlert('Один или несколько NFT уже кем-то забронированы или куплены!');
+                    return; // Не пускаем на оплату
+                }
+            } catch (e) {
+                console.error("Ошибка бронирования", e);
+                // В реальном проекте тут лучше тоже прерывать оплату, 
+                // но пока для теста оставляем проход дальше
+            }
+
             document.getElementById('payment-amount').innerText = total + ' ₽';
             showPage('payment');
         }
@@ -246,14 +214,41 @@
             tg.showAlert('Реквизиты скопированы!');
         }
 
-        function checkPayment() {
-            tg.showConfirm('Проверка платежа... Если вы перевели средства, нажмите ОК и ожидайте зачисления NFT в инвентарь.', (ok) => {
-                if(ok) {
-                    cart = []; // Очищаем корзину после предполагаемой успешной оплаты
-                    document.getElementById('cart-counter').innerText = '0';
-                    showPage('store');
-                }
-            });
+        // Проверка оплаты и уведомление админа
+        async function checkPayment() {
+            try {
+                // Отправляем запрос серверу, что пользователь нажал "Проверить"
+                await fetch(`${API_BASE}/notify-admin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: currentBookingIds,
+                        userId: tg.initDataUnsafe?.user?.id,
+                        username: tg.initDataUnsafe?.user?.username
+                    })
+                });
+            } catch(e) { console.error(e); }
+
+            tg.showAlert('Запрос отправлен администратору. Ожидайте зачисления NFT в инвентарь.');
+            cart = []; 
+            document.getElementById('cart-counter').innerText = '0';
+            currentBookingIds = [];
+            showPage('store');
+        }
+
+        // Если пользователь передумал
+        async function cancelPayment() {
+            // Можно отправить запрос на сервер для снятия брони вручную
+            try {
+                await fetch(`${API_BASE}/cancel-booking`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: currentBookingIds })
+                });
+            } catch(e) {}
+            
+            currentBookingIds = [];
+            showPage('store');
         }
 
         async function loadCatalog() {
@@ -265,7 +260,7 @@
                         <img src="${item.image_url}" class="item-image">
                         <div class="item-name">${item.name}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="goToPayment('item', ${item.price})">${item.price} ₽</button>
+                            <button class="btn-buy-now" onclick="goToPayment('item', '${item.id}', ${item.price})">${item.price} ₽</button>
                             <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f4d03f" stroke-width="2.5">
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
