@@ -38,7 +38,6 @@ def get_db_connection():
 
 # --- ФОНОВАЯ ЗАДАЧА: АВТОСНЯТИЕ БРОНИ (20 МИНУТ) ---
 async def auto_cancel_reservations():
-    """Проверяет базу каждую минуту и освобождает просроченные брони"""
     while True:
         try:
             with get_db_connection() as conn:
@@ -55,7 +54,7 @@ async def auto_cancel_reservations():
         except Exception as e:
             logging.error(f"Ошибка таймера бронирования: {e}")
 
-        await asyncio.sleep(60)  # Пауза 1 минута
+        await asyncio.sleep(60)
 
 
 # --- API МЕТОДЫ ---
@@ -76,6 +75,7 @@ async def handle_get_inventory(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Отдаем купленные товары по ID пользователя
                 cur.execute("SELECT name, image_url, nft_link FROM items WHERE buyer_id = %s AND status = 'Продан'",
                             (str(user_id),))
                 items = cur.fetchall()
@@ -84,7 +84,6 @@ async def handle_get_inventory(request):
         return web.json_response([], headers={"Access-Control-Allow-Origin": "*"})
 
 
-# Заменяет старый /reserve для совместимости с фронтендом
 async def handle_book(request):
     try:
         data = await request.json()
@@ -94,21 +93,26 @@ async def handle_book(request):
 
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Проверяем, доступны ли ВСЕ запрошенные товары
-                cur.execute("SELECT id, name, price FROM items WHERE id = ANY(%s) AND status = 'Доступен'", (item_ids,))
+                # ИЗМЕНЕНИЕ: Добавили nft_link в выборку
+                cur.execute("SELECT id, name, price, nft_link FROM items WHERE id = ANY(%s) AND status = 'Доступен'",
+                            (item_ids,))
                 items = cur.fetchall()
 
                 if len(items) == len(item_ids) and len(item_ids) > 0:
                     total_price = sum(i['price'] for i in items)
-                    # Ставим статус 'Забронирован' и записываем текущее время
+
                     cur.execute(
                         "UPDATE items SET status = 'Забронирован', buyer_id = %s, reserved_at = NOW(), last_event = NULL WHERE id = ANY(%s)",
                         (user_id, item_ids)
                     )
                     conn.commit()
 
-                    admin_msg = f"⏳ **Бронь!**\n👤 @{username}\n📦 Товаров: {len(items)}\n💰 Итого: {total_price} ₽\nОжидаем оплату (20 мин)..."
-                    await bot.send_message(ADMIN_ID, admin_msg)
+                    # ИЗМЕНЕНИЕ: Формируем список товаров со ссылками
+                    items_text = "\n".join([f"🔹 {i['name']} - {i['nft_link']}" for i in items])
+
+                    admin_msg = f"⏳ **Новая бронь!**\n👤 @{username}\n📦 Товаров: {len(items)}\n💰 Итого: {total_price} ₽\n\n**Товары в заказе:**\n{items_text}\n\nОжидаем оплату (20 мин)..."
+                    await bot.send_message(ADMIN_ID, admin_msg, disable_web_page_preview=True)
+
                     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
 
                 return web.json_response({"success": False, "error": "Товары уже заняты"},
@@ -118,7 +122,6 @@ async def handle_book(request):
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
-# Заменяет старый /check_payment
 async def handle_notify_admin(request):
     try:
         data = await request.json()
@@ -128,8 +131,9 @@ async def handle_notify_admin(request):
 
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # ИЗМЕНЕНИЕ: Добавили nft_link в выборку
                 cur.execute(
-                    "SELECT id, name, price FROM items WHERE id = ANY(%s) AND buyer_id = %s AND status = 'Забронирован'",
+                    "SELECT id, name, price, nft_link FROM items WHERE id = ANY(%s) AND buyer_id = %s AND status = 'Забронирован'",
                     (item_ids, user_id))
                 items = cur.fetchall()
 
@@ -142,15 +146,18 @@ async def handle_notify_admin(request):
                         InlineKeyboardButton(text="✅ Да", callback_data=f"bulk_yes_{user_id}_{ids_str}")
                     ]])
 
-                    msg = f"💰 **Запрос проверки оплаты!**\n👤 @{username} нажал кнопку проверки.\nСумма к проверке: {total} ₽\nТовары: {', '.join([i['name'] for i in items])}"
-                    await bot.send_message(ADMIN_ID, msg, reply_markup=admin_kb)
+                    # ИЗМЕНЕНИЕ: Формируем список товаров со ссылками
+                    items_text = "\n".join([f"🔹 {i['name']} - {i['nft_link']}" for i in items])
+
+                    msg = f"💰 **Пользователь оплатил!**\n👤 @{username} нажал кнопку проверки.\nСумма к проверке: {total} ₽\n\n**Товары в заказе:**\n{items_text}"
+                    await bot.send_message(ADMIN_ID, msg, reply_markup=admin_kb, disable_web_page_preview=True)
+
                     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
                 return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
     except:
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
-# Отмена брони пользователем вручную (кнопка "Отмена" на фронтенде)
 async def handle_cancel_booking(request):
     try:
         data = await request.json()
@@ -247,16 +254,15 @@ async def cmd_start(message: types.Message):
 app = web.Application()
 app.router.add_get('/items', handle_get_items)
 app.router.add_get('/inventory', handle_get_inventory)
-app.router.add_post('/book', handle_book)  # НОВОЕ: Бронь
-app.router.add_post('/notify-admin', handle_notify_admin)  # НОВОЕ: Проверка оплаты
-app.router.add_post('/cancel-booking', handle_cancel_booking)  # НОВОЕ: Отмена юзером
+app.router.add_post('/book', handle_book)
+app.router.add_post('/notify-admin', handle_notify_admin)
+app.router.add_post('/cancel-booking', handle_cancel_booking)
 app.router.add_get('/get_status', handle_get_status)
 app.router.add_post('/clear_event', handle_clear_event)
 app.router.add_options('/{tail:.*}', handle_options)
 
 
 async def main():
-    # Запускаем фоновую задачу таймера брони
     asyncio.create_task(auto_cancel_reservations())
 
     port = int(os.environ.get("PORT", 8080))
@@ -264,7 +270,6 @@ async def main():
     await runner.setup()
     await web.TCPSite(runner, '0.0.0.0', port).start()
 
-    # Запуск бота
     await dp.start_polling(bot)
 
 
