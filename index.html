@@ -6,7 +6,6 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
-        /* ... Весь предыдущий CSS остается без изменений ... */
         body { background-color: #080808; color: #ffffff; font-family: 'Inter', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding-bottom: 100px; -webkit-font-smoothing: antialiased; }
         header { width: 100%; padding: 40px 0 20px 0; text-align: center; position: relative; }
         h1 { font-weight: 650; font-size: 1.85rem; text-transform: uppercase; margin: 0; letter-spacing: 1px; color: #fff; text-shadow: 0 0 10px rgba(255, 255, 255, 0.2), 0 0 25px rgba(244, 208, 63, 0.8), 0 0 50px rgba(244, 208, 63, 0.6), 0 0 90px rgba(244, 208, 63, 0.3); }
@@ -32,17 +31,15 @@
         .btn-secondary { width: 100%; background: transparent; color: #888; border: 1px solid #333; border-radius: 12px; height: 50px; font-weight: 600; font-size: 1rem; margin-top: 10px; cursor: pointer; }
         .payment-box { background: #111; padding: 20px; border-radius: 16px; border: 1px solid #1a1a1a; margin-top: 20px; }
         
-        /* ИЗМЕНЕНИЯ ТУТ: Меньше шрифт реквизитов и компактная кнопка с иконкой */
         .req-input-group { display: flex; gap: 10px; margin-top: 10px; }
         .req-input { 
             flex-grow: 1; background: #000; border: 1px solid #333; color: #fff; 
             padding: 10px; border-radius: 8px; font-family: inherit; 
-            font-size: 0.85rem; /* Уменьшенный шрифт */
+            font-size: 0.85rem; 
         }
         .btn-copy { 
             background: #222; border: 1px solid #444; color: #fff; 
-            width: 42px; /* Фиксированная ширина для квадрата */
-            display: flex; align-items: center; justify-content: center; 
+            width: 42px; display: flex; align-items: center; justify-content: center; 
             border-radius: 8px; cursor: pointer; 
         }
 
@@ -51,6 +48,15 @@
         .tab-bar { position: fixed; bottom: 0; width: 100%; background: #000; border-top: 1px solid #1a1a1a; display: flex; justify-content: space-around; padding: 20px 0; z-index: 100; }
         .tab-item { color: #444; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; cursor: pointer; }
         .tab-item.active { color: #f4d03f; }
+        
+        /* Кнопка открытия NFT в инвентаре */
+        .btn-open-nft {
+            display: flex; justify-content: center; align-items: center; 
+            background: #000; color: #f4d03f; border: 1.5px solid #f4d03f; 
+            text-decoration: none; border-radius: 8px; height: 32px; 
+            font-weight: 800; font-size: 0.75rem; text-transform: uppercase;
+            width: 100%; box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
@@ -106,7 +112,9 @@
     </div>
 
     <div id="page-inventory" class="page">
-        <div style="padding: 100px 20px; text-align: center; color: #555;">ИНВЕНТАРЬ ПУСТ</div>
+        <div id="inventory-container" class="catalog-grid">
+            <div style="padding: 100px 20px; text-align: center; color: #555; grid-column: span 2;">ЗАГРУЗКА...</div>
+        </div>
     </div>
 
     <div class="tab-bar">
@@ -125,9 +133,15 @@
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.getElementById('page-' + pageId).classList.add('page-active');
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            
             if(pageId === 'store') document.getElementById('tab-store').classList.add('active');
-            if(pageId === 'inventory') document.getElementById('tab-inventory').classList.add('active');
             if(pageId === 'cart') renderCart();
+            
+            if(pageId === 'inventory') {
+                document.getElementById('tab-inventory').classList.add('active');
+                loadInventory(); // Запрашиваем актуальный инвентарь при переходе
+            }
+            
             tg.HapticFeedback.impactOccurred('light');
         }
 
@@ -166,7 +180,6 @@
             tg.HapticFeedback.impactOccurred('medium');
         }
 
-        // Логика перехода к оплате с запросом бронирования
         async function goToPayment(type, itemId = null, price = 0) {
             let total = 0;
             currentBookingIds = [];
@@ -179,7 +192,6 @@
                 currentBookingIds = [itemId];
             }
 
-            // Отправляем запрос на сервер для бронирования
             try {
                 const response = await fetch(`${API_BASE}/book`, {
                     method: 'POST',
@@ -194,12 +206,10 @@
                 const data = await response.json();
                 if (!data.success) {
                     tg.showAlert('Один или несколько NFT уже кем-то забронированы или куплены!');
-                    return; // Не пускаем на оплату
+                    return; 
                 }
             } catch (e) {
                 console.error("Ошибка бронирования", e);
-                // В реальном проекте тут лучше тоже прерывать оплату, 
-                // но пока для теста оставляем проход дальше
             }
 
             document.getElementById('payment-amount').innerText = total + ' ₽';
@@ -214,10 +224,8 @@
             tg.showAlert('Реквизиты скопированы!');
         }
 
-        // Проверка оплаты и уведомление админа
         async function checkPayment() {
             try {
-                // Отправляем запрос серверу, что пользователь нажал "Проверить"
                 await fetch(`${API_BASE}/notify-admin`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -236,9 +244,7 @@
             showPage('store');
         }
 
-        // Если пользователь передумал
         async function cancelPayment() {
-            // Можно отправить запрос на сервер для снятия брони вручную
             try {
                 await fetch(`${API_BASE}/cancel-booking`, {
                     method: 'POST',
@@ -270,7 +276,38 @@
                     </div>
                 `).join('');
             } catch (e) { 
-                document.getElementById('catalog-list').innerHTML = '<p style="text-align:center;width:100%;color:#555;">Ошибка загрузки товаров</p>';
+                document.getElementById('catalog-list').innerHTML = '<p style="text-align:center;width:100%;color:#555; grid-column: span 2;">Ошибка загрузки товаров</p>';
+            }
+        }
+
+        // НОВАЯ ФУНКЦИЯ ДЛЯ ЗАГРУЗКИ ИНВЕНТАРЯ
+        async function loadInventory() {
+            const userId = tg.initDataUnsafe?.user?.id;
+            const container = document.getElementById('inventory-container');
+            
+            if (!userId) {
+                container.innerHTML = '<div style="padding: 100px 20px; text-align: center; color: #555; grid-column: span 2;">ОШИБКА: НЕТ ID ПОЛЬЗОВАТЕЛЯ</div>';
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/inventory?user_id=${userId}`);
+                const items = await res.json();
+                
+                if (!items || items.length === 0) {
+                    container.innerHTML = '<div style="padding: 100px 20px; text-align: center; color: #555; grid-column: span 2;">ИНВЕНТАРЬ ПУСТ</div>';
+                } else {
+                    container.innerHTML = items.map(item => `
+                        <div class="item-card">
+                            <img src="${item.image_url}" class="item-image" style="margin-bottom: 8px;">
+                            <div class="item-name" style="margin-bottom: 8px;">${item.name}</div>
+                            <a href="${item.nft_link}" target="_blank" class="btn-open-nft">Открыть NFT</a>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error("Ошибка загрузки инвентаря", e);
+                container.innerHTML = '<div style="padding: 100px 20px; text-align: center; color: #555; grid-column: span 2;">ОШИБКА ЗАГРУЗКИ</div>';
             }
         }
 
