@@ -6,6 +6,10 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
+        /* ФИКС 1: Глобальный сброс отступов и box-sizing для предотвращения вылетов за пределы экрана */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { overflow-x: hidden; width: 100%; }
+
         body { background-color: #080808; color: #ffffff; font-family: 'Inter', sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding-bottom: 100px; -webkit-font-smoothing: antialiased; }
         header { width: 100%; padding: 40px 0 20px 0; text-align: center; position: relative; }
         h1 { font-weight: 650; font-size: 1.85rem; text-transform: uppercase; margin: 0; letter-spacing: 1px; color: #fff; text-shadow: 0 0 10px rgba(255, 255, 255, 0.2), 0 0 25px rgba(244, 208, 63, 0.8), 0 0 50px rgba(244, 208, 63, 0.6), 0 0 90px rgba(244, 208, 63, 0.3); }
@@ -163,14 +167,11 @@
             tg.HapticFeedback.impactOccurred('light');
         }
 
-        // ОТКРЫТИЕ ССЫЛОК ВНУТРИ БОТА (Встроенный браузер)
         function openInAppBrowser(url) {
             if (!url) return;
-            // Если это ссылка внутри телеграма
             if (url.includes('t.me') || url.includes('telegram.me')) {
                 tg.openTelegramLink(url);
             } else {
-                // Если внешняя ссылка — откроется внутренним браузером без вылета из бота
                 tg.openLink(url); 
             }
         }
@@ -219,7 +220,9 @@
                 currentBookingIds = cart.map(item => item.id);
             } else {
                 total = parseInt(price);
-                currentBookingIds = [itemId];
+                // ФИКС 2: Конвертируем itemId в число, чтобы бэкенд корректно его воспринял
+                let parsedId = isNaN(Number(itemId)) ? itemId : Number(itemId);
+                currentBookingIds = [parsedId];
             }
 
             try {
