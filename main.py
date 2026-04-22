@@ -53,7 +53,6 @@ async def auto_cancel_reservations():
                         logging.info(f"Снята просроченная бронь с {cur.rowcount} товаров.")
         except Exception as e:
             logging.error(f"Ошибка таймера бронирования: {e}")
-
         await asyncio.sleep(60)
 
 
@@ -76,8 +75,9 @@ async def handle_get_inventory(request):
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 # Отдаем купленные товары по ID пользователя
-                cur.execute("SELECT name, image_url, nft_link FROM items WHERE buyer_id = %s AND status = 'Продан'",
-                            (str(user_id),))
+                cur.execute(
+                    "SELECT id, name, image_url, nft_link, status FROM items WHERE buyer_id = %s AND status IN ('Продан', 'Выведен')",
+                    (str(user_id),))
                 items = cur.fetchall()
                 return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
     except:
@@ -93,7 +93,6 @@ async def handle_book(request):
 
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # ИЗМЕНЕНИЕ: Добавили nft_link в выборку
                 cur.execute("SELECT id, name, price, nft_link FROM items WHERE id = ANY(%s) AND status = 'Доступен'",
                             (item_ids,))
                 items = cur.fetchall()
@@ -107,9 +106,7 @@ async def handle_book(request):
                     )
                     conn.commit()
 
-                    # ИЗМЕНЕНИЕ: Формируем список товаров со ссылками
                     items_text = "\n".join([f"🔹 {i['name']} - {i['nft_link']}" for i in items])
-
                     admin_msg = f"⏳ **Новая бронь!**\n👤 @{username}\n📦 Товаров: {len(items)}\n💰 Итого: {total_price} ₽\n\n**Товары в заказе:**\n{items_text}\n\nОжидаем оплату (20 мин)..."
                     await bot.send_message(ADMIN_ID, admin_msg, disable_web_page_preview=True)
 
@@ -131,7 +128,6 @@ async def handle_notify_admin(request):
 
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # ИЗМЕНЕНИЕ: Добавили nft_link в выборку
                 cur.execute(
                     "SELECT id, name, price, nft_link FROM items WHERE id = ANY(%s) AND buyer_id = %s AND status = 'Забронирован'",
                     (item_ids, user_id))
@@ -146,9 +142,7 @@ async def handle_notify_admin(request):
                         InlineKeyboardButton(text="✅ Да", callback_data=f"bulk_yes_{user_id}_{ids_str}")
                     ]])
 
-                    # ИЗМЕНЕНИЕ: Формируем список товаров со ссылками
                     items_text = "\n".join([f"🔹 {i['name']} - {i['nft_link']}" for i in items])
-
                     msg = f"💰 **Пользователь оплатил!**\n👤 @{username} нажал кнопку проверки.\nСумма к проверке: {total} ₽\n\n**Товары в заказе:**\n{items_text}"
                     await bot.send_message(ADMIN_ID, msg, reply_markup=admin_kb, disable_web_page_preview=True)
 
@@ -175,7 +169,41 @@ async def handle_cancel_booking(request):
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
-# --- CALLBACKS ДЛЯ АДМИНА (МАССОВЫЕ) ---
+# НОВЫЙ МЕТОД: Обработка запроса на вывод от фронтенда
+async def handle_request_withdraw(request):
+    try:
+        data = await request.json()
+        item_id = data.get('itemId')
+        user_id = str(data.get('userId'))
+        username = data.get('username', 'Unknown')
+
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Проверяем, что товар принадлежит юзеру и имеет статус Продан
+                cur.execute(
+                    "SELECT id, name, nft_link FROM items WHERE id = %s AND buyer_id = %s AND status = 'Продан'",
+                    (item_id, user_id))
+                item = cur.fetchone()
+
+                if item:
+                    admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
+                        InlineKeyboardButton(text="✅ Вывести", callback_data=f"with_yes_{user_id}_{item['id']}"),
+                        InlineKeyboardButton(text="❌ Отклонить", callback_data=f"with_no_{user_id}_{item['id']}")
+                    ]])
+
+                    msg = f"📤 **Новый запрос на вывод NFT!**\n👤 @{username} (ID: {user_id})\n📦 Товар: {item['name']} (ID: {item['id']})\n🔗 Ссылка: {item['nft_link']}"
+                    await bot.send_message(ADMIN_ID, msg, reply_markup=admin_kb, disable_web_page_preview=True)
+
+                    return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+
+        return web.json_response({"success": False, "error": "Item not found or already withdrawn"},
+                                 headers={"Access-Control-Allow-Origin": "*"})
+    except Exception as e:
+        logging.error(f"Withdrawal error: {e}")
+        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+
+
+# --- CALLBACKS ДЛЯ АДМИНА ---
 
 @dp.callback_query(F.data.startswith("bulk_yes_"))
 async def admin_bulk_approve(callback: types.CallbackQuery):
@@ -208,6 +236,44 @@ async def admin_bulk_reject(callback: types.CallbackQuery):
     await callback.message.edit_text("❌ Заказ отклонен! Товары возвращены на витрину.")
     try:
         await bot.send_message(uid, "❌ Оплата не найдена. Бронь снята, товары возвращены в магазин.")
+    except:
+        pass
+
+
+# НОВЫЙ CALLBACK: Админ нажал "✅ Вывести"
+@dp.callback_query(F.data.startswith("with_yes_"))
+async def admin_withdraw_approve(callback: types.CallbackQuery):
+    _, _, uid, item_id = callback.data.split("_")
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Меняем статус на 'Выведен' и ставим ивент для фронта
+            cur.execute(
+                "UPDATE items SET status = 'Выведен', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
+                (int(item_id), uid)
+            )
+            conn.commit()
+    await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
+    try:
+        await bot.send_message(uid, f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
+    except:
+        pass
+
+
+# НОВЫЙ CALLBACK: Админ нажал "❌ Отклонить" (для вывода)
+@dp.callback_query(F.data.startswith("with_no_"))
+async def admin_withdraw_reject(callback: types.CallbackQuery):
+    _, _, uid, item_id = callback.data.split("_")
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Оставляем статус 'Продан', но отправляем ивент об отказе
+            cur.execute(
+                "UPDATE items SET last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
+                (int(item_id), uid)
+            )
+            conn.commit()
+    await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
+    try:
+        await bot.send_message(uid, f"❌ Отказ: вывод NFT (ID: {item_id}) отклонен администратором.")
     except:
         pass
 
@@ -257,6 +323,7 @@ app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_post('/book', handle_book)
 app.router.add_post('/notify-admin', handle_notify_admin)
 app.router.add_post('/cancel-booking', handle_cancel_booking)
+app.router.add_post('/request-withdraw', handle_request_withdraw)  # <--- ВОТ ТУТ ДОБАВЛЕН РОУТ
 app.router.add_get('/get_status', handle_get_status)
 app.router.add_post('/clear_event', handle_clear_event)
 app.router.add_options('/{tail:.*}', handle_options)
