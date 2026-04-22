@@ -74,13 +74,20 @@ async def handle_get_inventory(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Отдаем купленные товары по ID пользователя
+                # ВАЖНО: Добавили 'withdrawn' в выборку
                 cur.execute(
-                    "SELECT id, name, image_url, nft_link, status FROM items WHERE buyer_id = %s AND status IN ('Продан', 'Выведен')",
+                    "SELECT id, name, image_url, nft_link, status FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен')",
                     (str(user_id),))
                 items = cur.fetchall()
+
+                # Защита от старых записей: если в базе осталось "Выведен", для фронта меняем на "withdrawn"
+                for item in items:
+                    if item['status'] == 'Выведен':
+                        item['status'] = 'withdrawn'
+
                 return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
-    except:
+    except Exception as e:
+        logging.error(f"Ошибка загрузки инвентаря: {e}")
         return web.json_response([], headers={"Access-Control-Allow-Origin": "*"})
 
 
@@ -169,7 +176,6 @@ async def handle_cancel_booking(request):
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
-# НОВЫЙ МЕТОД: Обработка запроса на вывод от фронтенда
 async def handle_request_withdraw(request):
     try:
         data = await request.json()
@@ -179,7 +185,6 @@ async def handle_request_withdraw(request):
 
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Проверяем, что товар принадлежит юзеру и имеет статус Продан
                 cur.execute(
                     "SELECT id, name, nft_link FROM items WHERE id = %s AND buyer_id = %s AND status = 'Продан'",
                     (item_id, user_id))
@@ -187,8 +192,8 @@ async def handle_request_withdraw(request):
 
                 if item:
                     admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
-                        InlineKeyboardButton(text="✅ Вывести", callback_data=f"with_yes_{user_id}_{item['id']}"),
-                        InlineKeyboardButton(text="❌ Отклонить", callback_data=f"with_no_{user_id}_{item['id']}")
+                        InlineKeyboardButton(text="❌ Отклонить", callback_data=f"with_no_{user_id}_{item['id']}"),
+                        InlineKeyboardButton(text="✅ Вывести", callback_data=f"with_yes_{user_id}_{item['id']}")
                     ]])
 
                     msg = f"📤 **Новый запрос на вывод NFT!**\n👤 @{username} (ID: {user_id})\n📦 Товар: {item['name']} (ID: {item['id']})\n🔗 Ссылка: {item['nft_link']}"
@@ -240,15 +245,14 @@ async def admin_bulk_reject(callback: types.CallbackQuery):
         pass
 
 
-# НОВЫЙ CALLBACK: Админ нажал "✅ Вывести"
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
     _, _, uid, item_id = callback.data.split("_")
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Меняем статус на 'Выведен' и ставим ивент для фронта
+            # ВАЖНО: Устанавливаем статус 'withdrawn', чтобы фронтенд перенес предмет в историю
             cur.execute(
-                "UPDATE items SET status = 'Выведен', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
+                "UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
                 (int(item_id), uid)
             )
             conn.commit()
@@ -259,13 +263,12 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
         pass
 
 
-# НОВЫЙ CALLBACK: Админ нажал "❌ Отклонить" (для вывода)
 @dp.callback_query(F.data.startswith("with_no_"))
 async def admin_withdraw_reject(callback: types.CallbackQuery):
     _, _, uid, item_id = callback.data.split("_")
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Оставляем статус 'Продан', но отправляем ивент об отказе
+            # Оставляем статус 'Продан', чтобы он остался в активных NFT
             cur.execute(
                 "UPDATE items SET last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
                 (int(item_id), uid)
@@ -323,7 +326,7 @@ app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_post('/book', handle_book)
 app.router.add_post('/notify-admin', handle_notify_admin)
 app.router.add_post('/cancel-booking', handle_cancel_booking)
-app.router.add_post('/request-withdraw', handle_request_withdraw)  # <--- ВОТ ТУТ ДОБАВЛЕН РОУТ
+app.router.add_post('/request-withdraw', handle_request_withdraw)
 app.router.add_get('/get_status', handle_get_status)
 app.router.add_post('/clear_event', handle_clear_event)
 app.router.add_options('/{tail:.*}', handle_options)
