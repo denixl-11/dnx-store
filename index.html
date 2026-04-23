@@ -283,12 +283,22 @@
     <script>
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
-        let cart = [];
+        
+        // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Загружаем корзину из Local Storage ---
+        let cart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
+        document.getElementById('cart-counter').innerText = cart.length; // Обновляем счетчик при загрузке
+        // -----------------------------------------------------------
+
         let currentBookingIds = []; 
         
         let inventoryItemsData = [];
-        // Сохраняем ID тех NFT, вывод которых мы ожидаем
         let withdrawPending = JSON.parse(localStorage.getItem('withdrawPending') || '{}');
+
+        // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Функция для сохранения корзины ---
+        function saveCart() {
+            localStorage.setItem('dnx_cart', JSON.stringify(cart));
+        }
+        // -------------------------------------------------------
 
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
@@ -315,12 +325,23 @@
             }
         }
 
+        // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Проверка на дубликат и сохранение ---
         function addToCart(item) {
+            // Проверяем, есть ли уже товар с таким id в корзине
+            const isAlreadyInCart = cart.some(cartItem => cartItem.id === item.id);
+            
+            if (isAlreadyInCart) {
+                tg.showAlert("Этот NFT уже добавлен в корзину!");
+                return; // Прерываем функцию, если товар уже есть
+            }
+
             cart.push(item);
+            saveCart(); // Сохраняем в память
             document.getElementById('cart-counter').innerText = cart.length;
             tg.HapticFeedback.notificationOccurred('success');
             tg.showAlert(`Добавлено: ${item.name}`);
         }
+        // -----------------------------------------------------------
 
         function renderCart() {
             const list = document.getElementById('cart-items-list');
@@ -345,6 +366,7 @@
 
         function removeFromCart(index) {
             cart.splice(index, 1);
+            saveCart(); // Сохраняем изменения после удаления
             document.getElementById('cart-counter').innerText = cart.length;
             renderCart();
             tg.HapticFeedback.impactOccurred('medium');
@@ -406,7 +428,10 @@
             } catch(e) { console.error(e); }
 
             tg.showAlert('Запрос отправлен администратору. Ожидайте зачисления NFT в инвентарь.');
+            
+            // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Очищаем корзину после отправки ---
             cart = []; 
+            saveCart(); // Обновляем пустое хранилище
             document.getElementById('cart-counter').innerText = '0';
             currentBookingIds = [];
             showPage('store');
@@ -493,7 +518,7 @@
             const activeItems = inventoryItemsData.filter(i => i.status !== 'withdrawn');
             const historyItems = inventoryItemsData.filter(i => i.status === 'withdrawn');
 
-            // Рендер активных (если предмет в обработке вывода - показываем крутилку)
+            // Рендер активных
             if (activeItems.length === 0) {
                 activeContainer.innerHTML = '<div style="padding: 100px 20px; text-align: center; color: var(--text-muted); grid-column: span 2; font-size: 0.9rem;">У ВАС НЕТ NFT</div>';
             } else {
@@ -549,12 +574,11 @@
             tg.HapticFeedback.notificationOccurred('success');
         }
 
-        // Фоновый поллинг (опрос сервера каждые 5 секунд)
+        // Фоновый поллинг
         async function backgroundPoll() {
             const userId = tg.initDataUnsafe?.user?.id;
             if (!userId) return;
             
-            // Запрашиваем новые данные, только если мы на странице инвентаря ИЛИ есть предметы в ожидании вывода
             if (document.getElementById('page-inventory').classList.contains('page-active') || Object.keys(withdrawPending).length > 0) {
                  try {
                     const res = await fetch(`${API_BASE}/inventory?user_id=${userId}`);
@@ -562,7 +586,6 @@
                     
                     let needsUpdate = false;
                     
-                    // Если предмет выведен админом, удаляем его из ожидания
                     newData.forEach(newItem => {
                         if (newItem.status === 'withdrawn' && withdrawPending[newItem.id]) {
                             delete withdrawPending[newItem.id];
@@ -570,7 +593,6 @@
                         }
                     });
 
-                    // Если данные изменились (например, статус обновился), сохраняем и перерисовываем
                     if (needsUpdate || JSON.stringify(inventoryItemsData) !== JSON.stringify(newData)) {
                         inventoryItemsData = newData;
                         localStorage.setItem('withdrawPending', JSON.stringify(withdrawPending));
@@ -583,7 +605,6 @@
             }
         }
 
-        // Запускаем проверку каждые 5 секунд
         setInterval(backgroundPoll, 5000);
 
         loadCatalog();
