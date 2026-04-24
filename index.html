@@ -124,7 +124,12 @@
             color: #050505; border: none; border-radius: 12px; height: 52px; 
             font-weight: 700; font-size: 0.95rem; text-transform: uppercase; 
             letter-spacing: 1px; cursor: pointer; box-shadow: 0 4px 20px rgba(203, 161, 83, 0.2);
+            transition: 0.3s;
         }
+        .btn-main-action:disabled {
+            opacity: 0.4; filter: grayscale(100%); cursor: not-allowed; box-shadow: none;
+        }
+        
         .btn-secondary { 
             width: 100%; background: transparent; color: var(--text-muted); 
             border: 1px solid var(--border-color); border-radius: 12px; height: 52px; 
@@ -195,7 +200,6 @@
             background: var(--text-muted); cursor: wait; pointer-events: none; opacity: 0.8;
         }
 
-        /* КРУТИЛКА ЗАГРУЗКИ */
         .spinner {
             width: 16px; height: 16px;
             border: 2px solid rgba(10, 10, 12, 0.2);
@@ -210,6 +214,33 @@
             border: 1px dashed var(--border-color); border-radius: 10px; padding: 8px 0; margin-top: 8px;
             text-transform: uppercase; letter-spacing: 2px;
         }
+
+        /* --- СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-content {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 16px; padding: 24px; width: 90%; max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); transform: translateY(20px); transition: 0.3s ease;
+        }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+        .modal-title { font-weight: 700; font-size: 1.1rem; text-align: center; margin: 0 0 16px 0; color: var(--accent-gold); letter-spacing: 1px; }
+        .terms-list { font-size: 0.8rem; color: var(--text-muted); padding-left: 16px; line-height: 1.5; margin-bottom: 20px; }
+        .terms-list li { margin-bottom: 8px; }
+        .terms-checkbox-label {
+            display: flex; align-items: center; font-size: 0.8rem; font-weight: 500; cursor: pointer; gap: 10px; margin-bottom: 24px; color: var(--text-main); line-height: 1.3;
+        }
+        #terms-checkbox { display: none; }
+        .custom-checkbox {
+            width: 22px; height: 22px; border: 2px solid var(--border-color); border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: 0.2s; flex-shrink: 0;
+        }
+        #terms-checkbox:checked + .custom-checkbox { background: var(--accent-gold); border-color: var(--accent-gold); }
+        #terms-checkbox:checked + .custom-checkbox::after { content: '✓'; color: #000; font-weight: 900; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -232,7 +263,7 @@
     <div id="page-cart" class="page">
         <div id="cart-items-list" class="cart-list"></div>
         <div class="fixed-footer" id="pay-footer" style="display: none;">
-            <button class="btn-main-action" onclick="goToPayment('cart')">Перейти к оплате</button>
+            <button class="btn-main-action" onclick="openTermsModal('cart')">Перейти к оплате</button>
         </div>
     </div>
 
@@ -279,26 +310,63 @@
         <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
+    <div id="terms-modal-overlay" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="modal-title">УСЛОВИЯ ПОЛЬЗОВАНИЯ</h3>
+            <ul class="terms-list">
+                <li>Администрация не несет ответственности за перевод средств на сторонние реквизиты, не указанные в приложении.</li>
+                <li>Систематическое создание заявок на проверку оплаты без фактического перевода средств приведет к блокировке аккаунта.</li>
+                <li>Обработка и проверка платежа занимает до 15 минут.</li>
+                <li>Вывод цифровых активов (подарков) осуществляется в течение 2 часов.</li>
+            </ul>
+            <label class="terms-checkbox-label">
+                <input type="checkbox" id="terms-checkbox" onchange="toggleTermsButton()">
+                <span class="custom-checkbox"></span>
+                Я принимаю условия пользовательского соглашения
+            </label>
+            <div>
+                <button class="btn-main-action" id="btn-accept-terms" onclick="executePayment()" disabled>Продолжить оформление</button>
+                <button class="btn-secondary" onclick="closeTermsModal()" style="margin-top: 10px;">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-alert-overlay" class="modal-overlay">
+        <div class="modal-content" style="text-align: center; max-width: 320px; padding-top: 32px;">
+            <div id="custom-alert-message" style="margin-bottom: 24px; color: var(--text-main); font-size: 0.95rem; line-height: 1.5; font-weight: 500;">Текст</div>
+            <button class="btn-main-action" style="height: 44px; font-size: 0.85rem;" onclick="closeCustomAlert()">Понятно</button>
+        </div>
+    </div>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
         
-        // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Загружаем корзину из Local Storage ---
         let cart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
-        document.getElementById('cart-counter').innerText = cart.length; // Обновляем счетчик при загрузке
-        // -----------------------------------------------------------
+        document.getElementById('cart-counter').innerText = cart.length;
 
         let currentBookingIds = []; 
+        let pendingPaymentData = null; 
         
         let inventoryItemsData = [];
         let withdrawPending = JSON.parse(localStorage.getItem('withdrawPending') || '{}');
 
-        // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Функция для сохранения корзины ---
+        // --- КАСТОМНЫЕ УВЕДОМЛЕНИЯ ---
+        function showCustomAlert(message) {
+            document.getElementById('custom-alert-message').innerText = message;
+            document.getElementById('custom-alert-overlay').classList.add('active');
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function closeCustomAlert() {
+            document.getElementById('custom-alert-overlay').classList.remove('active');
+        }
+        // -----------------------------
+
         function saveCart() {
             localStorage.setItem('dnx_cart', JSON.stringify(cart));
         }
-        // -------------------------------------------------------
 
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
@@ -325,23 +393,19 @@
             }
         }
 
-        // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Проверка на дубликат и сохранение ---
         function addToCart(item) {
-            // Проверяем, есть ли уже товар с таким id в корзине
             const isAlreadyInCart = cart.some(cartItem => cartItem.id === item.id);
-            
             if (isAlreadyInCart) {
-                tg.showAlert("Этот NFT уже добавлен в корзину!");
-                return; // Прерываем функцию, если товар уже есть
+                showCustomAlert("Этот NFT уже добавлен в корзину!");
+                return;
             }
 
             cart.push(item);
-            saveCart(); // Сохраняем в память
+            saveCart();
             document.getElementById('cart-counter').innerText = cart.length;
             tg.HapticFeedback.notificationOccurred('success');
-            tg.showAlert(`Добавлено: ${item.name}`);
+            showCustomAlert(`Добавлено в корзину: ${item.name}`);
         }
-        // -----------------------------------------------------------
 
         function renderCart() {
             const list = document.getElementById('cart-items-list');
@@ -366,13 +430,39 @@
 
         function removeFromCart(index) {
             cart.splice(index, 1);
-            saveCart(); // Сохраняем изменения после удаления
+            saveCart(); 
             document.getElementById('cart-counter').innerText = cart.length;
             renderCart();
             tg.HapticFeedback.impactOccurred('medium');
         }
 
-        async function goToPayment(type, itemId = null, price = 0) {
+        function openTermsModal(type, itemId = null, price = 0) {
+            pendingPaymentData = { type, itemId, price };
+            
+            const checkbox = document.getElementById('terms-checkbox');
+            checkbox.checked = false;
+            document.getElementById('btn-accept-terms').disabled = true;
+
+            document.getElementById('terms-modal-overlay').classList.add('active');
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function closeTermsModal() {
+            document.getElementById('terms-modal-overlay').classList.remove('active');
+            pendingPaymentData = null;
+        }
+
+        function toggleTermsButton() {
+            const checkbox = document.getElementById('terms-checkbox');
+            document.getElementById('btn-accept-terms').disabled = !checkbox.checked;
+        }
+
+        async function executePayment() {
+            if (!pendingPaymentData) return;
+
+            closeTermsModal();
+
+            const { type, itemId, price } = pendingPaymentData;
             let total = 0;
             currentBookingIds = [];
 
@@ -397,7 +487,7 @@
                 });
                 const data = await response.json();
                 if (!data.success) {
-                    tg.showAlert('Один или несколько NFT уже кем-то забронированы или куплены!');
+                    showCustomAlert('Один или несколько NFT уже кем-то забронированы или куплены!');
                     return; 
                 }
             } catch (e) { console.error("Ошибка бронирования", e); }
@@ -411,7 +501,7 @@
             reqInput.select();
             document.execCommand('copy');
             tg.HapticFeedback.notificationOccurred('success');
-            tg.showAlert('Реквизиты скопированы!');
+            showCustomAlert('Реквизиты успешно скопированы!');
         }
 
         async function checkPayment() {
@@ -427,11 +517,10 @@
                 });
             } catch(e) { console.error(e); }
 
-            tg.showAlert('Запрос отправлен администратору. Ожидайте зачисления NFT в инвентарь.');
+            showCustomAlert('Запрос отправлен администратору. Ожидайте зачисления NFT в инвентарь.');
             
-            // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Очищаем корзину после отправки ---
             cart = []; 
-            saveCart(); // Обновляем пустое хранилище
+            saveCart(); 
             document.getElementById('cart-counter').innerText = '0';
             currentBookingIds = [];
             showPage('store');
@@ -459,7 +548,7 @@
                         <img src="${item.image_url}" class="item-image">
                         <div class="item-name">${item.name}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="goToPayment('item', '${item.id}', ${item.price})">${item.price} ₽</button>
+                            <button class="btn-buy-now" onclick="openTermsModal('item', '${item.id}', ${item.price})">${item.price} ₽</button>
                             <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
@@ -518,7 +607,6 @@
             const activeItems = inventoryItemsData.filter(i => i.status !== 'withdrawn');
             const historyItems = inventoryItemsData.filter(i => i.status === 'withdrawn');
 
-            // Рендер активных
             if (activeItems.length === 0) {
                 activeContainer.innerHTML = '<div style="padding: 100px 20px; text-align: center; color: var(--text-muted); grid-column: span 2; font-size: 0.9rem;">У ВАС НЕТ NFT</div>';
             } else {
@@ -537,7 +625,6 @@
                 }).join('');
             }
 
-            // Рендер истории
             if (historyItems.length === 0) {
                 historyContainer.innerHTML = '<div style="padding: 100px 20px; text-align: center; color: var(--text-muted); grid-column: span 2; font-size: 0.9rem;">ИСТОРИЯ ПУСТА</div>';
             } else {
@@ -554,7 +641,6 @@
         async function requestWithdraw(itemId) {
             if (withdrawPending[itemId]) return; 
 
-            // Блокируем кнопку и показываем крутилку
             withdrawPending[itemId] = true;
             localStorage.setItem('withdrawPending', JSON.stringify(withdrawPending));
             renderInventoryTabs(); 
@@ -574,7 +660,6 @@
             tg.HapticFeedback.notificationOccurred('success');
         }
 
-        // Фоновый поллинг
         async function backgroundPoll() {
             const userId = tg.initDataUnsafe?.user?.id;
             if (!userId) return;
