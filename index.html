@@ -459,10 +459,11 @@
 
         async function executePayment() {
             if (!pendingPaymentData) return;
-
+            
+            const { type, itemId, price } = pendingPaymentData;
+            
             closeTermsModal();
 
-            const { type, itemId, price } = pendingPaymentData;
             let total = 0;
             currentBookingIds = [];
 
