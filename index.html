@@ -268,27 +268,29 @@
     </div>
 
     <div id="page-payment" class="page">
-        <div style="padding: 30px 20px;">
-            <h2 style="text-align: center; color: var(--text-main); margin-top: 0; font-weight: 700; font-size: 1.2rem; letter-spacing: 1px;">ОФОРМЛЕНИЕ ЗАКАЗА</h2>
-            <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 30px;">Переведите точную сумму по реквизитам ниже. Бронь действует 20 минут.</p>
-            
-            <div class="payment-box">
-                <div style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Сумма к оплате</div>
-                <div id="payment-amount" style="font-size: 2rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 24px;">0 ₽</div>
+        <div style="padding: 30px 20px; display: flex; flex-direction: column; min-height: calc(100vh - 60px);">
+            <div style="flex: 1 0 auto;">
+                <h2 style="text-align: center; color: var(--text-main); margin-top: 0; font-weight: 700; font-size: 1.2rem; letter-spacing: 1px;">ОФОРМЛЕНИЕ ЗАКАЗА</h2>
+                <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 30px;">Переведите точную сумму по реквизитам ниже. Бронь действует 20 минут.</p>
                 
-                <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;">Реквизиты (СБП / Карта)</div>
-                <div class="req-input-group">
-                    <input type="text" id="req-card" class="req-input" value="1111 2222 3333 4444" readonly>
-                    <button class="btn-copy" onclick="copyReq()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                    </button>
+                <div class="payment-box">
+                    <div style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Сумма к оплате</div>
+                    <div id="payment-amount" style="font-size: 2rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 24px;">0 ₽</div>
+                    
+                    <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;">Реквизиты (СБП / Карта)</div>
+                    <div class="req-input-group">
+                        <input type="text" id="req-card" class="req-input" value="1111 2222 3333 4444" readonly>
+                        <button class="btn-copy" onclick="copyReq()">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div style="margin-top: 40px;">
+            <div style="margin-top: 40px; padding-bottom: 30px;">
                 <button class="btn-main-action" onclick="checkPayment()">Проверить оплату</button>
                 <button class="btn-secondary" onclick="cancelPayment()">Отмена</button>
             </div>
@@ -461,21 +463,14 @@
         }
 
         async function executePayment() {
-            // Проверяем, есть ли данные для оплаты
             if (!pendingPaymentData) return;
 
-            // 1. Сначала извлекаем данные в локальные переменные
             const { type, itemId, price } = pendingPaymentData;
-
-            // 2. Только теперь закрываем модальное окно
-            // (так как эта функция делает pendingPaymentData = null)
             closeTermsModal();
 
             let total = 0;
             currentBookingIds = [];
 
-            // Определяем логику расчета в зависимости от того, 
-            // оплачиваем мы один товар или всю корзину
             if (type === 'cart') {
                 total = cart.reduce((sum, item) => sum + parseInt(item.price), 0);
                 currentBookingIds = cart.map(item => item.id);
@@ -485,7 +480,11 @@
                 currentBookingIds = [parsedId];
             }
 
-            // Отправляем запрос на бронирование на сервер
+            // --- МГНОВЕННО ОТКРЫВАЕМ СТРАНИЦУ ОПЛАТЫ ---
+            document.getElementById('payment-amount').innerText = total + ' ₽';
+            showPage('payment');
+
+            // --- ЗАПРОС УХОДИТ В ФОНЕ ---
             try {
                 const response = await fetch(`${API_BASE}/book`, {
                     method: 'POST',
@@ -499,20 +498,18 @@
                 
                 const data = await response.json();
                 
-                // Если сервер вернул ошибку, показываем алерт и прерываем выполнение
+                // Если кто-то уже выкупил, кидаем обратно в магазин и показываем алерт
                 if (!data.success) {
+                    showPage('store');
                     showCustomAlert('Один или несколько NFT уже кем-то забронированы или куплены!');
                     return; 
                 }
             } catch (e) { 
                 console.error("Ошибка бронирования", e); 
+                showPage('store');
                 showCustomAlert('Ошибка соединения с сервером');
                 return;
             }
-
-            // Если всё успешно, обновляем сумму к оплате и переключаем страницу
-            document.getElementById('payment-amount').innerText = total + ' ₽';
-            showPage('payment');
         }
 
         function copyReq() {
@@ -524,10 +521,7 @@
         }
 
         async function checkPayment() {
-            // Если запрос уже в процессе обработки — просто игнорируем новые нажатия
             if (isCheckingPayment) return;
-
-            // Ставим блокировку: теперь функция не пропустит новые клики
             isCheckingPayment = true;
 
             try {
@@ -543,14 +537,11 @@
             } catch(e) { 
                 console.error(e); 
             } finally {
-                // Обязательно снимаем блокировку после того, как запрос завершился 
-                // (даже если произошла ошибка сети, чтобы кнопка не зависла намертво)
                 isCheckingPayment = false;
             }
 
             showCustomAlert('Запрос отправлен администратору. Ожидайте зачисления NFT в инвентарь.');
             
-            // Очищаем корзину и перекидываем пользователя обратно в магазин
             cart = []; 
             saveCart(); 
             document.getElementById('cart-counter').innerText = '0';
