@@ -352,6 +352,9 @@
         let inventoryItemsData = [];
         let withdrawPending = JSON.parse(localStorage.getItem('withdrawPending') || '{}');
 
+        // Добавляем переменную-флаг вне функции
+        let isCheckingPayment = false;
+
         // --- КАСТОМНЫЕ УВЕДОМЛЕНИЯ ---
         function showCustomAlert(message) {
             document.getElementById('custom-alert-message').innerText = message;
@@ -458,15 +461,21 @@
         }
 
         async function executePayment() {
+            // Проверяем, есть ли данные для оплаты
             if (!pendingPaymentData) return;
-            
+
+            // 1. Сначала извлекаем данные в локальные переменные
             const { type, itemId, price } = pendingPaymentData;
-            
+
+            // 2. Только теперь закрываем модальное окно
+            // (так как эта функция делает pendingPaymentData = null)
             closeTermsModal();
 
             let total = 0;
             currentBookingIds = [];
 
+            // Определяем логику расчета в зависимости от того, 
+            // оплачиваем мы один товар или всю корзину
             if (type === 'cart') {
                 total = cart.reduce((sum, item) => sum + parseInt(item.price), 0);
                 currentBookingIds = cart.map(item => item.id);
@@ -476,6 +485,7 @@
                 currentBookingIds = [parsedId];
             }
 
+            // Отправляем запрос на бронирование на сервер
             try {
                 const response = await fetch(`${API_BASE}/book`, {
                     method: 'POST',
@@ -486,13 +496,21 @@
                         username: tg.initDataUnsafe?.user?.username
                     })
                 });
+                
                 const data = await response.json();
+                
+                // Если сервер вернул ошибку, показываем алерт и прерываем выполнение
                 if (!data.success) {
                     showCustomAlert('Один или несколько NFT уже кем-то забронированы или куплены!');
                     return; 
                 }
-            } catch (e) { console.error("Ошибка бронирования", e); }
+            } catch (e) { 
+                console.error("Ошибка бронирования", e); 
+                showCustomAlert('Ошибка соединения с сервером');
+                return;
+            }
 
+            // Если всё успешно, обновляем сумму к оплате и переключаем страницу
             document.getElementById('payment-amount').innerText = total + ' ₽';
             showPage('payment');
         }
@@ -506,6 +524,12 @@
         }
 
         async function checkPayment() {
+            // Если запрос уже в процессе обработки — просто игнорируем новые нажатия
+            if (isCheckingPayment) return;
+
+            // Ставим блокировку: теперь функция не пропустит новые клики
+            isCheckingPayment = true;
+
             try {
                 await fetch(`${API_BASE}/notify-admin`, {
                     method: 'POST',
@@ -516,10 +540,17 @@
                         username: tg.initDataUnsafe?.user?.username
                     })
                 });
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error(e); 
+            } finally {
+                // Обязательно снимаем блокировку после того, как запрос завершился 
+                // (даже если произошла ошибка сети, чтобы кнопка не зависла намертво)
+                isCheckingPayment = false;
+            }
 
             showCustomAlert('Запрос отправлен администратору. Ожидайте зачисления NFT в инвентарь.');
             
+            // Очищаем корзину и перекидываем пользователя обратно в магазин
             cart = []; 
             saveCart(); 
             document.getElementById('cart-counter').innerText = '0';
