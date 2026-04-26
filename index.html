@@ -73,7 +73,8 @@
         }
         .item-card:hover { border-color: rgba(203, 161, 83, 0.3); }
         
-        .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 12px; object-fit: cover; margin-bottom: 14px; }
+        .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 12px; object-fit: cover; margin-bottom: 14px; cursor: pointer; transition: 0.2s; }
+        .item-image:active { transform: scale(0.95); }
         
         .item-name { 
             font-size: 0.95rem; font-weight: 500; margin-bottom: 14px; color: var(--text-main); 
@@ -241,6 +242,69 @@
         }
         #terms-checkbox:checked + .custom-checkbox { background: var(--accent-gold); border-color: var(--accent-gold); }
         #terms-checkbox:checked + .custom-checkbox::after { content: '✓'; color: #000; font-weight: 900; font-size: 14px; }
+
+        /* --- СТИЛИ ДЛЯ NFT-МОДАЛКИ (BOTTOM SHEET) --- */
+        .nft-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s ease;
+        }
+        .nft-modal-overlay.active { opacity: 1; pointer-events: all; }
+
+        .nft-modal-sheet {
+            position: absolute; bottom: -100%; left: 0; width: 100%;
+            background: var(--bg-main); border-radius: 24px 24px 0 0;
+            transition: bottom 0.4s cubic-bezier(0.1, 1, 0.2, 1);
+            display: flex; flex-direction: column; max-height: 90vh; overflow: hidden;
+            border-top: 1px solid var(--accent-gold-dim);
+        }
+        .nft-modal-overlay.active .nft-modal-sheet { bottom: 0; }
+
+        .nft-modal-header {
+            background: var(--bg-card);
+            padding: 30px 20px 20px; position: relative; text-align: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .nft-modal-close {
+            position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 50%; width: 32px; height: 32px; display: flex;
+            align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer;
+            transition: 0.2s;
+        }
+        .nft-modal-close:active { transform: scale(0.9); }
+        
+        .nft-modal-img {
+            width: 160px; height: 160px; object-fit: contain; margin: 0 auto 15px;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+            border-radius: 16px;
+        }
+        .nft-modal-title { font-size: 1.4rem; font-weight: 700; color: #fff; margin-bottom: 5px; }
+        .nft-modal-number { font-size: 0.9rem; color: var(--accent-gold); font-weight: 500; }
+
+        .nft-modal-body {
+            padding: 20px; overflow-y: auto; flex-grow: 1; background: var(--bg-main);
+        }
+        .trait-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid var(--border-color);
+        }
+        .trait-label { color: var(--text-muted); font-size: 0.85rem; font-weight: 500; width: 30%; }
+        .trait-value-col { display: flex; align-items: center; gap: 8px; flex-grow: 1; }
+        
+        /* ЗОЛОТЫЕ ЗНАЧЕНИЯ И ПРОЦЕНТЫ */
+        .trait-value { color: var(--accent-gold); font-weight: 600; font-size: 0.9rem; }
+        .trait-percent { 
+            background: var(--accent-gold-dim); color: var(--accent-gold); 
+            font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; font-weight: 700;
+        }
+        
+        .trait-price { color: var(--text-main); font-weight: 700; font-size: 0.9rem; }
+
+        .nft-modal-footer {
+            padding: 15px 20px 30px; border-top: 1px solid var(--border-color);
+            display: flex; gap: 10px; background: var(--bg-main);
+        }
     </style>
 </head>
 <body>
@@ -289,7 +353,6 @@
                     </div>
                 </div>
             </div>
-
             <div style="margin-top: 40px; padding-bottom: 30px;">
                 <button class="btn-main-action" onclick="checkPayment()">Проверить оплату</button>
                 <button class="btn-secondary" onclick="cancelPayment()">Отмена</button>
@@ -340,6 +403,27 @@
         </div>
     </div>
 
+    <div id="nft-detail-overlay" class="nft-modal-overlay" onclick="closeNftModal(event)">
+        <div class="nft-modal-sheet" onclick="event.stopPropagation()">
+            <div class="nft-modal-header" id="nft-modal-header-bg">
+                <div class="nft-modal-close" onclick="closeNftModal(event)">✕</div>
+                <img src="" id="nft-modal-img" class="nft-modal-img">
+                <div class="nft-modal-title" id="nft-modal-title">Name</div>
+                <div class="nft-modal-number" id="nft-modal-number">#00000</div>
+            </div>
+            <div class="nft-modal-body" id="nft-modal-traits">
+                </div>
+            <div class="nft-modal-footer">
+                <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 1; height: 48px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
+                        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
+                    </svg>
+                </button>
+                <button class="btn-main-action" id="nft-modal-btn-buy" style="flex: 3; height: 48px;">Купить за 0 ₽</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
@@ -351,10 +435,10 @@
         let currentBookingIds = []; 
         let pendingPaymentData = null; 
         
+        let currentCatalog = []; // Глобальная переменная каталога
         let inventoryItemsData = [];
         let withdrawPending = JSON.parse(localStorage.getItem('withdrawPending') || '{}');
 
-        // Добавляем переменную-флаг вне функции
         let isCheckingPayment = false;
 
         // --- КАСТОМНЫЕ УВЕДОМЛЕНИЯ ---
@@ -367,8 +451,54 @@
         function closeCustomAlert() {
             document.getElementById('custom-alert-overlay').classList.remove('active');
         }
-        // -----------------------------
 
+        // --- ФУНКЦИИ МОДАЛКИ NFT ---
+        function openNftModal(itemId) {
+            const item = currentCatalog.find(i => String(i.id) === String(itemId));
+            if (!item) return;
+
+            document.getElementById('nft-modal-img').src = item.image_url;
+            document.getElementById('nft-modal-title').innerText = item.name;
+            
+            document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : `#${Math.floor(Math.random() * 90000) + 10000}`;
+
+            const traits = item.traits || [
+                { label: 'Model', value: 'Silver Ride', percent: '2.5%', price: '4.68 TON' },
+                { label: 'Symbol', value: 'Party Hat', percent: '0.5%', price: '4.35 TON' },
+                { label: 'Backdrop', value: 'Cobalt Blue', percent: '1.2%', price: '5 TON' }
+            ];
+
+            document.getElementById('nft-modal-traits').innerHTML = traits.map(t => `
+                <div class="trait-row">
+                    <div class="trait-label">${t.label}</div>
+                    <div class="trait-value-col">
+                        <span class="trait-value">${t.value}</span>
+                        <span class="trait-percent">${t.percent}</span>
+                    </div>
+                    <div class="trait-price">${t.price}</div>
+                </div>
+            `).join('');
+
+            const btnBuy = document.getElementById('nft-modal-btn-buy');
+            btnBuy.innerText = `Купить за ${item.price} ₽`;
+            btnBuy.onclick = () => { closeNftModal(); openTermsModal('item', item.id, item.price); };
+
+            const btnCart = document.getElementById('nft-modal-btn-cart');
+            btnCart.onclick = () => { 
+                addToCart(item);
+                closeNftModal(); 
+            };
+
+            document.getElementById('nft-detail-overlay').classList.add('active');
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function closeNftModal(event) {
+            if (event && event.target !== event.currentTarget) return; 
+            document.getElementById('nft-detail-overlay').classList.remove('active');
+        }
+
+        // --- БАЗОВЫЕ ФУНКЦИИ ---
         function saveCart() {
             localStorage.setItem('dnx_cart', JSON.stringify(cart));
         }
@@ -480,11 +610,9 @@
                 currentBookingIds = [parsedId];
             }
 
-            // --- МГНОВЕННО ОТКРЫВАЕМ СТРАНИЦУ ОПЛАТЫ ---
             document.getElementById('payment-amount').innerText = total + ' ₽';
             showPage('payment');
 
-            // --- ЗАПРОС УХОДИТ В ФОНЕ ---
             try {
                 const response = await fetch(`${API_BASE}/book`, {
                     method: 'POST',
@@ -498,7 +626,6 @@
                 
                 const data = await response.json();
                 
-                // Если кто-то уже выкупил, кидаем обратно в магазин и показываем алерт
                 if (!data.success) {
                     showPage('store');
                     showCustomAlert('Один или несколько NFT уже кем-то забронированы или куплены!');
@@ -565,10 +692,10 @@
         async function loadCatalog() {
             try {
                 const res = await fetch(`${API_BASE}/items`);
-                const items = await res.json();
-                document.getElementById('catalog-list').innerHTML = items.map(item => `
+                currentCatalog = await res.json();
+                document.getElementById('catalog-list').innerHTML = currentCatalog.map(item => `
                     <div class="item-card">
-                        <img src="${item.image_url}" class="item-image">
+                        <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
                         <div class="item-name">${item.name}</div>
                         <div class="card-buttons">
                             <button class="btn-buy-now" onclick="openTermsModal('item', '${item.id}', ${item.price})">${item.price} ₽</button>
@@ -637,7 +764,7 @@
                     const isPending = !!withdrawPending[item.id];
                     return `
                         <div class="item-card">
-                            <img src="${item.image_url}" class="item-image">
+                            <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
                             <div class="item-name">${item.name}</div>
                             <button class="btn-open-nft" onclick="openInAppBrowser('${item.nft_link}')">Открыть NFT</button>
                             <button class="btn-withdraw ${isPending ? 'loading' : ''}" onclick="requestWithdraw('${item.id}')" ${isPending ? 'disabled' : ''}>
