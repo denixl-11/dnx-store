@@ -62,10 +62,25 @@ async def handle_get_items(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT id, name, price, status, image_url, nft_link FROM items WHERE status = 'Доступен'")
+                # ДОБАВЛЕНО: Запрашиваем traits
+                cur.execute(
+                    "SELECT id, name, price, status, image_url, nft_link, traits FROM items WHERE status = 'Доступен'")
                 items = cur.fetchall()
+
+                # ДОБАВЛЕНО: Распаковываем JSON-строку характеристик
+                for item in items:
+                    traits_raw = item.get('traits')
+                    if traits_raw:
+                        try:
+                            item['traits'] = json.loads(traits_raw)
+                        except Exception:
+                            item['traits'] = []
+                    else:
+                        item['traits'] = []
+
                 return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
+        logging.error(f"Ошибка: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
@@ -74,16 +89,25 @@ async def handle_get_inventory(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # ВАЖНО: Добавили 'withdrawn' в выборку
+                # ДОБАВЛЕНО: Запрашиваем traits для инвентаря тоже
                 cur.execute(
-                    "SELECT id, name, image_url, nft_link, status FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен')",
+                    "SELECT id, name, image_url, nft_link, status, traits FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен')",
                     (str(user_id),))
                 items = cur.fetchall()
 
-                # Защита от старых записей: если в базе осталось "Выведен", для фронта меняем на "withdrawn"
                 for item in items:
                     if item['status'] == 'Выведен':
                         item['status'] = 'withdrawn'
+
+                    # Распаковываем JSON
+                    traits_raw = item.get('traits')
+                    if traits_raw:
+                        try:
+                            item['traits'] = json.loads(traits_raw)
+                        except Exception:
+                            item['traits'] = []
+                    else:
+                        item['traits'] = []
 
                 return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
@@ -250,7 +274,6 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
     _, _, uid, item_id = callback.data.split("_")
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # ВАЖНО: Устанавливаем статус 'withdrawn', чтобы фронтенд перенес предмет в историю
             cur.execute(
                 "UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
                 (int(item_id), uid)
@@ -268,7 +291,6 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
     _, _, uid, item_id = callback.data.split("_")
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Оставляем статус 'Продан', чтобы он остался в активных NFT
             cur.execute(
                 "UPDATE items SET last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
                 (int(item_id), uid)
@@ -334,12 +356,10 @@ app.router.add_options('/{tail:.*}', handle_options)
 
 async def main():
     asyncio.create_task(auto_cancel_reservations())
-
     port = int(os.environ.get("PORT", 8080))
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, '0.0.0.0', port).start()
-
     await dp.start_polling(bot)
 
 
