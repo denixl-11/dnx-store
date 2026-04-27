@@ -62,12 +62,10 @@ async def handle_get_items(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # ДОБАВЛЕНО: Запрашиваем traits
                 cur.execute(
                     "SELECT id, name, price, status, image_url, nft_link, traits FROM items WHERE status = 'Доступен'")
                 items = cur.fetchall()
 
-                # ДОБАВЛЕНО: Распаковываем JSON-строку характеристик
                 for item in items:
                     traits_raw = item.get('traits')
                     if traits_raw:
@@ -89,7 +87,6 @@ async def handle_get_inventory(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # ДОБАВЛЕНО: Запрашиваем traits для инвентаря тоже
                 cur.execute(
                     "SELECT id, name, image_url, nft_link, status, traits FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен')",
                     (str(user_id),))
@@ -99,7 +96,6 @@ async def handle_get_inventory(request):
                     if item['status'] == 'Выведен':
                         item['status'] = 'withdrawn'
 
-                    # Распаковываем JSON
                     traits_raw = item.get('traits')
                     if traits_raw:
                         try:
