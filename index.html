@@ -19,138 +19,138 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { overflow-x: hidden; width: 100%; }
 
-        body { 
-            background-color: var(--bg-main); 
-            color: var(--text-main); 
-            font-family: 'Inter', sans-serif; 
-            margin: 0; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            min-height: 100vh; 
-            padding-bottom: 100px; 
-            -webkit-font-smoothing: antialiased; 
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding-bottom: 100px;
+            -webkit-font-smoothing: antialiased;
         }
 
         header { width: 100%; padding: 40px 0 25px 0; text-align: center; position: relative; border-bottom: 1px solid var(--border-color); }
-        
-        h1 { 
-            font-weight: 800; 
-            font-size: 1.7rem; 
-            text-transform: uppercase; 
-            margin: 0; 
-            letter-spacing: 3px; 
-            color: #fff; 
-            text-shadow: 0 0 10px rgba(203, 161, 83, 0.4), 
-                         0 0 20px rgba(203, 161, 83, 0.2), 
-                         0 0 30px rgba(203, 161, 83, 0.1); 
+
+        h1 {
+            font-weight: 800;
+            font-size: 1.7rem;
+            text-transform: uppercase;
+            margin: 0;
+            letter-spacing: 3px;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(203, 161, 83, 0.4),
+                         0 0 20px rgba(203, 161, 83, 0.2),
+                         0 0 30px rgba(203, 161, 83, 0.1);
         }
-        
+
         .subtitle { font-size: 0.65rem; color: var(--text-muted); margin-top: 6px; letter-spacing: 3px; text-transform: uppercase; font-weight: 500; }
-        
-        .cart-btn-header { 
-            position: absolute; right: 20px; top: 55%; transform: translateY(-50%); 
-            display: flex; align-items: center; 
-            background: rgba(255, 255, 255, 0.03); 
-            border: 1px solid var(--border-color); 
-            padding: 8px 14px; border-radius: 12px; cursor: pointer; 
+
+        .cart-btn-header {
+            position: absolute; right: 20px; top: 55%; transform: translateY(-50%);
+            display: flex; align-items: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px; border-radius: 12px; cursor: pointer;
             backdrop-filter: blur(10px); transition: 0.3s ease;
         }
         .cart-btn-header:active { transform: translateY(-50%) scale(0.95); }
         #cart-counter { color: var(--accent-gold); font-weight: 600; margin-left: 8px; font-size: 0.9rem; }
-        
+
         .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; padding: 20px; box-sizing: border-box; }
-        
-        .item-card { 
-            background: var(--bg-card); 
-            border: 1px solid var(--border-color); 
-            border-radius: 16px; 
-            padding: 12px; 
-            display: flex; 
+
+        .item-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 12px;
+            display: flex;
             flex-direction: column;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             transition: transform 0.2s ease, border-color 0.2s ease;
         }
         .item-card:hover { border-color: rgba(203, 161, 83, 0.3); }
-        
+
         .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 12px; object-fit: cover; margin-bottom: 14px; cursor: pointer; transition: 0.2s; }
         .item-image:active { transform: scale(0.95); }
-        
-        .item-name { 
-            font-size: 0.95rem; font-weight: 500; margin-bottom: 14px; color: var(--text-main); 
-            width: 100%; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+
+        .item-name {
+            font-size: 0.95rem; font-weight: 500; margin-bottom: 14px; color: var(--text-main);
+            width: 100%; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             text-align: center; letter-spacing: 0.5px;
         }
-        
+
         .card-buttons { display: flex; width: 100%; gap: 8px; }
-        
-        .btn-buy-now { 
-            flex: 1; 
-            background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); 
-            color: #050505; border: none; border-radius: 10px; height: 36px; 
-            font-weight: 700; font-size: 0.85rem; letter-spacing: 1px; 
-            text-transform: uppercase; cursor: pointer; 
+
+        .btn-buy-now {
+            flex: 1;
+            background: linear-gradient(135deg, #cba153 0%, #a47d33 100%);
+            color: #050505; border: none; border-radius: 10px; height: 36px;
+            font-weight: 700; font-size: 0.85rem; letter-spacing: 1px;
+            text-transform: uppercase; cursor: pointer;
             box-shadow: 0 4px 15px rgba(203, 161, 83, 0.2);
         }
-        
-        .btn-add-cart { 
-            width: 40px; background: rgba(255, 255, 255, 0.02); 
-            border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px; 
-            display: flex; align-items: center; justify-content: center; cursor: pointer; 
+
+        .btn-add-cart {
+            width: 40px; background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
         }
-        
+
         .btn-tg-link-full {
-            width: 100%; background: transparent; border: 1px solid var(--border-color); 
-            border-radius: 10px; height: 36px; display: flex; align-items: center; 
-            justify-content: center; cursor: pointer; margin-top: 8px; box-sizing: border-box; 
+            width: 100%; background: transparent; border: 1px solid var(--border-color);
+            border-radius: 10px; height: 36px; display: flex; align-items: center;
+            justify-content: center; cursor: pointer; margin-top: 8px; box-sizing: border-box;
             transition: 0.2s; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
         }
         .btn-tg-link-full svg { margin-right: 6px; }
-        
+
         .cart-list { padding: 20px; width: 100%; box-sizing: border-box; }
-        .cart-item { 
-            display: flex; align-items: center; background: var(--bg-card); 
-            padding: 12px; border-radius: 14px; margin-bottom: 12px; 
-            border: 1px solid var(--border-color); 
+        .cart-item {
+            display: flex; align-items: center; background: var(--bg-card);
+            padding: 12px; border-radius: 14px; margin-bottom: 12px;
+            border: 1px solid var(--border-color);
         }
         .cart-item img { width: 56px; height: 56px; border-radius: 10px; margin-right: 16px; object-fit: cover; }
         .cart-item-info { flex-grow: 1; }
         .cart-item-name { font-weight: 500; font-size: 0.95rem; margin-bottom: 6px; color: var(--text-main); }
         .cart-item-price { color: var(--accent-gold); font-weight: 600; font-size: 0.9rem; }
-        
+
         .fixed-footer { position: fixed; bottom: 80px; width: 100%; padding: 20px; box-sizing: border-box; background: linear-gradient(to top, #0a0a0c 80%, transparent); z-index: 90; }
-        
-        .btn-main-action { 
-            width: 100%; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); 
-            color: #050505; border: none; border-radius: 12px; height: 52px; 
-            font-weight: 700; font-size: 0.95rem; text-transform: uppercase; 
+
+        .btn-main-action {
+            width: 100%; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%);
+            color: #050505; border: none; border-radius: 12px; height: 52px;
+            font-weight: 700; font-size: 0.95rem; text-transform: uppercase;
             letter-spacing: 1px; cursor: pointer; box-shadow: 0 4px 20px rgba(203, 161, 83, 0.2);
             transition: 0.3s;
         }
         .btn-main-action:disabled {
             opacity: 0.4; filter: grayscale(100%); cursor: not-allowed; box-shadow: none;
         }
-        
-        .btn-secondary { 
-            width: 100%; background: transparent; color: var(--text-muted); 
-            border: 1px solid var(--border-color); border-radius: 12px; height: 52px; 
-            font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer; 
+
+        .btn-secondary {
+            width: 100%; background: transparent; color: var(--text-muted);
+            border: 1px solid var(--border-color); border-radius: 12px; height: 52px;
+            font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer;
         }
-        
-        .payment-box { 
-            background: var(--bg-card); padding: 24px; border-radius: 16px; 
+
+        .payment-box {
+            background: var(--bg-card); padding: 24px; border-radius: 16px;
             border: 1px solid var(--border-color); margin-top: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        
+
         .req-input-group { display: flex; gap: 10px; margin-top: 12px; }
-        .req-input { 
-            flex-grow: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); 
-            color: var(--text-main); padding: 12px; border-radius: 10px; 
+        .req-input {
+            flex-grow: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color);
+            color: var(--text-main); padding: 12px; border-radius: 10px;
             font-family: inherit; font-size: 0.9rem; letter-spacing: 1px;
         }
-        .btn-copy { 
-            background: var(--border-color); border: none; color: var(--text-main); 
-            width: 46px; display: flex; align-items: center; justify-content: center; 
+        .btn-copy {
+            background: var(--border-color); border: none; color: var(--text-main);
+            width: 46px; display: flex; align-items: center; justify-content: center;
             border-radius: 10px; cursor: pointer; transition: 0.2s;
         }
 
@@ -158,13 +158,13 @@
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .tab-bar { 
-            position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85); 
-            backdrop-filter: blur(15px); border-top: 1px solid var(--border-color); 
-            display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100; 
+        .tab-bar {
+            position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85);
+            backdrop-filter: blur(15px); border-top: 1px solid var(--border-color);
+            display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100;
         }
-        .tab-item { 
-            color: var(--text-muted); font-size: 0.7rem; font-weight: 600; 
+        .tab-item {
+            color: var(--text-muted); font-size: 0.7rem; font-weight: 600;
             text-transform: uppercase; letter-spacing: 2px; cursor: pointer; transition: 0.3s;
         }
         .tab-item.active { color: var(--accent-gold); text-shadow: 0 0 10px rgba(203, 161, 83, 0.3); }
@@ -181,9 +181,9 @@
         .inv-top-tab.active { color: var(--text-main); border-bottom: 2px solid var(--accent-gold); }
 
         .btn-open-nft {
-            display: flex; justify-content: center; align-items: center; 
-            background: transparent; color: var(--text-main); border: 1px solid var(--border-color); 
-            text-decoration: none; border-radius: 10px; height: 36px; 
+            display: flex; justify-content: center; align-items: center;
+            background: transparent; color: var(--text-main); border: 1px solid var(--border-color);
+            text-decoration: none; border-radius: 10px; height: 36px;
             font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
             width: 100%; box-sizing: border-box; margin-bottom: 8px;
         }
@@ -196,7 +196,7 @@
             cursor: pointer; transition: 0.3s;
         }
         .btn-withdraw svg { margin-left: 8px; }
-        
+
         .btn-withdraw.loading {
             background: var(--text-muted); cursor: wait; pointer-events: none; opacity: 0.8;
         }
@@ -216,7 +216,7 @@
             text-transform: uppercase; letter-spacing: 2px;
         }
 
-        /* --- СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН --- */
+        /* --- СТИЛИ ДЛЯ МОДАЛЬНЫХ ОКОН ПРОВЕРКИ --- */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
@@ -243,68 +243,70 @@
         #terms-checkbox:checked + .custom-checkbox { background: var(--accent-gold); border-color: var(--accent-gold); }
         #terms-checkbox:checked + .custom-checkbox::after { content: '✓'; color: #000; font-weight: 900; font-size: 14px; }
 
-        /* --- СТИЛИ ДЛЯ NFT-МОДАЛКИ (BOTTOM SHEET) --- */
+
+        /* =======================================================
+           НОВЫЙ ДИЗАЙН МОДАЛКИ NFT (ТОЧЬ В ТОЧЬ КАК РАКЕТА)
+           ======================================================= */
         .nft-modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
             z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s ease;
         }
         .nft-modal-overlay.active { opacity: 1; pointer-events: all; }
 
         .nft-modal-sheet {
             position: absolute; bottom: -100%; left: 0; width: 100%;
-            background: var(--bg-main); border-radius: 24px 24px 0 0;
+            background: #0a0a0c; border-radius: 24px 24px 0 0; /* Темный фон как в телеге */
             transition: bottom 0.4s cubic-bezier(0.1, 1, 0.2, 1);
-            display: flex; flex-direction: column; max-height: 90vh; overflow: hidden;
-            border-top: 1px solid var(--accent-gold-dim);
+            display: flex; flex-direction: column; max-height: 95vh; overflow: hidden;
         }
         .nft-modal-overlay.active .nft-modal-sheet { bottom: 0; }
 
-        .nft-modal-header {
-            background: var(--bg-card);
-            padding: 30px 20px 20px; position: relative; text-align: center;
-            border-bottom: 1px solid var(--border-color);
+        /* Верхняя часть с огромной картинкой */
+        .nft-modal-header-rocket {
+            position: relative; width: 100%; height: 350px;
+            background: linear-gradient(180deg, #4b6cb7 0%, #182848 100%);
+            display: flex; align-items: center; justify-content: center;
         }
-        .nft-modal-close {
-            position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.05);
-            border: 1px solid var(--border-color);
-            border-radius: 50%; width: 32px; height: 32px; display: flex;
-            align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer;
-            transition: 0.2s;
+        .nft-modal-header-rocket img {
+            width: 100%; height: 100%; object-fit: cover; border-radius: 24px 24px 0 0;
         }
-        .nft-modal-close:active { transform: scale(0.9); }
         
-        .nft-modal-img {
-            width: 160px; height: 160px; object-fit: contain; margin: 0 auto 15px;
-            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
-            border-radius: 16px;
+        /* Кнопки управления на картинке сверху */
+        .nft-modal-controls { position: absolute; top: 15px; right: 15px; display: flex; gap: 10px; z-index: 10; }
+        .nft-modal-close-btn {
+            background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;
+            backdrop-filter: blur(5px);
         }
-        .nft-modal-title { font-size: 1.4rem; font-weight: 700; color: #fff; margin-bottom: 5px; }
-        .nft-modal-number { font-size: 0.9rem; color: var(--accent-gold); font-weight: 500; }
+        
+        /* Название и номер поверх картинки снизу */
+        .nft-modal-overlay-text {
+            position: absolute; bottom: 0; left: 0; width: 100%;
+            background: linear-gradient(to top, #0a0a0c 0%, transparent 100%);
+            padding: 40px 20px 15px; text-align: center;
+        }
+        .nft-modal-overlay-title { font-size: 28px; font-weight: 800; color: #fff; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .nft-modal-overlay-number { font-size: 15px; color: rgba(255,255,255,0.6); font-weight: 600; margin-top: 4px; }
 
-        .nft-modal-body {
-            padding: 20px; overflow-y: auto; flex-grow: 1; background: var(--bg-main);
+        /* Таблица характеристик 1-в-1 как в телеграме */
+        .traits-table { 
+            width: 100%; background: #1c1c1e; border-radius: 12px; margin-top: 15px; margin-bottom: 20px;
+            border: 1px solid #2c2c2e; overflow: hidden; 
         }
-        .trait-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 0; border-bottom: 1px solid var(--border-color);
-        }
-        .trait-label { color: var(--text-muted); font-size: 0.85rem; font-weight: 500; width: 30%; }
-        .trait-value-col { display: flex; align-items: center; gap: 8px; flex-grow: 1; }
-        
-        /* ЗОЛОТЫЕ ЗНАЧЕНИЯ И ПРОЦЕНТЫ */
-        .trait-value { color: var(--accent-gold); font-weight: 600; font-size: 0.9rem; }
-        .trait-percent { 
-            background: var(--accent-gold-dim); color: var(--accent-gold); 
-            font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; font-weight: 700;
-        }
-        
-        .trait-price { color: var(--text-main); font-weight: 700; font-size: 0.9rem; }
+        .trait-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
+        .trait-row:last-child { border-bottom: none; }
+        .trait-label { color: #8e8e93; font-weight: 500; flex: 1; }
+        .trait-value-container { display: flex; align-items: center; gap: 8px; flex: 1.5; }
+        .trait-value { color: #5ac8fa; font-weight: 600; }
+        .trait-percent { background: rgba(90, 200, 250, 0.15); color: #5ac8fa; font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 700; }
+        .trait-price { color: #fff; font-weight: 600; font-size: 14px; text-align: right; flex: 1; }
 
         .nft-modal-footer {
-            padding: 15px 20px 30px; border-top: 1px solid var(--border-color);
-            display: flex; gap: 10px; background: var(--bg-main);
+            padding: 15px 20px 30px; border-top: 1px solid #2c2c2e;
+            display: flex; gap: 10px; background: #0a0a0c;
         }
+        /* ======================================================= */
     </style>
 </head>
 <body>
@@ -336,11 +338,11 @@
             <div style="flex: 1 0 auto;">
                 <h2 style="text-align: center; color: var(--text-main); margin-top: 0; font-weight: 700; font-size: 1.2rem; letter-spacing: 1px;">ОФОРМЛЕНИЕ ЗАКАЗА</h2>
                 <p style="text-align: center; color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 30px;">Переведите точную сумму по реквизитам ниже. Бронь действует 20 минут.</p>
-                
+
                 <div class="payment-box">
                     <div style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Сумма к оплате</div>
                     <div id="payment-amount" style="font-size: 2rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 24px;">0 ₽</div>
-                    
+
                     <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;">Реквизиты (СБП / Карта)</div>
                     <div class="req-input-group">
                         <input type="text" id="req-card" class="req-input" value="1111 2222 3333 4444" readonly>
@@ -365,7 +367,7 @@
             <div class="inv-top-tab active" onclick="switchInvTab('active', this)">Мои NFT</div>
             <div class="inv-top-tab" onclick="switchInvTab('history', this)">История выводов</div>
         </div>
-        
+
         <div id="inventory-active-container" class="catalog-grid"></div>
         <div id="inventory-history-container" class="catalog-grid" style="display: none;"></div>
     </div>
@@ -405,21 +407,31 @@
 
     <div id="nft-detail-overlay" class="nft-modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
-            <div class="nft-modal-header" id="nft-modal-header-bg">
-                <div class="nft-modal-close" onclick="closeNftModal(event)">✕</div>
-                <img src="" id="nft-modal-img" class="nft-modal-img">
-                <div class="nft-modal-title" id="nft-modal-title">Name</div>
-                <div class="nft-modal-number" id="nft-modal-number">#00000</div>
-            </div>
-            <div class="nft-modal-body" id="nft-modal-traits">
+            <div class="nft-modal-header-rocket">
+                <div class="nft-modal-controls">
+                    <div class="nft-modal-close-btn" onclick="closeNftModal(event)">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </div>
                 </div>
+                <img src="" id="nft-modal-img">
+                <div class="nft-modal-overlay-text">
+                    <div class="nft-modal-overlay-title" id="nft-modal-title">Name ›</div>
+                    <div class="nft-modal-overlay-number" id="nft-modal-number">#00000</div>
+                </div>
+            </div>
+            
+            <div class="nft-modal-body" style="padding: 20px; background: #0a0a0c; overflow-y: auto;">
+                <div id="nft-modal-traits-container">
+                    </div>
+            </div>
+            
             <div class="nft-modal-footer">
-                <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 1; height: 48px;">
+                <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 1; height: 48px; background: transparent; border: 1px solid var(--accent-gold); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
                         <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                     </svg>
                 </button>
-                <button class="btn-main-action" id="nft-modal-btn-buy" style="flex: 3; height: 48px;">Купить за 0 ₽</button>
+                <button class="btn-main-action" id="nft-modal-btn-buy" style="flex: 3; height: 48px; background: var(--accent-gold); color: #000; border-radius: 12px; font-weight: 700; text-transform: uppercase;">КУПИТЬ ЗА 0 ₽</button>
             </div>
         </div>
     </div>
@@ -428,13 +440,13 @@
     <script>
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
-        
+
         let cart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
         document.getElementById('cart-counter').innerText = cart.length;
 
-        let currentBookingIds = []; 
-        let pendingPaymentData = null; 
-        
+        let currentBookingIds = [];
+        let pendingPaymentData = null;
+
         let currentCatalog = []; // Глобальная переменная каталога
         let inventoryItemsData = [];
         let withdrawPending = JSON.parse(localStorage.getItem('withdrawPending') || '{}');
@@ -452,41 +464,55 @@
             document.getElementById('custom-alert-overlay').classList.remove('active');
         }
 
-        // --- ФУНКЦИИ МОДАЛКИ NFT ---
+        // --- ИЗМЕНЕННАЯ ФУНКЦИЯ МОДАЛКИ (ГЕНЕРАТОР ТАБЛИЦЫ) ---
         function openNftModal(itemId) {
-            const item = currentCatalog.find(i => String(i.id) === String(itemId));
+            // Ищем и в каталоге, и в инвентаре
+            let item = currentCatalog.find(i => String(i.id) === String(itemId));
+            if (!item) item = inventoryItemsData.find(i => String(i.id) === String(itemId));
             if (!item) return;
 
             document.getElementById('nft-modal-img').src = item.image_url;
-            document.getElementById('nft-modal-title').innerText = item.name;
-            
+            document.getElementById('nft-modal-title').innerText = item.name + ' ›';
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : `#${Math.floor(Math.random() * 90000) + 10000}`;
 
-            const traits = item.traits || [
-                { label: 'Model', value: 'Silver Ride', percent: '2.5%', price: '4.68 TON' },
-                { label: 'Symbol', value: 'Party Hat', percent: '0.5%', price: '4.35 TON' },
-                { label: 'Backdrop', value: 'Cobalt Blue', percent: '1.2%', price: '5 TON' }
-            ];
+            const traitsContainer = document.getElementById('nft-modal-traits-container');
 
-            document.getElementById('nft-modal-traits').innerHTML = traits.map(t => `
-                <div class="trait-row">
-                    <div class="trait-label">${t.label}</div>
-                    <div class="trait-value-col">
-                        <span class="trait-value">${t.value}</span>
-                        <span class="trait-percent">${t.percent}</span>
+            // Безопасно парсим то, что пришло из БД
+            let traits = [];
+            if (typeof item.traits === 'string') {
+                try { traits = JSON.parse(item.traits); } catch(e) {}
+            } else if (Array.isArray(item.traits)) {
+                traits = item.traits;
+            }
+
+            // Рендер таблицы (с проверкой на пустоту)
+            if (traits && traits.length > 0) {
+                traitsContainer.innerHTML = `
+                    <div class="traits-table">
+                        ${traits.map(t => `
+                            <div class="trait-row">
+                                <div class="trait-label" style="flex: 1;">${t.label || t.name}</div>
+                                <div class="trait-value-container" style="flex: 1.5;">
+                                    <span class="trait-value">${t.value}</span>
+                                    ${t.percent ? `<span class="trait-percent">${t.percent}</span>` : ''}
+                                </div>
+                                <div class="trait-price" style="text-align: right; flex: 1;">${t.price || ''}</div>
+                            </div>
+                        `).join('')}
                     </div>
-                    <div class="trait-price">${t.price}</div>
-                </div>
-            `).join('');
+                `;
+            } else {
+                traitsContainer.innerHTML = '<div style="text-align:center; color:#8e8e93; padding: 20px;">Нет характеристик</div>';
+            }
 
             const btnBuy = document.getElementById('nft-modal-btn-buy');
-            btnBuy.innerText = `Купить за ${item.price} ₽`;
+            btnBuy.innerText = `КУПИТЬ ЗА ${item.price} ₽`;
             btnBuy.onclick = () => { closeNftModal(); openTermsModal('item', item.id, item.price); };
 
             const btnCart = document.getElementById('nft-modal-btn-cart');
-            btnCart.onclick = () => { 
+            btnCart.onclick = () => {
                 addToCart(item);
-                closeNftModal(); 
+                closeNftModal();
             };
 
             document.getElementById('nft-detail-overlay').classList.add('active');
@@ -494,7 +520,7 @@
         }
 
         function closeNftModal(event) {
-            if (event && event.target !== event.currentTarget) return; 
+            if (event && event.target !== event.currentTarget) return;
             document.getElementById('nft-detail-overlay').classList.remove('active');
         }
 
@@ -507,15 +533,15 @@
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.getElementById('page-' + pageId).classList.add('page-active');
             document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            
+
             if(pageId === 'store') document.getElementById('tab-store').classList.add('active');
             if(pageId === 'cart') renderCart();
-            
+
             if(pageId === 'inventory') {
                 document.getElementById('tab-inventory').classList.add('active');
-                loadInventory(); 
+                loadInventory();
             }
-            
+
             tg.HapticFeedback.impactOccurred('light');
         }
 
@@ -524,7 +550,7 @@
             if (url.includes('t.me') || url.includes('telegram.me')) {
                 tg.openTelegramLink(url);
             } else {
-                tg.openLink(url); 
+                tg.openLink(url);
             }
         }
 
@@ -565,7 +591,7 @@
 
         function removeFromCart(index) {
             cart.splice(index, 1);
-            saveCart(); 
+            saveCart();
             document.getElementById('cart-counter').innerText = cart.length;
             renderCart();
             tg.HapticFeedback.impactOccurred('medium');
@@ -573,7 +599,7 @@
 
         function openTermsModal(type, itemId = null, price = 0) {
             pendingPaymentData = { type, itemId, price };
-            
+
             const checkbox = document.getElementById('terms-checkbox');
             checkbox.checked = false;
             document.getElementById('btn-accept-terms').disabled = true;
@@ -623,16 +649,16 @@
                         username: tg.initDataUnsafe?.user?.username
                     })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (!data.success) {
                     showPage('store');
                     showCustomAlert('Один или несколько NFT уже кем-то забронированы или куплены!');
-                    return; 
+                    return;
                 }
-            } catch (e) { 
-                console.error("Ошибка бронирования", e); 
+            } catch (e) {
+                console.error("Ошибка бронирования", e);
                 showPage('store');
                 showCustomAlert('Ошибка соединения с сервером');
                 return;
@@ -661,16 +687,16 @@
                         username: tg.initDataUnsafe?.user?.username
                     })
                 });
-            } catch(e) { 
-                console.error(e); 
+            } catch(e) {
+                console.error(e);
             } finally {
                 isCheckingPayment = false;
             }
 
             showCustomAlert('Запрос отправлен администратору. Ожидайте зачисления NFT в инвентарь.');
-            
-            cart = []; 
-            saveCart(); 
+
+            cart = [];
+            saveCart();
             document.getElementById('cart-counter').innerText = '0';
             currentBookingIds = [];
             showPage('store');
@@ -684,7 +710,7 @@
                     body: JSON.stringify({ items: currentBookingIds })
                 });
             } catch(e) {}
-            
+
             currentBookingIds = [];
             showPage('store');
         }
@@ -713,7 +739,7 @@
                         </button>
                     </div>
                 `).join('');
-            } catch (e) { 
+            } catch (e) {
                 document.getElementById('catalog-list').innerHTML = '<p style="text-align:center;width:100%;color:var(--text-muted); grid-column: span 2; font-size: 0.9rem;">Ошибка загрузки товаров</p>';
             }
         }
@@ -721,7 +747,7 @@
         function switchInvTab(tab, element) {
             document.querySelectorAll('.inv-top-tab').forEach(t => t.classList.remove('active'));
             element.classList.add('active');
-            
+
             if (tab === 'active') {
                 document.getElementById('inventory-active-container').style.display = 'grid';
                 document.getElementById('inventory-history-container').style.display = 'none';
@@ -735,12 +761,12 @@
         async function loadInventory() {
             const userId = tg.initDataUnsafe?.user?.id;
             const container = document.getElementById('inventory-active-container');
-            
+
             if (!userId) {
                 container.innerHTML = '<div style="padding: 100px 20px; text-align: center; color: var(--text-muted); grid-column: span 2; font-size: 0.85rem;">ОШИБКА: НЕТ ID ПОЛЬЗОВАТЕЛЯ</div>';
                 return;
             }
-            
+
             try {
                 const res = await fetch(`${API_BASE}/inventory?user_id=${userId}`);
                 inventoryItemsData = await res.json();
@@ -753,7 +779,7 @@
         function renderInventoryTabs() {
             const activeContainer = document.getElementById('inventory-active-container');
             const historyContainer = document.getElementById('inventory-history-container');
-            
+
             const activeItems = inventoryItemsData.filter(i => i.status !== 'withdrawn');
             const historyItems = inventoryItemsData.filter(i => i.status === 'withdrawn');
 
@@ -789,11 +815,11 @@
         }
 
         async function requestWithdraw(itemId) {
-            if (withdrawPending[itemId]) return; 
+            if (withdrawPending[itemId]) return;
 
             withdrawPending[itemId] = true;
             localStorage.setItem('withdrawPending', JSON.stringify(withdrawPending));
-            renderInventoryTabs(); 
+            renderInventoryTabs();
 
             try {
                 await fetch(`${API_BASE}/request-withdraw`, {
@@ -813,14 +839,14 @@
         async function backgroundPoll() {
             const userId = tg.initDataUnsafe?.user?.id;
             if (!userId) return;
-            
+
             if (document.getElementById('page-inventory').classList.contains('page-active') || Object.keys(withdrawPending).length > 0) {
                  try {
                     const res = await fetch(`${API_BASE}/inventory?user_id=${userId}`);
                     const newData = await res.json();
-                    
+
                     let needsUpdate = false;
-                    
+
                     newData.forEach(newItem => {
                         if (newItem.status === 'withdrawn' && withdrawPending[newItem.id]) {
                             delete withdrawPending[newItem.id];
@@ -831,7 +857,7 @@
                     if (needsUpdate || JSON.stringify(inventoryItemsData) !== JSON.stringify(newData)) {
                         inventoryItemsData = newData;
                         localStorage.setItem('withdrawPending', JSON.stringify(withdrawPending));
-                        
+
                         if (document.getElementById('page-inventory').classList.contains('page-active')) {
                             renderInventoryTabs();
                         }
