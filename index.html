@@ -245,7 +245,7 @@
 
 
         /* =======================================================
-           НОВЫЙ ДИЗАЙН МОДАЛКИ NFT (ТОЧЬ В ТОЧЬ КАК РАКЕТА)
+           ИСПРАВЛЕННЫЙ ДИЗАЙН МОДАЛКИ NFT (ЗОЛОТИСТО-ЧЕРНЫЙ + РОВНАЯ КАРТИНКА)
            ======================================================= */
         .nft-modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -256,22 +256,22 @@
 
         .nft-modal-sheet {
             position: absolute; bottom: -100%; left: 0; width: 100%;
-            background: #0a0a0c; border-radius: 24px 24px 0 0; /* Темный фон как в телеге */
+            background: #0a0a0c; border-radius: 24px 24px 0 0;
             transition: bottom 0.4s cubic-bezier(0.1, 1, 0.2, 1);
             display: flex; flex-direction: column; max-height: 95vh; overflow: hidden;
         }
         .nft-modal-overlay.active .nft-modal-sheet { bottom: 0; }
 
-        /* Верхняя часть с огромной картинкой */
+        /* Верхняя часть с ИДЕАЛЬНО КВАДРАТНОЙ картинкой */
         .nft-modal-header-rocket {
-            position: relative; width: 100%; height: 350px;
-            background: linear-gradient(180deg, #4b6cb7 0%, #182848 100%);
+            position: relative; width: 100%; aspect-ratio: 1 / 1; 
+            background: linear-gradient(180deg, #1a150c 0%, #0a0a0c 100%);
             display: flex; align-items: center; justify-content: center;
         }
         .nft-modal-header-rocket img {
             width: 100%; height: 100%; object-fit: cover; border-radius: 24px 24px 0 0;
         }
-        
+
         /* Кнопки управления на картинке сверху */
         .nft-modal-controls { position: absolute; top: 15px; right: 15px; display: flex; gap: 10px; z-index: 10; }
         .nft-modal-close-btn {
@@ -279,31 +279,31 @@
             display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;
             backdrop-filter: blur(5px);
         }
-        
+
         /* Название и номер поверх картинки снизу */
         .nft-modal-overlay-text {
             position: absolute; bottom: 0; left: 0; width: 100%;
-            background: linear-gradient(to top, #0a0a0c 0%, transparent 100%);
+            background: linear-gradient(to top, rgba(10,10,12,0.95) 0%, transparent 100%);
             padding: 40px 20px 15px; text-align: center;
         }
         .nft-modal-overlay-title { font-size: 28px; font-weight: 800; color: #fff; display: flex; align-items: center; justify-content: center; gap: 5px; }
-        .nft-modal-overlay-number { font-size: 15px; color: rgba(255,255,255,0.6); font-weight: 600; margin-top: 4px; }
+        .nft-modal-overlay-number { font-size: 15px; color: var(--accent-gold); font-weight: 600; margin-top: 4px; }
 
-        /* Таблица характеристик 1-в-1 как в телеграме */
-        .traits-table { 
-            width: 100%; background: #1c1c1e; border-radius: 12px; margin-top: 15px; margin-bottom: 20px;
-            border: 1px solid #2c2c2e; overflow: hidden; 
+        /* Таблица характеристик (золотисто-черный стиль) */
+        .traits-table {
+            width: 100%; background: var(--bg-card); border-radius: 12px; margin-top: 15px; margin-bottom: 20px;
+            border: 1px solid var(--border-color); overflow: hidden;
         }
-        .trait-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
+        .trait-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
         .trait-row:last-child { border-bottom: none; }
-        .trait-label { color: #8e8e93; font-weight: 500; flex: 1; }
+        .trait-label { color: var(--text-muted); font-weight: 500; flex: 1; }
         .trait-value-container { display: flex; align-items: center; gap: 8px; flex: 1.5; }
-        .trait-value { color: #5ac8fa; font-weight: 600; }
-        .trait-percent { background: rgba(90, 200, 250, 0.15); color: #5ac8fa; font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 700; }
+        .trait-value { color: var(--accent-gold); font-weight: 600; }
+        .trait-percent { background: var(--accent-gold-dim); color: var(--accent-gold); font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 700; }
         .trait-price { color: #fff; font-weight: 600; font-size: 14px; text-align: right; flex: 1; }
 
         .nft-modal-footer {
-            padding: 15px 20px 30px; border-top: 1px solid #2c2c2e;
+            padding: 15px 20px 30px; border-top: 1px solid var(--border-color);
             display: flex; gap: 10px; background: #0a0a0c;
         }
         /* ======================================================= */
@@ -419,12 +419,12 @@
                     <div class="nft-modal-overlay-number" id="nft-modal-number">#00000</div>
                 </div>
             </div>
-            
+
             <div class="nft-modal-body" style="padding: 20px; background: #0a0a0c; overflow-y: auto;">
                 <div id="nft-modal-traits-container">
                     </div>
             </div>
-            
+
             <div class="nft-modal-footer">
                 <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 1; height: 48px; background: transparent; border: 1px solid var(--accent-gold); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
@@ -502,7 +502,7 @@
                     </div>
                 `;
             } else {
-                traitsContainer.innerHTML = '<div style="text-align:center; color:#8e8e93; padding: 20px;">Нет характеристик</div>';
+                traitsContainer.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 20px;">Нет характеристик</div>';
             }
 
             const btnBuy = document.getElementById('nft-modal-btn-buy');
