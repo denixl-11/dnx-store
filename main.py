@@ -9,38 +9,25 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
-
+from dotenv import load_dotenv
 import os
 import logging
 import asyncio
 
-# Настройка логирования, чтобы видеть ошибки в панели Render
+load_dotenv()
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Пытаемся получить переменные
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-# БЕЗОПАСНАЯ ПРОВЕРКА (не палит данные)
-if not BOT_TOKEN:
-    logger.error("❌ КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN не найден в системе!")
-else:
-    # Покажет только первые 5 символов, чтобы ты убедился, что он есть
-    logger.info(f"✅ BOT_TOKEN успешно загружен (начинается на: {BOT_TOKEN[:5]}...)")
 
-if not DB_PASSWORD:
-    logger.error("❌ КРИТИЧЕСКАЯ ОШИБКА: DB_PASSWORD не найден в системе!")
-else:
-    logger.info("✅ DB_PASSWORD успешно загружен")
-
-# Если чего-то не хватает, бот не упадет с непонятной ошибкой, а просто остановится
-if not BOT_TOKEN or not DB_PASSWORD:
-    exit(1)
-
-# Дальше идет твой основной конфиг
 ADMIN_ID = 7106612591
 WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
+
+PAYMENT_REQUISITES = "💳 Карта: **** **** **** 0000 (Т-Банк)\n👤 Получатель: Твое Имя"
 
 DB_CONFIG = {
     "dbname": "neondb",
@@ -50,22 +37,6 @@ DB_CONFIG = {
     "port": "5432",
     "sslmode": "require"
 }
-# BOT_TOKEN = os.getenv("BOT_TOKEN")
-# DB_PASSWORD = os.getenv("DB_PASSWORD")
-#
-# ADMIN_ID = 7106612591
-# WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
-#
-# PAYMENT_REQUISITES = "💳 Карта: **** **** **** 0000 (Т-Банк)\n👤 Получатель: Твое Имя"
-#
-# DB_CONFIG = {
-#     "dbname": "neondb",
-#     "user": "neondb_owner",
-#     "password": DB_PASSWORD,
-#     "host": "ep-shy-sun-an8be4el.c-6.us-east-1.aws.neon.tech",
-#     "port": "5432",
-#     "sslmode": "require"
-# }
 # ===================================================
 
 logging.basicConfig(level=logging.INFO)
