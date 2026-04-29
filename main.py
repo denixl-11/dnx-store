@@ -10,8 +10,10 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 
-# ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = "8701376578:AAHyQRtBRGrVQsYXo3eqMnXfqJ1yRjzVwZA"
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+
 ADMIN_ID = 7106612591
 WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
 
@@ -20,7 +22,7 @@ PAYMENT_REQUISITES = "💳 Карта: **** **** **** 0000 (Т-Банк)\n👤 �
 DB_CONFIG = {
     "dbname": "neondb",
     "user": "neondb_owner",
-    "password": "npg_6AQSlRir7LKW",
+    "password": DB_PASSWORD,
     "host": "ep-shy-sun-an8be4el.c-6.us-east-1.aws.neon.tech",
     "port": "5432",
     "sslmode": "require"
