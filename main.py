@@ -16,13 +16,14 @@ import asyncio
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
+
+if not BOT_TOKEN:
+    print("❌ КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN не найден ни в системе, ни в .env!")
+    exit(1)
 
 ADMIN_ID = 7106612591
 WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
@@ -37,18 +38,16 @@ DB_CONFIG = {
     "port": "5432",
     "sslmode": "require"
 }
-# ===================================================
+
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
 
-# --- ФОНОВАЯ ЗАДАЧА: АВТОСНЯТИЕ БРОНИ (20 МИНУТ) ---
 async def auto_cancel_reservations():
     while True:
         try:
