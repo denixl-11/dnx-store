@@ -20,7 +20,7 @@ PAYMENT_REQUISITES = "💳 Карта: **** **** **** 0000 (Т-Банк)\n👤 �
 DB_CONFIG = {
     "dbname": "neondb",
     "user": "neondb_owner",
-    "password": "npg_mY3snQVxT7OF",
+    "password": "npg_6AQSlRir7LKW",
     "host": "ep-shy-sun-an8be4el.c-6.us-east-1.aws.neon.tech",
     "port": "5432",
     "sslmode": "require"
