@@ -11,7 +11,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = "8701376578:AAGqehQYFf3ePE61lDhWhCnR7Q2lthnR3Oc"
+BOT_TOKEN = "8701376578:AAHyQRtBRGrVQsYXo3eqMnXfqJ1yRjzVwZA"
 ADMIN_ID = 7106612591
 WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
 
