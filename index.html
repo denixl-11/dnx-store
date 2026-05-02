@@ -245,7 +245,7 @@
 
 
         /* =======================================================
-           ИСПРАВЛЕННЫЙ ДИЗАЙН МОДАЛКИ NFT (ЗОЛОТИСТО-ЧЕРНЫЙ + РОВНАЯ КАРТИНКА)
+           НОВЫЙ ДИЗАЙН МОДАЛКИ NFT (ТОЧЬ В ТОЧЬ КАК РАКЕТА)
            ======================================================= */
         .nft-modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -262,17 +262,18 @@
         }
         .nft-modal-overlay.active .nft-modal-sheet { bottom: 0; }
 
-        /* Верхняя часть с ИДЕАЛЬНО КВАДРАТНОЙ картинкой */
+        /* ИСПРАВЛЕНО: Квадратное фото по центру без затемнений */
         .nft-modal-header-rocket {
-            position: relative; width: 100%; aspect-ratio: 1 / 1; 
-            background: linear-gradient(180deg, #1a150c 0%, #0a0a0c 100%);
-            display: flex; align-items: center; justify-content: center;
+            position: relative; width: 100%;
+            background: #0a0a0c;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding-top: 50px;
         }
         .nft-modal-header-rocket img {
-            width: 100%; height: 100%; object-fit: cover; border-radius: 24px 24px 0 0;
+            width: 220px; height: 220px; object-fit: cover; border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
         }
 
-        /* Кнопки управления на картинке сверху */
         .nft-modal-controls { position: absolute; top: 15px; right: 15px; display: flex; gap: 10px; z-index: 10; }
         .nft-modal-close-btn {
             background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px;
@@ -280,30 +281,28 @@
             backdrop-filter: blur(5px);
         }
 
-        /* Название и номер поверх картинки снизу */
+        /* ИСПРАВЛЕНО: Текст аккуратно под фото без position absolute и без градиентов */
         .nft-modal-overlay-text {
-            position: absolute; bottom: 0; left: 0; width: 100%;
-            background: linear-gradient(to top, rgba(10,10,12,0.95) 0%, transparent 100%);
-            padding: 40px 20px 15px; text-align: center;
+            width: 100%;
+            padding: 20px 20px 10px; text-align: center;
         }
         .nft-modal-overlay-title { font-size: 28px; font-weight: 800; color: #fff; display: flex; align-items: center; justify-content: center; gap: 5px; }
-        .nft-modal-overlay-number { font-size: 15px; color: var(--accent-gold); font-weight: 600; margin-top: 4px; }
+        .nft-modal-overlay-number { font-size: 15px; color: rgba(255,255,255,0.6); font-weight: 600; margin-top: 4px; }
 
-        /* Таблица характеристик (золотисто-черный стиль) */
         .traits-table {
-            width: 100%; background: var(--bg-card); border-radius: 12px; margin-top: 15px; margin-bottom: 20px;
-            border: 1px solid var(--border-color); overflow: hidden;
+            width: 100%; background: #1c1c1e; border-radius: 12px; margin-top: 15px; margin-bottom: 20px;
+            border: 1px solid #2c2c2e; overflow: hidden;
         }
-        .trait-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        .trait-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
         .trait-row:last-child { border-bottom: none; }
-        .trait-label { color: var(--text-muted); font-weight: 500; flex: 1; }
+        .trait-label { color: #8e8e93; font-weight: 500; flex: 1; }
         .trait-value-container { display: flex; align-items: center; gap: 8px; flex: 1.5; }
-        .trait-value { color: var(--accent-gold); font-weight: 600; }
-        .trait-percent { background: var(--accent-gold-dim); color: var(--accent-gold); font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 700; }
+        .trait-value { color: #5ac8fa; font-weight: 600; }
+        .trait-percent { background: rgba(90, 200, 250, 0.15); color: #5ac8fa; font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 700; }
         .trait-price { color: #fff; font-weight: 600; font-size: 14px; text-align: right; flex: 1; }
 
         .nft-modal-footer {
-            padding: 15px 20px 30px; border-top: 1px solid var(--border-color);
+            padding: 15px 20px 30px; border-top: 1px solid #2c2c2e;
             display: flex; gap: 10px; background: #0a0a0c;
         }
         /* ======================================================= */
@@ -447,13 +446,12 @@
         let currentBookingIds = [];
         let pendingPaymentData = null;
 
-        let currentCatalog = []; // Глобальная переменная каталога
+        let currentCatalog = [];
         let inventoryItemsData = [];
         let withdrawPending = JSON.parse(localStorage.getItem('withdrawPending') || '{}');
 
         let isCheckingPayment = false;
 
-        // --- КАСТОМНЫЕ УВЕДОМЛЕНИЯ ---
         function showCustomAlert(message) {
             document.getElementById('custom-alert-message').innerText = message;
             document.getElementById('custom-alert-overlay').classList.add('active');
@@ -464,9 +462,7 @@
             document.getElementById('custom-alert-overlay').classList.remove('active');
         }
 
-        // --- ИЗМЕНЕННАЯ ФУНКЦИЯ МОДАЛКИ (ГЕНЕРАТОР ТАБЛИЦЫ) ---
         function openNftModal(itemId) {
-            // Ищем и в каталоге, и в инвентаре
             let item = currentCatalog.find(i => String(i.id) === String(itemId));
             if (!item) item = inventoryItemsData.find(i => String(i.id) === String(itemId));
             if (!item) return;
@@ -477,7 +473,6 @@
 
             const traitsContainer = document.getElementById('nft-modal-traits-container');
 
-            // Безопасно парсим то, что пришло из БД
             let traits = [];
             if (typeof item.traits === 'string') {
                 try { traits = JSON.parse(item.traits); } catch(e) {}
@@ -485,7 +480,6 @@
                 traits = item.traits;
             }
 
-            // Рендер таблицы (с проверкой на пустоту)
             if (traits && traits.length > 0) {
                 traitsContainer.innerHTML = `
                     <div class="traits-table">
@@ -502,7 +496,7 @@
                     </div>
                 `;
             } else {
-                traitsContainer.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding: 20px;">Нет характеристик</div>';
+                traitsContainer.innerHTML = '<div style="text-align:center; color:#8e8e93; padding: 20px;">Нет характеристик</div>';
             }
 
             const btnBuy = document.getElementById('nft-modal-btn-buy');
@@ -524,7 +518,6 @@
             document.getElementById('nft-detail-overlay').classList.remove('active');
         }
 
-        // --- БАЗОВЫЕ ФУНКЦИИ ---
         function saveCart() {
             localStorage.setItem('dnx_cart', JSON.stringify(cart));
         }
