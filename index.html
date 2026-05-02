@@ -156,7 +156,8 @@
 
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
         .page-active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* ИСПРАВЛЕНО: Убран transform из анимации, чтобы не ломать position: fixed у футера корзины */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .tab-bar {
             position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85);
@@ -262,15 +263,16 @@
         }
         .nft-modal-overlay.active .nft-modal-sheet { bottom: 0; }
 
-        /* ИСПРАВЛЕНО: Квадратное фото по центру без затемнений */
+        /* ИСПРАВЛЕНО: Отступ уменьшен, чтобы поднять картинку */
         .nft-modal-header-rocket {
             position: relative; width: 100%;
             background: #0a0a0c;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding-top: 50px;
+            padding-top: 25px;
         }
+        /* ИСПРАВЛЕНО: Картинка немного уменьшена для экономии места */
         .nft-modal-header-rocket img {
-            width: 220px; height: 220px; object-fit: cover; border-radius: 16px;
+            width: 190px; height: 190px; object-fit: cover; border-radius: 16px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.4);
         }
 
@@ -281,7 +283,6 @@
             backdrop-filter: blur(5px);
         }
 
-        /* ИСПРАВЛЕНО: Текст аккуратно под фото без position absolute и без градиентов */
         .nft-modal-overlay-text {
             width: 100%;
             padding: 20px 20px 10px; text-align: center;
@@ -290,20 +291,22 @@
         .nft-modal-overlay-number { font-size: 15px; color: rgba(255,255,255,0.6); font-weight: 600; margin-top: 4px; }
 
         .traits-table {
-            width: 100%; background: #1c1c1e; border-radius: 12px; margin-top: 15px; margin-bottom: 20px;
+            width: 100%; background: #1c1c1e; border-radius: 12px; margin-top: 10px; margin-bottom: 10px;
             border: 1px solid #2c2c2e; overflow: hidden;
         }
         .trait-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
         .trait-row:last-child { border-bottom: none; }
         .trait-label { color: #8e8e93; font-weight: 500; flex: 1; }
         .trait-value-container { display: flex; align-items: center; gap: 8px; flex: 1.5; }
-        .trait-value { color: #5ac8fa; font-weight: 600; }
-        .trait-percent { background: rgba(90, 200, 250, 0.15); color: #5ac8fa; font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 700; }
+
+        /* ИСПРАВЛЕНО: Золотистый цвет для характеристик */
+        .trait-value { color: var(--accent-gold); font-weight: 600; }
+        .trait-percent { background: var(--accent-gold-dim); color: var(--accent-gold); font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 700; }
         .trait-price { color: #fff; font-weight: 600; font-size: 14px; text-align: right; flex: 1; }
 
         .nft-modal-footer {
             padding: 15px 20px 30px; border-top: 1px solid #2c2c2e;
-            display: flex; gap: 10px; background: #0a0a0c;
+            background: #0a0a0c;
         }
         /* ======================================================= */
     </style>
@@ -419,18 +422,21 @@
                 </div>
             </div>
 
-            <div class="nft-modal-body" style="padding: 20px; background: #0a0a0c; overflow-y: auto;">
+            <div class="nft-modal-body" style="padding: 10px 20px; background: #0a0a0c; overflow-y: auto;">
                 <div id="nft-modal-traits-container">
                     </div>
             </div>
 
             <div class="nft-modal-footer">
-                <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 1; height: 48px; background: transparent; border: 1px solid var(--accent-gold); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
-                        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
-                    </svg>
-                </button>
-                <button class="btn-main-action" id="nft-modal-btn-buy" style="flex: 3; height: 48px; background: var(--accent-gold); color: #000; border-radius: 12px; font-weight: 700; text-transform: uppercase;">КУПИТЬ ЗА 0 ₽</button>
+                <!-- ИСПРАВЛЕНО: Кнопки сплющены (ограничена ширина, выровнены по центру, уменьшена высота) -->
+                <div style="display: flex; gap: 12px; width: 100%; max-width: 290px; margin: 0 auto;">
+                    <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 0 0 44px; height: 44px; background: transparent; border: 1px solid var(--accent-gold); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
+                            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
+                        </svg>
+                    </button>
+                    <button class="btn-main-action" id="nft-modal-btn-buy" style="flex: 1; height: 44px; background: var(--accent-gold); color: #000; border-radius: 12px; font-weight: 700; text-transform: uppercase;">КУПИТЬ ЗА 0 ₽</button>
+                </div>
             </div>
         </div>
     </div>
