@@ -65,14 +65,14 @@ async def handle_get_items(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # ДОБАВЛЕНО ПОЛЕ number
                 cur.execute(
-                    "SELECT id, name, price, status, image_url, nft_link, traits FROM items WHERE status = 'Доступен'")
+                    "SELECT id, name, price, status, image_url, nft_link, traits, number FROM items WHERE status = 'Доступен'")
                 items = cur.fetchall()
 
                 for item in items:
                     traits_raw = item.get('traits')
                     if traits_raw is not None:
-                        # psycopg2 автоматически парсит jsonb, поэтому проверяем тип
                         if isinstance(traits_raw, str):
                             try:
                                 item['traits'] = json.loads(traits_raw)
@@ -93,8 +93,9 @@ async def handle_get_inventory(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # ДОБАВЛЕНО ПОЛЕ number
                 cur.execute(
-                    "SELECT id, name, image_url, nft_link, status, traits FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен')",
+                    "SELECT id, name, image_url, nft_link, status, traits, number FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен')",
                     (str(user_id),))
                 items = cur.fetchall()
 

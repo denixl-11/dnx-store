@@ -156,7 +156,6 @@
 
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
         .page-active { display: block; }
-        /* ИСПРАВЛЕНО: Убран transform из анимации, чтобы не ломать position: fixed у футера корзины */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .tab-bar {
@@ -246,7 +245,7 @@
 
 
         /* =======================================================
-           НОВЫЙ ДИЗАЙН МОДАЛКИ NFT (ТОЧЬ В ТОЧЬ КАК РАКЕТА)
+           МОДАЛКА NFT
            ======================================================= */
         .nft-modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -263,14 +262,12 @@
         }
         .nft-modal-overlay.active .nft-modal-sheet { bottom: 0; }
 
-        /* ИСПРАВЛЕНО: Отступ уменьшен, чтобы поднять картинку */
         .nft-modal-header-rocket {
             position: relative; width: 100%;
             background: #0a0a0c;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             padding-top: 25px;
         }
-        /* ИСПРАВЛЕНО: Картинка немного уменьшена для экономии места */
         .nft-modal-header-rocket img {
             width: 190px; height: 190px; object-fit: cover; border-radius: 16px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.4);
@@ -280,8 +277,9 @@
         .nft-modal-close-btn {
             background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px;
             display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;
-            backdrop-filter: blur(5px);
+            backdrop-filter: blur(5px); transition: 0.2s;
         }
+        .nft-modal-close-btn:active { transform: scale(0.9); }
 
         .nft-modal-overlay-text {
             width: 100%;
@@ -297,18 +295,15 @@
         .trait-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
         .trait-row:last-child { border-bottom: none; }
         .trait-label { color: #8e8e93; font-weight: 500; flex: 1; }
-        .trait-value-container { display: flex; align-items: center; gap: 8px; flex: 1.5; }
+        .trait-value-container { display: flex; align-items: center; gap: 8px; flex: 2; justify-content: flex-end; }
 
-        /* ИСПРАВЛЕНО: Золотистый цвет для характеристик */
-        .trait-value { color: var(--accent-gold); font-weight: 600; }
-        .trait-percent { background: var(--accent-gold-dim); color: var(--accent-gold); font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 700; }
-        .trait-price { color: #fff; font-weight: 600; font-size: 14px; text-align: right; flex: 1; }
+        .trait-value { color: var(--accent-gold); font-weight: 600; text-align: right; }
+        .trait-percent { background: var(--accent-gold-dim); color: var(--accent-gold); font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
 
         .nft-modal-footer {
             padding: 15px 20px 30px; border-top: 1px solid #2c2c2e;
             background: #0a0a0c;
         }
-        /* ======================================================= */
     </style>
 </head>
 <body>
@@ -407,28 +402,27 @@
         </div>
     </div>
 
-    <div id="nft-detail-overlay" class="nft-modal-overlay" onclick="closeNftModal(event)">
+    <!-- Обновленная модалка NFT с исправленным крестиком -->
+    <div id="nft-detail-overlay" class="nft-modal-overlay" onclick="closeNftModalOverlay(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
             <div class="nft-modal-header-rocket">
                 <div class="nft-modal-controls">
-                    <div class="nft-modal-close-btn" onclick="closeNftModal(event)">
+                    <div class="nft-modal-close-btn" onclick="closeNftModal()">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </div>
                 </div>
                 <img src="" id="nft-modal-img">
                 <div class="nft-modal-overlay-text">
-                    <div class="nft-modal-overlay-title" id="nft-modal-title">Name ›</div>
+                    <div class="nft-modal-overlay-title" id="nft-modal-title">Name</div>
                     <div class="nft-modal-overlay-number" id="nft-modal-number">#00000</div>
                 </div>
             </div>
 
             <div class="nft-modal-body" style="padding: 10px 20px; background: #0a0a0c; overflow-y: auto;">
-                <div id="nft-modal-traits-container">
-                    </div>
+                <div id="nft-modal-traits-container"></div>
             </div>
 
             <div class="nft-modal-footer">
-                <!-- ИСПРАВЛЕНО: Кнопки сплющены (ограничена ширина, выровнены по центру, уменьшена высота) -->
                 <div style="display: flex; gap: 12px; width: 100%; max-width: 290px; margin: 0 auto;">
                     <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 0 0 44px; height: 44px; background: transparent; border: 1px solid var(--accent-gold); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
@@ -474,8 +468,8 @@
             if (!item) return;
 
             document.getElementById('nft-modal-img').src = item.image_url;
-            document.getElementById('nft-modal-title').innerText = item.name + ' ›';
-            document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : `#${Math.floor(Math.random() * 90000) + 10000}`;
+            document.getElementById('nft-modal-title').innerText = item.name; // Убрана стрелочка
+            document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : ''; // Берем номер из базы
 
             const traitsContainer = document.getElementById('nft-modal-traits-container');
 
@@ -486,17 +480,17 @@
                 traits = item.traits;
             }
 
+            // Рендер характеристик (без TON, растянуто по ширине)
             if (traits && traits.length > 0) {
                 traitsContainer.innerHTML = `
                     <div class="traits-table">
                         ${traits.map(t => `
                             <div class="trait-row">
                                 <div class="trait-label" style="flex: 1;">${t.label || t.name}</div>
-                                <div class="trait-value-container" style="flex: 1.5;">
+                                <div class="trait-value-container" style="flex: 2; display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
                                     <span class="trait-value">${t.value}</span>
                                     ${t.percent ? `<span class="trait-percent">${t.percent}</span>` : ''}
                                 </div>
-                                <div class="trait-price" style="text-align: right; flex: 1;">${t.price || ''}</div>
                             </div>
                         `).join('')}
                     </div>
@@ -519,8 +513,14 @@
             tg.HapticFeedback.impactOccurred('light');
         }
 
-        function closeNftModal(event) {
-            if (event && event.target !== event.currentTarget) return;
+        function closeNftModalOverlay(event) {
+            // Закрывать только если клик был именно по затемненному фону, а не по самой карточке
+            if (event && event.target === event.currentTarget) {
+                closeNftModal();
+            }
+        }
+
+        function closeNftModal() {
             document.getElementById('nft-detail-overlay').classList.remove('active');
         }
 
@@ -722,13 +722,14 @@
                     <div class="item-card">
                         <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
                         <div class="item-name">${item.name}</div>
+                        <!-- Кнопки поменяны местами: сначала корзина, потом купить -->
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="openTermsModal('item', '${item.id}', ${item.price})">${item.price} ₽</button>
                             <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                                 </svg>
                             </button>
+                            <button class="btn-buy-now" onclick="openTermsModal('item', '${item.id}', ${item.price})">${item.price} ₽</button>
                         </div>
                         <button class="btn-tg-link-full" onclick="openInAppBrowser('${item.nft_link}')">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--text-muted)">
