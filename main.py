@@ -10,16 +10,11 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 from dotenv import load_dotenv
-import os
-import logging
-import asyncio
 
 load_dotenv()
 
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
-
 
 if not BOT_TOKEN:
     print("❌ КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN не найден ни в системе, ни в .env!")
@@ -39,14 +34,12 @@ DB_CONFIG = {
     "sslmode": "require"
 }
 
-
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
-
 
 async def auto_cancel_reservations():
     while True:
@@ -66,7 +59,6 @@ async def auto_cancel_reservations():
             logging.error(f"Ошибка таймера бронирования: {e}")
         await asyncio.sleep(60)
 
-
 # --- API МЕТОДЫ ---
 
 async def handle_get_items(request):
@@ -79,11 +71,15 @@ async def handle_get_items(request):
 
                 for item in items:
                     traits_raw = item.get('traits')
-                    if traits_raw:
-                        try:
-                            item['traits'] = json.loads(traits_raw)
-                        except Exception:
-                            item['traits'] = []
+                    if traits_raw is not None:
+                        # psycopg2 автоматически парсит jsonb, поэтому проверяем тип
+                        if isinstance(traits_raw, str):
+                            try:
+                                item['traits'] = json.loads(traits_raw)
+                            except Exception:
+                                item['traits'] = []
+                        else:
+                            item['traits'] = traits_raw
                     else:
                         item['traits'] = []
 
@@ -91,7 +87,6 @@ async def handle_get_items(request):
     except Exception as e:
         logging.error(f"Ошибка: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": "*"})
-
 
 async def handle_get_inventory(request):
     user_id = request.query.get('user_id')
@@ -108,11 +103,14 @@ async def handle_get_inventory(request):
                         item['status'] = 'withdrawn'
 
                     traits_raw = item.get('traits')
-                    if traits_raw:
-                        try:
-                            item['traits'] = json.loads(traits_raw)
-                        except Exception:
-                            item['traits'] = []
+                    if traits_raw is not None:
+                        if isinstance(traits_raw, str):
+                            try:
+                                item['traits'] = json.loads(traits_raw)
+                            except Exception:
+                                item['traits'] = []
+                        else:
+                            item['traits'] = traits_raw
                     else:
                         item['traits'] = []
 
@@ -120,7 +118,6 @@ async def handle_get_inventory(request):
     except Exception as e:
         logging.error(f"Ошибка загрузки инвентаря: {e}")
         return web.json_response([], headers={"Access-Control-Allow-Origin": "*"})
-
 
 async def handle_book(request):
     try:
@@ -156,7 +153,6 @@ async def handle_book(request):
         logging.error(e)
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
-
 async def handle_notify_admin(request):
     try:
         data = await request.json()
@@ -189,7 +185,6 @@ async def handle_notify_admin(request):
     except:
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
-
 async def handle_cancel_booking(request):
     try:
         data = await request.json()
@@ -205,7 +200,6 @@ async def handle_cancel_booking(request):
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
     except:
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
-
 
 async def handle_request_withdraw(request):
     try:
@@ -238,7 +232,6 @@ async def handle_request_withdraw(request):
         logging.error(f"Withdrawal error: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
-
 # --- CALLBACKS ДЛЯ АДМИНА ---
 
 @dp.callback_query(F.data.startswith("bulk_yes_"))
@@ -257,7 +250,6 @@ async def admin_bulk_approve(callback: types.CallbackQuery):
     except:
         pass
 
-
 @dp.callback_query(F.data.startswith("bulk_no_"))
 async def admin_bulk_reject(callback: types.CallbackQuery):
     _, _, uid, ids_str = callback.data.split("_")
@@ -275,7 +267,6 @@ async def admin_bulk_reject(callback: types.CallbackQuery):
     except:
         pass
 
-
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
     _, _, uid, item_id = callback.data.split("_")
@@ -291,7 +282,6 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
         await bot.send_message(uid, f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
     except:
         pass
-
 
 @dp.callback_query(F.data.startswith("with_no_"))
 async def admin_withdraw_reject(callback: types.CallbackQuery):
@@ -309,7 +299,6 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
     except:
         pass
 
-
 # --- ОСТАЛЬНОЕ ---
 
 async def handle_get_status(request):
@@ -322,7 +311,6 @@ async def handle_get_status(request):
             return web.json_response({"last_event": res['last_event'] if res else None},
                                      headers={"Access-Control-Allow-Origin": "*"})
 
-
 async def handle_clear_event(request):
     data = await request.json()
     with get_db_connection() as conn:
@@ -331,7 +319,6 @@ async def handle_clear_event(request):
             conn.commit()
     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
 
-
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": "*",
@@ -339,14 +326,12 @@ async def handle_options(request):
         "Access-Control-Allow-Headers": "Content-Type"
     })
 
-
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     kb = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]]
     )
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
-
 
 # --- ЗАПУСК ---
 app = web.Application()
@@ -360,7 +345,6 @@ app.router.add_get('/get_status', handle_get_status)
 app.router.add_post('/clear_event', handle_clear_event)
 app.router.add_options('/{tail:.*}', handle_options)
 
-
 async def main():
     asyncio.create_task(auto_cancel_reservations())
     port = int(os.environ.get("PORT", 8080))
@@ -368,7 +352,6 @@ async def main():
     await runner.setup()
     await web.TCPSite(runner, '0.0.0.0', port).start()
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
