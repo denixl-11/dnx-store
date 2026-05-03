@@ -65,7 +65,6 @@ async def handle_get_items(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # ДОБАВЛЕНО ПОЛЕ number
                 cur.execute(
                     "SELECT id, name, price, status, image_url, nft_link, traits, number FROM items WHERE status = 'Доступен'")
                 items = cur.fetchall()
@@ -88,12 +87,31 @@ async def handle_get_items(request):
         logging.error(f"Ошибка: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": "*"})
 
+# Новый метод для вкладки активных заказов
+async def handle_get_active_orders(request):
+    user_id = request.query.get('user_id')
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT id, name, price, image_url, reserved_at FROM items WHERE buyer_id = %s AND status = 'Забронирован'",
+                    (str(user_id),)
+                )
+                items = cur.fetchall()
+                for item in items:
+                    if item['reserved_at']:
+                        # Передаем время брони в миллисекундах для фронтенда
+                        item['reserved_at'] = item['reserved_at'].timestamp() * 1000
+                return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
+    except Exception as e:
+        logging.error(f"Ошибка загрузки активных заказов: {e}")
+        return web.json_response([], headers={"Access-Control-Allow-Origin": "*"})
+
 async def handle_get_inventory(request):
     user_id = request.query.get('user_id')
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # ДОБАВЛЕНО ПОЛЕ number
                 cur.execute(
                     "SELECT id, name, image_url, nft_link, status, traits, number FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен')",
                     (str(user_id),))
@@ -337,6 +355,7 @@ async def cmd_start(message: types.Message):
 # --- ЗАПУСК ---
 app = web.Application()
 app.router.add_get('/items', handle_get_items)
+app.router.add_get('/active_orders', handle_get_active_orders) # Добавлен новый роут
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_post('/book', handle_book)
 app.router.add_post('/notify-admin', handle_notify_admin)

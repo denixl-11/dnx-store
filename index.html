@@ -48,15 +48,15 @@
 
         .subtitle { font-size: 0.65rem; color: var(--text-muted); margin-top: 6px; letter-spacing: 3px; text-transform: uppercase; font-weight: 500; }
 
+        /* Обновленная корзина - позиция статичная, чтобы встроить во вкладки */
         .cart-btn-header {
-            position: absolute; right: 20px; top: 55%; transform: translateY(-50%);
             display: flex; align-items: center;
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid var(--border-color);
             padding: 8px 14px; border-radius: 12px; cursor: pointer;
-            backdrop-filter: blur(10px); transition: 0.3s ease;
+            backdrop-filter: blur(10px); transition: 0.3s ease; flex-shrink: 0;
         }
-        .cart-btn-header:active { transform: translateY(-50%) scale(0.95); }
+        .cart-btn-header:active { transform: scale(0.95); }
         #cart-counter { color: var(--accent-gold); font-weight: 600; margin-left: 8px; font-size: 0.9rem; }
 
         .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; padding: 20px; box-sizing: border-box; }
@@ -179,6 +179,13 @@
             cursor: pointer; border-bottom: 2px solid transparent; transition: 0.3s;
         }
         .inv-top-tab.active { color: var(--text-main); border-bottom: 2px solid var(--accent-gold); }
+
+        /* Новые стили для вкладок магазина */
+        .store-top-tab {
+            color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+            cursor: pointer; transition: 0.3s; padding-bottom: 4px; border-bottom: 2px solid transparent;
+        }
+        .store-top-tab.active { color: var(--text-main); border-bottom: 2px solid var(--accent-gold); }
 
         .btn-open-nft {
             display: flex; justify-content: center; align-items: center;
@@ -311,16 +318,25 @@
     <header>
         <h1>DNX STORE</h1>
         <div class="subtitle">Exclusive Digital Assets</div>
-        <div class="cart-btn-header" onclick="showPage('cart')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-main)" stroke-width="2">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
-            </svg>
-            <span id="cart-counter">0</span>
-        </div>
     </header>
 
     <div id="page-store" class="page page-active">
+        <!-- Блок с вкладками и корзиной вынесен под черту -->
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid var(--border-color); background: rgba(10, 10, 12, 0.5);">
+            <div style="display: flex; gap: 20px;">
+                <div class="store-top-tab active" onclick="switchStoreTab('catalog', this)">Каталог</div>
+                <div class="store-top-tab" onclick="switchStoreTab('orders', this)">Активные заказы</div>
+            </div>
+            <div class="cart-btn-header" onclick="showPage('cart')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-main)" stroke-width="2">
+                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
+                </svg>
+                <span id="cart-counter">0</span>
+            </div>
+        </div>
+
         <div class="catalog-grid" id="catalog-list"></div>
+        <div class="catalog-grid" id="active-orders-list" style="display: none;"></div>
     </div>
 
     <div id="page-cart" class="page">
@@ -381,7 +397,7 @@
                 <li>Администрация не несет ответственности за перевод средств на сторонние реквизиты, не указанные в приложении.</li>
                 <li>Систематическое создание заявок на проверку оплаты без фактического перевода средств приведет к блокировке аккаунта.</li>
                 <li>Обработка и проверка платежа занимает до 15 минут.</li>
-                <li>Вывод цифровых активов (подарков) осуществляется в течение 2 часов.</li>
+                <!-- Пункт про вывод удален отсюда -->
             </ul>
             <label class="terms-checkbox-label">
                 <input type="checkbox" id="terms-checkbox" onchange="toggleTermsButton()">
@@ -395,6 +411,20 @@
         </div>
     </div>
 
+    <!-- Новое модальное окно для вывода -->
+    <div id="withdraw-modal-overlay" class="modal-overlay">
+        <div class="modal-content" style="text-align: center;">
+            <h3 class="modal-title" style="color: var(--text-main);">ВЫВОД АКТИВА</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px;">
+                Вывод цифровых активов (подарков) осуществляется в течение 2 часов. Продолжить?
+            </p>
+            <div style="display: flex; gap: 10px; flex-direction: column;">
+                <button class="btn-main-action" id="btn-confirm-withdraw" style="height: 46px;">Да, вывести</button>
+                <button class="btn-secondary" onclick="closeWithdrawModal()" style="height: 46px; margin-top: 0;">Отмена</button>
+            </div>
+        </div>
+    </div>
+
     <div id="custom-alert-overlay" class="modal-overlay">
         <div class="modal-content" style="text-align: center; max-width: 320px; padding-top: 32px;">
             <div id="custom-alert-message" style="margin-bottom: 24px; color: var(--text-main); font-size: 0.95rem; line-height: 1.5; font-weight: 500;">Текст</div>
@@ -402,7 +432,6 @@
         </div>
     </div>
 
-    <!-- Обновленная модалка NFT с исправленным крестиком -->
     <div id="nft-detail-overlay" class="nft-modal-overlay" onclick="closeNftModalOverlay(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
             <div class="nft-modal-header-rocket">
@@ -424,12 +453,12 @@
 
             <div class="nft-modal-footer">
                 <div style="display: flex; gap: 12px; width: 100%; max-width: 290px; margin: 0 auto;">
+                    <button class="btn-main-action" id="nft-modal-btn-buy" style="flex: 1; height: 44px; background: var(--accent-gold); color: #000; border-radius: 12px; font-weight: 700; text-transform: uppercase;">КУПИТЬ ЗА 0 ₽</button>
                     <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 0 0 44px; height: 44px; background: transparent; border: 1px solid var(--accent-gold); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
                             <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                         </svg>
                     </button>
-                    <button class="btn-main-action" id="nft-modal-btn-buy" style="flex: 1; height: 44px; background: var(--accent-gold); color: #000; border-radius: 12px; font-weight: 700; text-transform: uppercase;">КУПИТЬ ЗА 0 ₽</button>
                 </div>
             </div>
         </div>
@@ -451,6 +480,7 @@
         let withdrawPending = JSON.parse(localStorage.getItem('withdrawPending') || '{}');
 
         let isCheckingPayment = false;
+        let timers = {};
 
         function showCustomAlert(message) {
             document.getElementById('custom-alert-message').innerText = message;
@@ -468,8 +498,8 @@
             if (!item) return;
 
             document.getElementById('nft-modal-img').src = item.image_url;
-            document.getElementById('nft-modal-title').innerText = item.name; // Убрана стрелочка
-            document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : ''; // Берем номер из базы
+            document.getElementById('nft-modal-title').innerText = item.name;
+            document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
 
             const traitsContainer = document.getElementById('nft-modal-traits-container');
 
@@ -480,7 +510,6 @@
                 traits = item.traits;
             }
 
-            // Рендер характеристик (без TON, растянуто по ширине)
             if (traits && traits.length > 0) {
                 traitsContainer.innerHTML = `
                     <div class="traits-table">
@@ -514,7 +543,6 @@
         }
 
         function closeNftModalOverlay(event) {
-            // Закрывать только если клик был именно по затемненному фону, а не по самой карточке
             if (event && event.target === event.currentTarget) {
                 closeNftModal();
             }
@@ -541,6 +569,21 @@
                 loadInventory();
             }
 
+            tg.HapticFeedback.impactOccurred('light');
+        }
+
+        function switchStoreTab(tab, element) {
+            document.querySelectorAll('.store-top-tab').forEach(t => t.classList.remove('active'));
+            element.classList.add('active');
+
+            if (tab === 'catalog') {
+                document.getElementById('catalog-list').style.display = 'grid';
+                document.getElementById('active-orders-list').style.display = 'none';
+            } else {
+                document.getElementById('catalog-list').style.display = 'none';
+                document.getElementById('active-orders-list').style.display = 'grid';
+                loadActiveOrders();
+            }
             tg.HapticFeedback.impactOccurred('light');
         }
 
@@ -664,6 +707,13 @@
             }
         }
 
+        // Функция возврата к активному заказу из вкладки "Активные заказы"
+        function resumePayment(id, price) {
+            currentBookingIds = [id];
+            document.getElementById('payment-amount').innerText = price + ' ₽';
+            showPage('payment');
+        }
+
         function copyReq() {
             const reqInput = document.getElementById('req-card');
             reqInput.select();
@@ -722,14 +772,14 @@
                     <div class="item-card">
                         <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
                         <div class="item-name">${item.name}</div>
-                        <!-- Кнопки поменяны местами: сначала корзина, потом купить -->
+                        <!-- Кнопки поменяны обратно: сначала купить, потом корзина -->
                         <div class="card-buttons">
+                            <button class="btn-buy-now" onclick="openTermsModal('item', '${item.id}', ${item.price})">${item.price} ₽</button>
                             <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5">
                                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                                 </svg>
                             </button>
-                            <button class="btn-buy-now" onclick="openTermsModal('item', '${item.id}', ${item.price})">${item.price} ₽</button>
                         </div>
                         <button class="btn-tg-link-full" onclick="openInAppBrowser('${item.nft_link}')">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--text-muted)">
@@ -742,6 +792,54 @@
             } catch (e) {
                 document.getElementById('catalog-list').innerHTML = '<p style="text-align:center;width:100%;color:var(--text-muted); grid-column: span 2; font-size: 0.9rem;">Ошибка загрузки товаров</p>';
             }
+        }
+
+        // Таймеры и рендер для вкладки активных заказов
+        function startTimer(id, reservedAtTime) {
+            if(timers[id]) clearInterval(timers[id]);
+            const endTime = reservedAtTime + 20 * 60 * 1000; // 20 минут
+            timers[id] = setInterval(() => {
+                const now = new Date().getTime();
+                const diff = endTime - now;
+                const el = document.getElementById('timer-' + id);
+                if (!el) { clearInterval(timers[id]); return; }
+
+                if (diff <= 0) {
+                    el.innerText = 'Бронь снята';
+                    el.style.color = 'var(--text-muted)';
+                    clearInterval(timers[id]);
+                } else {
+                    const m = Math.floor(diff / 60000);
+                    const s = Math.floor((diff % 60000) / 1000);
+                    el.innerText = `Осталось: ${m}:${s < 10 ? '0':''}${s}`;
+                }
+            }, 1000);
+        }
+
+        async function loadActiveOrders() {
+            const userId = tg.initDataUnsafe?.user?.id;
+            if (!userId) return;
+            try {
+                const res = await fetch(`${API_BASE}/active_orders?user_id=${userId}`);
+                const orders = await res.json();
+                const container = document.getElementById('active-orders-list');
+                if(orders.length === 0) {
+                    container.innerHTML = '<div style="padding: 100px 20px; text-align: center; color: var(--text-muted); grid-column: span 2; font-size: 0.9rem;">НЕТ АКТИВНЫХ ЗАКАЗОВ</div>';
+                } else {
+                    container.innerHTML = orders.map(order => `
+                        <div class="item-card" style="align-items: center;">
+                            <img src="${order.image_url}" class="item-image" style="margin-bottom: 10px;">
+                            <div class="item-name">${order.name}</div>
+                            <div style="color: var(--accent-gold); font-size: 0.85rem; margin-bottom: 12px; font-weight: 600;" id="timer-${order.id}">Осталось: --:--</div>
+                            <button class="btn-main-action" style="height: 40px; font-size: 0.8rem;" onclick="resumePayment('${order.id}', ${order.price})">Оплатить ${order.price} ₽</button>
+                        </div>
+                    `).join('');
+
+                    orders.forEach(order => {
+                        if(order.reserved_at) startTimer(order.id, order.reserved_at);
+                    });
+                }
+            } catch(e) {}
         }
 
         function switchInvTab(tab, element) {
@@ -776,6 +874,24 @@
             }
         }
 
+        // Модальное окно вывода
+        let pendingWithdrawId = null;
+        function confirmWithdraw(itemId) {
+            pendingWithdrawId = itemId;
+            document.getElementById('withdraw-modal-overlay').classList.add('active');
+        }
+        function closeWithdrawModal() {
+            document.getElementById('withdraw-modal-overlay').classList.remove('active');
+            pendingWithdrawId = null;
+        }
+
+        document.getElementById('btn-confirm-withdraw').onclick = () => {
+            if(pendingWithdrawId) {
+                requestWithdraw(pendingWithdrawId);
+                closeWithdrawModal();
+            }
+        };
+
         function renderInventoryTabs() {
             const activeContainer = document.getElementById('inventory-active-container');
             const historyContainer = document.getElementById('inventory-history-container');
@@ -793,7 +909,7 @@
                             <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
                             <div class="item-name">${item.name}</div>
                             <button class="btn-open-nft" onclick="openInAppBrowser('${item.nft_link}')">Открыть NFT</button>
-                            <button class="btn-withdraw ${isPending ? 'loading' : ''}" onclick="requestWithdraw('${item.id}')" ${isPending ? 'disabled' : ''}>
+                            <button class="btn-withdraw ${isPending ? 'loading' : ''}" onclick="confirmWithdraw('${item.id}')" ${isPending ? 'disabled' : ''}>
                                 ${isPending ? '<div class="spinner"></div>' : 'Вывести <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>'}
                             </button>
                         </div>
