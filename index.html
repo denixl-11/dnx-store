@@ -48,16 +48,33 @@
 
         .subtitle { font-size: 0.65rem; color: var(--text-muted); margin-top: 6px; letter-spacing: 3px; text-transform: uppercase; font-weight: 500; }
 
-        /* Обновленная корзина - позиция статичная, чтобы встроить во вкладки */
+        /* Обновленная корзина и новые стили для кнопок-вкладок */
         .cart-btn-header {
-            display: flex; align-items: center;
+            display: flex; align-items: center; justify-content: center;
             background: rgba(255, 255, 255, 0.03);
             border: 1px solid var(--border-color);
-            padding: 8px 14px; border-radius: 12px; cursor: pointer;
+            padding: 0 14px; border-radius: 12px; cursor: pointer;
             backdrop-filter: blur(10px); transition: 0.3s ease; flex-shrink: 0;
+            height: 38px;
         }
         .cart-btn-header:active { transform: scale(0.95); }
         #cart-counter { color: var(--accent-gold); font-weight: 600; margin-left: 8px; font-size: 0.9rem; }
+
+        .store-tab-btn {
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 12px; cursor: pointer;
+            backdrop-filter: blur(10px); transition: 0.3s ease;
+            color: var(--text-muted); font-size: 0.7rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 1px;
+            height: 38px;
+        }
+        .store-tab-btn.active {
+            color: var(--text-main);
+            border-color: var(--accent-gold);
+            background: rgba(203, 161, 83, 0.08);
+        }
 
         .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; padding: 20px; box-sizing: border-box; }
 
@@ -179,13 +196,6 @@
             cursor: pointer; border-bottom: 2px solid transparent; transition: 0.3s;
         }
         .inv-top-tab.active { color: var(--text-main); border-bottom: 2px solid var(--accent-gold); }
-
-        /* Новые стили для вкладок магазина */
-        .store-top-tab {
-            color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
-            cursor: pointer; transition: 0.3s; padding-bottom: 4px; border-bottom: 2px solid transparent;
-        }
-        .store-top-tab.active { color: var(--text-main); border-bottom: 2px solid var(--accent-gold); }
 
         .btn-open-nft {
             display: flex; justify-content: center; align-items: center;
@@ -321,11 +331,11 @@
     </header>
 
     <div id="page-store" class="page page-active">
-        <!-- Блок с вкладками и корзиной вынесен под черту -->
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid var(--border-color); background: rgba(10, 10, 12, 0.5);">
-            <div style="display: flex; gap: 20px;">
-                <div class="store-top-tab active" onclick="switchStoreTab('catalog', this)">Каталог</div>
-                <div class="store-top-tab" onclick="switchStoreTab('orders', this)">Активные заказы</div>
+        <!-- Блок с вкладками и корзиной -->
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; border-bottom: 1px solid var(--border-color); background: rgba(10, 10, 12, 0.5); gap: 12px;">
+            <div style="display: flex; gap: 8px; flex: 1;">
+                <div class="store-tab-btn active" style="flex: 1;" onclick="switchStoreTab('catalog', this)">Каталог</div>
+                <div class="store-tab-btn" style="flex: 1;" onclick="switchStoreTab('orders', this)">Заказы</div>
             </div>
             <div class="cart-btn-header" onclick="showPage('cart')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-main)" stroke-width="2">
@@ -397,7 +407,6 @@
                 <li>Администрация не несет ответственности за перевод средств на сторонние реквизиты, не указанные в приложении.</li>
                 <li>Систематическое создание заявок на проверку оплаты без фактического перевода средств приведет к блокировке аккаунта.</li>
                 <li>Обработка и проверка платежа занимает до 15 минут.</li>
-                <!-- Пункт про вывод удален отсюда -->
             </ul>
             <label class="terms-checkbox-label">
                 <input type="checkbox" id="terms-checkbox" onchange="toggleTermsButton()">
@@ -411,7 +420,6 @@
         </div>
     </div>
 
-    <!-- Новое модальное окно для вывода -->
     <div id="withdraw-modal-overlay" class="modal-overlay">
         <div class="modal-content" style="text-align: center;">
             <h3 class="modal-title" style="color: var(--text-main);">ВЫВОД АКТИВА</h3>
@@ -573,7 +581,7 @@
         }
 
         function switchStoreTab(tab, element) {
-            document.querySelectorAll('.store-top-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.store-tab-btn').forEach(t => t.classList.remove('active'));
             element.classList.add('active');
 
             if (tab === 'catalog') {
@@ -707,11 +715,27 @@
             }
         }
 
-        // Функция возврата к активному заказу из вкладки "Активные заказы"
         function resumePayment(id, price) {
             currentBookingIds = [id];
             document.getElementById('payment-amount').innerText = price + ' ₽';
             showPage('payment');
+        }
+
+        // Функция для отмены одного заказа
+        async function cancelSingleOrder(id) {
+            try {
+                await fetch(`${API_BASE}/cancel-booking`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: [id] })
+                });
+                tg.HapticFeedback.impactOccurred('medium');
+                showCustomAlert('Заказ успешно отменен');
+                loadActiveOrders();
+                loadCatalog();
+            } catch(e) {
+                showCustomAlert('Ошибка при отмене заказа');
+            }
         }
 
         function copyReq() {
@@ -772,7 +796,6 @@
                     <div class="item-card">
                         <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
                         <div class="item-name">${item.name}</div>
-                        <!-- Кнопки поменяны обратно: сначала купить, потом корзина -->
                         <div class="card-buttons">
                             <button class="btn-buy-now" onclick="openTermsModal('item', '${item.id}', ${item.price})">${item.price} ₽</button>
                             <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
@@ -794,10 +817,9 @@
             }
         }
 
-        // Таймеры и рендер для вкладки активных заказов
         function startTimer(id, reservedAtTime) {
             if(timers[id]) clearInterval(timers[id]);
-            const endTime = reservedAtTime + 20 * 60 * 1000; // 20 минут
+            const endTime = reservedAtTime + 20 * 60 * 1000;
             timers[id] = setInterval(() => {
                 const now = new Date().getTime();
                 const diff = endTime - now;
@@ -831,7 +853,10 @@
                             <img src="${order.image_url}" class="item-image" style="margin-bottom: 10px;">
                             <div class="item-name">${order.name}</div>
                             <div style="color: var(--accent-gold); font-size: 0.85rem; margin-bottom: 12px; font-weight: 600;" id="timer-${order.id}">Осталось: --:--</div>
-                            <button class="btn-main-action" style="height: 40px; font-size: 0.8rem;" onclick="resumePayment('${order.id}', ${order.price})">Оплатить ${order.price} ₽</button>
+                            <div style="display: flex; gap: 8px; width: 100%;">
+                                <button class="btn-main-action" style="flex: 1; height: 36px; font-size: 0.75rem;" onclick="resumePayment('${order.id}', ${order.price})">Оплатить</button>
+                                <button class="btn-secondary" style="flex: 1; height: 36px; font-size: 0.75rem; margin-top: 0; color: #ff6b6b; border-color: rgba(255, 107, 107, 0.3);" onclick="cancelSingleOrder('${order.id}')">Отмена</button>
+                            </div>
                         </div>
                     `).join('');
 
@@ -874,7 +899,6 @@
             }
         }
 
-        // Модальное окно вывода
         let pendingWithdrawId = null;
         function confirmWithdraw(itemId) {
             pendingWithdrawId = itemId;

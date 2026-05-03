@@ -87,7 +87,6 @@ async def handle_get_items(request):
         logging.error(f"Ошибка: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": "*"})
 
-# Новый метод для вкладки активных заказов
 async def handle_get_active_orders(request):
     user_id = request.query.get('user_id')
     try:
@@ -355,7 +354,7 @@ async def cmd_start(message: types.Message):
 # --- ЗАПУСК ---
 app = web.Application()
 app.router.add_get('/items', handle_get_items)
-app.router.add_get('/active_orders', handle_get_active_orders) # Добавлен новый роут
+app.router.add_get('/active_orders', handle_get_active_orders)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_post('/book', handle_book)
 app.router.add_post('/notify-admin', handle_notify_admin)
