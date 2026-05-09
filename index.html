@@ -2,559 +2,479 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DNX STORE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
             --accent-gold: #cba153;
-            --accent-gold-dim: rgba(203, 161, 83, 0.15);
             --text-main: #e8e8e8;
             --text-muted: #7a7a7c;
-            --border-color: #222224;
         }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        html, body { overflow-x: hidden; width: 100%; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-main); color: var(--text-main); padding-bottom: 80px; -webkit-tap-highlight-color: transparent; }
 
-        body {
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            margin: 0; display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; padding-bottom: 100px; -webkit-font-smoothing: antialiased;
+        /* Header */
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 20px; position: sticky; top: 0; background: rgba(10, 10, 12, 0.9);
+            backdrop-filter: blur(10px); z-index: 100;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .header-title { font-weight: 800; font-size: 20px; letter-spacing: 1px; color: var(--text-main); }
+        .header-balance { background: rgba(203, 161, 83, 0.1); padding: 8px 15px; border-radius: 20px; color: var(--accent-gold); font-weight: 600; }
+
+        /* Navigation */
+        .nav {
+            position: fixed; bottom: 0; width: 100%; display: flex; justify-content: space-around;
+            background: #131315; padding: 15px 0; border-top: 1px solid rgba(255,255,255,0.05); z-index: 100;
+        }
+        .nav-item { color: var(--text-muted); font-size: 12px; text-align: center; cursor: pointer; transition: 0.3s; }
+        .nav-item.active { color: var(--accent-gold); }
+        .nav-icon { font-size: 24px; margin-bottom: 5px; display: block; }
+
+        .page { display: none; padding: 20px; animation: fadeIn 0.3s ease; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Grid */
+        .items-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .item-card {
+            background: var(--bg-card); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
+        }
+        .item-img { width: 100%; height: 140px; object-fit: cover; }
+        .item-details { padding: 12px; display: flex; flex-direction: column; flex-grow: 1; }
+        .item-name { font-weight: 600; font-size: 14px; margin-bottom: 5px; }
+        .item-price { color: var(--accent-gold); font-weight: 800; font-size: 16px; margin-bottom: 10px; }
+        .buy-btn {
+            margin-top: auto; background: rgba(203, 161, 83, 0.1); color: var(--accent-gold);
+            border: none; padding: 10px; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer;
         }
 
-        /* Обновленный хедер */
-        header {
-            width: 100%; padding: 20px; display: flex; justify-content: space-between;
-            align-items: center; position: relative; border-bottom: 1px solid var(--border-color);
-            background: rgba(10, 10, 12, 0.95); z-index: 50;
+        /* Cart */
+        .cart-summary { background: var(--bg-card); padding: 20px; border-radius: 16px; margin-top: 20px; font-size: 18px; font-weight: 600; border: 1px solid rgba(255,255,255,0.05); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            display: none; align-items: center; justify-content: center; z-index: 1000;
         }
-
-        .header-left { display: flex; align-items: center; gap: 8px; }
-        .avatar { width: 36px; height: 36px; border-radius: 50%; background: #222; object-fit: cover; border: 1px solid var(--border-color); }
-        .username { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
-
-        .header-center { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; }
-        h1 { font-weight: 800; font-size: 1.2rem; text-transform: uppercase; margin: 0; letter-spacing: 2px; color: #fff; text-shadow: 0 0 15px rgba(203, 161, 83, 0.3); }
-
-        .header-right {
-            background: rgba(203, 161, 83, 0.1); border: 1px solid var(--accent-gold);
-            padding: 8px 12px; border-radius: 12px; cursor: pointer; transition: 0.2s;
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: #131315; width: 90%; max-width: 350px; border-radius: 24px;
+            padding: 25px; position: relative; border: 1px solid rgba(255,255,255,0.1);
         }
-        .header-right:active { transform: scale(0.95); }
-        .balance-text { color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; }
+        .close-modal {
+            position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.1);
+            border: none; color: white; width: 30px; height: 30px; border-radius: 50%; font-size: 16px;
+        }
+        .modal-img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px; margin-bottom: 15px; }
+        .modal-title { font-size: 20px; font-weight: 800; margin-bottom: 10px; }
+        .modal-desc { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
 
-        .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; padding: 20px; box-sizing: border-box; }
+        /* Profile & Withdraw */
+        .profile-card { background: var(--bg-card); padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 20px; }
+        .input-field { width: 100%; background: #0a0a0c; border: 1px solid rgba(255,255,255,0.1); color: white; padding: 12px; border-radius: 10px; margin-top: 10px; }
 
-        .item-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; }
-        .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 12px; object-fit: cover; margin-bottom: 14px; cursor: pointer; }
-        .item-name { font-size: 0.95rem; font-weight: 500; margin-bottom: 14px; color: var(--text-main); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* Game Styles */
+        .game-card { background: var(--bg-card); padding: 20px; border-radius: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 20px; }
+        .roulette-wheel { font-size: 60px; margin: 20px 0; display: inline-block; }
+        .spin-anim { animation: spin 0.5s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .game-btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: 800; font-size: 16px; margin-bottom: 10px; color: white; }
+        .game-btn-red { background: #e63946; }
+        .game-btn-black { background: #1a1a1d; border: 1px solid #333; }
+        .game-btn-green { background: #2a9d8f; }
 
-        .card-buttons { display: flex; width: 100%; gap: 8px; }
-        .btn-buy-now { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 10px; height: 36px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; cursor: pointer; }
-        .btn-add-cart { width: 40px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-
-        .btn-main-action { width: 100%; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
-        .btn-secondary { width: 100%; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 12px; height: 52px; font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer; }
-
-        .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
-        .page-active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        /* Вкладки снизу (теперь 3 штуки) */
-        .tab-bar { position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85); backdrop-filter: blur(15px); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100; }
-        .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
-        .tab-item.active { color: var(--accent-gold); }
-
-        /* Игровое поле */
-        .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
-        .game-canvas-wrap { position: relative; width: 80%; height: 25vh; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); background: #131315; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
-        #gameCanvas { width: 100%; height: 100%; display: block; }
-        .game-info-overlay { position: absolute; bottom: 8px; left: 12px; font-size: 0.65rem; color: rgba(255,255,255,0.4); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-        .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3rem; font-weight: 800; color: rgba(255,255,255,0.1); pointer-events: none; }
-
-        .game-controls { display: flex; gap: 12px; width: 80%; margin-top: 20px; }
-        .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
-        .game-btn-cancel { width: 80%; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
-
-        /* Модалки */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
-        .modal-overlay.active { opacity: 1; pointer-events: all; }
-        .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); transform: translateY(20px); transition: 0.3s ease; text-align: center; }
-        .modal-overlay.active .modal-content { transform: translateY(0); }
-        .modal-title { font-weight: 700; font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px; text-transform: uppercase; }
-        .input-dark { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 14px; border-radius: 10px; font-size: 1rem; margin-bottom: 20px; box-sizing: border-box; text-align: center; }
-
-        /* Модалка NFT (ракета) */
-        .nft-modal-sheet { position: absolute; bottom: -100%; left: 0; width: 100%; background: #0a0a0c; border-radius: 24px 24px 0 0; transition: bottom 0.4s; display: flex; flex-direction: column; max-height: 95vh; overflow: hidden; }
-        .nft-modal-overlay.active .nft-modal-sheet { bottom: 0; }
-        .nft-modal-header-rocket { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; padding-top: 25px; }
-        .nft-modal-header-rocket img { width: 190px; height: 190px; object-fit: cover; border-radius: 16px; }
-        .traits-table { width: 100%; background: #1c1c1e; border-radius: 12px; margin: 10px 0; border: 1px solid #2c2c2e; overflow: hidden; }
-        .trait-row { display: flex; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
+        .empty-text { text-align: center; color: var(--text-muted); margin-top: 50px; font-size: 16px; }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="header-left">
-            <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">
-            <div class="username" id="username-display">User</div>
-        </div>
-        <div class="header-center">
-            <h1>DNX STORE</h1>
-        </div>
-        <div class="header-right" onclick="showPage('balance')">
-            <span class="balance-text" id="header-balance">0 USDT</span>
-        </div>
-    </header>
-
-    <div id="page-game" class="page">
-        <div class="game-container">
-            <div class="game-canvas-wrap">
-                <canvas id="gameCanvas"></canvas>
-                <div class="game-info-overlay" id="game-players-count">Игроки: 0/20</div>
-                <div class="game-timer-overlay" id="game-timer-bg"></div>
-            </div>
-
-            <div class="game-controls">
-                <button class="game-btn" onclick="openBetConfirm(0.1)">+0.1 USDT</button>
-                <button class="game-btn" onclick="openCustomBet()">Своя сумма</button>
-            </div>
-            <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
-        </div>
+    <div class="header">
+        <div class="header-title"></div> <div class="header-balance"><span id="user-balance">0.00</span> ₽</div>
     </div>
 
-    <div id="page-store" class="page page-active">
-        <div style="padding: 15px 20px; display: flex; justify-content: flex-end; background: rgba(10, 10, 12, 0.5);">
-            <div class="cart-btn-header" onclick="showPage('cart')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-main)" stroke-width="2">
-                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
-                </svg>
-                <span id="cart-counter">0</span>
-            </div>
-        </div>
-        <div class="catalog-grid" id="catalog-list"></div>
+    <div id="page-catalog" class="page active">
+        <div class="items-grid" id="catalog-grid"></div>
     </div>
 
     <div id="page-cart" class="page">
-        <div id="cart-items-list" class="cart-list"></div>
-        <div class="fixed-footer" id="pay-footer" style="display: none;">
-            <button class="btn-main-action" onclick="buyCart()">Оплатить корзину (Списать USDT)</button>
+        <div id="cart-list"></div>
+        <div class="cart-summary">
+            <div>Итого: <span id="cart-total" style="color:var(--accent-gold);">0.00</span> ₽</div>
+            <button class="buy-btn" onclick="checkout()" style="width:100%; margin-top:15px; padding:15px; font-size:16px;">Оплатить все</button>
         </div>
     </div>
 
-    <div id="page-balance" class="page">
-        <div style="padding: 30px 20px; display: flex; flex-direction: column; align-items: center;">
-            <h2 style="color: var(--text-main); font-weight: 700; margin-bottom: 10px;">ТЕКУЩИЙ БАЛАНС</h2>
-            <div style="font-size: 2.5rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 40px;" id="big-balance">0 USDT</div>
+    <div id="page-game" class="page">
+        <div class="game-card">
+            <h2 style="margin-bottom: 10px;">Рулетка DNX</h2>
+            <div style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">Ставка: 100 ₽</div>
 
-            <button class="btn-main-action" onclick="openTopupModal()">ПОПОЛНИТЬ</button>
+            <div id="roulette-display" class="roulette-wheel">🎲</div>
+            <div id="game-status" style="font-weight: 600; color: var(--accent-gold); height: 24px;">Выберите цвет</div>
+        </div>
+
+        <div class="game-controls">
+            <button class="game-btn game-btn-red" onclick="openBetConfirm('red')">Ставка на Красное (2x)</button>
+            <button class="game-btn game-btn-black" onclick="openBetConfirm('black')">Ставка на Черное (2x)</button>
+            <button class="game-btn game-btn-green" onclick="openBetConfirm('green')">Ставка на Зеленое (14x)</button>
+
+            <button class="game-btn" style="background: transparent; border: 1px solid var(--accent-gold); color: var(--accent-gold); margin-top: 15px;" onclick="return false;">Изменить ставку</button>
         </div>
     </div>
 
-    <div id="page-inventory" class="page">
-        <div style="display:flex; border-bottom: 1px solid var(--border-color); padding: 0 20px; background: rgba(10, 10, 12, 0.5);">
-            <div class="tab-item active" style="padding:16px 0; border-bottom: 2px solid var(--accent-gold); color:var(--text-main)" onclick="switchInv(this, 'active')">Мои NFT</div>
-            <div class="tab-item" style="padding:16px 0; border-bottom: 2px solid transparent;" onclick="switchInv(this, 'history')">История</div>
+    <div id="page-profile" class="page">
+        <div class="profile-card">
+            <h3 style="margin-bottom: 15px;">Пополнение баланса</h3>
+            <input type="number" id="topup-amount" class="input-field" placeholder="Сумма (₽)">
+            <button class="buy-btn" style="width:100%; margin-top:15px; padding:15px;" onclick="requestTopup()">Пополнить</button>
         </div>
-        <div id="inventory-active-container" class="catalog-grid"></div>
-        <div id="inventory-history-container" class="catalog-grid" style="display: none;"></div>
+
+        <h3 style="margin: 20px 0 15px;">Ваш Инвентарь</h3>
+        <div class="items-grid" id="inventory-grid"></div>
     </div>
 
-    <div class="tab-bar">
-        <div class="tab-item" id="tab-game" onclick="showPage('game')">ИГРА</div>
-        <div class="tab-item active" id="tab-store" onclick="showPage('store')">МАГАЗИН</div>
-        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
-    </div>
-
-    <div id="nft-detail-overlay" class="modal-overlay nft-modal-overlay" onclick="closeNftModal(event)">
-        <div class="nft-modal-sheet" onclick="event.stopPropagation()">
-            <div class="nft-modal-header-rocket">
-                <div style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer;" onclick="closeNftModal(true)">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </div>
-                <img src="" id="nft-modal-img">
-                <div style="padding: 20px; text-align: center;">
-                    <div style="font-size: 28px; font-weight: 800; color: #fff;" id="nft-modal-title">Name</div>
-                    <div style="font-size: 15px; color: rgba(255,255,255,0.6); margin-top: 4px;" id="nft-modal-number">#0000</div>
-                </div>
-            </div>
-            <div style="padding: 10px 20px; overflow-y: auto;" id="nft-modal-traits-container"></div>
-            <div style="padding: 15px 20px 30px; border-top: 1px solid #2c2c2e; background: #0a0a0c;">
-                <div style="display: flex; gap: 12px; max-width: 290px; margin: 0 auto;">
-                    <button class="btn-main-action" id="nft-modal-btn-buy" style="flex: 1; height: 44px;">КУПИТЬ</button>
-                    <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 0 0 44px; height: 44px;">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
-                    </button>
-                </div>
-            </div>
+    <div class="nav">
+        <div class="nav-item active" onclick="switchPage('catalog', this)">
+            <span class="nav-icon">🛍️</span> Каталог
+        </div>
+        <div class="nav-item" onclick="switchPage('cart', this)">
+            <span class="nav-icon">🛒</span> Корзина (<span id="cart-count">0</span>)
+        </div>
+        <div class="nav-item" onclick="switchPage('game', this)">
+            <span class="nav-icon">🎮</span> Игра
+        </div>
+        <div class="nav-item" onclick="switchPage('profile', this)">
+            <span class="nav-icon">👤</span> Профиль
         </div>
     </div>
 
-    <div id="topup-modal" class="modal-overlay">
+    <div class="modal-overlay" id="item-modal">
         <div class="modal-content">
-            <h3 class="modal-title">ПОПОЛНЕНИЕ (USDT)</h3>
-            <ul style="font-size: 0.8rem; color: var(--text-muted); text-align: left; padding-left: 16px; margin-bottom: 20px;">
-                <li>Администрация не несет ответственности за перевод на сторонние реквизиты.</li>
-                <li>Заявки без фактического перевода блокируются.</li>
-                <li>Обработка занимает до 15 минут.</li>
-            </ul>
-            <input type="number" id="topup-amount" class="input-dark" placeholder="Введите сумму USDT">
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 15px;" id="req-text">Загрузка реквизитов...</div>
-            <label style="display: flex; align-items: center; font-size: 0.8rem; text-align:left; cursor: pointer; gap: 10px; margin-bottom: 20px; color: var(--text-main);">
-                <input type="checkbox" id="terms-checkbox" onchange="document.getElementById('btn-send-topup').disabled = !this.checked;" style="display:none;">
-                <span style="width:22px; height:22px; border:2px solid var(--border-color); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0;" id="custom-chk"></span>
-                Я подтверждаю перевод по реквизитам
-            </label>
-            <button class="btn-main-action" id="btn-send-topup" onclick="sendTopup()" disabled>Отправить заявку</button>
-            <button class="btn-secondary" onclick="closeModal('topup-modal')">Отмена</button>
+            <button class="close-modal" onclick="closeModal('item-modal')">✕</button>
+            <img id="modal-img" src="" class="modal-img">
+            <div id="modal-title" class="modal-title"></div>
+            <div id="modal-desc" class="modal-desc"></div>
+            <button id="modal-btn" class="buy-btn" style="width:100%; padding:15px; font-size:16px;"></button>
         </div>
     </div>
 
-    <div id="alert-modal" class="modal-overlay">
-        <div class="modal-content" style="padding-top: 32px;">
-            <div id="alert-msg" style="margin-bottom: 24px; color: var(--text-main); font-size: 0.95rem; line-height: 1.5; font-weight: 500;">Текст</div>
-            <button class="btn-main-action" style="height: 44px; font-size: 0.85rem;" onclick="closeModal('alert-modal')">Понятно</button>
-        </div>
-    </div>
-
-    <div id="confirm-bet-modal" class="modal-overlay">
+    <div class="modal-overlay" id="inv-modal">
         <div class="modal-content">
-            <h3 class="modal-title">Подтверждение</h3>
-            <p style="color: var(--text-main); margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> USDT?</p>
-            <button class="btn-main-action" onclick="executeBet()">Подтвердить</button>
-            <button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button>
+            <button class="close-modal" onclick="closeModal('inv-modal')">✕</button>
+            <img id="inv-modal-img" src="" class="modal-img">
+            <div id="inv-modal-title" class="modal-title"></div>
+            <p style="color:var(--text-muted); font-size:14px; margin-bottom: 15px;">Для вывода предмета нажмите кнопку ниже. Администратор свяжется с вами.</p>
+            <button id="inv-modal-withdraw-btn" class="buy-btn" style="width:100%; padding:15px; font-size:16px; background:#e63946; color:white;">Вывести</button>
         </div>
     </div>
 
-    <div id="custom-bet-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 class="modal-title">Своя ставка</h3>
-            <input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма USDT">
-            <button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button>
-            <button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button>
+    <div class="modal-overlay" id="bet-modal">
+        <div class="modal-content" style="text-align: center;">
+            <button class="close-modal" onclick="closeModal('bet-modal')">✕</button>
+            <h3 style="margin-bottom: 15px;">Подтверждение</h3>
+            <p style="margin-bottom: 20px; color: var(--text-muted);">Вы ставите <b style="color: white;">100 ₽</b> на <b id="bet-color-text" style="color: var(--accent-gold);">Цвет</b>.</p>
+            <button class="buy-btn" style="width:100%; padding:15px; font-size:16px;" onclick="placeBet()">Подтвердить ставку</button>
         </div>
     </div>
 
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
-        const API_BASE = 'https://dnx-shop.onrender.com';
+        const API_BASE = 'https://denixl-store-44.onrender.com';
 
-        let userBalance = 0.0;
-        let cart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
-        let currentCatalog = [];
-        let inventoryData = [];
+        const uId = tg.initDataUnsafe?.user?.id || 12345;
+        const uName = tg.initDataUnsafe?.user?.username || 'TestUser';
 
-        // Инициализация юзера
-        const uId = tg.initDataUnsafe?.user?.id || "guest";
-        const uName = tg.initDataUnsafe?.user?.username || "Guest";
-        document.getElementById('username-display').innerText = uName;
-        if(tg.initDataUnsafe?.user?.photo_url) {
-            document.getElementById('avatar-img').src = tg.initDataUnsafe.user.photo_url;
-        }
+        let catalogItems = [];
+        let inventoryItems = [];
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        let currentItem = null;
+        let selectedBetColor = '';
 
-        // --- БАЗОВЫЕ УТИЛИТЫ ---
-        function showAlert(msg) {
-            document.getElementById('alert-msg').innerText = msg;
-            document.getElementById('alert-modal').classList.add('active');
-            tg.HapticFeedback.impactOccurred('light');
-        }
-        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
-        function showPage(id) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
-            document.querySelectorAll('.tab-bar .tab-item').forEach(t => t.classList.remove('active'));
-            document.getElementById('page-' + id).classList.add('page-active');
-            if(id !== 'balance' && id !== 'cart') document.getElementById('tab-' + id).classList.add('active');
-
-            if(id === 'store') loadCatalog();
-            if(id === 'inventory') loadInventory();
-            if(id === 'cart') renderCart();
+        function updateCartCount() {
+            document.getElementById('cart-count').innerText = cart.length;
+            localStorage.setItem('cart', JSON.stringify(cart));
         }
 
         async function updateBalance() {
             try {
                 const res = await fetch(`${API_BASE}/user?user_id=${uId}&username=${uName}`);
                 const data = await res.json();
-                userBalance = data.balance || 0;
-                const txt = userBalance.toFixed(2) + ' USDT';
-                document.getElementById('header-balance').innerText = txt;
-                document.getElementById('big-balance').innerText = txt;
-            } catch(e) {}
+                document.getElementById('user-balance').innerText = parseFloat(data.balance).toFixed(2);
+            } catch (e) {
+                console.error("Balance error:", e);
+            }
         }
-        setInterval(updateBalance, 3000);
 
-        // --- МАГАЗИН И ПОКУПКИ ---
+        function switchPage(pageId, el) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            el.classList.add('active');
+
+            if(pageId === 'cart') loadCart();
+            if(pageId === 'profile') loadInventory();
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
         async function loadCatalog() {
             try {
                 const res = await fetch(`${API_BASE}/items`);
-                currentCatalog = await res.json();
-                document.getElementById('catalog-list').innerHTML = currentCatalog.map(item => `
-                    <div class="item-card">
-                        <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
-                        <div class="item-name">${item.name}</div>
-                        <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="buyItem('${item.id}', ${item.price})">${item.price} ₽</button>
-                            <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item)})'>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
-                            </button>
+                catalogItems = await res.json();
+                const grid = document.getElementById('catalog-grid');
+                grid.innerHTML = '';
+
+                catalogItems.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'item-card';
+                    div.innerHTML = `
+                        <img src="${item.image_url}" class="item-img" alt="" onclick="showItemModal(${item.id})">
+                        <div class="item-details">
+                            <div class="item-name">${item.name}</div>
+                            <div class="item-price">${parseFloat(item.price).toFixed(2)} ₽</div>
+                            <button class="buy-btn" onclick="addToCart(${item.id})">В корзину</button>
                         </div>
+                    `;
+                    grid.appendChild(div);
+                });
+            } catch (e) {
+                document.getElementById('catalog-grid').innerHTML = '<div class="empty-text">Ошибка загрузки товаров</div>';
+            }
+        }
+
+        function showItemModal(id) {
+            currentItem = catalogItems.find(i => i.id === id);
+            if(!currentItem) return;
+
+            document.getElementById('modal-img').src = currentItem.image_url;
+            document.getElementById('modal-title').innerText = currentItem.name;
+            document.getElementById('modal-desc').innerText = currentItem.description || 'Описание отсутствует.';
+
+            const btn = document.getElementById('modal-btn');
+            btn.innerText = `Добавить за ${parseFloat(currentItem.price).toFixed(2)} ₽`;
+            btn.onclick = () => {
+                addToCart(currentItem.id);
+                closeModal('item-modal');
+            };
+
+            document.getElementById('item-modal').classList.add('active');
+        }
+
+        function addToCart(id) {
+            const item = catalogItems.find(i => i.id === id);
+            if(item) {
+                cart.push(item);
+                updateCartCount();
+                tg.HapticFeedback.impactOccurred('light');
+            }
+        }
+
+        // Обновленная функция отрисовки корзины (сеткой)
+        function loadCart() {
+            const list = document.getElementById('cart-list');
+            list.innerHTML = '';
+            let total = 0;
+
+            if(cart.length === 0) {
+                list.className = ''; // Убираем сетку для центрирования пустого текста
+                list.innerHTML = '<div class="empty-text">Корзина пуста</div>';
+                document.getElementById('cart-total').innerText = '0.00';
+                return;
+            }
+
+            list.className = 'items-grid'; // Добавляем сетку
+
+            cart.forEach((item, index) => {
+                total += item.price;
+                const div = document.createElement('div');
+                div.className = 'item-card';
+                div.innerHTML = `
+                    <img src="${item.image_url}" class="item-img" alt="" onclick="showItemModal(${item.id})" style="cursor: pointer;">
+                    <div class="item-details">
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-price">${parseFloat(item.price).toFixed(2)} ₽</div>
+                        <button class="buy-btn" style="background: rgba(255, 59, 48, 0.1); color: #ff3b30;" onclick="removeFromCart(${index})">Убрать</button>
                     </div>
-                `).join('');
-            } catch(e) {}
+                `;
+                list.appendChild(div);
+            });
+            document.getElementById('cart-total').innerText = total.toFixed(2);
         }
 
-        function openNftModal(id) {
-            const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
-            if(!item) return;
-            document.getElementById('nft-modal-img').src = item.image_url;
-            document.getElementById('nft-modal-title').innerText = item.name;
-            document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
-
-            let traits = typeof item.traits === 'string' ? JSON.parse(item.traits || '[]') : (item.traits || []);
-            document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
-                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-label">${t.label||t.name}</div><div class="trait-value-container"><span class="trait-value">${t.value}</span>${t.percent?`<span class="trait-percent">${t.percent}</span>`:''}</div></div>`).join('')}</div>` :
-                '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
-
-            document.getElementById('nft-modal-btn-buy').innerText = `КУПИТЬ ЗА ${item.price||0} ₽`;
-            document.getElementById('nft-modal-btn-buy').onclick = () => { closeNftModal(true); buyItem(item.id, item.price); };
-            document.getElementById('nft-modal-btn-cart').onclick = () => { closeNftModal(true); addToCart(item); };
-            document.getElementById('nft-detail-overlay').classList.add('active');
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            updateCartCount();
+            loadCart();
         }
 
-        function closeNftModal(force=false) { if(force || event.target === event.currentTarget) document.getElementById('nft-detail-overlay').classList.remove('active'); }
+        async function checkout() {
+            if(cart.length === 0) return alert("Корзина пуста");
 
-        function addToCart(item) {
-            if(!cart.find(c => c.id === item.id)) { cart.push(item); localStorage.setItem('dnx_cart', JSON.stringify(cart)); }
-            document.getElementById('cart-counter').innerText = cart.length;
-            showAlert(`Добавлено: ${item.name}`);
-        }
+            const total = cart.reduce((sum, item) => sum + item.price, 0);
 
-        function renderCart() {
-            document.getElementById('cart-counter').innerText = cart.length;
-            const list = document.getElementById('cart-items-list');
-            if(!cart.length) { list.innerHTML = '<div style="text-align:center; padding: 40px; color:var(--text-muted);">Пусто</div>'; document.getElementById('pay-footer').style.display = 'none'; return; }
-            list.innerHTML = cart.map((c, i) => `<div class="cart-item"><img src="${c.image_url}"><div class="cart-item-info"><div class="cart-item-name">${c.name}</div><div class="cart-item-price">${c.price} ₽</div></div><div style="font-size:1.5rem; cursor:pointer;" onclick="cart.splice(${i},1);localStorage.setItem('dnx_cart',JSON.stringify(cart));renderCart()">×</div></div>`).join('');
-            document.getElementById('pay-footer').style.display = 'block';
-        }
-
-        // МОМЕНТАЛЬНАЯ ПОКУПКА
-        async function buyItem(itemId, price) {
-            if(userBalance < price) { showAlert("Недостаточно средств. Пополните баланс."); return; }
             try {
-                const res = await fetch(`${API_BASE}/buy`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({items: [itemId], userId: uId}) });
+                const res = await fetch(`${API_BASE}/buy`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: uId, items: cart.map(i => i.id), total_price: total })
+                });
                 const data = await res.json();
-                if(data.success) { showAlert("Успешная покупка! NFT в инвентаре."); updateBalance(); loadCatalog(); }
-                else { showAlert(data.error === 'insufficient_funds' ? "Недостаточно средств!" : "Товар уже недоступен."); loadCatalog(); }
-            } catch(e) { showAlert("Ошибка сети"); }
-        }
 
-        async function buyCart() {
-            const total = cart.reduce((s, c) => s + Number(c.price), 0);
-            if(userBalance < total) { showAlert("Недостаточно средств. Пополните баланс."); return; }
-            const ids = cart.map(c => c.id);
-            try {
-                const res = await fetch(`${API_BASE}/buy`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({items: ids, userId: uId}) });
-                const data = await res.json();
-                if(data.success) { showAlert("Корзина оплачена! NFT в инвентаре."); cart=[]; localStorage.setItem('dnx_cart', '[]'); renderCart(); updateBalance(); }
-                else { showAlert("Ошибка оплаты. Возможно часть товаров недоступна."); loadCatalog(); }
-            } catch(e) { showAlert("Ошибка сети"); }
-        }
-
-        // --- БАЛАНС / ПОПОЛНЕНИЕ ---
-        document.getElementById('terms-checkbox').addEventListener('change', function() {
-            document.getElementById('custom-chk').innerHTML = this.checked ? '✓' : '';
-            document.getElementById('custom-chk').style.borderColor = this.checked ? 'var(--accent-gold)' : 'var(--border-color)';
-            document.getElementById('custom-chk').style.color = '#000';
-            document.getElementById('custom-chk').style.background = this.checked ? 'var(--accent-gold)' : 'transparent';
-        });
-
-        async function openTopupModal() {
-            document.getElementById('terms-checkbox').checked = false;
-            document.getElementById('custom-chk').innerHTML = '';
-            document.getElementById('custom-chk').style.background = 'transparent';
-            document.getElementById('btn-send-topup').disabled = true;
-            document.getElementById('topup-modal').classList.add('active');
-            try {
-                const r = await fetch(`${API_BASE}/req`);
-                const d = await r.json();
-                document.getElementById('req-text').innerText = "Реквизиты: " + d.req;
-            } catch(e) {}
-        }
-
-        async function sendTopup() {
-            const amt = document.getElementById('topup-amount').value;
-            if(!amt || amt <= 0) { showAlert("Введите корректную сумму"); return; }
-            closeModal('topup-modal');
-            await fetch(`${API_BASE}/topup`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: amt}) });
-            showAlert("Заявка отправлена. Ожидайте зачисления.");
-        }
-
-        // --- ИНВЕНТАРЬ ---
-        function switchInv(el, type) {
-            document.querySelectorAll('#page-inventory .tab-item').forEach(t => { t.classList.remove('active'); t.style.borderColor='transparent'; t.style.color='var(--text-muted)'; });
-            el.classList.add('active'); el.style.borderColor='var(--accent-gold)'; el.style.color='var(--text-main)';
-            document.getElementById('inventory-active-container').style.display = type === 'active' ? 'grid' : 'none';
-            document.getElementById('inventory-history-container').style.display = type === 'history' ? 'grid' : 'none';
+                if(data.success) {
+                    cart = [];
+                    updateCartCount();
+                    loadCart();
+                    updateBalance();
+                    tg.showAlert("Покупка успешна! Предметы добавлены в инвентарь.");
+                } else {
+                    tg.showAlert("Ошибка: " + data.error);
+                }
+            } catch(e) {
+                alert("Ошибка сети");
+            }
         }
 
         async function loadInventory() {
             try {
-                const r = await fetch(`${API_BASE}/inventory?user_id=${uId}`);
-                inventoryData = await r.json();
-                const act = inventoryData.filter(i => i.status !== 'withdrawn');
-                const hist = inventoryData.filter(i => i.status === 'withdrawn');
+                const res = await fetch(`${API_BASE}/inventory?user_id=${uId}`);
+                inventoryItems = await res.json();
+                const grid = document.getElementById('inventory-grid');
+                grid.innerHTML = '';
 
-                document.getElementById('inventory-active-container').innerHTML = act.length ? act.map(i => `<div class="item-card"><img src="${i.image_url}" class="item-image" onclick="openNftModal('${i.id}')"><div class="item-name">${i.name}</div><button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
-                document.getElementById('inventory-history-container').innerHTML = hist.length ? hist.map(i => `<div class="item-card" style="opacity:0.5"><img src="${i.image_url}" class="item-image" style="filter:grayscale(100%)"><div class="item-name">${i.name}</div><div style="text-align:center; font-size:0.7rem; border:1px dashed #555; border-radius:8px; padding:4px;">ВЫВЕДЕНО</div></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
-            } catch(e) {}
-        }
-
-        async function withdraw(id) {
-            await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) });
-            showAlert("Запрос на вывод отправлен!");
-        }
-
-        // --- МИНИ ИГРА ---
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        let gamePoller;
-        let isSpinning = false;
-        let betAmountTemp = 0;
-        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, winner_x: 0 };
-
-        // Ресайз канваса для четкости
-        function resizeCanvas() {
-            const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width * 2; canvas.height = rect.height * 2;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        setTimeout(resizeCanvas, 100);
-
-        function drawGameFrame(ballX = null) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if(gState.players.length === 0) {
-                ctx.fillStyle = "rgba(255,255,255,0.05)";
-                ctx.fillRect(0,0, canvas.width, canvas.height);
-                ctx.fillStyle = "#555"; ctx.font = "30px Inter"; ctx.textAlign = "center";
-                ctx.fillText("Ждем ставки...", canvas.width/2, canvas.height/2);
-                return;
-            }
-
-            let curX = 0;
-            gState.players.forEach(p => {
-                let w = (p.amount / gState.pool) * canvas.width;
-                ctx.fillStyle = p.color;
-                ctx.fillRect(curX, 0, w, canvas.height);
-                // Имя
-                ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(curX, canvas.height-40, w, 40);
-                ctx.fillStyle = "#fff"; ctx.font = "24px Inter"; ctx.textAlign = "center";
-                ctx.fillText(p.username.substring(0,6), curX + w/2, canvas.height - 12);
-                curX += w;
-            });
-
-            // Мячик
-            if(ballX !== null) {
-                ctx.beginPath();
-                ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
-                ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 15;
-                ctx.fill(); ctx.shadowBlur = 0; ctx.closePath();
-
-                ctx.beginPath(); ctx.moveTo(ballX, 0); ctx.lineTo(ballX, canvas.height);
-                ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 4; ctx.stroke();
-            }
-        }
-
-        async function pollGame() {
-            try {
-                const r = await fetch(`${API_BASE}/game/state`);
-                gState = await r.json();
-
-                document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
-
-                // Кнопка отмены
-                const hasMyBet = gState.players.find(p => p.id === String(uId));
-                document.getElementById('btn-cancel-bet').style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
-
-                // Таймер
-                const bgT = document.getElementById('game-timer-bg');
-                if(gState.status === 'counting') { bgT.innerText = gState.timer; } else { bgT.innerText = ''; }
-
-                // Анимация
-                if(gState.status === 'spinning' && !isSpinning) {
-                    isSpinning = true;
-                    runSpinAnimation(gState.winner_x);
-                } else if(gState.status !== 'spinning') {
-                    isSpinning = false;
-                    drawGameFrame();
+                if(inventoryItems.length === 0) {
+                    grid.innerHTML = '<div class="empty-text" style="grid-column: span 2;">Инвентарь пуст</div>';
+                    return;
                 }
+
+                inventoryItems.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'item-card';
+
+                    let statusBtn = `<button class="buy-btn" onclick="openInvModal(${item.id})">Подробнее</button>`;
+                    if(item.status === 'withdrawing') statusBtn = `<button class="buy-btn" style="color:gray; background:#222;" disabled>В обработке</button>`;
+                    if(item.status === 'withdrawn') statusBtn = `<button class="buy-btn" style="color:#2a9d8f; background:rgba(42,157,143,0.1);" disabled>Выведено</button>`;
+
+                    div.innerHTML = `
+                        <img src="${item.image_url}" class="item-img" alt="">
+                        <div class="item-details">
+                            <div class="item-name">${item.item_name}</div>
+                            ${statusBtn}
+                        </div>
+                    `;
+                    grid.appendChild(div);
+                });
             } catch(e) {}
         }
-        setInterval(pollGame, 1000);
 
-        function runSpinAnimation(targetPct) {
-            const targetX = targetPct * canvas.width;
-            let currentX = 0;
-            let velocity = canvas.width * 0.15; // скорость
-            let startTime = Date.now();
+        function openInvModal(invId) {
+            currentItem = inventoryItems.find(i => i.id === invId);
+            if(!currentItem) return;
 
-            function animate() {
-                let elapsed = Date.now() - startTime;
-                if(elapsed < 4000) {
-                    // Фаза 1: летает туда-сюда
-                    currentX += velocity;
-                    if(currentX > canvas.width || currentX < 0) velocity *= -1;
-                    drawGameFrame(currentX);
-                    requestAnimationFrame(animate);
-                } else if (elapsed < 6500) {
-                    // Фаза 2: доезжает до цели
-                    currentX += (targetX - currentX) * 0.05;
-                    drawGameFrame(currentX);
-                    requestAnimationFrame(animate);
-                } else {
-                    // Финал
-                    drawGameFrame(targetX);
-                    setTimeout(() => { updateBalance(); }, 1000);
+            document.getElementById('inv-modal-img').src = currentItem.image_url;
+            document.getElementById('inv-modal-title').innerText = currentItem.item_name;
+
+            const btn = document.getElementById('inv-modal-withdraw-btn');
+            btn.onclick = () => requestWithdraw(currentItem.id);
+
+            document.getElementById('inv-modal').classList.add('active');
+        }
+
+        async function requestWithdraw(invId) {
+            try {
+                const res = await fetch(`${API_BASE}/request-withdraw`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: uId, username: uName, inv_id: invId })
+                });
+                if(res.ok) {
+                    tg.showAlert("Запрос на вывод отправлен!");
+                    closeModal('inv-modal');
+                    loadInventory();
                 }
+            } catch(e) {
+                alert("Ошибка сети");
             }
-            animate();
         }
 
-        function openBetConfirm(amt) { betAmountTemp = amt; document.getElementById('confirm-bet-amount').innerText = amt; document.getElementById('confirm-bet-modal').classList.add('active'); }
-        function openCustomBet() { document.getElementById('custom-bet-input').value = ''; document.getElementById('custom-bet-modal').classList.add('active'); }
-        function submitCustomBet() {
-            const v = parseFloat(document.getElementById('custom-bet-input').value);
-            if(v > 0) { closeModal('custom-bet-modal'); openBetConfirm(v); }
-        }
+        async function requestTopup() {
+            const amount = document.getElementById('topup-amount').value;
+            if(!amount || amount <= 0) return alert("Введите корректную сумму");
 
-        async function executeBet() {
-            closeModal('confirm-bet-modal');
-            if(userBalance < betAmountTemp) { showAlert("Недостаточно средств на балансе!"); return; }
             try {
-                const r = await fetch(`${API_BASE}/game/bet`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: betAmountTemp}) });
-                const d = await r.json();
-                if(d.success) { updateBalance(); pollGame(); }
-                else { showAlert(d.error === 'insufficient_funds' ? "Недостаточно средств!" : "Ставка не принята"); }
-            } catch(e) {}
+                const res = await fetch(`${API_BASE}/req`);
+                const data = await res.json();
+
+                await fetch(`${API_BASE}/topup`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: uId, username: uName, amount: amount })
+                });
+
+                tg.showAlert(`Переведите ${amount}₽ по реквизитам:\n\n${data.req}\n\nПосле оплаты администратор зачислит средства.`);
+                document.getElementById('topup-amount').value = '';
+            } catch(e) {
+                alert("Ошибка сети");
+            }
         }
 
-        async function cancelGameBet() {
+        // Game logic
+        function openBetConfirm(color) {
+            selectedBetColor = color;
+            let text = color === 'red' ? 'Красное' : color === 'black' ? 'Черное' : 'Зеленое';
+            document.getElementById('bet-color-text').innerText = text;
+            document.getElementById('bet-modal').classList.add('active');
+        }
+
+        async function placeBet() {
+            closeModal('bet-modal');
+            const wheel = document.getElementById('roulette-display');
+            const status = document.getElementById('game-status');
+
+            wheel.classList.add('spin-anim');
+            status.innerText = 'Ставка принята. Крутим...';
+            status.style.color = 'var(--text-main)';
+
             try {
-                await fetch(`${API_BASE}/game/cancel`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId}) });
-                updateBalance(); pollGame();
-            } catch(e) {}
+                const res = await fetch(`${API_BASE}/game/bet`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ userId: uId, username: uName, color: selectedBetColor, amount: 100 })
+                });
+                const data = await res.json();
+
+                setTimeout(() => {
+                    wheel.classList.remove('spin-anim');
+                    if(data.success) {
+                        updateBalance();
+                        status.innerText = data.win ? `Победа! Выпало ${data.result}` : `Поражение. Выпало ${data.result}`;
+                        status.style.color = data.win ? '#2a9d8f' : '#e63946';
+                    } else {
+                        status.innerText = "Ошибка: " + data.error;
+                    }
+                }, 1500);
+
+            } catch(e) {
+                wheel.classList.remove('spin-anim');
+                status.innerText = "Ошибка соединения";
+            }
         }
 
-        updateBalance();
-        loadCatalog();
+        // Init
         tg.expand();
-        tg.ready();
+        updateBalance();
+        updateCartCount();
+        loadCatalog();
     </script>
 </body>
 </html>
