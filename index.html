@@ -384,7 +384,7 @@
                 btnBuy.onclick = () => { closeNftModal(true); buyItem(item.id, item.price); };
                 btnCart.onclick = () => { closeNftModal(true); addToCart(item); };
             } else {
-                // ИСПРАВЛЕНО: Режим Инвентаря
+                // ИСПРАВЛЕНО: Режим Инвентаря и Таймер 2 Часа
                 btnBuy.style.display = 'none'; btnCart.style.display = 'none'; btnWith.style.display = 'block';
 
                 const lastReq = localStorage.getItem(`withdraw_time_${item.id}`);
@@ -530,7 +530,7 @@
                 closeModal('withdraw-modal-overlay');
                 const itemId = pendingWithdrawId;
 
-                // Ставим таймер СРАЗУ
+                // Ставим таймер СРАЗУ (защита от спама)
                 localStorage.setItem(`withdraw_time_${itemId}`, new Date().getTime().toString());
                 loadInventory(); // рендер блока сразу обновит кнопку
 
