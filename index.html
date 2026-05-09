@@ -2,9 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DNX STORE</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-main: #0a0a0c;
@@ -16,21 +16,18 @@
             --border-color: #222224;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { overflow-x: hidden; width: 100%; }
 
         body {
             background-color: var(--bg-main);
             color: var(--text-main);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            padding-bottom: 100px;
-            -webkit-font-smoothing: antialiased;
+            font-family: 'Inter', sans-serif;
+            margin: 0; display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; padding-bottom: 100px; -webkit-font-smoothing: antialiased;
         }
 
-        /* ИСПРАВЛЕНО: Шапка без названия магазина */
+        /* Обновленный хедер */
         header {
             width: 100%; padding: 20px; display: flex; justify-content: space-between;
             align-items: center; position: relative; border-bottom: 1px solid var(--border-color);
@@ -39,54 +36,36 @@
 
         .header-left { display: flex; align-items: center; gap: 8px; }
         .avatar { width: 36px; height: 36px; border-radius: 50%; background: #222; object-fit: cover; border: 1px solid var(--border-color); }
-        .username { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .username { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+
+        .header-center { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; }
+        h1 { font-weight: 800; font-size: 1.2rem; text-transform: uppercase; margin: 0; letter-spacing: 2px; color: #fff; text-shadow: 0 0 15px rgba(203, 161, 83, 0.3); }
 
         .header-right {
             background: rgba(203, 161, 83, 0.1); border: 1px solid var(--accent-gold);
             padding: 8px 12px; border-radius: 12px; cursor: pointer; transition: 0.2s;
-            flex-shrink: 0;
         }
         .header-right:active { transform: scale(0.95); }
         .balance-text { color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; }
 
-        .cart-btn-header {
-            display: flex; align-items: center; justify-content: center;
-            background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color);
-            padding: 0 14px; border-radius: 12px; cursor: pointer;
-            backdrop-filter: blur(10px); transition: 0.3s ease; flex-shrink: 0; height: 38px;
-        }
-        .cart-btn-header:active { transform: scale(0.95); }
-        #cart-counter { color: var(--accent-gold); font-weight: 600; margin-left: 8px; font-size: 0.9rem; }
-
         .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; padding: 20px; box-sizing: border-box; }
 
-        .item-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); transition: 0.2s ease; }
-        /* ИСПРАВЛЕНО: Масштаб картинки */
-        .item-image { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 12px; margin-bottom: 14px; cursor: pointer; transition: 0.2s; }
-        .item-image:active { transform: scale(0.95); }
+        .item-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; }
+        .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 12px; object-fit: cover; margin-bottom: 14px; cursor: pointer; }
         .item-name { font-size: 0.95rem; font-weight: 500; margin-bottom: 14px; color: var(--text-main); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         .card-buttons { display: flex; width: 100%; gap: 8px; }
-        .btn-buy-now { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 10px; height: 36px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; cursor: pointer; box-shadow: 0 4px 15px rgba(203, 161, 83, 0.2); }
+        .btn-buy-now { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 10px; height: 36px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; cursor: pointer; }
         .btn-add-cart { width: 40px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-
-        .btn-tg-link-full { width: 100%; background: transparent; border: 1px solid var(--border-color); border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-top: 8px; box-sizing: border-box; transition: 0.2s; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-        .btn-tg-link-full svg { margin-right: 6px; }
 
         .btn-main-action { width: 100%; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
         .btn-secondary { width: 100%; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 12px; height: 52px; font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer; }
-
-        .cart-list { padding: 20px; width: 100%; box-sizing: border-box; }
-        .cart-item { display: flex; align-items: center; background: var(--bg-card); padding: 12px; border-radius: 14px; margin-bottom: 12px; border: 1px solid var(--border-color); }
-        .cart-item img { width: 56px; height: 56px; border-radius: 10px; margin-right: 16px; object-fit: cover; }
-        .cart-item-info { flex-grow: 1; }
-        .cart-item-name { font-weight: 500; font-size: 0.95rem; margin-bottom: 6px; color: var(--text-main); }
-        .cart-item-price { color: var(--accent-gold); font-weight: 600; font-size: 0.9rem; }
 
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
+        /* Вкладки снизу (теперь 3 штуки) */
         .tab-bar { position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85); backdrop-filter: blur(15px); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100; }
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
@@ -97,6 +76,7 @@
         #gameCanvas { width: 100%; height: 100%; display: block; }
         .game-info-overlay { position: absolute; bottom: 8px; left: 12px; font-size: 0.65rem; color: rgba(255,255,255,0.4); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
         .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3rem; font-weight: 800; color: rgba(255,255,255,0.1); pointer-events: none; }
+
         .game-controls { display: flex; gap: 12px; width: 80%; margin-top: 20px; }
         .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .game-btn-cancel { width: 80%; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
@@ -113,15 +93,9 @@
         .nft-modal-sheet { position: absolute; bottom: -100%; left: 0; width: 100%; background: #0a0a0c; border-radius: 24px 24px 0 0; transition: bottom 0.4s; display: flex; flex-direction: column; max-height: 95vh; overflow: hidden; }
         .nft-modal-overlay.active .nft-modal-sheet { bottom: 0; }
         .nft-modal-header-rocket { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; padding-top: 25px; }
-        /* ИСПРАВЛЕНО: Масштаб в модалке */
-        .nft-modal-header-rocket img { width: 190px; height: 190px; object-fit: cover; aspect-ratio: 1; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
-
+        .nft-modal-header-rocket img { width: 190px; height: 190px; object-fit: cover; border-radius: 16px; }
         .traits-table { width: 100%; background: #1c1c1e; border-radius: 12px; margin: 10px 0; border: 1px solid #2c2c2e; overflow: hidden; }
         .trait-row { display: flex; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
-
-        .btn-open-nft { display: flex; justify-content: center; align-items: center; background: transparent; color: var(--text-main); border: 1px solid var(--border-color); text-decoration: none; border-radius: 10px; height: 36px; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
-        .btn-withdraw { display: flex; justify-content: center; align-items: center; background: var(--text-main); color: var(--bg-main); border: none; border-radius: 10px; height: 36px; font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; width: 100%; box-sizing: border-box; cursor: pointer; transition: 0.3s; }
-        .btn-withdraw.loading { background: #555; color: #fff; cursor: not-allowed; opacity: 0.9; }
     </style>
 </head>
 <body>
@@ -130,6 +104,9 @@
         <div class="header-left">
             <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">
             <div class="username" id="username-display">User</div>
+        </div>
+        <div class="header-center">
+            <h1>DNX STORE</h1>
         </div>
         <div class="header-right" onclick="showPage('balance')">
             <span class="balance-text" id="header-balance">0 USDT</span>
@@ -143,6 +120,7 @@
                 <div class="game-info-overlay" id="game-players-count">Игроки: 0/20</div>
                 <div class="game-timer-overlay" id="game-timer-bg"></div>
             </div>
+
             <div class="game-controls">
                 <button class="game-btn" onclick="openBetConfirm(0.1)">+0.1 USDT</button>
                 <button class="game-btn" onclick="openCustomBet()">Своя сумма</button>
@@ -165,7 +143,7 @@
 
     <div id="page-cart" class="page">
         <div id="cart-items-list" class="cart-list"></div>
-        <div class="fixed-footer" id="pay-footer" style="display: none; position: relative; bottom: auto; background: transparent;">
+        <div class="fixed-footer" id="pay-footer" style="display: none;">
             <button class="btn-main-action" onclick="buyCart()">Оплатить корзину (Списать USDT)</button>
         </div>
     </div>
@@ -174,6 +152,7 @@
         <div style="padding: 30px 20px; display: flex; flex-direction: column; align-items: center;">
             <h2 style="color: var(--text-main); font-weight: 700; margin-bottom: 10px;">ТЕКУЩИЙ БАЛАНС</h2>
             <div style="font-size: 2.5rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 40px;" id="big-balance">0 USDT</div>
+
             <button class="btn-main-action" onclick="openTopupModal()">ПОПОЛНИТЬ</button>
         </div>
     </div>
@@ -212,7 +191,6 @@
                     <button class="btn-add-cart" id="nft-modal-btn-cart" style="flex: 0 0 44px; height: 44px;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                     </button>
-                    <button class="btn-main-action" id="nft-modal-btn-withdraw" style="flex: 1; height: 44px; display: none; background: var(--accent-gold); color: #000;">ВЫВЕСТИ</button>
                 </div>
             </div>
         </div>
@@ -235,15 +213,6 @@
             </label>
             <button class="btn-main-action" id="btn-send-topup" onclick="sendTopup()" disabled>Отправить заявку</button>
             <button class="btn-secondary" onclick="closeModal('topup-modal')">Отмена</button>
-        </div>
-    </div>
-
-    <div id="withdraw-modal-overlay" class="modal-overlay">
-        <div class="modal-content">
-            <h3 class="modal-title" style="color: var(--accent-gold);">ВЫВОД АКТИВА</h3>
-            <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 24px;">Вывод цифровых активов (подарков) осуществляется в течение 2 часов. Продолжить?</p>
-            <button class="btn-main-action" id="btn-confirm-withdraw">Да, вывести</button>
-            <button class="btn-secondary" onclick="closeModal('withdraw-modal-overlay')">Отмена</button>
         </div>
     </div>
 
@@ -272,6 +241,7 @@
         </div>
     </div>
 
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
@@ -281,16 +251,15 @@
         let currentCatalog = [];
         let inventoryData = [];
 
+        // Инициализация юзера
         const uId = tg.initDataUnsafe?.user?.id || "guest";
-        let uName = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name || "User";
+        const uName = tg.initDataUnsafe?.user?.username || "Guest";
+        document.getElementById('username-display').innerText = uName;
+        if(tg.initDataUnsafe?.user?.photo_url) {
+            document.getElementById('avatar-img').src = tg.initDataUnsafe.user.photo_url;
+        }
 
-        // ИСПРАВЛЕНО: Обрезка имени/ID чтобы не залезало на баланс
-        let displayName = String(uName);
-        if (displayName.length > 10) displayName = displayName.substring(0, 9) + '...';
-        document.getElementById('username-display').innerText = displayName;
-
-        if(tg.initDataUnsafe?.user?.photo_url) document.getElementById('avatar-img').src = tg.initDataUnsafe.user.photo_url;
-
+        // --- БАЗОВЫЕ УТИЛИТЫ ---
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
             document.getElementById('alert-modal').classList.add('active');
@@ -321,12 +290,7 @@
         }
         setInterval(updateBalance, 3000);
 
-        function openInAppBrowser(url) {
-            if (!url) return;
-            if (url.includes('t.me') || url.includes('telegram.me')) tg.openTelegramLink(url);
-            else tg.openLink(url);
-        }
-
+        // --- МАГАЗИН И ПОКУПКИ ---
         async function loadCatalog() {
             try {
                 const res = await fetch(`${API_BASE}/items`);
@@ -341,69 +305,26 @@
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                             </button>
                         </div>
-                        <button class="btn-tg-link-full" onclick="openInAppBrowser('${item.nft_link}')">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--text-muted)"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.06-.2-.07-.06-.17-.04-.25-.02-.11.02-1.83 1.16-5.16 3.41-.48.33-.92.5-1.32.49-.44-.01-1.28-.24-1.9-.44-.76-.25-1.36-.38-1.3-.8.03-.22.33-.45.9-.68 3.55-1.54 5.92-2.57 7.11-3.06 3.39-1.4 4.1-1.65 4.56-1.66.11 0 .33.03.47.14.12.1.15.24.16.35-.01.06-.01.17-.02.28z"/></svg> Смотреть
-                        </button>
                     </div>
                 `).join('');
             } catch(e) {}
         }
 
-        // ИСПРАВЛЕНО: Логика универсальной модалки
-        let pendingWithdrawId = null;
         function openNftModal(id) {
             const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
             if(!item) return;
-
             document.getElementById('nft-modal-img').src = item.image_url;
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
 
-            // ИСПРАВЛЕНО: Характеристики золотые
-            const tCont = document.getElementById('nft-modal-traits-container');
-            let traits = [];
-            try { traits = typeof item.traits === 'string' ? JSON.parse(item.traits) : (item.traits || []); } catch(e) {}
+            let traits = typeof item.traits === 'string' ? JSON.parse(item.traits || '[]') : (item.traits || []);
+            document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
+                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-label">${t.label||t.name}</div><div class="trait-value-container"><span class="trait-value">${t.value}</span>${t.percent?`<span class="trait-percent">${t.percent}</span>`:''}</div></div>`).join('')}</div>` :
+                '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
 
-            if (traits.length > 0) {
-                tCont.innerHTML = `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-label">${t.label||t.name}</div><div class="trait-value-container" style="flex:2; display:flex; justify-content:flex-end; align-items:center; gap:8px;"><span class="trait-value" style="color:var(--accent-gold);">${t.value}</span>${t.percent?`<span class="trait-percent" style="color:var(--accent-gold); background:rgba(203,161,83,0.15); padding:3px 6px; border-radius:6px;">${t.percent}</span>`:''}</div></div>`).join('')}</div>`;
-            } else if (item.description) {
-                // Если характеристик нет, но есть описание
-                tCont.innerHTML = '<div style="padding: 10px; color: var(--accent-gold); line-height: 1.5; font-size: 14px;">' + item.description.replace(/\n/g, '<br>') + '</div>';
-            } else {
-                tCont.innerHTML = '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
-            }
-
-            const btnBuy = document.getElementById('nft-modal-btn-buy');
-            const btnCart = document.getElementById('nft-modal-btn-cart');
-            const btnWith = document.getElementById('nft-modal-btn-withdraw');
-
-            // Проверяем откуда открыли
-            if (item.status === 'Доступен' || !item.status) {
-                btnBuy.style.display = 'block'; btnCart.style.display = 'flex'; btnWith.style.display = 'none';
-                btnBuy.innerText = `КУПИТЬ ЗА ${item.price} ₽`;
-                btnBuy.onclick = () => { closeNftModal(true); buyItem(item.id, item.price); };
-                btnCart.onclick = () => { closeNftModal(true); addToCart(item); };
-            } else {
-                // ИСПРАВЛЕНО: Режим Инвентаря и Таймер 2 Часа
-                btnBuy.style.display = 'none'; btnCart.style.display = 'none'; btnWith.style.display = 'block';
-
-                const lastReq = localStorage.getItem(`withdraw_time_${item.id}`);
-                if (item.status === 'withdrawn') {
-                    btnWith.innerText = 'УЖЕ ВЫВЕДЕНО'; btnWith.disabled = true; btnWith.style.background = '#555'; btnWith.style.color = '#fff';
-                } else if (lastReq && (new Date().getTime() - parseInt(lastReq)) < 2 * 60 * 60 * 1000) {
-                    const diff = new Date().getTime() - parseInt(lastReq);
-                    const minsLeft = Math.ceil((2 * 60 * 60 * 1000 - diff) / 60000);
-                    btnWith.innerText = `ОЖИДАНИЕ (${minsLeft} МИН)`; btnWith.disabled = true; btnWith.style.background = '#555'; btnWith.style.color = '#fff';
-                } else {
-                    btnWith.innerText = 'ВЫВЕСТИ'; btnWith.disabled = false; btnWith.style.background = 'var(--accent-gold)'; btnWith.style.color = '#000';
-                    btnWith.onclick = () => {
-                        closeNftModal(true);
-                        pendingWithdrawId = item.id;
-                        document.getElementById('withdraw-modal-overlay').classList.add('active');
-                    };
-                }
-            }
-
+            document.getElementById('nft-modal-btn-buy').innerText = `КУПИТЬ ЗА ${item.price||0} ₽`;
+            document.getElementById('nft-modal-btn-buy').onclick = () => { closeNftModal(true); buyItem(item.id, item.price); };
+            document.getElementById('nft-modal-btn-cart').onclick = () => { closeNftModal(true); addToCart(item); };
             document.getElementById('nft-detail-overlay').classList.add('active');
         }
 
@@ -423,6 +344,7 @@
             document.getElementById('pay-footer').style.display = 'block';
         }
 
+        // МОМЕНТАЛЬНАЯ ПОКУПКА
         async function buyItem(itemId, price) {
             if(userBalance < price) { showAlert("Недостаточно средств. Пополните баланс."); return; }
             try {
@@ -445,6 +367,7 @@
             } catch(e) { showAlert("Ошибка сети"); }
         }
 
+        // --- БАЛАНС / ПОПОЛНЕНИЕ ---
         document.getElementById('terms-checkbox').addEventListener('change', function() {
             document.getElementById('custom-chk').innerHTML = this.checked ? '✓' : '';
             document.getElementById('custom-chk').style.borderColor = this.checked ? 'var(--accent-gold)' : 'var(--border-color)';
@@ -473,6 +396,7 @@
             showAlert("Заявка отправлена. Ожидайте зачисления.");
         }
 
+        // --- ИНВЕНТАРЬ ---
         function switchInv(el, type) {
             document.querySelectorAll('#page-inventory .tab-item').forEach(t => { t.classList.remove('active'); t.style.borderColor='transparent'; t.style.color='var(--text-muted)'; });
             el.classList.add('active'); el.style.borderColor='var(--accent-gold)'; el.style.color='var(--text-main)';
@@ -480,7 +404,6 @@
             document.getElementById('inventory-history-container').style.display = type === 'history' ? 'grid' : 'none';
         }
 
-        // ИСПРАВЛЕНО: Логика таймера на карточках инвентаря
         async function loadInventory() {
             try {
                 const r = await fetch(`${API_BASE}/inventory?user_id=${uId}`);
@@ -488,69 +411,15 @@
                 const act = inventoryData.filter(i => i.status !== 'withdrawn');
                 const hist = inventoryData.filter(i => i.status === 'withdrawn');
 
-                document.getElementById('inventory-active-container').innerHTML = act.length ? act.map(item => {
-                    const lastReq = localStorage.getItem(`withdraw_time_${item.id}`);
-                    let isLocked = false;
-                    let btnText = 'Вывести <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>';
-
-                    if (lastReq) {
-                        const diff = new Date().getTime() - parseInt(lastReq);
-                        if (diff < 2 * 60 * 60 * 1000) {
-                            isLocked = true;
-                            btnText = `Ожидание (${Math.ceil((2 * 60 * 60 * 1000 - diff) / 60000)} мин)`;
-                        } else {
-                            localStorage.removeItem(`withdraw_time_${item.id}`);
-                        }
-                    }
-
-                    return `
-                        <div class="item-card">
-                            <img src="${item.image_url}" class="item-image" style="aspect-ratio:1; object-fit:cover;" onclick="openNftModal('${item.id}')">
-                            <div class="item-name">${item.name}</div>
-                            <button class="btn-open-nft" onclick="openInAppBrowser('${item.nft_link}')">Открыть NFT</button>
-                            <button class="btn-withdraw ${isLocked ? 'loading' : ''}" style="${isLocked ? 'background:#555; color:#fff;' : ''}" onclick="${isLocked ? '' : `confirmWithdrawBtn('${item.id}')`}" ${isLocked ? 'disabled' : ''}>
-                                ${btnText}
-                            </button>
-                        </div>
-                    `;
-                }).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
-
-                document.getElementById('inventory-history-container').innerHTML = hist.length ? hist.map(i => `<div class="item-card" style="opacity:0.5"><img src="${i.image_url}" class="item-image" style="filter:grayscale(100%)"><div class="item-name">${i.name}</div><div class="history-tag">ВЫВЕДЕНО</div></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
+                document.getElementById('inventory-active-container').innerHTML = act.length ? act.map(i => `<div class="item-card"><img src="${i.image_url}" class="item-image" onclick="openNftModal('${i.id}')"><div class="item-name">${i.name}</div><button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
+                document.getElementById('inventory-history-container').innerHTML = hist.length ? hist.map(i => `<div class="item-card" style="opacity:0.5"><img src="${i.image_url}" class="item-image" style="filter:grayscale(100%)"><div class="item-name">${i.name}</div><div style="text-align:center; font-size:0.7rem; border:1px dashed #555; border-radius:8px; padding:4px;">ВЫВЕДЕНО</div></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
             } catch(e) {}
         }
 
-        function confirmWithdrawBtn(id) {
-            pendingWithdrawId = id;
-            document.getElementById('withdraw-modal-overlay').classList.add('active');
+        async function withdraw(id) {
+            await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) });
+            showAlert("Запрос на вывод отправлен!");
         }
-
-        // Подтверждение вывода
-        document.getElementById('btn-confirm-withdraw').onclick = async () => {
-            if(pendingWithdrawId) {
-                closeModal('withdraw-modal-overlay');
-                const itemId = pendingWithdrawId;
-
-                // Ставим таймер СРАЗУ (защита от спама)
-                localStorage.setItem(`withdraw_time_${itemId}`, new Date().getTime().toString());
-                loadInventory(); // рендер блока сразу обновит кнопку
-
-                try {
-                    const res = await fetch(`${API_BASE}/request-withdraw`, {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({itemId: itemId, userId: uId, username: uName})
-                    });
-                    if(res.ok) showAlert("Запрос на вывод отправлен!");
-                    else {
-                        localStorage.removeItem(`withdraw_time_${itemId}`);
-                        loadInventory();
-                    }
-                } catch(e) {
-                    localStorage.removeItem(`withdraw_time_${itemId}`);
-                    loadInventory();
-                }
-                pendingWithdrawId = null;
-            }
-        };
 
         // --- МИНИ ИГРА ---
         const canvas = document.getElementById('gameCanvas');
@@ -560,6 +429,7 @@
         let betAmountTemp = 0;
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, winner_x: 0 };
 
+        // Ресайз канваса для четкости
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
             canvas.width = rect.width * 2; canvas.height = rect.height * 2;
@@ -582,16 +452,20 @@
                 let w = (p.amount / gState.pool) * canvas.width;
                 ctx.fillStyle = p.color;
                 ctx.fillRect(curX, 0, w, canvas.height);
+                // Имя
                 ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(curX, canvas.height-40, w, 40);
                 ctx.fillStyle = "#fff"; ctx.font = "24px Inter"; ctx.textAlign = "center";
                 ctx.fillText(p.username.substring(0,6), curX + w/2, canvas.height - 12);
                 curX += w;
             });
 
+            // Мячик
             if(ballX !== null) {
-                ctx.beginPath(); ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
+                ctx.beginPath();
+                ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
                 ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 15;
                 ctx.fill(); ctx.shadowBlur = 0; ctx.closePath();
+
                 ctx.beginPath(); ctx.moveTo(ballX, 0); ctx.lineTo(ballX, canvas.height);
                 ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 4; ctx.stroke();
             }
@@ -601,18 +475,24 @@
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
                 gState = await r.json();
+
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
 
+                // Кнопка отмены
                 const hasMyBet = gState.players.find(p => p.id === String(uId));
                 document.getElementById('btn-cancel-bet').style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
 
+                // Таймер
                 const bgT = document.getElementById('game-timer-bg');
                 if(gState.status === 'counting') { bgT.innerText = gState.timer; } else { bgT.innerText = ''; }
 
+                // Анимация
                 if(gState.status === 'spinning' && !isSpinning) {
-                    isSpinning = true; runSpinAnimation(gState.winner_x);
+                    isSpinning = true;
+                    runSpinAnimation(gState.winner_x);
                 } else if(gState.status !== 'spinning') {
-                    isSpinning = false; drawGameFrame();
+                    isSpinning = false;
+                    drawGameFrame();
                 }
             } catch(e) {}
         }
@@ -620,17 +500,25 @@
 
         function runSpinAnimation(targetPct) {
             const targetX = targetPct * canvas.width;
-            let currentX = 0, velocity = canvas.width * 0.15, startTime = Date.now();
+            let currentX = 0;
+            let velocity = canvas.width * 0.15; // скорость
+            let startTime = Date.now();
+
             function animate() {
                 let elapsed = Date.now() - startTime;
                 if(elapsed < 4000) {
+                    // Фаза 1: летает туда-сюда
                     currentX += velocity;
                     if(currentX > canvas.width || currentX < 0) velocity *= -1;
-                    drawGameFrame(currentX); requestAnimationFrame(animate);
+                    drawGameFrame(currentX);
+                    requestAnimationFrame(animate);
                 } else if (elapsed < 6500) {
+                    // Фаза 2: доезжает до цели
                     currentX += (targetX - currentX) * 0.05;
-                    drawGameFrame(currentX); requestAnimationFrame(animate);
+                    drawGameFrame(currentX);
+                    requestAnimationFrame(animate);
                 } else {
+                    // Финал
                     drawGameFrame(targetX);
                     setTimeout(() => { updateBalance(); }, 1000);
                 }
@@ -640,7 +528,10 @@
 
         function openBetConfirm(amt) { betAmountTemp = amt; document.getElementById('confirm-bet-amount').innerText = amt; document.getElementById('confirm-bet-modal').classList.add('active'); }
         function openCustomBet() { document.getElementById('custom-bet-input').value = ''; document.getElementById('custom-bet-modal').classList.add('active'); }
-        function submitCustomBet() { const v = parseFloat(document.getElementById('custom-bet-input').value); if(v > 0) { closeModal('custom-bet-modal'); openBetConfirm(v); } }
+        function submitCustomBet() {
+            const v = parseFloat(document.getElementById('custom-bet-input').value);
+            if(v > 0) { closeModal('custom-bet-modal'); openBetConfirm(v); }
+        }
 
         async function executeBet() {
             closeModal('confirm-bet-modal');

@@ -16,6 +16,7 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
+# Скрытые реквизиты и админ
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 PAYMENT_REQUISITES = os.getenv("PAYMENT_REQUISITES", "Реквизиты скрыты/не настроены")
 
@@ -43,10 +44,12 @@ def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
 
+# Автосоздание нужных таблиц
 def init_db():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # Таблица пользователей для баланса
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
@@ -54,6 +57,7 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
+                # Добавляем колонку number, если ее еще нет
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 conn.commit()
     except Exception as e:
@@ -65,8 +69,8 @@ init_db()
 # --- ЛОГИКА МИНИ-ИГРЫ ---
 game_lock = asyncio.Lock()
 game_state = {
-    "status": "waiting",
-    "players": {},
+    "status": "waiting",  # waiting, counting, spinning
+    "players": {},  # user_id -> {"username": str, "amount": float, "color": str}
     "pool": 0.0,
     "timer": 15,
     "winner_x": 0.0
@@ -87,10 +91,12 @@ async def game_worker():
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
 
+                    # Определение победителя
                     winner_val = random.uniform(0, game_state["pool"])
                     current_sum = 0
                     winner_id = None
 
+                    # Для визуализации: маппинг на шкалу от 0.0 до 1.0
                     for uid, p in game_state["players"].items():
                         start_pct = current_sum / game_state["pool"]
                         current_sum += p["amount"]
@@ -98,6 +104,7 @@ async def game_worker():
 
                         if winner_val <= current_sum and winner_id is None:
                             winner_id = uid
+                            # Шарик остановится где-то внутри сегмента этого игрока
                             game_state["winner_x"] = random.uniform(start_pct + 0.02, end_pct - 0.02)
 
                     if winner_id:
@@ -112,7 +119,7 @@ async def game_worker():
                             logging.error(f"Game DB error: {e}")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(7)
+            await asyncio.sleep(7)  # Ждем 7 секунд пока идет анимация на фронте
             async with game_lock:
                 game_state = {
                     "status": "waiting",
@@ -203,6 +210,7 @@ async def handle_get_inventory(request):
         return web.json_response([], headers={"Access-Control-Allow-Origin": "*"})
 
 
+# НОВАЯ ЛОГИКА МГНОВЕННОЙ ПОКУПКИ (Списание с баланса)
 async def handle_buy(request):
     try:
         data = await request.json()
@@ -221,7 +229,9 @@ async def handle_buy(request):
                     user = cur.fetchone()
 
                     if user and float(user['balance']) >= float(total_price):
+                        # Списываем баланс
                         cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (total_price, user_id))
+                        # Выдаем предмет
                         cur.execute(
                             "UPDATE items SET status = 'Продан', buyer_id = %s, last_event = 'approved' WHERE id = ANY(%s)",
                             (user_id, item_ids))
@@ -289,6 +299,7 @@ async def handle_game_bet(request):
             if len(game_state["players"]) >= 20 and user_id not in game_state["players"]:
                 return web.json_response({"success": False, "error": "room_full"})
 
+            # Проверка баланса
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
@@ -299,6 +310,7 @@ async def handle_game_bet(request):
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
                     conn.commit()
 
+            # Добавляем ставку в пул
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
@@ -309,6 +321,7 @@ async def handle_game_bet(request):
 
             game_state["pool"] += amount
 
+            # Запуск таймера если 2+ игроков
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
