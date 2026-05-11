@@ -38,9 +38,6 @@
         .avatar { width: 36px; height: 36px; border-radius: 50%; background: #222; object-fit: cover; border: 1px solid var(--border-color); }
         .username { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
 
-        .header-center { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; }
-        h1 { font-weight: 800; font-size: 1.2rem; text-transform: uppercase; margin: 0; letter-spacing: 2px; color: #fff; text-shadow: 0 0 15px rgba(203, 161, 83, 0.3); }
-
         .header-right {
             background: rgba(203, 161, 83, 0.1); border: 1px solid var(--accent-gold);
             padding: 8px 12px; border-radius: 12px; cursor: pointer; transition: 0.2s;
@@ -65,7 +62,7 @@
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* Вкладки снизу (теперь 3 штуки) */
+        /* Вкладки снизу */
         .tab-bar { position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85); backdrop-filter: blur(15px); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100; }
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
@@ -89,7 +86,13 @@
         .modal-title { font-weight: 700; font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px; text-transform: uppercase; }
         .input-dark { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 14px; border-radius: 10px; font-size: 1rem; margin-bottom: 20px; box-sizing: border-box; text-align: center; }
 
-        /* Модалка NFT (ракета) */
+        /* Сетка кнопок пополнения */
+        .topup-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; width: 100%; max-width: 400px; margin-bottom: 20px; }
+        .topup-btn { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 12px; height: 48px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
+        .topup-btn:active { transform: scale(0.95); }
+        .topup-btn.custom-btn { grid-column: span 3; border-color: var(--accent-gold); color: var(--accent-gold); background: rgba(203, 161, 83, 0.05); }
+
+        /* Модалка NFT */
         .nft-modal-sheet { position: absolute; bottom: -100%; left: 0; width: 100%; background: #0a0a0c; border-radius: 24px 24px 0 0; transition: bottom 0.4s; display: flex; flex-direction: column; max-height: 95vh; overflow: hidden; }
         .nft-modal-overlay.active .nft-modal-sheet { bottom: 0; }
         .nft-modal-header-rocket { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; padding-top: 25px; }
@@ -105,11 +108,8 @@
             <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">
             <div class="username" id="username-display">User</div>
         </div>
-        <div class="header-center">
-            <h1>DNX STORE</h1>
-        </div>
         <div class="header-right" onclick="showPage('balance')">
-            <span class="balance-text" id="header-balance">0 USDT</span>
+            <span class="balance-text" id="header-balance">0 ₽</span>
         </div>
     </header>
 
@@ -122,7 +122,7 @@
             </div>
 
             <div class="game-controls">
-                <button class="game-btn" onclick="openBetConfirm(0.1)">+0.1 USDT</button>
+                <button class="game-btn" onclick="openBetConfirm(50)">+50 ₽</button>
                 <button class="game-btn" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
@@ -144,16 +144,24 @@
     <div id="page-cart" class="page">
         <div id="cart-items-list" class="cart-list"></div>
         <div class="fixed-footer" id="pay-footer" style="display: none;">
-            <button class="btn-main-action" onclick="buyCart()">Оплатить корзину (Списать USDT)</button>
+            <button class="btn-main-action" onclick="buyCart()">Оплатить корзину (Списать ₽)</button>
         </div>
     </div>
 
     <div id="page-balance" class="page">
         <div style="padding: 30px 20px; display: flex; flex-direction: column; align-items: center;">
             <h2 style="color: var(--text-main); font-weight: 700; margin-bottom: 10px;">ТЕКУЩИЙ БАЛАНС</h2>
-            <div style="font-size: 2.5rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 40px;" id="big-balance">0 USDT</div>
+            <div style="font-size: 2.5rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 30px;" id="big-balance">0 ₽</div>
 
-            <button class="btn-main-action" onclick="openTopupModal()">ПОПОЛНИТЬ</button>
+            <div class="topup-grid">
+                <button class="topup-btn" onclick="initTopup(50)">50 ₽</button>
+                <button class="topup-btn" onclick="initTopup(100)">100 ₽</button>
+                <button class="topup-btn" onclick="initTopup(250)">250 ₽</button>
+                <button class="topup-btn" onclick="initTopup(500)">500 ₽</button>
+                <button class="topup-btn" onclick="initTopup(1000)">1000 ₽</button>
+                <button class="topup-btn" onclick="initTopup(5000)">5000 ₽</button>
+                <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
+            </div>
         </div>
     </div>
 
@@ -196,16 +204,24 @@
         </div>
     </div>
 
+    <div id="custom-amount-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="modal-title">Своя сумма</h3>
+            <input type="number" id="custom-amount-input" class="input-dark" placeholder="Сумма от 50 ₽">
+            <button class="btn-main-action" onclick="submitCustomAmount()">Оплатить</button>
+            <button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button>
+        </div>
+    </div>
+
     <div id="topup-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3 class="modal-title">ПОПОЛНЕНИЕ (USDT)</h3>
+            <h3 class="modal-title">ПОПОЛНЕНИЕ НА <span id="display-topup-amount">0</span> ₽</h3>
             <ul style="font-size: 0.8rem; color: var(--text-muted); text-align: left; padding-left: 16px; margin-bottom: 20px;">
                 <li>Администрация не несет ответственности за перевод на сторонние реквизиты.</li>
                 <li>Заявки без фактического перевода блокируются.</li>
                 <li>Обработка занимает до 15 минут.</li>
             </ul>
-            <input type="number" id="topup-amount" class="input-dark" placeholder="Введите сумму USDT">
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 15px;" id="req-text">Загрузка реквизитов...</div>
+            <div style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 15px; font-weight: bold; word-break: break-all;" id="req-text">Загрузка реквизитов...</div>
             <label style="display: flex; align-items: center; font-size: 0.8rem; text-align:left; cursor: pointer; gap: 10px; margin-bottom: 20px; color: var(--text-main);">
                 <input type="checkbox" id="terms-checkbox" onchange="document.getElementById('btn-send-topup').disabled = !this.checked;" style="display:none;">
                 <span style="width:22px; height:22px; border:2px solid var(--border-color); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0;" id="custom-chk"></span>
@@ -226,7 +242,7 @@
     <div id="confirm-bet-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 class="modal-title">Подтверждение</h3>
-            <p style="color: var(--text-main); margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> USDT?</p>
+            <p style="color: var(--text-main); margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> ₽?</p>
             <button class="btn-main-action" onclick="executeBet()">Подтвердить</button>
             <button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button>
         </div>
@@ -235,7 +251,7 @@
     <div id="custom-bet-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 class="modal-title">Своя ставка</h3>
-            <input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма USDT">
+            <input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма ₽">
             <button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button>
             <button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button>
         </div>
@@ -250,6 +266,7 @@
         let cart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
         let currentCatalog = [];
         let inventoryData = [];
+        let pendingTopupAmount = 0;
 
         // Инициализация юзера
         const uId = tg.initDataUnsafe?.user?.id || "guest";
@@ -283,7 +300,7 @@
                 const res = await fetch(`${API_BASE}/user?user_id=${uId}&username=${uName}`);
                 const data = await res.json();
                 userBalance = data.balance || 0;
-                const txt = userBalance.toFixed(2) + ' USDT';
+                const txt = userBalance.toFixed(2) + ' ₽';
                 document.getElementById('header-balance').innerText = txt;
                 document.getElementById('big-balance').innerText = txt;
             } catch(e) {}
@@ -375,7 +392,26 @@
             document.getElementById('custom-chk').style.background = this.checked ? 'var(--accent-gold)' : 'transparent';
         });
 
+        function initTopup(amount) {
+            if (amount < 50) { showAlert("Минимальная сумма пополнения 50 ₽"); return; }
+            pendingTopupAmount = amount;
+            openTopupModal();
+        }
+
+        function openCustomAmountModal() {
+            document.getElementById('custom-amount-input').value = '';
+            document.getElementById('custom-amount-modal').classList.add('active');
+        }
+
+        function submitCustomAmount() {
+            const val = parseFloat(document.getElementById('custom-amount-input').value);
+            if (!val || val < 50) { showAlert("Минимальная сумма пополнения 50 ₽"); return; }
+            closeModal('custom-amount-modal');
+            initTopup(val);
+        }
+
         async function openTopupModal() {
+            document.getElementById('display-topup-amount').innerText = pendingTopupAmount;
             document.getElementById('terms-checkbox').checked = false;
             document.getElementById('custom-chk').innerHTML = '';
             document.getElementById('custom-chk').style.background = 'transparent';
@@ -389,10 +425,9 @@
         }
 
         async function sendTopup() {
-            const amt = document.getElementById('topup-amount').value;
-            if(!amt || amt <= 0) { showAlert("Введите корректную сумму"); return; }
+            if(!pendingTopupAmount || pendingTopupAmount < 50) { showAlert("Ошибка суммы"); return; }
             closeModal('topup-modal');
-            await fetch(`${API_BASE}/topup`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: amt}) });
+            await fetch(`${API_BASE}/topup`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: pendingTopupAmount}) });
             showAlert("Заявка отправлена. Ожидайте зачисления.");
         }
 

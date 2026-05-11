@@ -158,7 +158,7 @@ async def handle_topup_request(request):
         username = data.get('username', 'Unknown')
         amount = float(data.get('amount', 0))
 
-        admin_msg = f"💸 **Заявка на пополнение USDT!**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} USDT\n\nПроверьте поступление по реквизитам."
+        admin_msg = f"💸 **Заявка на пополнение средств!**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} ₽\n\nПроверьте поступление по реквизитам."
         admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"topup_no_{user_id}_{amount}"),
             InlineKeyboardButton(text="✅ Зачислить", callback_data=f"topup_yes_{user_id}_{amount}")
@@ -373,9 +373,9 @@ async def admin_topup_approve(callback: types.CallbackQuery):
                 "INSERT INTO users (id, balance) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET balance = users.balance + EXCLUDED.balance",
                 (uid, float(amount)))
             conn.commit()
-    await callback.message.edit_text(f"✅ Баланс пополнен на {amount} USDT!")
+    await callback.message.edit_text(f"✅ Баланс пополнен на {amount} ₽!")
     try:
-        await bot.send_message(uid, f"💰 Ваш баланс успешно пополнен на {amount} USDT!")
+        await bot.send_message(uid, f"💰 Ваш баланс успешно пополнен на {amount} ₽!")
     except:
         pass
 
@@ -383,9 +383,9 @@ async def admin_topup_approve(callback: types.CallbackQuery):
 @dp.callback_query(F.data.startswith("topup_no_"))
 async def admin_topup_reject(callback: types.CallbackQuery):
     _, _, uid, amount = callback.data.split("_")
-    await callback.message.edit_text(f"❌ Заявка на {amount} USDT отклонена.")
+    await callback.message.edit_text(f"❌ Заявка на {amount} ₽ отклонена.")
     try:
-        await bot.send_message(uid, f"❌ Отказ: заявка на пополнение {amount} USDT отклонена.")
+        await bot.send_message(uid, f"❌ Отказ: заявка на пополнение {amount} ₽ отклонена.")
     except:
         pass
 
