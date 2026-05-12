@@ -16,15 +16,13 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
-# Скрытые реквизиты и админ
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-PAYMENT_REQUISITES = os.getenv("PAYMENT_REQUISITES", "Реквизиты скрыты/не настроены")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7106612591"))  # Твой админ ID
+PAYMENT_REQUISITES = os.getenv("PAYMENT_REQUISITES", "💳 Карта: **** **** **** 0000 (Т-Банк)")
+WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
 
 if not BOT_TOKEN:
     print("❌ КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN не найден!")
     exit(1)
-
-WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
 
 DB_CONFIG = {
     "dbname": "neondb",
@@ -43,8 +41,6 @@ dp = Dispatcher()
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
-
-# Автосоздание нужных таблиц
 def init_db():
     try:
         with get_db_connection() as conn:
@@ -57,29 +53,25 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                # Добавляем колонку number, если ее еще нет
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 conn.commit()
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
-
 
 init_db()
 
 # --- ЛОГИКА МИНИ-ИГРЫ ---
 game_lock = asyncio.Lock()
 game_state = {
-    "status": "waiting",  # waiting, counting, spinning
-    "players": {},  # user_id -> {"username": str, "amount": float, "color": str}
+    "status": "waiting",
+    "players": {},
     "pool": 0.0,
     "timer": 15,
     "winner_x": 0.0
 }
 
-
 def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
-
 
 async def game_worker():
     global game_state
@@ -90,13 +82,10 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-
-                    # Определение победителя
                     winner_val = random.uniform(0, game_state["pool"])
                     current_sum = 0
                     winner_id = None
 
-                    # Для визуализации: маппинг на шкалу от 0.0 до 1.0
                     for uid, p in game_state["players"].items():
                         start_pct = current_sum / game_state["pool"]
                         current_sum += p["amount"]
@@ -104,7 +93,6 @@ async def game_worker():
 
                         if winner_val <= current_sum and winner_id is None:
                             winner_id = uid
-                            # Шарик остановится где-то внутри сегмента этого игрока
                             game_state["winner_x"] = random.uniform(start_pct + 0.02, end_pct - 0.02)
 
                     if winner_id:
@@ -119,7 +107,7 @@ async def game_worker():
                             logging.error(f"Game DB error: {e}")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(7)  # Ждем 7 секунд пока идет анимация на фронте
+            await asyncio.sleep(7)
             async with game_lock:
                 game_state = {
                     "status": "waiting",
@@ -128,6 +116,22 @@ async def game_worker():
                     "timer": 15,
                     "winner_x": 0.0
                 }
+
+# --- CORS MIDDLEWARE ---
+@web.middleware
+async def cors_middleware(request, handler):
+    if request.method == 'OPTIONS':
+        return web.Response(headers={
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        })
+    try:
+        response = await handler(request)
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+    except Exception as e:
+        return web.json_response({"error": "server error"}, status=500, headers={'Access-Control-Allow-Origin': '*'})
 
 
 # --- API МЕТОДЫ ---
@@ -145,11 +149,9 @@ async def handle_get_user(request):
                 cur.execute("SELECT balance FROM users WHERE id = %s", (str(user_id),))
                 user = cur.fetchone()
                 conn.commit()
-                return web.json_response({"balance": float(user['balance']) if user else 0.0},
-                                         headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"balance": float(user['balance']) if user else 0.0})
     except Exception as e:
-        return web.json_response({"balance": 0.0}, status=500, headers={"Access-Control-Allow-Origin": "*"})
-
+        return web.json_response({"balance": 0.0}, status=500)
 
 async def handle_topup_request(request):
     try:
@@ -158,35 +160,30 @@ async def handle_topup_request(request):
         username = data.get('username', 'Unknown')
         amount = float(data.get('amount', 0))
 
-        admin_msg = f"💸 **Заявка на пополнение средств!**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} ₽\n\nПроверьте поступление по реквизитам."
+        admin_msg = f"💸 **Заявка на пополнение баланса!**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} ₽\n\nПроверьте поступление по реквизитам."
         admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"topup_no_{user_id}_{amount}"),
             InlineKeyboardButton(text="✅ Зачислить", callback_data=f"topup_yes_{user_id}_{amount}")
         ]])
         await bot.send_message(ADMIN_ID, admin_msg, reply_markup=admin_kb)
-        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": True})
     except:
-        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
-
+        return web.json_response({"success": False})
 
 async def handle_get_items(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    "SELECT id, name, price, status, image_url, nft_link, traits, number FROM items WHERE status = 'Доступен'")
+                cur.execute("SELECT id, name, price, status, image_url, nft_link, traits, number FROM items WHERE status = 'Доступен'")
                 items = cur.fetchall()
                 for item in items:
                     traits_raw = item.get('traits')
                     if isinstance(traits_raw, str):
-                        try:
-                            item['traits'] = json.loads(traits_raw)
-                        except:
-                            item['traits'] = []
-                return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
+                        try: item['traits'] = json.loads(traits_raw)
+                        except: item['traits'] = []
+                return web.json_response(items)
     except Exception as e:
-        return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": "*"})
-
+        return web.json_response([], status=500)
 
 async def handle_get_inventory(request):
     user_id = request.query.get('user_id')
@@ -201,16 +198,13 @@ async def handle_get_inventory(request):
                     if item['status'] == 'Выведен': item['status'] = 'withdrawn'
                     traits_raw = item.get('traits')
                     if isinstance(traits_raw, str):
-                        try:
-                            item['traits'] = json.loads(traits_raw)
-                        except:
-                            item['traits'] = []
-                return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
+                        try: item['traits'] = json.loads(traits_raw)
+                        except: item['traits'] = []
+                return web.json_response(items)
     except Exception:
-        return web.json_response([], headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response([])
 
-
-# НОВАЯ ЛОГИКА МГНОВЕННОЙ ПОКУПКИ (Списание с баланса)
+# МОМЕНТАЛЬНАЯ ПОКУПКА ЗА БАЛАНС
 async def handle_buy(request):
     try:
         data = await request.json()
@@ -236,15 +230,12 @@ async def handle_buy(request):
                             "UPDATE items SET status = 'Продан', buyer_id = %s, last_event = 'approved' WHERE id = ANY(%s)",
                             (user_id, item_ids))
                         conn.commit()
-                        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+                        return web.json_response({"success": True})
                     else:
-                        return web.json_response({"success": False, "error": "insufficient_funds"},
-                                                 headers={"Access-Control-Allow-Origin": "*"})
-                return web.json_response({"success": False, "error": "items_unavailable"},
-                                         headers={"Access-Control-Allow-Origin": "*"})
+                        return web.json_response({"success": False, "error": "insufficient_funds"})
+                return web.json_response({"success": False, "error": "items_unavailable"})
     except Exception as e:
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
-
+        return web.json_response({"success": False}, status=500)
 
 async def handle_request_withdraw(request):
     try:
@@ -266,11 +257,10 @@ async def handle_request_withdraw(request):
                     ]])
                     msg = f"📤 **Новый запрос на вывод NFT!**\n👤 @{username} (ID: {user_id})\n📦 Товар: {item['name']} (ID: {item['id']})\n🔗 Ссылка: {item['nft_link']}"
                     await bot.send_message(ADMIN_ID, msg, reply_markup=admin_kb, disable_web_page_preview=True)
-                    return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
-        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
+                    return web.json_response({"success": True})
+        return web.json_response({"success": False})
     except:
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
-
+        return web.json_response({"success": False}, status=500)
 
 # --- ИГРОВЫЕ API ---
 async def handle_game_state(request):
@@ -281,8 +271,7 @@ async def handle_game_state(request):
             "pool": game_state["pool"],
             "timer": game_state["timer"],
             "winner_x": game_state["winner_x"]
-        }, headers={"Access-Control-Allow-Origin": "*"})
-
+        })
 
 async def handle_game_bet(request):
     try:
@@ -299,7 +288,6 @@ async def handle_game_bet(request):
             if len(game_state["players"]) >= 20 and user_id not in game_state["players"]:
                 return web.json_response({"success": False, "error": "room_full"})
 
-            # Проверка баланса
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
@@ -310,7 +298,6 @@ async def handle_game_bet(request):
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
                     conn.commit()
 
-            # Добавляем ставку в пул
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
@@ -321,16 +308,13 @@ async def handle_game_bet(request):
 
             game_state["pool"] += amount
 
-            # Запуск таймера если 2+ игроков
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
 
-        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": True})
     except Exception as e:
-        logging.error(f"Bet error: {e}")
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
-
+        return web.json_response({"success": False}, status=500)
 
 async def handle_game_cancel(request):
     try:
@@ -346,21 +330,13 @@ async def handle_game_cancel(request):
                         conn.commit()
                 game_state["players"] = {}
                 game_state["pool"] = 0.0
-                return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
-        return web.json_response({"success": False, "error": "cannot_cancel"},
-                                 headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"success": True})
+        return web.json_response({"success": False, "error": "cannot_cancel"})
     except:
-        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
-
+        return web.json_response({"success": False})
 
 async def handle_get_requisites(request):
-    return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": "*"})
-
-
-async def handle_options(request):
-    return web.Response(
-        headers={"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                 "Access-Control-Allow-Headers": "Content-Type"})
+    return web.json_response({"req": PAYMENT_REQUISITES})
 
 
 # --- CALLBACKS ДЛЯ АДМИНА ---
@@ -374,21 +350,15 @@ async def admin_topup_approve(callback: types.CallbackQuery):
                 (uid, float(amount)))
             conn.commit()
     await callback.message.edit_text(f"✅ Баланс пополнен на {amount} ₽!")
-    try:
-        await bot.send_message(uid, f"💰 Ваш баланс успешно пополнен на {amount} ₽!")
-    except:
-        pass
-
+    try: await bot.send_message(uid, f"💰 Ваш баланс успешно пополнен на {amount} ₽!")
+    except: pass
 
 @dp.callback_query(F.data.startswith("topup_no_"))
 async def admin_topup_reject(callback: types.CallbackQuery):
     _, _, uid, amount = callback.data.split("_")
     await callback.message.edit_text(f"❌ Заявка на {amount} ₽ отклонена.")
-    try:
-        await bot.send_message(uid, f"❌ Отказ: заявка на пополнение {amount} ₽ отклонена.")
-    except:
-        pass
-
+    try: await bot.send_message(uid, f"❌ Отказ: заявка на пополнение {amount} ₽ отклонена.")
+    except: pass
 
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
@@ -400,11 +370,8 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
                 (int(item_id), uid))
             conn.commit()
     await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
-    try:
-        await bot.send_message(uid, f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
-    except:
-        pass
-
+    try: await bot.send_message(uid, f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
+    except: pass
 
 @dp.callback_query(F.data.startswith("with_no_"))
 async def admin_withdraw_reject(callback: types.CallbackQuery):
@@ -415,21 +382,17 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
                         (int(item_id), uid))
             conn.commit()
     await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
-    try:
-        await bot.send_message(uid, f"❌ Отказ: вывод NFT (ID: {item_id}) отклонен администратором.")
-    except:
-        pass
-
+    try: await bot.send_message(uid, f"❌ Отказ: вывод NFT (ID: {item_id}) отклонен администратором.")
+    except: pass
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]])
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]])
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
 
 
 # --- ЗАПУСК ---
-app = web.Application()
+app = web.Application(middlewares=[cors_middleware])
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)
 app.router.add_get('/inventory', handle_get_inventory)
@@ -440,7 +403,6 @@ app.router.add_post('/request-withdraw', handle_request_withdraw)
 app.router.add_get('/game/state', handle_game_state)
 app.router.add_post('/game/bet', handle_game_bet)
 app.router.add_post('/game/cancel', handle_game_cancel)
-app.router.add_options('/{tail:.*}', handle_options)
 
 
 async def main():
