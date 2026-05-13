@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -115,7 +115,7 @@
         .cart-item-info { flex: 1; }
         .fixed-footer { position: fixed; bottom: 85px; width: 100%; padding: 0 20px; z-index: 90; box-sizing: border-box; }
 
-        /* Кнопка Telegram в модалке */
+        /* Кнопка Telegram в модалке (слева, такой же размер как крестик) */
         .modal-tg-btn {
             position: absolute;
             top: 15px;
@@ -132,6 +132,16 @@
             z-index: 10;
         }
         .modal-tg-btn:hover { background: rgba(203, 161, 83, 0.3); }
+        .modal-tg-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke: white;
+            stroke-width: 1.8;
+            fill: none;
+        }
+        .modal-tg-btn:hover svg {
+            stroke: var(--accent-gold);
+        }
     </style>
 </head>
 <body>
@@ -219,11 +229,13 @@
 
     <div id="nft-detail-overlay" class="modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
+            <!-- Кнопка Telegram слева -->
             <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2">
-                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
+            <!-- Крестик справа -->
             <div style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10;" onclick="closeNftModal(true)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </div>
@@ -601,7 +613,7 @@
             loadInventory();
         }
 
-        // --- МИНИ ИГРА С ПЛАВНОЙ АНИМАЦИЕЙ ---
+        // --- МИНИ ИГРА С ПЛАВНОЙ АНИМАЦИЕЙ (разгон, отскоки, затем торможение) ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, winner_x: 0 };
@@ -704,43 +716,77 @@
             }, 1000);
         }
 
-        let lastSpinWinnerX = 0;
+        // Новая анимация: разгон + хаотичные отскоки, затем торможение
         function runSpinAnimation(targetPct, targetCanvasWidth) {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
 
             const targetX = targetPct * targetCanvasWidth;
             let currentX = 0;
+            let velocity = 0;
+            let phase = 0; // 0 = разгон и отскоки, 1 = торможение к цели
             let startTime = null;
-            const DURATION = 4000; // 4 секунды движения
+            const BOUNCE_DURATION = 1600; // 1.6 сек отскоков
+            const SLOW_DURATION = 2500;   // 2.5 сек торможения
 
-            function animateStep(timestamp) {
+            // Случайная начальная скорость (быстрый разгон)
+            velocity = (Math.random() * 400 + 200) * (Math.random() > 0.5 ? 1 : -1);
+
+            function animate(timestamp) {
                 if(!startTime) startTime = timestamp;
                 const elapsed = timestamp - startTime;
-                let t = Math.min(1, elapsed / DURATION);
-                // easeOutCubic для плавной остановки
-                const easeOut = 1 - Math.pow(1 - t, 3);
-                currentX = targetX * easeOut;
-                drawGameFrame(currentX);
-                if(t < 1) {
-                    animationFrameId = requestAnimationFrame(animateStep);
-                } else {
-                    // Движение завершено - финальная позиция
-                    drawGameFrame(targetX);
-                    animationFrameId = null;
-                    // Запускаем зум после полной остановки
-                    setTimeout(() => {
-                        const originX = (targetX / canvas.width) * 100;
-                        canvas.style.transformOrigin = `${originX}% 50%`;
-                        canvas.style.transform = "scale(2.5)";
-                        // Сброс зума через 2 секунды
+
+                if(phase === 0 && elapsed < BOUNCE_DURATION) {
+                    // Фаза отскоков: движение с отражением от границ
+                    currentX += velocity;
+                    // Отскоки от стенок
+                    if(currentX <= 0) {
+                        currentX = 0;
+                        velocity = Math.abs(velocity);
+                    }
+                    if(currentX >= targetCanvasWidth) {
+                        currentX = targetCanvasWidth;
+                        velocity = -Math.abs(velocity);
+                    }
+                    // Небольшое случайное изменение скорости для живости
+                    if(Math.random() < 0.05) {
+                        velocity += (Math.random() - 0.5) * 50;
+                        velocity = Math.min(Math.max(velocity, -500), 500);
+                    }
+                    drawGameFrame(currentX);
+                    animationFrameId = requestAnimationFrame(animate);
+                }
+                else if (phase === 0 && elapsed >= BOUNCE_DURATION) {
+                    // Переключаемся на фазу торможения
+                    phase = 1;
+                    startTime = timestamp; // сброс времени для easeOut
+                    animate(timestamp);
+                }
+                else if (phase === 1) {
+                    const t = Math.min(1, (timestamp - startTime) / SLOW_DURATION);
+                    // easeOutCubic
+                    const eased = 1 - Math.pow(1 - t, 3);
+                    currentX = targetX * eased + (currentX * (1 - eased));
+                    drawGameFrame(currentX);
+                    if(t < 1) {
+                        animationFrameId = requestAnimationFrame(animate);
+                    } else {
+                        // Анимация завершена
+                        drawGameFrame(targetX);
+                        animationFrameId = null;
+                        // Зум
                         setTimeout(() => {
-                            canvas.style.transform = "scale(1)";
-                        }, 2000);
-                        updateBalance();
-                    }, 100);
+                            const originX = (targetX / canvas.width) * 100;
+                            canvas.style.transformOrigin = `${originX}% 50%`;
+                            canvas.style.transform = "scale(2.5)";
+                            setTimeout(() => {
+                                canvas.style.transform = "scale(1)";
+                            }, 2000);
+                            updateBalance();
+                        }, 100);
+                    }
                 }
             }
-            animationFrameId = requestAnimationFrame(animateStep);
+            animationFrameId = requestAnimationFrame(animate);
         }
 
         async function pollGame() {
@@ -776,8 +822,7 @@
 
                 if(gState.status === 'spinning' && !isSpinning) {
                     isSpinning = true;
-                    lastSpinWinnerX = gState.winner_x;
-                    runSpinAnimation(lastSpinWinnerX, canvas.width);
+                    runSpinAnimation(gState.winner_x, canvas.width);
                 } else if(gState.status !== 'spinning' && isSpinning) {
                     isSpinning = false;
                     if(animationFrameId) {
