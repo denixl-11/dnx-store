@@ -5,7 +5,6 @@ import psycopg2
 import json
 import random
 from psycopg2.extras import RealDictCursor
-from datetime import datetime
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -43,7 +42,6 @@ def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
 
-# Автосоздание нужных таблиц
 def init_db():
     try:
         with get_db_connection() as conn:
@@ -55,7 +53,6 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                # Безопасное добавление колонок
                 try:
                     cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 except Exception as e:
@@ -70,16 +67,42 @@ init_db()
 # --- ЛОГИКА МИНИ-ИГРЫ ---
 game_lock = asyncio.Lock()
 game_state = {
-    "status": "waiting",
+    "status": "waiting",      # waiting, counting, spinning
     "players": {},
     "pool": 0.0,
-    "timer": 15,
-    "winner_x": 0.0
+    "timer": 15
 }
 
 
 def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
+
+
+async def finish_round(winner_x, pool, players):
+    """Определяет победителя по позиции winner_x (0..1) и начисляет выигрыш"""
+    if pool <= 0 or not players:
+        return
+    cumulative = 0.0
+    winner_id = None
+    for uid, p in players.items():
+        start = cumulative
+        cumulative += p["amount"] / pool
+        if start <= winner_x <= cumulative:
+            winner_id = uid
+            break
+    if winner_id:
+        winner_bet = players[winner_id]["amount"]
+        others_bets = pool - winner_bet
+        profit = winner_bet + (others_bets * 0.7)
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s",
+                                (profit, winner_id))
+                    conn.commit()
+            logging.info(f"Winner {winner_id} won {profit} RUB (pos {winner_x})")
+        except Exception as e:
+            logging.error(f"Game DB error: {e}")
 
 
 async def game_worker():
@@ -92,49 +115,16 @@ async def game_worker():
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
 
-                    # Определение победителя
-                    if game_state["pool"] > 0:
-                        winner_val = random.uniform(0, game_state["pool"])
-                        current_sum = 0
-                        winner_id = None
-                        start_pct = 0
-
-                        for uid, p in game_state["players"].items():
-                            start_pct = current_sum / game_state["pool"]
-                            current_sum += p["amount"]
-                            end_pct = current_sum / game_state["pool"]
-
-                            if winner_val <= current_sum and winner_id is None:
-                                winner_id = uid
-                                # Позиция внутри сектора победителя
-                                sector_progress = (winner_val - (current_sum - p["amount"])) / p["amount"]
-                                game_state["winner_x"] = start_pct + sector_progress * (p["amount"] / game_state["pool"])
-
-                        if winner_id:
-                            winner_bet = game_state["players"][winner_id]["amount"]
-                            others_bets = game_state["pool"] - winner_bet
-                            profit = winner_bet + (others_bets * 0.7)
-
-                            try:
-                                with get_db_connection() as conn:
-                                    with conn.cursor() as cur:
-                                        cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s",
-                                                    (profit, winner_id))
-                                        conn.commit()
-                                logging.info(f"Winner {winner_id} won {profit} RUB")
-                            except Exception as e:
-                                logging.error(f"Game DB error: {e}")
-
         if game_state["status"] == "spinning":
-            await asyncio.sleep(7)  # Ждём анимацию на фронте
+            await asyncio.sleep(12)   # даём время на анимацию и отправку /finish
             async with game_lock:
-                game_state = {
-                    "status": "waiting",
-                    "players": {},
-                    "pool": 0.0,
-                    "timer": 15,
-                    "winner_x": 0.0
-                }
+                if game_state["status"] == "spinning":  # если не пришёл finish - принудительный сброс
+                    game_state = {
+                        "status": "waiting",
+                        "players": {},
+                        "pool": 0.0,
+                        "timer": 15
+                    }
 
 
 # --- API МЕТОДЫ ---
@@ -211,7 +201,6 @@ async def handle_get_inventory(request):
                     (str(user_id),))
                 items = cur.fetchall()
                 for item in items:
-                    # Нормализация статуса
                     if item['status'] == 'Выведен':
                         item['status'] = 'withdrawn'
                     traits_raw = item.get('traits')
@@ -297,8 +286,7 @@ async def handle_game_state(request):
             "status": game_state["status"],
             "players": list(game_state["players"].values()),
             "pool": game_state["pool"],
-            "timer": game_state["timer"],
-            "winner_x": game_state["winner_x"]
+            "timer": game_state["timer"]
         }, headers={"Access-Control-Allow-Origin": "*"})
 
 
@@ -368,6 +356,27 @@ async def handle_game_cancel(request):
     except Exception as e:
         logging.error(f"Cancel error: {e}")
         return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
+
+
+async def handle_game_finish(request):
+    """Фронт присылает финальную позицию мячика (0..1) после остановки"""
+    try:
+        data = await request.json()
+        pos = float(data.get('position', 0))
+        async with game_lock:
+            if game_state["status"] == "spinning":
+                await finish_round(pos, game_state["pool"], game_state["players"])
+                game_state = {
+                    "status": "waiting",
+                    "players": {},
+                    "pool": 0.0,
+                    "timer": 15
+                }
+                return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": False, "error": "not_spinning"}, headers={"Access-Control-Allow-Origin": "*"})
+    except Exception as e:
+        logging.error(f"Finish error: {e}")
+        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
 async def handle_get_requisites(request):
@@ -485,6 +494,7 @@ app.router.add_post('/request-withdraw', handle_request_withdraw)
 app.router.add_get('/game/state', handle_game_state)
 app.router.add_post('/game/bet', handle_game_bet)
 app.router.add_post('/game/cancel', handle_game_cancel)
+app.router.add_post('/game/finish', handle_game_finish)
 app.router.add_options('/{tail:.*}', handle_options)
 
 
