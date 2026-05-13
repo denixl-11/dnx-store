@@ -116,9 +116,9 @@ async def game_worker():
                     game_state["status"] = "spinning"
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(12)   # даём время на анимацию и отправку /finish
+            await asyncio.sleep(12)   # ждём анимацию 12 секунд
             async with game_lock:
-                if game_state["status"] == "spinning":  # если не пришёл finish - принудительный сброс
+                if game_state["status"] == "spinning":
                     game_state = {
                         "status": "waiting",
                         "players": {},
