@@ -6,6 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* все стили без изменений, оставляем как было */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -65,14 +66,13 @@
 
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
 
-        /* Игровое поле с анимацией зума */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap { position: relative; width: 90%; height: 25vh; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); background: #131315; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
         #gameCanvas {
             width: 100%;
             height: 100%;
             display: block;
-            transition: transform 1.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            transition: transform 2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
             will-change: transform;
         }
         .game-info-overlay { position: absolute; bottom: 8px; left: 12px; font-size: 0.65rem; color: rgba(255,255,255,0.4); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
@@ -82,14 +82,12 @@
         .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .game-btn-cancel { width: 90%; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
 
-        /* Список ставок под игрой */
         .bets-list-container { width: 90%; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
         .bets-list-header { padding: 12px 15px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); text-align: center; letter-spacing: 1px; }
         .bets-list { max-height: 200px; overflow-y: auto; padding: 5px 15px; }
         .bet-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; align-items: center; }
         .bet-row:last-child { border-bottom: none; }
 
-        /* Модалки */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; text-align: center; }
@@ -115,7 +113,6 @@
         .cart-item-info { flex: 1; }
         .fixed-footer { position: fixed; bottom: 85px; width: 100%; padding: 0 20px; z-index: 90; box-sizing: border-box; }
 
-        /* Кнопка Telegram в модалке (слева, такой же размер как крестик) */
         .modal-tg-btn {
             position: absolute;
             top: 15px;
@@ -229,13 +226,11 @@
 
     <div id="nft-detail-overlay" class="modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
-            <!-- Кнопка Telegram слева -->
             <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>
-            <!-- Крестик справа -->
             <div style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10;" onclick="closeNftModal(true)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </div>
@@ -419,7 +414,6 @@
             document.getElementById('nft-modal-btn-buy').onclick = () => { closeNftModal(true); buyItem(item.id, item.price); };
             document.getElementById('nft-modal-btn-cart').onclick = () => { closeNftModal(true); addToCart(item); };
 
-            // Кнопка Telegram
             const tgBtn = document.getElementById('nft-tg-link-btn');
             if(item.nft_link && item.nft_link.trim() !== '') {
                 tgBtn.style.display = 'flex';
@@ -613,7 +607,7 @@
             loadInventory();
         }
 
-        // --- МИНИ ИГРА С ПЛАВНОЙ АНИМАЦИЕЙ (разгон, отскоки, затем торможение) ---
+        // --- МИНИ ИГРА С ПЛАВНОЙ АНИМАЦИЕЙ ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, winner_x: 0 };
@@ -716,29 +710,33 @@
             }, 1000);
         }
 
-        // Новая анимация: разгон + хаотичные отскоки, затем торможение
+        // Новая анимация: 3 секунды разгон + отскоки, затем 7 секунд плавное торможение.
+        // За 2 секунды до конца начинается зум (CSS transition)
         function runSpinAnimation(targetPct, targetCanvasWidth) {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
 
             const targetX = targetPct * targetCanvasWidth;
             let currentX = 0;
-            let velocity = 0;
-            let phase = 0; // 0 = разгон и отскоки, 1 = торможение к цели
+            let velocity = (Math.random() * 600 + 300) * (Math.random() > 0.5 ? 1 : -1); // высокая скорость
+            let phase = 0; // 0 = отскоки, 1 = торможение
             let startTime = null;
-            const BOUNCE_DURATION = 1600; // 1.6 сек отскоков
-            const SLOW_DURATION = 2500;   // 2.5 сек торможения
+            const BOUNCE_DURATION = 3000;   // 3 секунды хаотичных отскоков
+            const SLOW_DURATION = 7000;     // 7 секунд торможения
+            const ZOOM_START_OFFSET = 2000; // за 2 секунды до конца торможения запускаем зум
 
-            // Случайная начальная скорость (быстрый разгон)
-            velocity = (Math.random() * 400 + 200) * (Math.random() > 0.5 ? 1 : -1);
+            let zoomStarted = false;
+
+            // Сброс предыдущего зума
+            canvas.style.transition = 'transform 2s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+            canvas.style.transform = 'scale(1)';
 
             function animate(timestamp) {
                 if(!startTime) startTime = timestamp;
                 const elapsed = timestamp - startTime;
 
                 if(phase === 0 && elapsed < BOUNCE_DURATION) {
-                    // Фаза отскоков: движение с отражением от границ
+                    // Фаза быстрых отскоков
                     currentX += velocity;
-                    // Отскоки от стенок
                     if(currentX <= 0) {
                         currentX = 0;
                         velocity = Math.abs(velocity);
@@ -747,42 +745,44 @@
                         currentX = targetCanvasWidth;
                         velocity = -Math.abs(velocity);
                     }
-                    // Небольшое случайное изменение скорости для живости
+                    // Иногда меняем скорость для живости
                     if(Math.random() < 0.05) {
-                        velocity += (Math.random() - 0.5) * 50;
-                        velocity = Math.min(Math.max(velocity, -500), 500);
+                        velocity += (Math.random() - 0.5) * 60;
+                        velocity = Math.min(Math.max(velocity, -600), 600);
                     }
                     drawGameFrame(currentX);
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else if (phase === 0 && elapsed >= BOUNCE_DURATION) {
-                    // Переключаемся на фазу торможения
                     phase = 1;
-                    startTime = timestamp; // сброс времени для easeOut
+                    startTime = timestamp; // обнуляем для фазы торможения
                     animate(timestamp);
                 }
                 else if (phase === 1) {
                     const t = Math.min(1, (timestamp - startTime) / SLOW_DURATION);
-                    // easeOutCubic
-                    const eased = 1 - Math.pow(1 - t, 3);
+                    // очень плавное замедление: easeOutQuart
+                    const eased = 1 - Math.pow(1 - t, 4);
                     currentX = targetX * eased + (currentX * (1 - eased));
                     drawGameFrame(currentX);
+
+                    // Запуск зума за 2 секунды до окончания торможения
+                    if(!zoomStarted && (SLOW_DURATION - (timestamp - startTime)) <= ZOOM_START_OFFSET) {
+                        zoomStarted = true;
+                        const originX = (targetX / canvas.width) * 100;
+                        canvas.style.transformOrigin = `${originX}% 50%`;
+                        canvas.style.transform = 'scale(2.5)';
+                    }
+
                     if(t < 1) {
                         animationFrameId = requestAnimationFrame(animate);
                     } else {
-                        // Анимация завершена
+                        // Завершение анимации
                         drawGameFrame(targetX);
                         animationFrameId = null;
-                        // Зум
+                        // Обновляем баланс через секунду (после зуба)
                         setTimeout(() => {
-                            const originX = (targetX / canvas.width) * 100;
-                            canvas.style.transformOrigin = `${originX}% 50%`;
-                            canvas.style.transform = "scale(2.5)";
-                            setTimeout(() => {
-                                canvas.style.transform = "scale(1)";
-                            }, 2000);
                             updateBalance();
-                        }, 100);
+                        }, 500);
                     }
                 }
             }
