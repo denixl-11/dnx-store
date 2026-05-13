@@ -5,6 +5,7 @@ import psycopg2
 import json
 import random
 from psycopg2.extras import RealDictCursor
+from datetime import datetime
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -16,13 +17,13 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-PAYMENT_REQUISITES = os.getenv("PAYMENT_REQUISITES", "+79991234567 (СБП)")
-
-WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
+PAYMENT_REQUISITES = os.getenv("PAYMENT_REQUISITES", "Реквизиты скрыты/не настроены")
 
 if not BOT_TOKEN:
-    logging.critical("КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN не найден!")
+    print("❌ КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN не найден!")
     exit(1)
+
+WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
 
 DB_CONFIG = {
     "dbname": "neondb",
@@ -42,6 +43,7 @@ def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
 
+# Автосоздание нужных таблиц
 def init_db():
     try:
         with get_db_connection() as conn:
@@ -86,35 +88,37 @@ async def game_worker():
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
 
-                    if game_state["pool"] > 0:
-                        winner_val = random.uniform(0, game_state["pool"])
-                        current_sum = 0
-                        winner_id = None
+                    # Определение победителя
+                    winner_val = random.uniform(0, game_state["pool"])
+                    current_sum = 0
+                    winner_id = None
 
-                        for uid, p in game_state["players"].items():
-                            start_pct = current_sum / game_state["pool"]
-                            current_sum += p["amount"]
-                            end_pct = current_sum / game_state["pool"]
+                    for uid, p in game_state["players"].items():
+                        start_pct = current_sum / game_state["pool"]
+                        current_sum += p["amount"]
+                        end_pct = current_sum / game_state["pool"]
 
-                            if winner_val <= current_sum and winner_id is None:
-                                winner_id = uid
-                                # Генерируем точку остановки строго внутри сегмента победителя
-                                game_state["winner_x"] = random.uniform(start_pct + 0.02, end_pct - 0.02)
+                        if winner_val <= current_sum and winner_id is None:
+                            winner_id = uid
+                            game_state["winner_x"] = random.uniform(start_pct + 0.02, end_pct - 0.02)
 
-                        if winner_id:
-                            # 10% комиссия сервиса
-                            profit = game_state["pool"] * 0.9
-                            try:
-                                with get_db_connection() as conn:
-                                    with conn.cursor() as cur:
-                                        cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s",
-                                                    (profit, winner_id))
-                                        conn.commit()
-                            except Exception as e:
-                                logging.error(f"Game DB error: {e}")
+                    if winner_id:
+                        # --- НОВАЯ ФОРМУЛА КОМИССИИ ---
+                        winner_bet = game_state["players"][winner_id]["amount"]
+                        others_bets = game_state["pool"] - winner_bet
+                        profit = winner_bet + (others_bets * 0.7)  # Возврат своей ставки + 70% от чужих ставок
+
+                        try:
+                            with get_db_connection() as conn:
+                                with conn.cursor() as cur:
+                                    cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s",
+                                                (profit, winner_id))
+                                    conn.commit()
+                        except Exception as e:
+                            logging.error(f"Game DB error: {e}")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(8)  # Ждем 8 секунд для завершения анимации на фронте
+            await asyncio.sleep(7)  # Ждем 7 секунд пока идет анимация на фронте
             async with game_lock:
                 game_state = {
                     "status": "waiting",
@@ -144,6 +148,24 @@ async def handle_get_user(request):
                                          headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         return web.json_response({"balance": 0.0}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+
+
+async def handle_topup_request(request):
+    try:
+        data = await request.json()
+        user_id = str(data.get('userId'))
+        username = data.get('username', 'Unknown')
+        amount = float(data.get('amount', 0))
+
+        admin_msg = f"💸 **Заявка на пополнение средств!**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} ₽\n\nПроверьте поступление по реквизитам."
+        admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"topup_no_{user_id}_{amount}"),
+            InlineKeyboardButton(text="✅ Зачислить", callback_data=f"topup_yes_{user_id}_{amount}")
+        ]])
+        await bot.send_message(ADMIN_ID, admin_msg, reply_markup=admin_kb)
+        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+    except:
+        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
 
 
 async def handle_get_items(request):
@@ -246,24 +268,6 @@ async def handle_request_withdraw(request):
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
-async def handle_topup_request(request):
-    try:
-        data = await request.json()
-        user_id = str(data.get('userId'))
-        username = data.get('username', 'Unknown')
-        amount = float(data.get('amount', 0))
-
-        admin_msg = f"💸 **Заявка на пополнение средств!**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} ₽\n\nПроверьте поступление по реквизитам."
-        admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"topup_no_{user_id}_{amount}"),
-            InlineKeyboardButton(text="✅ Зачислить", callback_data=f"topup_yes_{user_id}_{amount}")
-        ]])
-        await bot.send_message(ADMIN_ID, admin_msg, reply_markup=admin_kb)
-        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
-    except:
-        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
-
-
 # --- ИГРОВЫЕ API ---
 async def handle_game_state(request):
     async with game_lock:
@@ -287,19 +291,17 @@ async def handle_game_bet(request):
 
         async with game_lock:
             if game_state["status"] != "waiting" and game_state["status"] != "counting":
-                return web.json_response({"success": False, "error": "game_started"},
-                                         headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"success": False, "error": "game_started"})
             if len(game_state["players"]) >= 20 and user_id not in game_state["players"]:
-                return web.json_response({"success": False, "error": "room_full"},
-                                         headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"success": False, "error": "room_full"})
 
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
                     user = cur.fetchone()
                     if not user or float(user['balance']) < amount:
-                        return web.json_response({"success": False, "error": "insufficient_funds"},
-                                                 headers={"Access-Control-Allow-Origin": "*"})
+                        return web.json_response({"success": False, "error": "insufficient_funds"})
+
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
                     conn.commit()
 
@@ -319,6 +321,7 @@ async def handle_game_bet(request):
 
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
+        logging.error(f"Bet error: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
@@ -328,8 +331,7 @@ async def handle_game_cancel(request):
         user_id = str(data.get('userId'))
 
         async with game_lock:
-            if len(game_state["players"]) == 1 and user_id in game_state["players"] and game_state[
-                "status"] == "waiting":
+            if len(game_state["players"]) == 1 and user_id in game_state["players"]:
                 refund = game_state["players"][user_id]["amount"]
                 with get_db_connection() as conn:
                     with conn.cursor() as cur:
@@ -415,10 +417,11 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="✨ Открыть Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]])
+        inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]])
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
 
 
+# --- ЗАПУСК ---
 app = web.Application()
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)

@@ -52,6 +52,7 @@
         .btn-add-cart { width: 40px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
         .btn-main-action { width: 100%; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
+        .btn-main-action:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-secondary { width: 100%; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 12px; height: 52px; font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer; }
 
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
@@ -64,16 +65,28 @@
 
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
 
-        /* Игровое поле */
+        /* Игровое поле с анимацией зума */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap { position: relative; width: 90%; height: 25vh; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); background: #131315; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
-        #gameCanvas { width: 100%; height: 100%; display: block; }
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            transition: transform 1.5s cubic-bezier(0.25, 0.1, 0.25, 1); /* Плавный зум */
+        }
         .game-info-overlay { position: absolute; bottom: 8px; left: 12px; font-size: 0.65rem; color: rgba(255,255,255,0.4); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
         .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203, 161, 83, 0.2); pointer-events: none; }
 
         .game-controls { display: flex; gap: 12px; width: 90%; margin-top: 20px; }
         .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .game-btn-cancel { width: 90%; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
+
+        /* Список ставок под игрой */
+        .bets-list-container { width: 90%; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
+        .bets-list-header { padding: 12px 15px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); text-align: center; letter-spacing: 1px; }
+        .bets-list { max-height: 200px; overflow-y: auto; padding: 5px 15px; }
+        .bet-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; align-items: center; }
+        .bet-row:last-child { border-bottom: none; }
 
         /* Модалки */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
@@ -125,6 +138,11 @@
                 <button class="game-btn" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
+
+            <div class="bets-list-container" id="bets-list-container">
+                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color: var(--accent-gold);">0 ₽</span>)</div>
+                <div class="bets-list" id="game-bets-list"></div>
+            </div>
         </div>
     </div>
 
@@ -231,7 +249,7 @@
         <div class="modal-content">
             <h3 class="modal-title">Подтверждение</h3>
             <p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> ₽?</p>
-            <button class="btn-main-action" onclick="executeBet()">Подтвердить</button>
+            <button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button>
             <button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button>
         </div>
     </div>
@@ -264,7 +282,7 @@
         let currentCatalog = [];
         let inventoryData = [];
         let pendingTopupAmount = 0;
-        let pendingBet = 0;
+        let betAmountTemp = 0;
 
         // Инициализация
         const uId = tg.initDataUnsafe?.user?.id || "guest_id";
@@ -468,7 +486,7 @@
             loadInventory();
         }
 
-        // --- МИНИ ИГРА С ПЛАВНОЙ АНИМАЦИЕЙ ---
+        // --- МИНИ ИГРА С ПЛАВНОЙ АНИМАЦИЕЙ И ЗУМОМ ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, winner_x: 0 };
@@ -518,6 +536,30 @@
             }
         }
 
+        // Рендер списка ставок (Сортировка по убыванию)
+        function renderBetsList() {
+            const container = document.getElementById('bets-list-container');
+            const list = document.getElementById('game-bets-list');
+
+            if(!gState.players || gState.players.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'flex';
+            document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
+
+            const sorted = [...gState.players].sort((a,b) => b.amount - a.amount);
+            list.innerHTML = sorted.map(p => `
+                <div class="bet-row">
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <span style="width:12px; height:12px; border-radius:50%; background:${p.color}; display:inline-block;"></span>
+                        <span style="font-weight: 600;">${p.username}</span>
+                    </span>
+                    <span style="color: var(--accent-gold); font-weight: 700;">${p.amount} ₽</span>
+                </div>
+            `).join('');
+        }
+
         function startLocalTimer(val) {
             clearInterval(timerInterval);
             localTimer = val;
@@ -535,9 +577,7 @@
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
 
-                // Синхронизация независимого таймера
                 if (newState.status === 'counting' && newState.timer !== lastServerTimer) {
-                    // Обновляем локальный таймер, если сервер ушел вперед или назад более чем на 1 секунду
                     if (Math.abs(localTimer - newState.timer) > 1) {
                         startLocalTimer(newState.timer);
                     }
@@ -550,16 +590,17 @@
                 gState = newState;
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
 
-                // Кнопка отмены
+                renderBetsList();
+
                 const hasMyBet = gState.players.find(p => p.id === String(uId));
                 document.getElementById('btn-cancel-bet').style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
 
-                // Запуск анимации
                 if(gState.status === 'spinning' && !isSpinning) {
                     isSpinning = true;
                     runSpinAnimation(gState.winner_x);
                 } else if(gState.status !== 'spinning') {
                     isSpinning = false;
+                    canvas.style.transform = "scale(1)"; // СБРОС ЗУМА при новом раунде
                     drawGameFrame();
                 }
             } catch(e) {}
@@ -568,37 +609,40 @@
 
         function runSpinAnimation(targetPct) {
             const targetX = targetPct * canvas.width;
-            const duration = 6500; // 6.5 секунд
-            const startTime = performance.now();
+            let currentX = 0;
+            let velocity = canvas.width * 0.15; // скорость
+            let startTime = Date.now();
 
-            // 4 полных круга + конечная позиция
-            const rotations = 4;
-            const totalDistance = (rotations * canvas.width) + targetX;
-
-            // Функция плавного замедления (Ease Out Cubic)
-            function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
-
-            function animate(now) {
-                let elapsed = now - startTime;
-                let progress = Math.min(elapsed / duration, 1);
-
-                let currentPos = totalDistance * easeOutCubic(progress);
-                let visualX = currentPos % canvas.width;
-
-                drawGameFrame(visualX);
-
-                if (progress < 1) {
+            function animate() {
+                let elapsed = Date.now() - startTime;
+                if(elapsed < 4000) {
+                    // Фаза 1: летает туда-сюда
+                    currentX += velocity;
+                    if(currentX > canvas.width || currentX < 0) velocity *= -1;
+                    drawGameFrame(currentX);
+                    requestAnimationFrame(animate);
+                } else if (elapsed < 6500) {
+                    // Фаза 2: доезжает до цели
+                    currentX += (targetX - currentX) * 0.05;
+                    drawGameFrame(currentX);
                     requestAnimationFrame(animate);
                 } else {
-                    isSpinning = false;
-                    setTimeout(updateBalance, 1000); // Обновляем баланс после остановки рулетки
+                    // Финал
+                    drawGameFrame(targetX);
+
+                    // --- ЭФФЕКТ ПРИБЛИЖЕНИЯ ---
+                    const originX = (targetX / canvas.width) * 100;
+                    canvas.style.transformOrigin = `${originX}% 50%`;
+                    canvas.style.transform = "scale(2.5)"; // Увеличиваем в 2.5 раза
+
+                    setTimeout(() => { updateBalance(); }, 1000);
                 }
             }
             requestAnimationFrame(animate);
         }
 
         function openBetConfirm(amt) {
-            pendingBet = amt;
+            betAmountTemp = amt;
             document.getElementById('confirm-bet-amount').innerText = amt;
             document.getElementById('confirm-bet-modal').classList.add('active');
         }
@@ -611,15 +655,39 @@
             if(v > 0) { closeModal('custom-bet-modal'); openBetConfirm(v); }
         }
 
+        // Выполнение ставки
         async function executeBet() {
-            closeModal('confirm-bet-modal');
-            if(userBalance < pendingBet) { showAlert("Недостаточно средств на балансе!"); return; }
+            const btn = document.getElementById('btn-confirm-bet');
+            btn.disabled = true;
+            btn.innerText = 'Загрузка...';
+
+            if(userBalance < betAmountTemp) {
+                showAlert("Недостаточно средств на балансе!");
+                closeModal('confirm-bet-modal');
+                btn.disabled = false; btn.innerText = 'Подтвердить';
+                return;
+            }
+
             try {
-                const r = await fetch(`${API_BASE}/game/bet`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: pendingBet}) });
+                const r = await fetch(`${API_BASE}/game/bet`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: betAmountTemp}) });
                 const d = await r.json();
-                if(d.success) { updateBalance(); pollGame(); }
-                else { showAlert(d.error === 'insufficient_funds' ? "Недостаточно средств!" : "Ставка не принята"); }
-            } catch(e) {}
+                closeModal('confirm-bet-modal');
+
+                if(d.success) {
+                    await updateBalance();
+                    await pollGame();
+                } else {
+                    let msg = "Ставка не принята";
+                    if (d.error === 'insufficient_funds') msg = "Недостаточно средств!";
+                    if (d.error === 'game_started') msg = "Игра уже началась, подождите!";
+                    if (d.error === 'room_full') msg = "В комнате уже 20 игроков!";
+                    showAlert(msg);
+                }
+            } catch(e) {
+                closeModal('confirm-bet-modal');
+                showAlert("Ошибка сети, попробуйте снова");
+            }
+            btn.disabled = false; btn.innerText = 'Подтвердить';
         }
 
         async function cancelGameBet() {
