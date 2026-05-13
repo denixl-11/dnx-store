@@ -6,7 +6,6 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* все стили без изменений, оставляем как было */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -160,13 +159,11 @@
                 <div class="game-info-overlay" id="game-players-count">Игроки: 0/20</div>
                 <div class="game-timer-overlay" id="game-timer-bg"></div>
             </div>
-
             <div class="game-controls">
                 <button class="game-btn" onclick="openBetConfirm(50)">+50 ₽</button>
                 <button class="game-btn" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
-
             <div class="bets-list-container" id="bets-list-container">
                 <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color: var(--accent-gold);">0 ₽</span>)</div>
                 <div class="bets-list" id="game-bets-list"></div>
@@ -317,7 +314,6 @@
         let pendingTopupAmount = 0;
         let betAmountTemp = 0;
 
-        // Инициализация
         const uId = tg.initDataUnsafe?.user?.id || "guest_id";
         const uName = tg.initDataUnsafe?.user?.username || "Guest";
         document.getElementById('username-display').innerText = uName;
@@ -325,7 +321,6 @@
             document.getElementById('avatar-img').src = tg.initDataUnsafe.user.photo_url;
         }
 
-        // Общие утилиты
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
             document.getElementById('alert-modal').classList.add('active');
@@ -360,7 +355,6 @@
         }
         setInterval(updateBalance, 5000);
 
-        // --- МАГАЗИН И КОРЗИНА ---
         async function loadCatalog() {
             try {
                 const res = await fetch(`${API_BASE}/items`);
@@ -509,7 +503,6 @@
             } catch(e) { showAlert("Ошибка сети"); }
         }
 
-        // --- БАЛАНС И ПОПОЛНЕНИЕ ---
         document.getElementById('terms-checkbox')?.addEventListener('change', function() {
             const chkSpan = document.getElementById('custom-chk');
             if(chkSpan) {
@@ -567,7 +560,6 @@
             showAlert("Заявка отправлена. Ожидайте зачисления.");
         }
 
-        // --- ИНВЕНТАРЬ ---
         function switchInv(el, type) {
             document.querySelectorAll('#page-inventory .tab-item').forEach(t => {
                 t.classList.remove('active');
@@ -607,10 +599,9 @@
             loadInventory();
         }
 
-        // --- МИНИ ИГРА С ПЛАВНОЙ АНИМАЦИЕЙ ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, winner_x: 0 };
+        let gState = { players: [], pool: 0, status: 'waiting', timer: 15 };
         let isSpinning = false;
         let animationFrameId = null;
         let lastServerTimer = 15;
@@ -710,82 +701,68 @@
             }, 1000);
         }
 
-        // Новая анимация: 3 секунды разгон + отскоки, затем 7 секунд плавное торможение.
-        // За 2 секунды до конца начинается зум (CSS transition)
-        function runSpinAnimation(targetPct, targetCanvasWidth) {
+        // Новая анимация с линейным затуханием скорости и отправкой позиции
+        function runSpinAnimation(targetCanvasWidth) {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
 
-            const targetX = targetPct * targetCanvasWidth;
-            let currentX = 0;
-            let velocity = (Math.random() * 600 + 300) * (Math.random() > 0.5 ? 1 : -1); // высокая скорость
-            let phase = 0; // 0 = отскоки, 1 = торможение
-            let startTime = null;
-            const BOUNCE_DURATION = 3000;   // 3 секунды хаотичных отскоков
-            const SLOW_DURATION = 7000;     // 7 секунд торможения
-            const ZOOM_START_OFFSET = 2000; // за 2 секунды до конца торможения запускаем зум
+            let currentX = canvas.width / 2;
+            let velocity = (Math.random() * 600 + 300) * (Math.random() > 0.5 ? 1 : -1);
+            const startTime = performance.now();
+            const DURATION = 10000;
+            const initialSpeed = Math.abs(velocity);
+            const deceleration = initialSpeed / DURATION;
 
-            let zoomStarted = false;
+            let lastTimestamp = startTime;
+            let finished = false;
 
-            // Сброс предыдущего зума
-            canvas.style.transition = 'transform 2s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-            canvas.style.transform = 'scale(1)';
-
-            function animate(timestamp) {
-                if(!startTime) startTime = timestamp;
-                const elapsed = timestamp - startTime;
-
-                if(phase === 0 && elapsed < BOUNCE_DURATION) {
-                    // Фаза быстрых отскоков
-                    currentX += velocity;
-                    if(currentX <= 0) {
-                        currentX = 0;
-                        velocity = Math.abs(velocity);
-                    }
-                    if(currentX >= targetCanvasWidth) {
-                        currentX = targetCanvasWidth;
-                        velocity = -Math.abs(velocity);
-                    }
-                    // Иногда меняем скорость для живости
-                    if(Math.random() < 0.05) {
-                        velocity += (Math.random() - 0.5) * 60;
-                        velocity = Math.min(Math.max(velocity, -600), 600);
-                    }
-                    drawGameFrame(currentX);
+            function animate(now) {
+                if(finished) return;
+                const dt = Math.min(100, now - lastTimestamp);
+                if(dt <= 0) {
                     animationFrameId = requestAnimationFrame(animate);
+                    return;
                 }
-                else if (phase === 0 && elapsed >= BOUNCE_DURATION) {
-                    phase = 1;
-                    startTime = timestamp; // обнуляем для фазы торможения
-                    animate(timestamp);
-                }
-                else if (phase === 1) {
-                    const t = Math.min(1, (timestamp - startTime) / SLOW_DURATION);
-                    // очень плавное замедление: easeOutQuart
-                    const eased = 1 - Math.pow(1 - t, 4);
-                    currentX = targetX * eased + (currentX * (1 - eased));
+                lastTimestamp = now;
+                const elapsed = now - startTime;
+                if(elapsed >= DURATION) {
                     drawGameFrame(currentX);
-
-                    // Запуск зума за 2 секунды до окончания торможения
-                    if(!zoomStarted && (SLOW_DURATION - (timestamp - startTime)) <= ZOOM_START_OFFSET) {
-                        zoomStarted = true;
-                        const originX = (targetX / canvas.width) * 100;
-                        canvas.style.transformOrigin = `${originX}% 50%`;
-                        canvas.style.transform = 'scale(2.5)';
-                    }
-
-                    if(t < 1) {
-                        animationFrameId = requestAnimationFrame(animate);
-                    } else {
-                        // Завершение анимации
-                        drawGameFrame(targetX);
-                        animationFrameId = null;
-                        // Обновляем баланс через секунду (после зуба)
-                        setTimeout(() => {
-                            updateBalance();
-                        }, 500);
-                    }
+                    animationFrameId = null;
+                    const pos = currentX / canvas.width;
+                    fetch(`${API_BASE}/game/finish`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({position: pos})
+                    }).catch(e => console.error("Finish error", e));
+                    setTimeout(() => updateBalance(), 1000);
+                    finished = true;
+                    return;
                 }
+
+                let speed = initialSpeed - deceleration * elapsed;
+                if(speed < 0) speed = 0;
+                let direction = velocity > 0 ? 1 : -1;
+                let step = direction * speed * (dt / 1000);
+                currentX += step;
+
+                if(currentX <= 0) {
+                    currentX = 0;
+                    velocity = Math.abs(velocity);
+                    speed = initialSpeed - deceleration * elapsed;
+                    velocity = speed;
+                } else if(currentX >= canvas.width) {
+                    currentX = canvas.width;
+                    velocity = -Math.abs(velocity);
+                    speed = initialSpeed - deceleration * elapsed;
+                    velocity = -speed;
+                } else {
+                    velocity = direction * speed;
+                }
+
+                drawGameFrame(currentX);
+                animationFrameId = requestAnimationFrame(animate);
             }
+
+            lastTimestamp = performance.now();
             animationFrameId = requestAnimationFrame(animate);
         }
 
@@ -822,14 +799,13 @@
 
                 if(gState.status === 'spinning' && !isSpinning) {
                     isSpinning = true;
-                    runSpinAnimation(gState.winner_x, canvas.width);
+                    runSpinAnimation(canvas.width);
                 } else if(gState.status !== 'spinning' && isSpinning) {
                     isSpinning = false;
                     if(animationFrameId) {
                         cancelAnimationFrame(animationFrameId);
                         animationFrameId = null;
                     }
-                    canvas.style.transform = "scale(1)";
                     drawGameFrame();
                 } else if(gState.status !== 'spinning' && !isSpinning) {
                     drawGameFrame();
@@ -912,7 +888,6 @@
             } catch(e) {}
         }
 
-        // Запуск
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
