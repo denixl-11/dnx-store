@@ -81,28 +81,35 @@ def generate_color():
 async def finish_round(winner_x, pool, players):
     """Определяет победителя по позиции winner_x (0..1) и начисляет выигрыш"""
     if pool <= 0 or not players:
+        logging.warning(f"finish_round: pool={pool}, players={players}")
         return
     cumulative = 0.0
     winner_id = None
+    # Сортируем игроков по id для детерминизма (необязательно)
     for uid, p in players.items():
         start = cumulative
         cumulative += p["amount"] / pool
+        logging.info(f"Player {uid} amount {p['amount']} -> sector [{start:.3f}, {cumulative:.3f}]")
         if start <= winner_x <= cumulative:
             winner_id = uid
+            logging.info(f"Winner found: {uid} at position {winner_x}")
             break
     if winner_id:
         winner_bet = players[winner_id]["amount"]
         others_bets = pool - winner_bet
         profit = winner_bet + (others_bets * 0.7)
+        logging.info(f"Winner {winner_id} bet={winner_bet}, others={others_bets}, profit={profit}")
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s",
                                 (profit, winner_id))
                     conn.commit()
-            logging.info(f"Winner {winner_id} won {profit} RUB (pos {winner_x})")
+            logging.info(f"Balance updated for {winner_id}: +{profit} RUB")
         except Exception as e:
             logging.error(f"Game DB error: {e}")
+    else:
+        logging.warning(f"No winner found for position {winner_x}")
 
 
 async def game_worker():
@@ -114,11 +121,14 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
+                    logging.info("Game status changed to spinning")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(12)   # ждём анимацию 12 секунд
             async with game_lock:
                 if game_state["status"] == "spinning":
+                    # Если фронт не отправил finish за 12 секунд, сбрасываем принудительно
+                    logging.warning("Game finish not received, force reset")
                     game_state = {
                         "status": "waiting",
                         "players": {},
@@ -363,6 +373,7 @@ async def handle_game_finish(request):
     try:
         data = await request.json()
         pos = float(data.get('position', 0))
+        logging.info(f"Game finish received: position={pos}")
         async with game_lock:
             if game_state["status"] == "spinning":
                 await finish_round(pos, game_state["pool"], game_state["players"])
@@ -373,6 +384,8 @@ async def handle_game_finish(request):
                     "timer": 15
                 }
                 return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+            else:
+                logging.warning(f"Game finish called but status={game_state['status']}")
         return web.json_response({"success": False, "error": "not_spinning"}, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         logging.error(f"Finish error: {e}")

@@ -139,37 +139,43 @@
             stroke: var(--accent-gold);
         }
 
-        /* НОВЫЙ СТИЛЬ для кнопок в модалке NFT — одинаковые по ширине */
-        .modal-action-buttons {
+        .modal-buttons-row {
             display: flex;
             gap: 10px;
+            align-items: stretch;
         }
-        .modal-action-buttons button {
+        .modal-buttons-row .btn-buy-modal {
             flex: 1;
-            height: 52px;
+            background: linear-gradient(135deg, #cba153 0%, #a47d33 100%);
+            color: #050505;
+            border: none;
             border-radius: 12px;
+            height: 52px;
             font-weight: 700;
             font-size: 0.95rem;
             text-transform: uppercase;
             cursor: pointer;
             transition: 0.3s;
+        }
+        .modal-buttons-row .btn-cart-icon {
+            width: 52px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--accent-gold);
+            border-radius: 12px;
+            height: 52px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            cursor: pointer;
+            transition: 0.3s;
         }
-        .btn-buy-modal {
-            background: linear-gradient(135deg, #cba153 0%, #a47d33 100%);
-            color: #050505;
-            border: none;
-        }
-        .btn-cart-modal {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--accent-gold);
-            color: var(--accent-gold);
-        }
-        .btn-cart-modal svg {
+        .modal-buttons-row .btn-cart-icon svg {
             stroke: var(--accent-gold);
+            width: 24px;
+            height: 24px;
+        }
+        .modal-buttons-row .btn-cart-icon:hover {
+            background: rgba(203, 161, 83, 0.1);
         }
     </style>
 </head>
@@ -273,15 +279,13 @@
             </div>
             <div style="padding: 0 20px; overflow-y: auto; flex: 1;" id="nft-modal-traits-container"></div>
             <div style="padding: 20px;">
-                <!-- ИСПРАВЛЕННЫЙ БЛОК КНОПОК: одинаковые по ширине -->
-                <div class="modal-action-buttons">
+                <div class="modal-buttons-row">
                     <button class="btn-buy-modal" id="nft-modal-btn-buy">КУПИТЬ</button>
-                    <button class="btn-cart-modal" id="nft-modal-btn-cart">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <div class="btn-cart-icon" id="nft-modal-btn-cart">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                         </svg>
-                        В КОРЗИНУ
-                    </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -441,7 +445,6 @@
                 `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
                 '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
 
-            // обновляем текст кнопки покупки
             const buyBtn = document.getElementById('nft-modal-btn-buy');
             buyBtn.innerHTML = `КУПИТЬ ЗА ${item.price || 0} ₽`;
             buyBtn.onclick = () => { closeNftModal(true); buyItem(item.id, item.price); };
@@ -742,15 +745,14 @@
             }, 1000);
         }
 
-        // Новая анимация: 12 секунд, начальная скорость 600-1500 пикс/сек
+        // Анимация: скорость до 2500, замедление до 0 за 12 секунд, зум после остановки
         function runSpinAnimation(targetCanvasWidth) {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
 
             let currentX = canvas.width / 2;
-            // Резкий пинок: скорость от 600 до 1500
-            let velocity = (Math.random() * 900 + 600) * (Math.random() > 0.5 ? 1 : -1);
+            let velocity = (Math.random() * 500 + 2000) * (Math.random() > 0.5 ? 1 : -1); // 2000-2500
             const startTime = performance.now();
-            const DURATION = 12000; // 12 секунд
+            const DURATION = 12000;
             const initialSpeed = Math.abs(velocity);
             const deceleration = initialSpeed / DURATION;
 
@@ -770,12 +772,24 @@
                     drawGameFrame(currentX);
                     animationFrameId = null;
                     const pos = currentX / canvas.width;
+                    // Отправляем финальную позицию
                     fetch(`${API_BASE}/game/finish`, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({position: pos})
                     }).catch(e => console.error("Finish error", e));
-                    setTimeout(() => updateBalance(), 1000);
+
+                    // ЗУМ после остановки
+                    setTimeout(() => {
+                        const originX = (currentX / canvas.width) * 100;
+                        canvas.style.transformOrigin = `${originX}% 50%`;
+                        canvas.style.transform = "scale(2.5)";
+                        setTimeout(() => {
+                            canvas.style.transform = "scale(1)";
+                        }, 2000);
+                    }, 100);
+
+                    setTimeout(() => updateBalance(), 1200);
                     finished = true;
                     return;
                 }
