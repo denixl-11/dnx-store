@@ -85,7 +85,6 @@ async def finish_round(winner_x, pool, players):
         return
     cumulative = 0.0
     winner_id = None
-    # Сортируем игроков по id для детерминизма (необязательно)
     for uid, p in players.items():
         start = cumulative
         cumulative += p["amount"] / pool
@@ -124,10 +123,9 @@ async def game_worker():
                     logging.info("Game status changed to spinning")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(12)   # ждём анимацию 12 секунд
+            await asyncio.sleep(12)
             async with game_lock:
                 if game_state["status"] == "spinning":
-                    # Если фронт не отправил finish за 12 секунд, сбрасываем принудительно
                     logging.warning("Game finish not received, force reset")
                     game_state = {
                         "status": "waiting",
@@ -301,6 +299,7 @@ async def handle_game_state(request):
 
 
 async def handle_game_bet(request):
+    global game_state
     try:
         data = await request.json()
         user_id = str(data.get('userId'))
@@ -347,6 +346,7 @@ async def handle_game_bet(request):
 
 
 async def handle_game_cancel(request):
+    global game_state
     try:
         data = await request.json()
         user_id = str(data.get('userId'))
@@ -369,7 +369,7 @@ async def handle_game_cancel(request):
 
 
 async def handle_game_finish(request):
-    """Фронт присылает финальную позицию мячика (0..1) после остановки"""
+    global game_state
     try:
         data = await request.json()
         pos = float(data.get('position', 0))
@@ -386,7 +386,7 @@ async def handle_game_finish(request):
                 return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
             else:
                 logging.warning(f"Game finish called but status={game_state['status']}")
-        return web.json_response({"success": False, "error": "not_spinning"}, headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"success": False, "error": "not_spinning"}, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         logging.error(f"Finish error: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
@@ -455,7 +455,7 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
                     "UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
                     (int(item_id), uid))
                 conn.commit()
-        await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
+        await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВВЕРЖДЕН**")
         try:
             await bot.send_message(uid, f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
         except:
