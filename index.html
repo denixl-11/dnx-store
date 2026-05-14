@@ -14,116 +14,66 @@
             --text-muted: #7a7a7c;
             --border-color: #222224;
         }
-
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { overflow-x: hidden; width: 100%; }
-
         body {
-            background-color: var(--bg-main);
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            padding-bottom: 100px;
-            -webkit-font-smoothing: antialiased;
+            background-color: var(--bg-main); color: var(--text-main);
+            font-family: 'Inter', sans-serif; margin: 0;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; padding-bottom: 100px; -webkit-font-smoothing: antialiased;
         }
-
         header {
-            width: 100%;
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: relative;
-            border-bottom: 1px solid var(--border-color);
-            background: rgba(10, 10, 12, 0.95);
-            z-index: 50;
+            width: 100%; padding: 20px; display: flex; justify-content: space-between;
+            align-items: center; position: relative; border-bottom: 1px solid var(--border-color);
+            background: rgba(10, 10, 12, 0.95); z-index: 50;
         }
-
         .header-left { display: flex; align-items: center; gap: 8px; }
         .avatar { width: 36px; height: 36px; border-radius: 50%; background: #222; object-fit: cover; border: 1px solid var(--border-color); }
         .username { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
-
         .header-right {
-            background: rgba(203, 161, 83, 0.1);
-            border: 1px solid var(--accent-gold);
-            padding: 8px 12px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: 0.2s;
+            background: rgba(203, 161, 83, 0.1); border: 1px solid var(--accent-gold);
+            padding: 8px 12px; border-radius: 12px; cursor: pointer; transition: 0.2s;
         }
         .header-right:active { transform: scale(0.95); }
         .balance-text { color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; }
-
         .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; padding: 20px; box-sizing: border-box; }
         .item-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; }
         .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 12px; object-fit: cover; margin-bottom: 14px; cursor: pointer; }
         .item-name { font-size: 0.95rem; font-weight: 500; margin-bottom: 14px; color: var(--text-main); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
         .card-buttons { display: flex; width: 100%; gap: 8px; }
         .btn-buy-now { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 10px; height: 36px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; cursor: pointer; }
         .btn-add-cart { width: 40px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-
         .btn-main-action { width: 100%; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
         .btn-main-action:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-secondary { width: 100%; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 12px; height: 52px; font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer; }
-
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .tab-bar {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background: rgba(10, 10, 12, 0.85);
-            backdrop-filter: blur(15px);
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-around;
-            padding: 20px 0 25px 0;
-            z-index: 100;
-        }
+        .tab-bar { position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85); backdrop-filter: blur(15px); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100; }
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
-
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
-
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap { position: relative; width: 90%; height: 25vh; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); background: #131315; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
-        #gameCanvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            transition: transform 2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-            will-change: transform;
-        }
+        #gameCanvas { width: 100%; height: 100%; display: block; }
         .game-info-overlay { position: absolute; bottom: 8px; left: 12px; font-size: 0.65rem; color: rgba(255,255,255,0.4); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
         .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203, 161, 83, 0.2); pointer-events: none; }
-
         .game-controls { display: flex; gap: 12px; width: 90%; margin-top: 20px; }
         .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .game-btn-cancel { width: 90%; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
-
         .bets-list-container { width: 90%; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
         .bets-list-header { padding: 12px 15px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); text-align: center; letter-spacing: 1px; }
         .bets-list { max-height: 200px; overflow-y: auto; padding: 5px 15px; }
         .bet-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; align-items: center; }
         .bet-row:last-child { border-bottom: none; }
-
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; text-align: center; }
         .modal-title { font-weight: 700; font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px; text-transform: uppercase; }
         .input-dark { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 14px; border-radius: 10px; font-size: 1rem; margin-bottom: 20px; box-sizing: border-box; text-align: center; }
-
         .topup-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; width: 100%; max-width: 400px; margin-bottom: 20px; }
         .topup-btn { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 12px; height: 48px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
         .topup-btn.custom-btn { grid-column: span 3; border-color: var(--accent-gold); color: var(--accent-gold); }
-
         .nft-modal-sheet { position: fixed; bottom: -100%; left: 0; width: 100%; background: #0a0a0c; border-radius: 24px 24px 0 0; transition: bottom 0.4s; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; z-index: 1100; }
         .modal-overlay.active .nft-modal-sheet { bottom: 0; }
         .nft-modal-header-rocket { padding-top: 25px; display: flex; flex-direction: column; align-items: center; position: relative; }
@@ -132,13 +82,11 @@
         .trait-row { display: flex; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
         .trait-row .trait-name { color: var(--accent-gold); font-weight: 500; }
         .trait-row .trait-value { color: var(--accent-gold); font-weight: 600; }
-
         .cart-list { padding: 20px; }
         .cart-item { display: flex; align-items: center; gap: 15px; background: var(--bg-card); padding: 12px; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border-color); }
         .cart-item img { width: 50px; height: 50px; border-radius: 8px; }
         .cart-item-info { flex: 1; }
         .fixed-footer { position: fixed; bottom: 85px; width: 100%; padding: 0 20px; z-index: 90; box-sizing: border-box; }
-
         .modal-tg-btn {
             position: absolute;
             top: 15px;
@@ -157,12 +105,10 @@
         .modal-tg-btn:hover { background: rgba(203, 161, 83, 0.3); }
         .modal-tg-btn svg { width: 20px; height: 20px; stroke: white; stroke-width: 1.8; fill: none; }
         .modal-tg-btn:hover svg { stroke: var(--accent-gold); }
-
         .modal-buttons-row { display: flex; gap: 10px; align-items: stretch; }
         .modal-buttons-row .btn-buy-modal { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
         .modal-buttons-row .btn-cart-icon { width: 52px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 12px; height: 52px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; }
         .modal-buttons-row .btn-cart-icon svg { stroke: var(--accent-gold); width: 24px; height: 24px; }
-
         .winner-modal .winner-avatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-gold); margin-bottom: 16px; }
         .winner-modal .winner-name { font-size: 1.4rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 8px; }
         .winner-modal .winner-amount { font-size: 1.2rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; }
@@ -170,7 +116,6 @@
     </style>
 </head>
 <body>
-
     <header>
         <div class="header-left">
             <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">
@@ -360,9 +305,7 @@
         const uName = tg.initDataUnsafe?.user?.username || "Guest";
         const uAvatar = tg.initDataUnsafe?.user?.photo_url || "";
         document.getElementById('username-display').innerText = uName;
-        if(uAvatar) {
-            document.getElementById('avatar-img').src = uAvatar;
-        }
+        if(uAvatar) document.getElementById('avatar-img').src = uAvatar;
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
@@ -381,7 +324,6 @@
             if(pageEl) pageEl.classList.add('page-active');
             const tabEl = document.getElementById('tab-' + id);
             if(tabEl) tabEl.classList.add('active');
-
             if(id === 'store') loadCatalog();
             if(id === 'inventory') loadInventory();
             if(id === 'cart') renderCart();
@@ -419,12 +361,7 @@
 
         function escapeHtml(str) {
             if(!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if(m === '&') return '&amp;';
-                if(m === '<') return '&lt;';
-                if(m === '>') return '&gt;';
-                return m;
-            });
+            return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
         }
 
         function openNftModal(id) {
@@ -442,7 +379,6 @@
                     traits = item.traits;
                 }
             }
-
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
                 `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
                 '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
@@ -450,28 +386,19 @@
             const buyBtn = document.getElementById('nft-modal-btn-buy');
             buyBtn.innerHTML = `КУПИТЬ ЗА ${item.price || 0} ₽`;
             buyBtn.onclick = () => { closeNftModal(true); buyItem(item.id, item.price); };
-            
             const cartBtn = document.getElementById('nft-modal-btn-cart');
             cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
-
             const tgBtn = document.getElementById('nft-tg-link-btn');
             if(item.nft_link && item.nft_link.trim() !== '') {
                 tgBtn.style.display = 'flex';
-                tgBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    window.open(item.nft_link, '_blank');
-                };
-            } else {
-                tgBtn.style.display = 'none';
-            }
-
+                tgBtn.onclick = (e) => { e.stopPropagation(); window.open(item.nft_link, '_blank'); };
+            } else tgBtn.style.display = 'none';
             document.getElementById('nft-detail-overlay').classList.add('active');
         }
 
         function closeNftModal(force=false) {
-            if(force || (event && event.target.id === 'nft-detail-overlay')) {
+            if(force || (event && event.target.id === 'nft-detail-overlay'))
                 document.getElementById('nft-detail-overlay').classList.remove('active');
-            }
         }
 
         function addToCart(item) {
@@ -518,13 +445,8 @@
                 const data = await res.json();
                 if(data.success) {
                     showAlert("Успешная покупка! NFT добавлен в инвентарь.");
-                    updateBalance();
-                    loadCatalog();
-                    if(currentCatalog.some(i => i.id === itemId)) loadInventory();
-                } else {
-                    showAlert(data.error === 'insufficient_funds' ? "Недостаточно средств!" : "Товар уже недоступен.");
-                    loadCatalog();
-                }
+                    updateBalance(); loadCatalog(); loadInventory();
+                } else showAlert(data.error === 'insufficient_funds' ? "Недостаточно средств!" : "Товар уже недоступен.");
             } catch(e) { showAlert("Ошибка сети"); }
         }
 
@@ -537,15 +459,9 @@
                 const data = await res.json();
                 if(data.success) {
                     showAlert("Корзина успешно оплачена!");
-                    cart=[];
-                    localStorage.setItem('dnx_cart', '[]');
-                    renderCart();
-                    updateBalance();
-                    loadInventory();
-                } else {
-                    showAlert("Ошибка оплаты. Возможно часть товаров уже недоступна.");
-                    loadCatalog();
-                }
+                    cart=[]; localStorage.setItem('dnx_cart', '[]');
+                    renderCart(); updateBalance(); loadInventory();
+                } else showAlert("Ошибка оплаты. Возможно часть товаров уже недоступна.");
             } catch(e) { showAlert("Ошибка сети"); }
         }
 
@@ -554,39 +470,32 @@
             if(chkSpan) {
                 chkSpan.innerHTML = this.checked ? '✓' : '';
                 chkSpan.style.borderColor = this.checked ? 'var(--accent-gold)' : 'var(--border-color)';
-                chkSpan.style.color = '#000';
                 chkSpan.style.background = this.checked ? 'var(--accent-gold)' : 'transparent';
             }
         });
 
         function initTopup(amount) {
-            if (amount < 50) { showAlert("Минимальная сумма 50 ₽"); return; }
+            if(amount < 50) { showAlert("Минимальная сумма 50 ₽"); return; }
             pendingTopupAmount = amount;
             openTopupModal();
         }
-
         function openCustomAmountModal() {
             document.getElementById('custom-amount-input').value = '';
             document.getElementById('custom-amount-modal').classList.add('active');
         }
-
         function submitCustomAmount() {
             const val = parseFloat(document.getElementById('custom-amount-input').value);
-            if (!val || val < 50) { showAlert("Минимальная сумма 50 ₽"); return; }
+            if(!val || val < 50) { showAlert("Минимальная сумма 50 ₽"); return; }
             closeModal('custom-amount-modal');
             initTopup(val);
         }
-
         async function openTopupModal() {
             document.getElementById('display-topup-amount').innerText = pendingTopupAmount;
             const chk = document.getElementById('terms-checkbox');
             if(chk) {
                 chk.checked = false;
                 const chkSpan = document.getElementById('custom-chk');
-                if(chkSpan) {
-                    chkSpan.innerHTML = '';
-                    chkSpan.style.background = 'transparent';
-                }
+                if(chkSpan) { chkSpan.innerHTML = ''; chkSpan.style.background = 'transparent'; }
             }
             const btn = document.getElementById('btn-send-topup');
             if(btn) btn.disabled = true;
@@ -598,7 +507,6 @@
                 if(reqDiv) reqDiv.innerText = "Реквизиты: " + d.req;
             } catch(e) {}
         }
-
         async function sendTopup() {
             if(!pendingTopupAmount || pendingTopupAmount < 50) return;
             closeModal('topup-modal');
@@ -627,7 +535,6 @@
                 inventoryData = await r.json();
                 const act = inventoryData.filter(i => i.status !== 'withdrawn');
                 const hist = inventoryData.filter(i => i.status === 'withdrawn');
-
                 const activeContainer = document.getElementById('inventory-active-container');
                 if(activeContainer) {
                     activeContainer.innerHTML = act.length ? act.map(i => `<div class="item-card"><img src="${i.image_url}" class="item-image" onclick="openNftModal('${i.id}')"><div class="item-name">${escapeHtml(i.name)}</div><button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
@@ -676,7 +583,6 @@
                 ctx.fillText("Ждем ставки...", canvas.width/2, canvas.height/2);
                 return;
             }
-
             let curX = 0;
             gState.players.forEach(p => {
                 let w = (p.amount / gState.pool) * canvas.width;
@@ -690,7 +596,6 @@
                 ctx.fillText(p.username.substring(0,6), curX + w/2, canvas.height - 12);
                 curX += w;
             });
-
             if(ballX !== null && ballX !== undefined) {
                 ctx.beginPath();
                 ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
@@ -712,7 +617,6 @@
         function renderBetsList() {
             const container = document.getElementById('bets-list-container');
             const list = document.getElementById('game-bets-list');
-
             if(!gState.players || gState.players.length === 0) {
                 if(container) container.style.display = 'none';
                 return;
@@ -720,7 +624,6 @@
             if(container) container.style.display = 'flex';
             const poolSpan = document.getElementById('game-total-pool');
             if(poolSpan) poolSpan.innerText = `${gState.pool} ₽`;
-
             const sorted = [...gState.players].sort((a,b) => b.amount - a.amount);
             if(list) {
                 list.innerHTML = sorted.map(p => `
@@ -750,12 +653,9 @@
 
         function showWinnerModal(winner) {
             if(!winner) return;
-            const winnerName = winner.username || "Игрок";
-            const winAmount = winner.win_amount || 0;
-            document.getElementById('winner-name').innerText = winnerName;
-            document.getElementById('winner-amount').innerText = winAmount.toFixed(2);
-            const avatarContainer = document.getElementById('winner-avatar-container');
-            avatarContainer.innerHTML = `<img src="${uAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">`;
+            document.getElementById('winner-name').innerText = winner.username || "Игрок";
+            document.getElementById('winner-amount').innerText = (winner.win_amount || 0).toFixed(2);
+            document.getElementById('winner-avatar-container').innerHTML = `<img src="${uAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">`;
             document.getElementById('winner-modal').classList.add('active');
         }
 
@@ -763,22 +663,22 @@
             document.getElementById('winner-modal').classList.remove('active');
         }
 
-        // Новая анимация: 11 секунд движения + 1 секунда паузы, зум после паузы
+        // Анимация: 8 секунд движения + 2 секунды паузы, без зума
         function runSpinAnimation(targetCanvasWidth) {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            
+
             let currentX = canvas.width / 2;
             let velocity = (Math.random() * 500 + 4000) * (Math.random() > 0.5 ? 1 : -1);
             const startTime = performance.now();
-            const MOVE_DURATION = 11000; // 11 секунд движения
-            const PAUSE_DURATION = 1000;   // 1 секунда паузы после остановки
+            const MOVE_DURATION = 8000; // 8 секунд движения
+            const PAUSE_DURATION = 2000; // 2 секунды паузы
             const initialSpeed = Math.abs(velocity);
             const deceleration = initialSpeed / MOVE_DURATION;
-            
+
             let lastTimestamp = startTime;
             let finished = false;
             let finalX = null;
-            
+
             function animate(now) {
                 if(finished) return;
                 const dt = Math.min(100, now - lastTimestamp);
@@ -788,15 +688,12 @@
                 }
                 lastTimestamp = now;
                 const elapsed = now - startTime;
-                
+
                 if(elapsed >= MOVE_DURATION) {
-                    // Движение закончено, фиксируем позицию
-                    if (finalX === null) finalX = currentX;
+                    finalX = currentX;
                     drawGameFrame(finalX);
-                    
-                    // Пауза 1 секунда
+                    // Пауза 2 секунды
                     setTimeout(() => {
-                        // Отправляем результат
                         const pos = finalX / canvas.width;
                         fetch(`${API_BASE}/game/finish`, {
                             method: 'POST',
@@ -805,34 +702,22 @@
                         })
                         .then(res => res.json())
                         .then(data => {
-                            if(data.success && data.winner) {
-                                showWinnerModal(data.winner);
-                            }
+                            if(data.success && data.winner) showWinnerModal(data.winner);
                             updateBalance();
                         })
                         .catch(e => console.error("Finish error", e));
-                        
-                        // Зум к шарику
-                        const originX = (finalX / canvas.width) * 100;
-                        canvas.style.transformOrigin = `${originX}% 50%`;
-                        canvas.style.transition = 'transform 2s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
-                        canvas.style.transform = 'scale(2.5)';
-                        setTimeout(() => {
-                            canvas.style.transform = 'scale(1)';
-                        }, 2000);
                     }, PAUSE_DURATION);
-                    
                     animationFrameId = null;
                     finished = true;
                     return;
                 }
-                
+
                 let speed = initialSpeed - deceleration * elapsed;
                 if(speed < 0) speed = 0;
                 let direction = velocity > 0 ? 1 : -1;
                 let step = direction * speed * (dt / 1000);
                 currentX += step;
-                
+
                 if(currentX <= 0) {
                     currentX = 0;
                     velocity = Math.abs(velocity);
@@ -846,11 +731,9 @@
                 } else {
                     velocity = direction * speed;
                 }
-                
                 drawGameFrame(currentX);
                 animationFrameId = requestAnimationFrame(animate);
             }
-            
             lastTimestamp = performance.now();
             animationFrameId = requestAnimationFrame(animate);
         }
@@ -859,11 +742,8 @@
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
-
                 if (newState.status === 'counting' && newState.timer !== lastServerTimer) {
-                    if (Math.abs(localTimer - newState.timer) > 1) {
-                        startLocalTimer(newState.timer);
-                    }
+                    if (Math.abs(localTimer - newState.timer) > 1) startLocalTimer(newState.timer);
                     lastServerTimer = newState.timer;
                 } else if (newState.status !== 'counting') {
                     const timerBg = document.getElementById('game-timer-bg');
@@ -873,28 +753,21 @@
                         timerInterval = null;
                     }
                 }
-
                 gState = newState;
                 const playersCountSpan = document.getElementById('game-players-count');
                 if(playersCountSpan) playersCountSpan.innerText = `Игроки: ${gState.players.length}/20`;
-
                 renderBetsList();
-
                 const hasMyBet = gState.players.find(p => p.id === String(uId));
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) {
                     cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
                 }
-
                 if(gState.status === 'spinning' && !isSpinning) {
                     isSpinning = true;
                     runSpinAnimation(canvas.width);
                 } else if(gState.status !== 'spinning' && isSpinning) {
                     isSpinning = false;
-                    if(animationFrameId) {
-                        cancelAnimationFrame(animationFrameId);
-                        animationFrameId = null;
-                    }
+                    if(animationFrameId) cancelAnimationFrame(animationFrameId);
                     drawGameFrame();
                 } else if(gState.status !== 'spinning' && !isSpinning) {
                     drawGameFrame();
@@ -906,49 +779,34 @@
 
         function openBetConfirm(amt) {
             betAmountTemp = amt;
-            const confirmSpan = document.getElementById('confirm-bet-amount');
-            if(confirmSpan) confirmSpan.innerText = amt;
-            const modal = document.getElementById('confirm-bet-modal');
-            if(modal) modal.classList.add('active');
+            document.getElementById('confirm-bet-amount').innerText = amt;
+            document.getElementById('confirm-bet-modal').classList.add('active');
         }
-
         function openCustomBet() {
             document.getElementById('custom-bet-input').value = '';
             document.getElementById('custom-bet-modal').classList.add('active');
         }
-
         function submitCustomBet() {
             const v = parseFloat(document.getElementById('custom-bet-input').value);
             if(v > 0) {
                 closeModal('custom-bet-modal');
                 openBetConfirm(v);
-            } else {
-                showAlert("Введите сумму больше 0");
-            }
+            } else showAlert("Введите сумму больше 0");
         }
 
         async function executeBet() {
             const btn = document.getElementById('btn-confirm-bet');
-            if(btn) {
-                btn.disabled = true;
-                btn.innerText = 'Загрузка...';
-            }
-
+            if(btn) { btn.disabled = true; btn.innerText = 'Загрузка...'; }
             if(userBalance < betAmountTemp) {
                 showAlert("Недостаточно средств на балансе!");
                 closeModal('confirm-bet-modal');
-                if(btn) {
-                    btn.disabled = false;
-                    btn.innerText = 'Подтвердить';
-                }
+                if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
                 return;
             }
-
             try {
                 const r = await fetch(`${API_BASE}/game/bet`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: betAmountTemp}) });
                 const d = await r.json();
                 closeModal('confirm-bet-modal');
-
                 if(d.success) {
                     await updateBalance();
                     await pollGame();
@@ -963,21 +821,16 @@
                 closeModal('confirm-bet-modal');
                 showAlert("Ошибка сети, попробуйте снова");
             }
-            if(btn) {
-                btn.disabled = false;
-                btn.innerText = 'Подтвердить';
-            }
+            if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
 
         async function cancelGameBet() {
             try {
                 await fetch(`${API_BASE}/game/cancel`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId}) });
-                updateBalance();
-                pollGame();
+                updateBalance(); pollGame();
             } catch(e) {}
         }
 
-        // Старт
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
