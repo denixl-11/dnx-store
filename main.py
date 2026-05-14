@@ -4,6 +4,7 @@ import os
 import psycopg2
 import json
 import random
+import time
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -83,12 +84,7 @@ def generate_color():
 
 
 def simulate_trajectory(canvas_width, move_duration=10.0):
-    """
-    Детерминированная симуляция движения шарика по горизонтали с отскоками.
-    Параметры фиксированы: старт x = 0, начальная скорость = 4000 пикс/сек вправо.
-    Замедление: линейное уменьшение скорости до 0 за move_duration секунд.
-    Возвращает финальную позицию x через move_duration секунд (нормализованную от 0 до 1).
-    """
+    """Детерминированная симуляция движения шарика по горизонтали с отскоками."""
     x = 0.0
     v = 4000.0
     deceleration = v / move_duration
@@ -166,11 +162,10 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-                    # Для симуляции используем фиктивную ширину 1000 (нормализация потом)
                     canvas_width = 1000
                     winner_x = simulate_trajectory(canvas_width, move_duration=10.0)
                     game_state["winner_x"] = winner_x
-                    game_state["spin_start_time"] = asyncio.get_event_loop().time()
+                    game_state["spin_start_time"] = time.time()  # абсолютное время
                     logging.info(f"Game spinning started, winner_x={winner_x}")
 
         if game_state["status"] == "spinning":
@@ -212,6 +207,9 @@ async def handle_game_state(request):
         }, headers={"Access-Control-Allow-Origin": "*"})
 
 
+# Остальные хендлеры (идентичны вашим, с .strip() для id) - привожу только для полноты, они такие же как в предыдущем сообщении.
+# Чтобы не дублировать, оставлю как есть - вы их уже видели. В финальном файле они будут.
+
 async def handle_get_user(request):
     user_id = request.query.get('user_id')
     username = request.query.get('username', 'Unknown')
@@ -239,7 +237,6 @@ async def handle_topup_request(request):
         user_id = str(data.get('userId')).strip()
         username = data.get('username', 'Unknown')
         amount = float(data.get('amount', 0))
-
         admin_msg = f"💸 **Заявка на пополнение средств!**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} ₽\n\nПроверьте поступление по реквизитам."
         admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"topup_no_{user_id}_{amount}"),
@@ -303,21 +300,16 @@ async def handle_buy(request):
         data = await request.json()
         item_ids = data.get('items', [])
         user_id = str(data.get('userId')).strip()
-
         if not item_ids:
             return web.json_response({"success": False, "error": "no_items"}, headers={"Access-Control-Allow-Origin": "*"})
-
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("SELECT id, price FROM items WHERE id = ANY(%s) AND status = 'Доступен'", (item_ids,))
                 items = cur.fetchall()
-
                 if len(items) == len(item_ids):
                     total_price = sum(i['price'] for i in items)
-
                     cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
                     user = cur.fetchone()
-
                     if user and float(user['balance']) >= float(total_price):
                         cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (total_price, user_id))
                         cur.execute(
@@ -341,7 +333,6 @@ async def handle_request_withdraw(request):
         item_id = data.get('itemId')
         user_id = str(data.get('userId')).strip()
         username = data.get('username', 'Unknown')
-
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
@@ -369,26 +360,21 @@ async def handle_game_bet(request):
         user_id = str(data.get('userId')).strip()
         username = data.get('username', 'Player')
         amount = float(data.get('amount', 0))
-
         if amount <= 0:
             return web.json_response({"success": False, "error": "invalid_amount"}, headers={"Access-Control-Allow-Origin": "*"})
-
         async with game_lock:
             if game_state["status"] != "waiting" and game_state["status"] != "counting":
                 return web.json_response({"success": False, "error": "game_started"}, headers={"Access-Control-Allow-Origin": "*"})
             if len(game_state["players"]) >= 20 and user_id not in game_state["players"]:
                 return web.json_response({"success": False, "error": "room_full"}, headers={"Access-Control-Allow-Origin": "*"})
-
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
                     user = cur.fetchone()
                     if not user or float(user['balance']) < amount:
                         return web.json_response({"success": False, "error": "insufficient_funds"}, headers={"Access-Control-Allow-Origin": "*"})
-
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
                     conn.commit()
-
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
@@ -396,13 +382,10 @@ async def handle_game_bet(request):
                     "id": user_id, "username": username,
                     "amount": amount, "color": generate_color()
                 }
-
             game_state["pool"] += amount
-
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
-
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         logging.error(f"Bet error: {e}")
@@ -414,7 +397,6 @@ async def handle_game_cancel(request):
     try:
         data = await request.json()
         user_id = str(data.get('userId')).strip()
-
         async with game_lock:
             if len(game_state["players"]) == 1 and user_id in game_state["players"]:
                 refund = game_state["players"][user_id]["amount"]
@@ -425,15 +407,13 @@ async def handle_game_cancel(request):
                 game_state["players"] = {}
                 game_state["pool"] = 0.0
                 return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
-        return web.json_response({"success": False, "error": "cannot_cancel"},
-                                 headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": False, "error": "cannot_cancel"}, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         logging.error(f"Cancel error: {e}")
         return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
 
 
 async def handle_game_finish(request):
-    # Устаревший эндпоинт, оставлен для совместимости
     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
 
 
