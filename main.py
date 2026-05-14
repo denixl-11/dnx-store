@@ -83,26 +83,33 @@ async def finish_round(winner_x, pool, players):
     if pool <= 0 or not players:
         logging.warning(f"finish_round: pool={pool}, players={players}")
         return None
+    # Нормализуем winner_x в [0,1]
+    winner_x = max(0.0, min(1.0, winner_x))
     cumulative = 0.0
     winner_id = None
     winner_username = None
+    logging.info(f"Determining winner for position {winner_x}, pool={pool}")
     for uid, p in players.items():
-        start = cumulative
-        cumulative += p["amount"] / pool
-        if start <= winner_x <= cumulative:
+        sector_start = cumulative
+        sector_end = cumulative + (p["amount"] / pool)
+        logging.info(f"Sector for {uid}: [{sector_start:.6f}, {sector_end:.6f}]")
+        if sector_start <= winner_x <= sector_end:
             winner_id = uid
             winner_username = p.get("username", "Игрок")
             break
+        cumulative = sector_end
     if winner_id:
         winner_bet = players[winner_id]["amount"]
         others_bets = pool - winner_bet
         profit = winner_bet + (others_bets * 0.7)
+        logging.info(f"Winner {winner_id} bet={winner_bet}, others={others_bets}, profit={profit}")
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s",
                                 (profit, winner_id))
                     conn.commit()
+            logging.info(f"Balance updated for {winner_id}: +{profit} RUB")
             return {
                 "user_id": winner_id,
                 "username": winner_username,
@@ -112,6 +119,7 @@ async def finish_round(winner_x, pool, players):
             logging.error(f"Game DB error: {e}")
             return None
     else:
+        logging.warning(f"No winner found for position {winner_x}")
         return None
 
 
@@ -127,7 +135,8 @@ async def game_worker():
                     logging.info("Game status changed to spinning")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(14)  # ждём 12с движения + 2с паузы на фронте
+            # Ждём 12 секунд: 11 секунд движения + 1 секунда паузы на фронте
+            await asyncio.sleep(12)
             async with game_lock:
                 if game_state["status"] == "spinning":
                     logging.warning("Game finish not received, force reset")
