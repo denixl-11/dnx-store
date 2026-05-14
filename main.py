@@ -4,7 +4,7 @@ import os
 import psycopg2
 import json
 import random
-import time
+from decimal import Decimal
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -83,8 +83,12 @@ def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
 
 
-def simulate_trajectory(canvas_width, move_duration=10.0):
-    """Детерминированная симуляция движения шарика по горизонтали с отскоками."""
+def simulate_trajectory(canvas_width=1000, move_duration=10.0):
+    """
+    Детерминированная симуляция движения шарика по горизонтали с отскоками.
+    Начальная позиция x=0, скорость 4000 вправо, линейное замедление до 0 за move_duration секунд.
+    Возвращает нормализованную позицию (0..1) через move_duration секунд.
+    """
     x = 0.0
     v = 4000.0
     deceleration = v / move_duration
@@ -139,7 +143,7 @@ async def finish_round():
                     cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
                     rows = cur.rowcount
                     conn.commit()
-                    logging.info(f"Balance updated for {winner_id}: +{profit} RUB. Rows: {rows}")
+                    logging.info(f"Balance updated for {winner_id}: +{profit} RUB. Rows affected: {rows}")
             return {
                 "user_id": winner_id,
                 "username": winner_username,
@@ -162,11 +166,9 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-                    canvas_width = 1000
-                    winner_x = simulate_trajectory(canvas_width, move_duration=10.0)
-                    game_state["winner_x"] = winner_x
-                    game_state["spin_start_time"] = time.time()  # абсолютное время
-                    logging.info(f"Game spinning started, winner_x={winner_x}")
+                    game_state["winner_x"] = simulate_trajectory()
+                    game_state["spin_start_time"] = asyncio.get_event_loop().time()
+                    logging.info(f"Game spinning started, winner_x={game_state['winner_x']}")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(12)  # 10 сек движения + 2 сек паузы
@@ -206,9 +208,6 @@ async def handle_game_state(request):
             "last_winner": game_state.get("last_winner")
         }, headers={"Access-Control-Allow-Origin": "*"})
 
-
-# Остальные хендлеры (идентичны вашим, с .strip() для id) - привожу только для полноты, они такие же как в предыдущем сообщении.
-# Чтобы не дублировать, оставлю как есть - вы их уже видели. В финальном файле они будут.
 
 async def handle_get_user(request):
     user_id = request.query.get('user_id')
@@ -414,6 +413,7 @@ async def handle_game_cancel(request):
 
 
 async def handle_game_finish(request):
+    # Устаревший эндпоинт, оставлен для совместимости
     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
 
 
