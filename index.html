@@ -520,7 +520,7 @@
         }
         async function withdraw(id) { await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) }); showAlert("Запрос на вывод отправлен администратору!"); loadInventory(); }
 
-        // ======================== ИГРА ========================
+        // ---------------------------- ИГРА ----------------------------
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15 };
@@ -573,25 +573,21 @@
         function showWinnerModal(winner) { if(!winner) return; document.getElementById('winner-name').innerText = winner.username; document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2); document.getElementById('winner-avatar-container').innerHTML = `<img src="${uAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">`; document.getElementById('winner-modal').classList.add('active'); }
         function closeWinnerModal() { document.getElementById('winner-modal').classList.remove('active'); }
 
-        // Новая анимация: 10 секунд движения (первые 5 сек быстрое торможение, следующие 5 сек очень медленное), затем 2 секунды стоянки
+        // Анимация: 10 секунд движения (5 сек быстрое торможение, 5 сек медленное), затем 2 секунды паузы
         function runSpinAnimation() {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
             let currentX = canvas.width / 2;
-            let velocity = (Math.random() * 500 + 4000); // базовая скорость 4000-4500
+            let velocity = (Math.random() * 500 + 4000); // 4000-4500
             const direction = Math.random() > 0.5 ? 1 : -1;
             velocity = velocity * direction;
             const startTime = performance.now();
             const MOVE_DURATION = 10000; // 10 секунд движения
-            const PAUSE_DURATION = 2000;  // 2 секунды стоянки
+            const PAUSE_DURATION = 2000;  // 2 секунды паузы
             const initialSpeed = Math.abs(velocity);
-            // Функция замедления: за первые 5 секунд скорость падает с initialSpeed до initialSpeed*0.2,
-            // за следующие 5 секунд - с initialSpeed*0.2 до 0.
-            function getSpeedFactor(progress) { // progress от 0 до 1
+            function getSpeedFactor(progress) {
                 if (progress <= 0.5) {
-                    // первая половина: быстрое падение от 1 до 0.2
                     return 1 - 0.8 * (progress / 0.5);
                 } else {
-                    // вторая половина: медленное падение от 0.2 до 0
                     return 0.2 * (1 - (progress - 0.5) / 0.5);
                 }
             }

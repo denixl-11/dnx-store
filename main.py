@@ -9,7 +9,6 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
-from decimal import Decimal
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -80,62 +79,50 @@ def generate_color():
 
 
 async def finish_round(winner_x, pool, players):
-    """
-    Определяет победителя по позиции winner_x (0..1) и начисляет выигрыш.
-    Возвращает данные победителя или None.
-    """
+    """Определяет победителя, начисляет выигрыш и возвращает данные о победителе"""
     if pool <= 0 or not players:
         logging.warning(f"finish_round: pool={pool}, players={players}")
         return None
-    # Ограничиваем winner_x
     winner_x = max(0.0, min(1.0, winner_x))
-    logging.info(f"Определение победителя для позиции {winner_x}, общий пул={pool}")
-
-    # Сортируем игроков для детерминизма
-    sorted_players = sorted(players.items(), key=lambda x: x[0])
     cumulative = 0.0
     winner_id = None
     winner_username = None
-    for uid, p in sorted_players:
+    logging.info(f"Determining winner for position {winner_x}, pool={pool}")
+    for uid, p in players.items():
         sector_start = cumulative
         sector_end = cumulative + (p["amount"] / pool)
-        logging.info(f"Сектор игрока {uid} (username={p.get('username')}): [{sector_start:.10f} - {sector_end:.10f}]")
+        logging.info(f"Sector for {uid}: [{sector_start:.10f}, {sector_end:.10f}]")
         if sector_start <= winner_x <= sector_end:
-            winner_id = uid
+            winner_id = str(uid)
             winner_username = p.get("username", "Игрок")
-            logging.info(f"Победитель найден: {winner_id} ({winner_username})")
             break
         cumulative = sector_end
-
-    if not winner_id:
-        logging.error(f"Не удалось определить победителя для позиции {winner_x}")
-        return None
-
-    winner_bet = players[winner_id]["amount"]
-    others_bets = pool - winner_bet
-    profit = winner_bet + (others_bets * 0.7)
-    logging.info(f"Победитель {winner_id} поставил {winner_bet}, чужие ставки={others_bets}, выигрыш={profit}")
-
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # Проверяем, существует ли пользователь
-                cur.execute("SELECT balance FROM users WHERE id = %s", (winner_id,))
-                user = cur.fetchone()
-                if not user:
-                    logging.error(f"Пользователь {winner_id} не найден в БД!")
-                    return None
-                # Обновляем баланс
-                cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
-                conn.commit()
-                logging.info(f"Баланс пользователя {winner_id} успешно увеличен на {profit}")
-                return {
-                    "user_id": winner_id,
-                    "username": winner_username,
-                    "win_amount": float(profit)
-                }
-    except Exception as e:
-        logging.error(f"Ошибка БД при начислении выигрыша: {e}")
+    if winner_id:
+        winner_bet = players[winner_id]["amount"]
+        others_bets = pool - winner_bet
+        profit = winner_bet + (others_bets * 0.7)
+        logging.info(f"Winner {winner_id} bet={winner_bet}, others={others_bets}, profit={profit}")
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT id, balance FROM users WHERE id = %s", (winner_id,))
+                    user = cur.fetchone()
+                    if not user:
+                        logging.error(f"User {winner_id} not found in DB!")
+                        return None
+                    cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
+                    conn.commit()
+                    logging.info(f"Balance updated for {winner_id}: +{profit} RUB. Old balance: {user[1]}")
+            return {
+                "user_id": winner_id,
+                "username": winner_username,
+                "win_amount": profit
+            }
+        except Exception as e:
+            logging.error(f"Game DB error: {e}")
+            return None
+    else:
+        logging.warning(f"No winner found for position {winner_x}")
         return None
 
 
@@ -148,13 +135,14 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-                    logging.info("Статус игры изменён на spinning")
+                    logging.info("Game status changed to spinning")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(12)  # 10 сек движения + 2 сек паузы
+            # Увеличил до 15 секунд: 10 движение + 2 пауза + 3 запас
+            await asyncio.sleep(15)
             async with game_lock:
                 if game_state["status"] == "spinning":
-                    logging.warning("Финиш игры не получен, принудительный сброс")
+                    logging.warning("Game finish not received, force reset")
                     game_state = {
                         "status": "waiting",
                         "players": {},
@@ -257,8 +245,7 @@ async def handle_buy(request):
         user_id = str(data.get('userId'))
 
         if not item_ids:
-            return web.json_response({"success": False, "error": "no_items"},
-                                     headers={"Access-Control-Allow-Origin": "*"})
+            return web.json_response({"success": False, "error": "no_items"}, headers={"Access-Control-Allow-Origin": "*"})
 
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -334,24 +321,20 @@ async def handle_game_bet(request):
         amount = float(data.get('amount', 0))
 
         if amount <= 0:
-            return web.json_response({"success": False, "error": "invalid_amount"},
-                                     headers={"Access-Control-Allow-Origin": "*"})
+            return web.json_response({"success": False, "error": "invalid_amount"}, headers={"Access-Control-Allow-Origin": "*"})
 
         async with game_lock:
             if game_state["status"] != "waiting" and game_state["status"] != "counting":
-                return web.json_response({"success": False, "error": "game_started"},
-                                         headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"success": False, "error": "game_started"}, headers={"Access-Control-Allow-Origin": "*"})
             if len(game_state["players"]) >= 20 and user_id not in game_state["players"]:
-                return web.json_response({"success": False, "error": "room_full"},
-                                         headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"success": False, "error": "room_full"}, headers={"Access-Control-Allow-Origin": "*"})
 
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
                     user = cur.fetchone()
                     if not user or float(user['balance']) < amount:
-                        return web.json_response({"success": False, "error": "insufficient_funds"},
-                                                 headers={"Access-Control-Allow-Origin": "*"})
+                        return web.json_response({"success": False, "error": "insufficient_funds"}, headers={"Access-Control-Allow-Origin": "*"})
 
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
                     conn.commit()
@@ -404,7 +387,7 @@ async def handle_game_finish(request):
     try:
         data = await request.json()
         pos = float(data.get('position', 0))
-        logging.info(f"Получен finish игры: position={pos}")
+        logging.info(f"Game finish received: position={pos}")
         async with game_lock:
             if game_state["status"] == "spinning":
                 winner_data = await finish_round(pos, game_state["pool"], game_state["players"])
@@ -415,16 +398,11 @@ async def handle_game_finish(request):
                     "timer": 15
                 }
                 if winner_data:
-                    logging.info(f"Победитель определён: {winner_data}")
-                    return web.json_response({"success": True, "winner": winner_data},
-                                             headers={"Access-Control-Allow-Origin": "*"})
+                    return web.json_response({"success": True, "winner": winner_data}, headers={"Access-Control-Allow-Origin": "*"})
                 else:
-                    logging.warning("Победитель не определён")
-                    return web.json_response({"success": True, "winner": None},
-                                             headers={"Access-Control-Allow-Origin": "*"})
+                    return web.json_response({"success": True, "winner": None}, headers={"Access-Control-Allow-Origin": "*"})
             else:
-                return web.json_response({"success": False, "error": "not_spinning"},
-                                         headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"success": False, "error": "not_spinning"}, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         logging.error(f"Finish error: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
@@ -495,8 +473,7 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
                 conn.commit()
         await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
         try:
-            await bot.send_message(uid,
-                                   f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
+            await bot.send_message(uid, f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
         except:
             pass
     except Exception as e:
