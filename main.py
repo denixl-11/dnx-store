@@ -4,6 +4,7 @@ import os
 import psycopg2
 import json
 import random
+from decimal import Decimal
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -53,6 +54,8 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
+                # Очищаем id от пробелов
+                cur.execute("UPDATE users SET id = TRIM(id)")
                 try:
                     cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 except Exception as e:
@@ -70,7 +73,10 @@ game_state = {
     "status": "waiting",
     "players": {},
     "pool": 0.0,
-    "timer": 15
+    "timer": 15,
+    "winner_x": None,
+    "spin_start_time": None,
+    "last_winner": None          # временное хранилище победителя для показа модалки
 }
 
 
@@ -78,22 +84,23 @@ def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
 
 
-async def finish_round(winner_x, pool, players):
-    """Определяет победителя, начисляет выигрыш и возвращает данные о победителе"""
-    if pool <= 0 or not players:
-        logging.warning(f"finish_round: pool={pool}, players={players}")
+async def finish_round():
+    """Определяет победителя по сохранённому winner_x и начисляет выигрыш"""
+    global game_state
+    winner_x = game_state["winner_x"]
+    pool = game_state["pool"]
+    players = game_state["players"]
+    if pool <= 0 or not players or winner_x is None:
+        logging.warning(f"finish_round: invalid state pool={pool}, players={players}, winner_x={winner_x}")
         return None
-    winner_x = max(0.0, min(1.0, winner_x))
     cumulative = 0.0
     winner_id = None
     winner_username = None
-    logging.info(f"Determining winner for position {winner_x}, pool={pool}")
     for uid, p in players.items():
         sector_start = cumulative
         sector_end = cumulative + (p["amount"] / pool)
-        logging.info(f"Sector for {uid}: [{sector_start:.10f}, {sector_end:.10f}]")
         if sector_start <= winner_x <= sector_end:
-            winner_id = str(uid)
+            winner_id = str(uid).strip()
             winner_username = p.get("username", "Игрок")
             break
         cumulative = sector_end
@@ -101,7 +108,6 @@ async def finish_round(winner_x, pool, players):
         winner_bet = players[winner_id]["amount"]
         others_bets = pool - winner_bet
         profit = winner_bet + (others_bets * 0.7)
-        logging.info(f"Winner {winner_id} bet={winner_bet}, others={others_bets}, profit={profit}")
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
@@ -111,7 +117,11 @@ async def finish_round(winner_x, pool, players):
                         logging.error(f"User {winner_id} not found in DB!")
                         return None
                     cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
+                    rows = cur.rowcount
                     conn.commit()
+                    if rows == 0:
+                        logging.error(f"Update failed for {winner_id}, no rows affected")
+                        return None
                     logging.info(f"Balance updated for {winner_id}: +{profit} RUB. Old balance: {user[1]}")
             return {
                 "user_id": winner_id,
@@ -135,20 +145,36 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-                    logging.info("Game status changed to spinning")
+                    game_state["winner_x"] = random.uniform(0.0, 1.0)
+                    game_state["spin_start_time"] = asyncio.get_event_loop().time()
+                    logging.info(f"Game spinning started, winner_x={game_state['winner_x']}")
 
         if game_state["status"] == "spinning":
-            # Увеличил до 15 секунд: 10 движение + 2 пауза + 3 запас
-            await asyncio.sleep(15)
+            await asyncio.sleep(12)  # 10 сек движения + 2 сек паузы
             async with game_lock:
                 if game_state["status"] == "spinning":
-                    logging.warning("Game finish not received, force reset")
+                    winner_data = await finish_round()
+                    # Сохраняем победителя для фронта
+                    game_state["last_winner"] = winner_data
+                    # Сбрасываем состояние
                     game_state = {
                         "status": "waiting",
                         "players": {},
                         "pool": 0.0,
-                        "timer": 15
+                        "timer": 15,
+                        "winner_x": None,
+                        "spin_start_time": None,
+                        "last_winner": winner_data   # сохраняем для следующего ответа
                     }
+                    # Через секунду очистим last_winner, чтобы не показывать повторно
+                    asyncio.create_task(clear_last_winner())
+
+
+async def clear_last_winner():
+    await asyncio.sleep(5)
+    async with game_lock:
+        if "last_winner" in game_state:
+            game_state["last_winner"] = None
 
 
 # --- API МЕТОДЫ ---
@@ -162,8 +188,8 @@ async def handle_get_user(request):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     "INSERT INTO users (id, username) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
-                    (str(user_id), username))
-                cur.execute("SELECT balance FROM users WHERE id = %s", (str(user_id),))
+                    (str(user_id).strip(), username))
+                cur.execute("SELECT balance FROM users WHERE id = %s", (str(user_id).strip(),))
                 user = cur.fetchone()
                 conn.commit()
                 return web.json_response({"balance": float(user['balance']) if user else 0.0},
@@ -176,7 +202,7 @@ async def handle_get_user(request):
 async def handle_topup_request(request):
     try:
         data = await request.json()
-        user_id = str(data.get('userId'))
+        user_id = str(data.get('userId')).strip()
         username = data.get('username', 'Unknown')
         amount = float(data.get('amount', 0))
 
@@ -221,7 +247,7 @@ async def handle_get_inventory(request):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     "SELECT id, name, image_url, nft_link, status, traits, number FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен')",
-                    (str(user_id),))
+                    (str(user_id).strip(),))
                 items = cur.fetchall()
                 for item in items:
                     if item['status'] == 'Выведен':
@@ -242,7 +268,7 @@ async def handle_buy(request):
     try:
         data = await request.json()
         item_ids = data.get('items', [])
-        user_id = str(data.get('userId'))
+        user_id = str(data.get('userId')).strip()
 
         if not item_ids:
             return web.json_response({"success": False, "error": "no_items"}, headers={"Access-Control-Allow-Origin": "*"})
@@ -279,7 +305,7 @@ async def handle_request_withdraw(request):
     try:
         data = await request.json()
         item_id = data.get('itemId')
-        user_id = str(data.get('userId'))
+        user_id = str(data.get('userId')).strip()
         username = data.get('username', 'Unknown')
 
         with get_db_connection() as conn:
@@ -308,7 +334,10 @@ async def handle_game_state(request):
             "status": game_state["status"],
             "players": list(game_state["players"].values()),
             "pool": game_state["pool"],
-            "timer": game_state["timer"]
+            "timer": game_state["timer"],
+            "winner_x": game_state["winner_x"],
+            "spin_start_time": game_state["spin_start_time"],
+            "last_winner": game_state.get("last_winner")
         }, headers={"Access-Control-Allow-Origin": "*"})
 
 
@@ -316,7 +345,7 @@ async def handle_game_bet(request):
     global game_state
     try:
         data = await request.json()
-        user_id = str(data.get('userId'))
+        user_id = str(data.get('userId')).strip()
         username = data.get('username', 'Player')
         amount = float(data.get('amount', 0))
 
@@ -363,7 +392,7 @@ async def handle_game_cancel(request):
     global game_state
     try:
         data = await request.json()
-        user_id = str(data.get('userId'))
+        user_id = str(data.get('userId')).strip()
 
         async with game_lock:
             if len(game_state["players"]) == 1 and user_id in game_state["players"]:
@@ -383,29 +412,8 @@ async def handle_game_cancel(request):
 
 
 async def handle_game_finish(request):
-    global game_state
-    try:
-        data = await request.json()
-        pos = float(data.get('position', 0))
-        logging.info(f"Game finish received: position={pos}")
-        async with game_lock:
-            if game_state["status"] == "spinning":
-                winner_data = await finish_round(pos, game_state["pool"], game_state["players"])
-                game_state = {
-                    "status": "waiting",
-                    "players": {},
-                    "pool": 0.0,
-                    "timer": 15
-                }
-                if winner_data:
-                    return web.json_response({"success": True, "winner": winner_data}, headers={"Access-Control-Allow-Origin": "*"})
-                else:
-                    return web.json_response({"success": True, "winner": None}, headers={"Access-Control-Allow-Origin": "*"})
-            else:
-                return web.json_response({"success": False, "error": "not_spinning"}, headers={"Access-Control-Allow-Origin": "*"})
-    except Exception as e:
-        logging.error(f"Finish error: {e}")
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+    # Устаревший эндпоинт, больше не нужен
+    return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
 
 
 async def handle_get_requisites(request):
@@ -418,7 +426,7 @@ async def handle_options(request):
                  "Access-Control-Allow-Headers": "Content-Type"})
 
 
-# --- CALLBACKS ДЛЯ АДМИНА ---
+# --- CALLBACKS ДЛЯ АДМИНА (без изменений) ---
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
@@ -431,11 +439,11 @@ async def admin_topup_approve(callback: types.CallbackQuery):
             with conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO users (id, balance) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET balance = users.balance + EXCLUDED.balance",
-                    (uid, float(amount)))
+                    (uid.strip(), float(amount)))
                 conn.commit()
         await callback.message.edit_text(f"✅ Баланс пополнен на {amount} ₽!")
         try:
-            await bot.send_message(uid, f"💰 Ваш баланс успешно пополнен на {amount} ₽!")
+            await bot.send_message(uid.strip(), f"💰 Ваш баланс успешно пополнен на {amount} ₽!")
         except:
             pass
     except Exception as e:
@@ -452,7 +460,7 @@ async def admin_topup_reject(callback: types.CallbackQuery):
     _, _, uid, amount = parts
     await callback.message.edit_text(f"❌ Заявка на {amount} ₽ отклонена.")
     try:
-        await bot.send_message(uid, f"❌ Отказ: заявка на пополнение {amount} ₽ отклонена.")
+        await bot.send_message(uid.strip(), f"❌ Отказ: заявка на пополнение {amount} ₽ отклонена.")
     except:
         pass
 
@@ -469,11 +477,11 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
-                    (int(item_id), uid))
+                    (int(item_id), uid.strip()))
                 conn.commit()
         await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
         try:
-            await bot.send_message(uid, f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
+            await bot.send_message(uid.strip(), f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
         except:
             pass
     except Exception as e:
@@ -492,11 +500,11 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("UPDATE items SET last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
-                            (int(item_id), uid))
+                            (int(item_id), uid.strip()))
                 conn.commit()
         await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
         try:
-            await bot.send_message(uid, f"❌ Отказ: вывод NFT (ID: {item_id}) отклонен администратором.")
+            await bot.send_message(uid.strip(), f"❌ Отказ: вывод NFT (ID: {item_id}) отклонен администратором.")
         except:
             pass
     except Exception as e:
