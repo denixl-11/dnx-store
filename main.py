@@ -9,6 +9,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
+from decimal import Decimal
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -79,52 +80,62 @@ def generate_color():
 
 
 async def finish_round(winner_x, pool, players):
-    """Определяет победителя, начисляет выигрыш и возвращает данные о победителе"""
+    """
+    Определяет победителя по позиции winner_x (0..1) и начисляет выигрыш.
+    Возвращает данные победителя или None.
+    """
     if pool <= 0 or not players:
         logging.warning(f"finish_round: pool={pool}, players={players}")
         return None
-    # Ограничиваем winner_x диапазоном [0,1]
+    # Ограничиваем winner_x
     winner_x = max(0.0, min(1.0, winner_x))
+    logging.info(f"Определение победителя для позиции {winner_x}, общий пул={pool}")
 
-    # Сортируем игроков для детерминизма (не обязательно)
+    # Сортируем игроков для детерминизма
     sorted_players = sorted(players.items(), key=lambda x: x[0])
-
     cumulative = 0.0
     winner_id = None
     winner_username = None
-
     for uid, p in sorted_players:
         sector_start = cumulative
         sector_end = cumulative + (p["amount"] / pool)
-        logging.info(f"Sector for {uid}: [{sector_start:.10f}, {sector_end:.10f}], winner_x={winner_x:.10f}")
+        logging.info(f"Сектор игрока {uid} (username={p.get('username')}): [{sector_start:.10f} - {sector_end:.10f}]")
         if sector_start <= winner_x <= sector_end:
             winner_id = uid
             winner_username = p.get("username", "Игрок")
+            logging.info(f"Победитель найден: {winner_id} ({winner_username})")
             break
         cumulative = sector_end
 
-    if winner_id:
-        winner_bet = players[winner_id]["amount"]
-        others_bets = pool - winner_bet
-        profit = winner_bet + (others_bets * 0.7)
-        logging.info(f"Winner {winner_id} bet={winner_bet}, others={others_bets}, profit={profit}")
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s",
-                                (profit, winner_id))
-                    conn.commit()
-            logging.info(f"Balance updated for {winner_id}: +{profit} RUB")
-            return {
-                "user_id": winner_id,
-                "username": winner_username,
-                "win_amount": profit
-            }
-        except Exception as e:
-            logging.error(f"Game DB error: {e}")
-            return None
-    else:
-        logging.warning(f"No winner found for position {winner_x}")
+    if not winner_id:
+        logging.error(f"Не удалось определить победителя для позиции {winner_x}")
+        return None
+
+    winner_bet = players[winner_id]["amount"]
+    others_bets = pool - winner_bet
+    profit = winner_bet + (others_bets * 0.7)
+    logging.info(f"Победитель {winner_id} поставил {winner_bet}, чужие ставки={others_bets}, выигрыш={profit}")
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Проверяем, существует ли пользователь
+                cur.execute("SELECT balance FROM users WHERE id = %s", (winner_id,))
+                user = cur.fetchone()
+                if not user:
+                    logging.error(f"Пользователь {winner_id} не найден в БД!")
+                    return None
+                # Обновляем баланс
+                cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
+                conn.commit()
+                logging.info(f"Баланс пользователя {winner_id} успешно увеличен на {profit}")
+                return {
+                    "user_id": winner_id,
+                    "username": winner_username,
+                    "win_amount": float(profit)
+                }
+    except Exception as e:
+        logging.error(f"Ошибка БД при начислении выигрыша: {e}")
         return None
 
 
@@ -137,14 +148,13 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-                    logging.info("Game status changed to spinning")
+                    logging.info("Статус игры изменён на spinning")
 
         if game_state["status"] == "spinning":
-            # Ждём 10 секунд: 8 сек движения + 2 сек стоянки
-            await asyncio.sleep(10)
+            await asyncio.sleep(12)  # 10 сек движения + 2 сек паузы
             async with game_lock:
                 if game_state["status"] == "spinning":
-                    logging.warning("Game finish not received, force reset")
+                    logging.warning("Финиш игры не получен, принудительный сброс")
                     game_state = {
                         "status": "waiting",
                         "players": {},
@@ -153,7 +163,7 @@ async def game_worker():
                     }
 
 
-# --- API МЕТОДЫ (остальные без изменений) ---
+# --- API МЕТОДЫ ---
 async def handle_get_user(request):
     user_id = request.query.get('user_id')
     username = request.query.get('username', 'Unknown')
@@ -394,7 +404,7 @@ async def handle_game_finish(request):
     try:
         data = await request.json()
         pos = float(data.get('position', 0))
-        logging.info(f"Game finish received: position={pos}")
+        logging.info(f"Получен finish игры: position={pos}")
         async with game_lock:
             if game_state["status"] == "spinning":
                 winner_data = await finish_round(pos, game_state["pool"], game_state["players"])
@@ -405,9 +415,11 @@ async def handle_game_finish(request):
                     "timer": 15
                 }
                 if winner_data:
+                    logging.info(f"Победитель определён: {winner_data}")
                     return web.json_response({"success": True, "winner": winner_data},
                                              headers={"Access-Control-Allow-Origin": "*"})
                 else:
+                    logging.warning("Победитель не определён")
                     return web.json_response({"success": True, "winner": None},
                                              headers={"Access-Control-Allow-Origin": "*"})
             else:
