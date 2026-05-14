@@ -520,7 +520,7 @@
         }
         async function withdraw(id) { await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) }); showAlert("Запрос на вывод отправлен администратору!"); loadInventory(); }
 
-        // ---------------------------- ИГРА (синхронизированная) ----------------------------
+        // ======================== ИГРА (синхронизированная) ========================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, winner_x: null, spin_start_time: null, last_winner: null };
@@ -530,74 +530,136 @@
         let localTimer = 15;
         let timerInterval = null;
 
-        function resizeCanvas() { const rect = canvas.parentElement.getBoundingClientRect(); canvas.width = rect.width * 2; canvas.height = rect.height * 2; drawGameFrame(); }
-        window.addEventListener('resize', resizeCanvas); setTimeout(resizeCanvas, 100);
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            drawGameFrame();
+        }
+        window.addEventListener('resize', resizeCanvas);
+        setTimeout(resizeCanvas, 100);
 
         function drawGameFrame(ballX = null) {
             if(!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if(!gState.players || gState.players.length === 0) {
-                ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fillRect(0,0, canvas.width, canvas.height);
-                ctx.fillStyle = "#555"; ctx.font = "30px Inter"; ctx.textAlign = "center"; ctx.fillText("Ждем ставки...", canvas.width/2, canvas.height/2);
+                ctx.fillStyle = "rgba(255,255,255,0.05)";
+                ctx.fillRect(0,0, canvas.width, canvas.height);
+                ctx.fillStyle = "#555";
+                ctx.font = "30px Inter";
+                ctx.textAlign = "center";
+                ctx.fillText("Ждем ставки...", canvas.width/2, canvas.height/2);
                 return;
             }
             let curX = 0;
             gState.players.forEach(p => {
                 let w = (p.amount / gState.pool) * canvas.width;
-                ctx.fillStyle = p.color; ctx.fillRect(curX, 0, w, canvas.height);
-                ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(curX, canvas.height-40, w, 40);
-                ctx.fillStyle = "#fff"; ctx.font = "24px Inter"; ctx.textAlign = "center";
+                ctx.fillStyle = p.color;
+                ctx.fillRect(curX, 0, w, canvas.height);
+                ctx.fillStyle = "rgba(0,0,0,0.5)";
+                ctx.fillRect(curX, canvas.height-40, w, 40);
+                ctx.fillStyle = "#fff";
+                ctx.font = "24px Inter";
+                ctx.textAlign = "center";
                 ctx.fillText(p.username.substring(0,6), curX + w/2, canvas.height - 12);
                 curX += w;
             });
             if(ballX !== null && ballX !== undefined) {
-                ctx.beginPath(); ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
-                ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 15; ctx.fill(); ctx.shadowBlur = 0; ctx.closePath();
-                ctx.beginPath(); ctx.moveTo(ballX, 0); ctx.lineTo(ballX, canvas.height);
-                ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 4; ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
+                ctx.fillStyle = "#fff";
+                ctx.shadowColor = "#fff";
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.closePath();
+                ctx.beginPath();
+                ctx.moveTo(ballX, 0);
+                ctx.lineTo(ballX, canvas.height);
+                ctx.strokeStyle = "rgba(255,255,255,0.8)";
+                ctx.lineWidth = 4;
+                ctx.stroke();
             }
         }
 
         function renderBetsList() {
             const container = document.getElementById('bets-list-container');
             const list = document.getElementById('game-bets-list');
-            if(!gState.players || gState.players.length === 0) { if(container) container.style.display = 'none'; return; }
+            if(!gState.players || gState.players.length === 0) {
+                if(container) container.style.display = 'none';
+                return;
+            }
             if(container) container.style.display = 'flex';
             document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
             const sorted = [...gState.players].sort((a,b) => b.amount - a.amount);
             if(list) list.innerHTML = sorted.map(p => `<div class="bet-row"><span style="display:flex; gap:8px;"><span style="width:12px; height:12px; border-radius:50%; background:${p.color};"></span><span>${escapeHtml(p.username)}</span></span><span style="color:var(--accent-gold);">${p.amount} ₽</span></div>`).join('');
         }
 
-        function startLocalTimer(val) { if(timerInterval) clearInterval(timerInterval); localTimer = val; const timerBg = document.getElementById('game-timer-bg'); if(timerBg) timerBg.innerText = localTimer; timerInterval = setInterval(() => { if(localTimer > 0) { localTimer--; if(timerBg) timerBg.innerText = localTimer; } }, 1000); }
+        function startLocalTimer(val) {
+            if(timerInterval) clearInterval(timerInterval);
+            localTimer = val;
+            const timerBg = document.getElementById('game-timer-bg');
+            if(timerBg) timerBg.innerText = localTimer;
+            timerInterval = setInterval(() => {
+                if(localTimer > 0) {
+                    localTimer--;
+                    if(timerBg) timerBg.innerText = localTimer;
+                }
+            }, 1000);
+        }
 
-        function showWinnerModal(winner) { if(!winner) return; document.getElementById('winner-name').innerText = winner.username; document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2); document.getElementById('winner-avatar-container').innerHTML = `<img src="${uAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">`; document.getElementById('winner-modal').classList.add('active'); }
+        function showWinnerModal(winner) {
+            if(!winner) return;
+            document.getElementById('winner-name').innerText = winner.username;
+            document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
+            document.getElementById('winner-avatar-container').innerHTML = `<img src="${uAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">`;
+            document.getElementById('winner-modal').classList.add('active');
+        }
         function closeWinnerModal() { document.getElementById('winner-modal').classList.remove('active'); }
 
-        // Анимация синхронизирована с сервером (spin_start_time, winner_x)
-        function runSpinAnimation(targetX, startTimeSec) {
+        // Синхронизированная анимация с отскоками (строго по времени, без случайностей)
+        function runSpinAnimation(targetX, startTime) {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            const nowSec = performance.now() / 1000;
-            let elapsed = nowSec - startTimeSec;
+            const now = performance.now() / 1000;
+            let elapsed = now - startTime;
             const MOVE_DURATION = 10;   // 10 секунд движения
             const PAUSE_DURATION = 2;    // 2 секунды паузы
             if (elapsed >= MOVE_DURATION + PAUSE_DURATION) {
                 drawGameFrame(targetX);
                 return;
             }
+            let x = 0;
+            let v = 4000;
+            const deceleration = v / MOVE_DURATION;
+            let prevTime = startTime;
             function animate() {
-                const now = performance.now() / 1000;
-                let t = now - startTimeSec;
-                if (t >= MOVE_DURATION + PAUSE_DURATION) {
+                const nowSec = performance.now() / 1000;
+                let t = Math.min(nowSec, startTime + MOVE_DURATION + PAUSE_DURATION);
+                if (t >= startTime + MOVE_DURATION + PAUSE_DURATION) {
                     drawGameFrame(targetX);
                     animationFrameId = null;
                     return;
                 }
-                let progress = Math.min(1, Math.max(0, t / MOVE_DURATION));
-                let eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
-                let currentX = targetX * eased;
-                drawGameFrame(currentX);
+                let dt = Math.min(0.05, t - prevTime);
+                if (dt <= 0) {
+                    animationFrameId = requestAnimationFrame(animate);
+                    return;
+                }
+                prevTime = t;
+                let elapsedMove = Math.min(MOVE_DURATION, Math.max(0, t - startTime));
+                let speed = v - deceleration * elapsedMove;
+                if (speed < 0) speed = 0;
+                let step = speed * dt;
+                x += step;
+                if (x < 0) {
+                    x = -x;
+                } else if (x > canvas.width) {
+                    x = 2 * canvas.width - x;
+                }
+                drawGameFrame(x);
                 animationFrameId = requestAnimationFrame(animate);
             }
+            prevTime = startTime;
             animationFrameId = requestAnimationFrame(animate);
         }
 
@@ -607,7 +669,6 @@
                 const newState = await r.json();
                 gState = newState;
 
-                // таймер
                 if (gState.status === 'counting' && gState.timer !== lastServerTimer) {
                     if (Math.abs(localTimer - gState.timer) > 1) startLocalTimer(gState.timer);
                     lastServerTimer = gState.timer;
@@ -636,13 +697,11 @@
                     drawGameFrame();
                 }
 
-                // Показываем модалку победителя один раз
                 if (gState.last_winner && !window._winnerShown) {
                     window._winnerShown = true;
                     showWinnerModal(gState.last_winner);
                     setTimeout(() => { window._winnerShown = false; }, 5000);
                 }
-
             } catch(e) { console.error(e); }
         }
         setInterval(pollGame, 1000);
