@@ -4,7 +4,6 @@ import os
 import psycopg2
 import json
 import random
-from decimal import Decimal
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -54,7 +53,6 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                # Очищаем id от пробелов
                 cur.execute("UPDATE users SET id = TRIM(id)")
                 try:
                     cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
@@ -76,7 +74,7 @@ game_state = {
     "timer": 15,
     "winner_x": None,
     "spin_start_time": None,
-    "last_winner": None          # временное хранилище победителя для показа модалки
+    "last_winner": None
 }
 
 
@@ -84,14 +82,40 @@ def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
 
 
+def simulate_trajectory(canvas_width, move_duration=10.0):
+    """
+    Детерминированная симуляция движения шарика по горизонтали с отскоками.
+    Параметры фиксированы: старт x = 0, начальная скорость = 4000 пикс/сек вправо.
+    Замедление: линейное уменьшение скорости до 0 за move_duration секунд.
+    Возвращает финальную позицию x через move_duration секунд (нормализованную от 0 до 1).
+    """
+    x = 0.0
+    v = 4000.0
+    deceleration = v / move_duration
+    dt = 0.01
+    steps = int(move_duration / dt)
+    for _ in range(steps):
+        if v > 0:
+            v = max(0, v - deceleration * dt)
+        elif v < 0:
+            v = min(0, v + deceleration * dt)
+        x += v * dt
+        if x < 0:
+            x = -x
+            v = -v
+        elif x > canvas_width:
+            x = 2 * canvas_width - x
+            v = -v
+    return x / canvas_width
+
+
 async def finish_round():
-    """Определяет победителя по сохранённому winner_x и начисляет выигрыш"""
     global game_state
     winner_x = game_state["winner_x"]
     pool = game_state["pool"]
     players = game_state["players"]
     if pool <= 0 or not players or winner_x is None:
-        logging.warning(f"finish_round: invalid state pool={pool}, players={players}, winner_x={winner_x}")
+        logging.warning(f"finish_round: invalid state")
         return None
     cumulative = 0.0
     winner_id = None
@@ -119,17 +143,14 @@ async def finish_round():
                     cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
                     rows = cur.rowcount
                     conn.commit()
-                    if rows == 0:
-                        logging.error(f"Update failed for {winner_id}, no rows affected")
-                        return None
-                    logging.info(f"Balance updated for {winner_id}: +{profit} RUB. Old balance: {user[1]}")
+                    logging.info(f"Balance updated for {winner_id}: +{profit} RUB. Rows: {rows}")
             return {
                 "user_id": winner_id,
                 "username": winner_username,
                 "win_amount": profit
             }
         except Exception as e:
-            logging.error(f"Game DB error: {e}")
+            logging.error(f"DB error: {e}")
             return None
     else:
         logging.warning(f"No winner found for position {winner_x}")
@@ -145,18 +166,19 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-                    game_state["winner_x"] = random.uniform(0.0, 1.0)
+                    # Для симуляции используем фиктивную ширину 1000 (нормализация потом)
+                    canvas_width = 1000
+                    winner_x = simulate_trajectory(canvas_width, move_duration=10.0)
+                    game_state["winner_x"] = winner_x
                     game_state["spin_start_time"] = asyncio.get_event_loop().time()
-                    logging.info(f"Game spinning started, winner_x={game_state['winner_x']}")
+                    logging.info(f"Game spinning started, winner_x={winner_x}")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(12)  # 10 сек движения + 2 сек паузы
             async with game_lock:
                 if game_state["status"] == "spinning":
                     winner_data = await finish_round()
-                    # Сохраняем победителя для фронта
                     game_state["last_winner"] = winner_data
-                    # Сбрасываем состояние
                     game_state = {
                         "status": "waiting",
                         "players": {},
@@ -164,9 +186,8 @@ async def game_worker():
                         "timer": 15,
                         "winner_x": None,
                         "spin_start_time": None,
-                        "last_winner": winner_data   # сохраняем для следующего ответа
+                        "last_winner": winner_data
                     }
-                    # Через секунду очистим last_winner, чтобы не показывать повторно
                     asyncio.create_task(clear_last_winner())
 
 
@@ -178,6 +199,19 @@ async def clear_last_winner():
 
 
 # --- API МЕТОДЫ ---
+async def handle_game_state(request):
+    async with game_lock:
+        return web.json_response({
+            "status": game_state["status"],
+            "players": list(game_state["players"].values()),
+            "pool": game_state["pool"],
+            "timer": game_state["timer"],
+            "winner_x": game_state["winner_x"],
+            "spin_start_time": game_state["spin_start_time"],
+            "last_winner": game_state.get("last_winner")
+        }, headers={"Access-Control-Allow-Origin": "*"})
+
+
 async def handle_get_user(request):
     user_id = request.query.get('user_id')
     username = request.query.get('username', 'Unknown')
@@ -328,19 +362,6 @@ async def handle_request_withdraw(request):
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
-async def handle_game_state(request):
-    async with game_lock:
-        return web.json_response({
-            "status": game_state["status"],
-            "players": list(game_state["players"].values()),
-            "pool": game_state["pool"],
-            "timer": game_state["timer"],
-            "winner_x": game_state["winner_x"],
-            "spin_start_time": game_state["spin_start_time"],
-            "last_winner": game_state.get("last_winner")
-        }, headers={"Access-Control-Allow-Origin": "*"})
-
-
 async def handle_game_bet(request):
     global game_state
     try:
@@ -412,7 +433,7 @@ async def handle_game_cancel(request):
 
 
 async def handle_game_finish(request):
-    # Устаревший эндпоинт, больше не нужен
+    # Устаревший эндпоинт, оставлен для совместимости
     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
 
 
@@ -426,7 +447,7 @@ async def handle_options(request):
                  "Access-Control-Allow-Headers": "Content-Type"})
 
 
-# --- CALLBACKS ДЛЯ АДМИНА (без изменений) ---
+# --- CALLBACKS ДЛЯ АДМИНА ---
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
