@@ -4,7 +4,6 @@ import os
 import psycopg2
 import json
 import random
-from decimal import Decimal
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -85,9 +84,9 @@ def generate_color():
 
 def simulate_trajectory(canvas_width=1000, move_duration=10.0):
     """
-    Детерминированная симуляция движения шарика по горизонтали с отскоками.
-    Начальная позиция x=0, скорость 4000 вправо, линейное замедление до 0 за move_duration секунд.
-    Возвращает нормализованную позицию (0..1) через move_duration секунд.
+    Симуляция движения шарика с отскоками и линейным замедлением.
+    Начальная позиция x=0, начальная скорость v=4000 вправо.
+    Возвращает нормализованную позицию остановки (0..1).
     """
     x = 0.0
     v = 4000.0
@@ -166,14 +165,12 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-                    game_state["winner_x"] = simulate_trajectory()
+                    winner_x = simulate_trajectory()
+                    game_state["winner_x"] = winner_x
                     game_state["spin_start_time"] = asyncio.get_event_loop().time()
-                    logging.info(f"Game spinning started, winner_x={game_state['winner_x']}")
-
-        if game_state["status"] == "spinning":
-            await asyncio.sleep(12)  # 10 сек движения + 2 сек паузы
-            async with game_lock:
-                if game_state["status"] == "spinning":
+                    logging.info(f"Game spinning started, winner_x={winner_x}")
+            elif game_state["status"] == "spinning":
+                if game_state["spin_start_time"] and asyncio.get_event_loop().time() - game_state["spin_start_time"] >= 12:
                     winner_data = await finish_round()
                     game_state["last_winner"] = winner_data
                     game_state = {
@@ -413,7 +410,7 @@ async def handle_game_cancel(request):
 
 
 async def handle_game_finish(request):
-    # Устаревший эндпоинт, оставлен для совместимости
+    # Не используется, оставлен для совместимости
     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
 
 
