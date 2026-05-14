@@ -79,29 +79,27 @@ def generate_color():
 
 
 async def finish_round(winner_x, pool, players):
-    """Определяет победителя по позиции winner_x (0..1) и начисляет выигрыш"""
+    """Определяет победителя, начисляет выигрыш и возвращает данные о победителе"""
     if pool <= 0 or not players:
         logging.warning(f"finish_round: pool={pool}, players={players}")
         return None
-
-    # Нормализуем позицию
+    # Ограничиваем winner_x диапазоном [0,1]
     winner_x = max(0.0, min(1.0, winner_x))
+
+    # Сортируем игроков для детерминизма (не обязательно)
+    sorted_players = sorted(players.items(), key=lambda x: x[0])
+
     cumulative = 0.0
     winner_id = None
     winner_username = None
 
-    logging.info(f"=== ОПРЕДЕЛЕНИЕ ПОБЕДИТЕЛЯ ===")
-    logging.info(f"Пул: {pool}, позиция: {winner_x}")
-
-    for uid, p in players.items():
+    for uid, p in sorted_players:
         sector_start = cumulative
         sector_end = cumulative + (p["amount"] / pool)
-        logging.info(
-            f"Игрок {uid} ({p['username']}) ставка {p['amount']} -> сектор [{sector_start:.6f}, {sector_end:.6f}]")
+        logging.info(f"Sector for {uid}: [{sector_start:.10f}, {sector_end:.10f}], winner_x={winner_x:.10f}")
         if sector_start <= winner_x <= sector_end:
             winner_id = uid
             winner_username = p.get("username", "Игрок")
-            logging.info(f"!!! ПОБЕДИТЕЛЬ НАЙДЕН: {winner_id} ({winner_username}) !!!")
             break
         cumulative = sector_end
 
@@ -109,28 +107,24 @@ async def finish_round(winner_x, pool, players):
         winner_bet = players[winner_id]["amount"]
         others_bets = pool - winner_bet
         profit = winner_bet + (others_bets * 0.7)
-        logging.info(f"Выигрыш: {profit} ₽ (своя ставка {winner_bet} + 70% от чужих {others_bets})")
-
+        logging.info(f"Winner {winner_id} bet={winner_bet}, others={others_bets}, profit={profit}")
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Обновляем баланс победителя
-                    cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
+                    cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s",
+                                (profit, winner_id))
                     conn.commit()
-                    # Проверяем, что обновилось
-                    cur.execute("SELECT balance FROM users WHERE id = %s", (winner_id,))
-                    new_balance = cur.fetchone()[0]
-                    logging.info(f"Баланс пользователя {winner_id} обновлён: +{profit} -> теперь {new_balance}")
+            logging.info(f"Balance updated for {winner_id}: +{profit} RUB")
             return {
                 "user_id": winner_id,
                 "username": winner_username,
                 "win_amount": profit
             }
         except Exception as e:
-            logging.error(f"Ошибка БД при начислении: {e}")
+            logging.error(f"Game DB error: {e}")
             return None
     else:
-        logging.warning(f"Победитель не найден для позиции {winner_x}")
+        logging.warning(f"No winner found for position {winner_x}")
         return None
 
 
@@ -146,7 +140,7 @@ async def game_worker():
                     logging.info("Game status changed to spinning")
 
         if game_state["status"] == "spinning":
-            # Ждём 10 секунд: 8 секунд движения + 2 секунды паузы
+            # Ждём 10 секунд: 8 сек движения + 2 сек стоянки
             await asyncio.sleep(10)
             async with game_lock:
                 if game_state["status"] == "spinning":
@@ -159,7 +153,7 @@ async def game_worker():
                     }
 
 
-# --- API МЕТОДЫ ---
+# --- API МЕТОДЫ (остальные без изменений) ---
 async def handle_get_user(request):
     user_id = request.query.get('user_id')
     username = request.query.get('username', 'Unknown')

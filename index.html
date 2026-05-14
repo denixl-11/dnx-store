@@ -6,6 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* все стили такие же, как в предыдущем полном файле (не менялись) */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -49,7 +50,11 @@
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .tab-bar { position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85); backdrop-filter: blur(15px); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100; }
+        .tab-bar {
+            position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85); backdrop-filter: blur(15px);
+            border-top: 1px solid var(--border-color); display: flex; justify-content: space-around;
+            padding: 20px 0 25px 0; z-index: 100;
+        }
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
@@ -65,7 +70,6 @@
         .bets-list-header { padding: 12px 15px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); text-align: center; letter-spacing: 1px; }
         .bets-list { max-height: 200px; overflow-y: auto; padding: 5px 15px; }
         .bet-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; align-items: center; }
-        .bet-row:last-child { border-bottom: none; }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; text-align: center; }
@@ -88,26 +92,15 @@
         .cart-item-info { flex: 1; }
         .fixed-footer { position: fixed; bottom: 85px; width: 100%; padding: 0 20px; z-index: 90; box-sizing: border-box; }
         .modal-tg-btn {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: 0.2s;
-            z-index: 10;
+            position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; z-index: 10;
         }
         .modal-tg-btn:hover { background: rgba(203, 161, 83, 0.3); }
         .modal-tg-btn svg { width: 20px; height: 20px; stroke: white; stroke-width: 1.8; fill: none; }
         .modal-tg-btn:hover svg { stroke: var(--accent-gold); }
         .modal-buttons-row { display: flex; gap: 10px; align-items: stretch; }
-        .modal-buttons-row .btn-buy-modal { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
-        .modal-buttons-row .btn-cart-icon { width: 52px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 12px; height: 52px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; }
+        .modal-buttons-row .btn-buy-modal { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; }
+        .modal-buttons-row .btn-cart-icon { width: 52px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 12px; height: 52px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .modal-buttons-row .btn-cart-icon svg { stroke: var(--accent-gold); width: 24px; height: 24px; }
         .winner-modal .winner-avatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-gold); margin-bottom: 16px; }
         .winner-modal .winner-name { font-size: 1.4rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 8px; }
@@ -312,18 +305,13 @@
             document.getElementById('alert-modal').classList.add('active');
             try { tg.HapticFeedback.impactOccurred('light'); } catch(e){}
         }
-        function closeModal(id) {
-            const el = document.getElementById(id);
-            if(el) el.classList.remove('active');
-        }
+        function closeModal(id) { const el = document.getElementById(id); if(el) el.classList.remove('active'); }
 
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.querySelectorAll('.tab-bar .tab-item').forEach(t => t.classList.remove('active'));
-            const pageEl = document.getElementById('page-' + id);
-            if(pageEl) pageEl.classList.add('page-active');
-            const tabEl = document.getElementById('tab-' + id);
-            if(tabEl) tabEl.classList.add('active');
+            const pageEl = document.getElementById('page-' + id); if(pageEl) pageEl.classList.add('page-active');
+            const tabEl = document.getElementById('tab-' + id); if(tabEl) tabEl.classList.add('active');
             if(id === 'store') loadCatalog();
             if(id === 'inventory') loadInventory();
             if(id === 'cart') renderCart();
@@ -359,10 +347,7 @@
             } catch(e) { console.error(e); }
         }
 
-        function escapeHtml(str) {
-            if(!str) return '';
-            return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
-        }
+        function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 
         function openNftModal(id) {
             const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
@@ -370,19 +355,14 @@
             document.getElementById('nft-modal-img').src = item.image_url;
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
-
             let traits = [];
             if(item.traits) {
-                if(typeof item.traits === 'string') {
-                    try { traits = JSON.parse(item.traits); } catch(e) { traits = []; }
-                } else if(Array.isArray(item.traits)) {
-                    traits = item.traits;
-                }
+                if(typeof item.traits === 'string') try { traits = JSON.parse(item.traits); } catch(e) {}
+                else if(Array.isArray(item.traits)) traits = item.traits;
             }
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
                 `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
                 '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
-
             const buyBtn = document.getElementById('nft-modal-btn-buy');
             buyBtn.innerHTML = `КУПИТЬ ЗА ${item.price || 0} ₽`;
             buyBtn.onclick = () => { closeNftModal(true); buyItem(item.id, item.price); };
@@ -395,11 +375,7 @@
             } else tgBtn.style.display = 'none';
             document.getElementById('nft-detail-overlay').classList.add('active');
         }
-
-        function closeNftModal(force=false) {
-            if(force || (event && event.target.id === 'nft-detail-overlay'))
-                document.getElementById('nft-detail-overlay').classList.remove('active');
-        }
+        function closeNftModal(force=false) { if(force || (event && event.target.id === 'nft-detail-overlay')) document.getElementById('nft-detail-overlay').classList.remove('active'); }
 
         function addToCart(item) {
             if(!cart.find(c => c.id === item.id)) {
@@ -411,7 +387,6 @@
                 renderCart();
             }
         }
-
         function renderCart() {
             document.getElementById('cart-counter').innerText = cart.length;
             const list = document.getElementById('cart-items-list');
@@ -431,25 +406,17 @@
                 </div>`).join('');
             document.getElementById('pay-footer').style.display = 'block';
         }
-
-        function removeFromCart(index) {
-            cart.splice(index,1);
-            localStorage.setItem('dnx_cart', JSON.stringify(cart));
-            renderCart();
-        }
+        function removeFromCart(index) { cart.splice(index,1); localStorage.setItem('dnx_cart', JSON.stringify(cart)); renderCart(); }
 
         async function buyItem(itemId, price) {
             if(userBalance < price) { showAlert("Недостаточно средств. Пополните баланс."); return; }
             try {
                 const res = await fetch(`${API_BASE}/buy`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({items: [itemId], userId: uId}) });
                 const data = await res.json();
-                if(data.success) {
-                    showAlert("Успешная покупка! NFT добавлен в инвентарь.");
-                    updateBalance(); loadCatalog(); loadInventory();
-                } else showAlert(data.error === 'insufficient_funds' ? "Недостаточно средств!" : "Товар уже недоступен.");
+                if(data.success) { showAlert("Успешная покупка! NFT добавлен в инвентарь."); updateBalance(); loadCatalog(); if(currentCatalog.some(i => i.id === itemId)) loadInventory(); }
+                else { showAlert(data.error === 'insufficient_funds' ? "Недостаточно средств!" : "Товар уже недоступен."); loadCatalog(); }
             } catch(e) { showAlert("Ошибка сети"); }
         }
-
         async function buyCart() {
             const total = cart.reduce((s, c) => s + Number(c.price), 0);
             if(userBalance < total) { showAlert("Недостаточно средств. Пополните баланс."); return; }
@@ -457,102 +424,47 @@
             try {
                 const res = await fetch(`${API_BASE}/buy`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({items: ids, userId: uId}) });
                 const data = await res.json();
-                if(data.success) {
-                    showAlert("Корзина успешно оплачена!");
-                    cart=[]; localStorage.setItem('dnx_cart', '[]');
-                    renderCart(); updateBalance(); loadInventory();
-                } else showAlert("Ошибка оплаты. Возможно часть товаров уже недоступна.");
+                if(data.success) { showAlert("Корзина успешно оплачена!"); cart=[]; localStorage.setItem('dnx_cart', '[]'); renderCart(); updateBalance(); loadInventory(); }
+                else { showAlert("Ошибка оплаты. Возможно часть товаров уже недоступна."); loadCatalog(); }
             } catch(e) { showAlert("Ошибка сети"); }
         }
 
         document.getElementById('terms-checkbox')?.addEventListener('change', function() {
             const chkSpan = document.getElementById('custom-chk');
-            if(chkSpan) {
-                chkSpan.innerHTML = this.checked ? '✓' : '';
-                chkSpan.style.borderColor = this.checked ? 'var(--accent-gold)' : 'var(--border-color)';
-                chkSpan.style.background = this.checked ? 'var(--accent-gold)' : 'transparent';
-            }
+            if(chkSpan) { chkSpan.innerHTML = this.checked ? '✓' : ''; chkSpan.style.borderColor = this.checked ? 'var(--accent-gold)' : 'var(--border-color)'; chkSpan.style.color = '#000'; chkSpan.style.background = this.checked ? 'var(--accent-gold)' : 'transparent'; }
         });
 
-        function initTopup(amount) {
-            if(amount < 50) { showAlert("Минимальная сумма 50 ₽"); return; }
-            pendingTopupAmount = amount;
-            openTopupModal();
-        }
-        function openCustomAmountModal() {
-            document.getElementById('custom-amount-input').value = '';
-            document.getElementById('custom-amount-modal').classList.add('active');
-        }
-        function submitCustomAmount() {
-            const val = parseFloat(document.getElementById('custom-amount-input').value);
-            if(!val || val < 50) { showAlert("Минимальная сумма 50 ₽"); return; }
-            closeModal('custom-amount-modal');
-            initTopup(val);
-        }
+        function initTopup(amount) { if (amount < 50) { showAlert("Минимальная сумма 50 ₽"); return; } pendingTopupAmount = amount; openTopupModal(); }
+        function openCustomAmountModal() { document.getElementById('custom-amount-input').value = ''; document.getElementById('custom-amount-modal').classList.add('active'); }
+        function submitCustomAmount() { const val = parseFloat(document.getElementById('custom-amount-input').value); if (!val || val < 50) { showAlert("Минимальная сумма 50 ₽"); return; } closeModal('custom-amount-modal'); initTopup(val); }
         async function openTopupModal() {
             document.getElementById('display-topup-amount').innerText = pendingTopupAmount;
-            const chk = document.getElementById('terms-checkbox');
-            if(chk) {
-                chk.checked = false;
-                const chkSpan = document.getElementById('custom-chk');
-                if(chkSpan) { chkSpan.innerHTML = ''; chkSpan.style.background = 'transparent'; }
-            }
-            const btn = document.getElementById('btn-send-topup');
-            if(btn) btn.disabled = true;
+            const chk = document.getElementById('terms-checkbox'); if(chk) { chk.checked = false; const chkSpan = document.getElementById('custom-chk'); if(chkSpan) { chkSpan.innerHTML = ''; chkSpan.style.background = 'transparent'; } }
+            const btn = document.getElementById('btn-send-topup'); if(btn) btn.disabled = true;
             document.getElementById('topup-modal').classList.add('active');
-            try {
-                const r = await fetch(`${API_BASE}/req`);
-                const d = await r.json();
-                const reqDiv = document.getElementById('req-text');
-                if(reqDiv) reqDiv.innerText = "Реквизиты: " + d.req;
-            } catch(e) {}
+            try { const r = await fetch(`${API_BASE}/req`); const d = await r.json(); const reqDiv = document.getElementById('req-text'); if(reqDiv) reqDiv.innerText = "Реквизиты: " + d.req; } catch(e) {}
         }
-        async function sendTopup() {
-            if(!pendingTopupAmount || pendingTopupAmount < 50) return;
-            closeModal('topup-modal');
-            await fetch(`${API_BASE}/topup`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: pendingTopupAmount}) });
-            showAlert("Заявка отправлена. Ожидайте зачисления.");
-        }
+        async function sendTopup() { if(!pendingTopupAmount || pendingTopupAmount < 50) return; closeModal('topup-modal'); await fetch(`${API_BASE}/topup`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: pendingTopupAmount}) }); showAlert("Заявка отправлена. Ожидайте зачисления."); }
 
         function switchInv(el, type) {
-            document.querySelectorAll('#page-inventory .tab-item').forEach(t => {
-                t.classList.remove('active');
-                t.style.borderColor='transparent';
-                t.style.color='var(--text-muted)';
-            });
-            el.classList.add('active');
-            el.style.borderColor='var(--accent-gold)';
-            el.style.color='var(--accent-gold)';
-            const activeContainer = document.getElementById('inventory-active-container');
-            const historyContainer = document.getElementById('inventory-history-container');
-            if(activeContainer) activeContainer.style.display = type === 'active' ? 'grid' : 'none';
-            if(historyContainer) historyContainer.style.display = type === 'history' ? 'grid' : 'none';
+            document.querySelectorAll('#page-inventory .tab-item').forEach(t => { t.classList.remove('active'); t.style.borderColor='transparent'; t.style.color='var(--text-muted)'; });
+            el.classList.add('active'); el.style.borderColor='var(--accent-gold)'; el.style.color='var(--accent-gold)';
+            document.getElementById('inventory-active-container').style.display = type === 'active' ? 'grid' : 'none';
+            document.getElementById('inventory-history-container').style.display = type === 'history' ? 'grid' : 'none';
         }
-
         async function loadInventory() {
             try {
                 const r = await fetch(`${API_BASE}/inventory?user_id=${uId}`);
                 inventoryData = await r.json();
                 const act = inventoryData.filter(i => i.status !== 'withdrawn');
                 const hist = inventoryData.filter(i => i.status === 'withdrawn');
-                const activeContainer = document.getElementById('inventory-active-container');
-                if(activeContainer) {
-                    activeContainer.innerHTML = act.length ? act.map(i => `<div class="item-card"><img src="${i.image_url}" class="item-image" onclick="openNftModal('${i.id}')"><div class="item-name">${escapeHtml(i.name)}</div><button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
-                }
-                const historyContainer = document.getElementById('inventory-history-container');
-                if(historyContainer) {
-                    historyContainer.innerHTML = hist.length ? hist.map(i => `<div class="item-card" style="opacity:0.5"><img src="${i.image_url}" class="item-image" style="filter:grayscale(100%)"><div class="item-name">${escapeHtml(i.name)}</div><div style="text-align:center; font-size:0.7rem; border:1px dashed #555; border-radius:8px; padding:4px;">ВЫВЕДЕНО</div></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
-                }
+                document.getElementById('inventory-active-container').innerHTML = act.length ? act.map(i => `<div class="item-card"><img src="${i.image_url}" class="item-image" onclick="openNftModal('${i.id}')"><div class="item-name">${escapeHtml(i.name)}</div><button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
+                document.getElementById('inventory-history-container').innerHTML = hist.length ? hist.map(i => `<div class="item-card" style="opacity:0.5"><img src="${i.image_url}" class="item-image" style="filter:grayscale(100%)"><div class="item-name">${escapeHtml(i.name)}</div><div style="text-align:center; font-size:0.7rem; border:1px dashed #555; border-radius:8px; padding:4px;">ВЫВЕДЕНО</div></div>`).join('') : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
             } catch(e) { console.error(e); }
         }
+        async function withdraw(id) { await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) }); showAlert("Запрос на вывод отправлен администратору!"); loadInventory(); }
 
-        async function withdraw(id) {
-            await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) });
-            showAlert("Запрос на вывод отправлен администратору!");
-            loadInventory();
-        }
-
-        // ---------------------------- ИГРА ----------------------------
+        // ======================== ИГРА ========================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15 };
@@ -562,175 +474,90 @@
         let localTimer = 15;
         let timerInterval = null;
 
-        function resizeCanvas() {
-            const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width * 2;
-            canvas.height = rect.height * 2;
-            drawGameFrame();
-        }
-        window.addEventListener('resize', resizeCanvas);
-        setTimeout(resizeCanvas, 100);
+        function resizeCanvas() { const rect = canvas.parentElement.getBoundingClientRect(); canvas.width = rect.width * 2; canvas.height = rect.height * 2; drawGameFrame(); }
+        window.addEventListener('resize', resizeCanvas); setTimeout(resizeCanvas, 100);
 
         function drawGameFrame(ballX = null) {
             if(!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if(!gState.players || gState.players.length === 0) {
-                ctx.fillStyle = "rgba(255,255,255,0.05)";
-                ctx.fillRect(0,0, canvas.width, canvas.height);
-                ctx.fillStyle = "#555";
-                ctx.font = "30px Inter";
-                ctx.textAlign = "center";
-                ctx.fillText("Ждем ставки...", canvas.width/2, canvas.height/2);
+                ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fillRect(0,0, canvas.width, canvas.height);
+                ctx.fillStyle = "#555"; ctx.font = "30px Inter"; ctx.textAlign = "center"; ctx.fillText("Ждем ставки...", canvas.width/2, canvas.height/2);
                 return;
             }
             let curX = 0;
             gState.players.forEach(p => {
                 let w = (p.amount / gState.pool) * canvas.width;
-                ctx.fillStyle = p.color;
-                ctx.fillRect(curX, 0, w, canvas.height);
-                ctx.fillStyle = "rgba(0,0,0,0.5)";
-                ctx.fillRect(curX, canvas.height-40, w, 40);
-                ctx.fillStyle = "#fff";
-                ctx.font = "24px Inter";
-                ctx.textAlign = "center";
+                ctx.fillStyle = p.color; ctx.fillRect(curX, 0, w, canvas.height);
+                ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(curX, canvas.height-40, w, 40);
+                ctx.fillStyle = "#fff"; ctx.font = "24px Inter"; ctx.textAlign = "center";
                 ctx.fillText(p.username.substring(0,6), curX + w/2, canvas.height - 12);
                 curX += w;
             });
             if(ballX !== null && ballX !== undefined) {
-                ctx.beginPath();
-                ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
-                ctx.fillStyle = "#fff";
-                ctx.shadowColor = "#fff";
-                ctx.shadowBlur = 15;
-                ctx.fill();
-                ctx.shadowBlur = 0;
-                ctx.closePath();
-                ctx.beginPath();
-                ctx.moveTo(ballX, 0);
-                ctx.lineTo(ballX, canvas.height);
-                ctx.strokeStyle = "rgba(255,255,255,0.8)";
-                ctx.lineWidth = 4;
-                ctx.stroke();
+                ctx.beginPath(); ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
+                ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 15; ctx.fill(); ctx.shadowBlur = 0; ctx.closePath();
+                ctx.beginPath(); ctx.moveTo(ballX, 0); ctx.lineTo(ballX, canvas.height);
+                ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 4; ctx.stroke();
             }
         }
 
         function renderBetsList() {
             const container = document.getElementById('bets-list-container');
             const list = document.getElementById('game-bets-list');
-            if(!gState.players || gState.players.length === 0) {
-                if(container) container.style.display = 'none';
-                return;
-            }
+            if(!gState.players || gState.players.length === 0) { if(container) container.style.display = 'none'; return; }
             if(container) container.style.display = 'flex';
-            const poolSpan = document.getElementById('game-total-pool');
-            if(poolSpan) poolSpan.innerText = `${gState.pool} ₽`;
+            document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
             const sorted = [...gState.players].sort((a,b) => b.amount - a.amount);
-            if(list) {
-                list.innerHTML = sorted.map(p => `
-                    <div class="bet-row">
-                        <span style="display:flex; align-items:center; gap:8px;">
-                            <span style="width:12px; height:12px; border-radius:50%; background:${p.color}; display:inline-block;"></span>
-                            <span style="font-weight: 600;">${escapeHtml(p.username)}</span>
-                        </span>
-                        <span style="color: var(--accent-gold); font-weight: 700;">${p.amount} ₽</span>
-                    </div>
-                `).join('');
-            }
+            if(list) list.innerHTML = sorted.map(p => `<div class="bet-row"><span style="display:flex; gap:8px;"><span style="width:12px; height:12px; border-radius:50%; background:${p.color};"></span><span>${escapeHtml(p.username)}</span></span><span style="color:var(--accent-gold);">${p.amount} ₽</span></div>`).join('');
         }
 
-        function startLocalTimer(val) {
-            if(timerInterval) clearInterval(timerInterval);
-            localTimer = val;
-            const timerBg = document.getElementById('game-timer-bg');
-            if(timerBg) timerBg.innerText = localTimer;
-            timerInterval = setInterval(() => {
-                if(localTimer > 0) {
-                    localTimer--;
-                    if(timerBg) timerBg.innerText = localTimer;
-                }
-            }, 1000);
-        }
+        function startLocalTimer(val) { if(timerInterval) clearInterval(timerInterval); localTimer = val; const timerBg = document.getElementById('game-timer-bg'); if(timerBg) timerBg.innerText = localTimer; timerInterval = setInterval(() => { if(localTimer > 0) { localTimer--; if(timerBg) timerBg.innerText = localTimer; } }, 1000); }
 
-        function showWinnerModal(winner) {
-            if(!winner) return;
-            document.getElementById('winner-name').innerText = winner.username || "Игрок";
-            document.getElementById('winner-amount').innerText = (winner.win_amount || 0).toFixed(2);
-            document.getElementById('winner-avatar-container').innerHTML = `<img src="${uAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">`;
-            document.getElementById('winner-modal').classList.add('active');
-        }
+        function showWinnerModal(winner) { if(!winner) return; document.getElementById('winner-name').innerText = winner.username; document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2); document.getElementById('winner-avatar-container').innerHTML = `<img src="${uAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">`; document.getElementById('winner-modal').classList.add('active'); }
+        function closeWinnerModal() { document.getElementById('winner-modal').classList.remove('active'); }
 
-        function closeWinnerModal() {
-            document.getElementById('winner-modal').classList.remove('active');
-        }
-
-        // Анимация: 8 секунд движения + 2 секунды паузы, без зума
-        function runSpinAnimation(targetCanvasWidth) {
+        // Анимация: 8 секунд движения + 2 секунды паузы, БЕЗ ЗУМА
+        function runSpinAnimation() {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-
             let currentX = canvas.width / 2;
             let velocity = (Math.random() * 500 + 4000) * (Math.random() > 0.5 ? 1 : -1);
             const startTime = performance.now();
-            const MOVE_DURATION = 8000; // 8 секунд движения
-            const PAUSE_DURATION = 2000; // 2 секунды паузы
+            const MOVE_DURATION = 8000;  // 8 секунд движения
+            const PAUSE_DURATION = 2000; // 2 секунды стоянки
             const initialSpeed = Math.abs(velocity);
             const deceleration = initialSpeed / MOVE_DURATION;
-
             let lastTimestamp = startTime;
             let finished = false;
             let finalX = null;
-
             function animate(now) {
                 if(finished) return;
                 const dt = Math.min(100, now - lastTimestamp);
-                if(dt <= 0) {
-                    animationFrameId = requestAnimationFrame(animate);
-                    return;
-                }
+                if(dt <= 0) { animationFrameId = requestAnimationFrame(animate); return; }
                 lastTimestamp = now;
                 const elapsed = now - startTime;
-
                 if(elapsed >= MOVE_DURATION) {
                     finalX = currentX;
                     drawGameFrame(finalX);
-                    // Пауза 2 секунды
+                    animationFrameId = null;
                     setTimeout(() => {
                         const pos = finalX / canvas.width;
-                        fetch(`${API_BASE}/game/finish`, {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({position: pos})
-                        })
+                        fetch(`${API_BASE}/game/finish`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({position: pos}) })
                         .then(res => res.json())
-                        .then(data => {
-                            if(data.success && data.winner) showWinnerModal(data.winner);
-                            updateBalance();
-                        })
+                        .then(data => { if(data.success && data.winner) showWinnerModal(data.winner); updateBalance(); })
                         .catch(e => console.error("Finish error", e));
                     }, PAUSE_DURATION);
-                    animationFrameId = null;
                     finished = true;
                     return;
                 }
-
                 let speed = initialSpeed - deceleration * elapsed;
                 if(speed < 0) speed = 0;
                 let direction = velocity > 0 ? 1 : -1;
                 let step = direction * speed * (dt / 1000);
                 currentX += step;
-
-                if(currentX <= 0) {
-                    currentX = 0;
-                    velocity = Math.abs(velocity);
-                    speed = initialSpeed - deceleration * elapsed;
-                    velocity = speed;
-                } else if(currentX >= canvas.width) {
-                    currentX = canvas.width;
-                    velocity = -Math.abs(velocity);
-                    speed = initialSpeed - deceleration * elapsed;
-                    velocity = -speed;
-                } else {
-                    velocity = direction * speed;
-                }
+                if(currentX <= 0) { currentX = 0; velocity = Math.abs(velocity); speed = initialSpeed - deceleration * elapsed; velocity = speed; }
+                else if(currentX >= canvas.width) { currentX = canvas.width; velocity = -Math.abs(velocity); speed = initialSpeed - deceleration * elapsed; velocity = -speed; }
+                else { velocity = direction * speed; }
                 drawGameFrame(currentX);
                 animationFrameId = requestAnimationFrame(animate);
             }
@@ -742,98 +569,40 @@
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
-                if (newState.status === 'counting' && newState.timer !== lastServerTimer) {
-                    if (Math.abs(localTimer - newState.timer) > 1) startLocalTimer(newState.timer);
-                    lastServerTimer = newState.timer;
-                } else if (newState.status !== 'counting') {
-                    const timerBg = document.getElementById('game-timer-bg');
-                    if(timerBg && newState.status !== 'spinning') timerBg.innerText = '';
-                    if(newState.status !== 'spinning' && timerInterval) {
-                        clearInterval(timerInterval);
-                        timerInterval = null;
-                    }
-                }
+                if (newState.status === 'counting' && newState.timer !== lastServerTimer) { if (Math.abs(localTimer - newState.timer) > 1) startLocalTimer(newState.timer); lastServerTimer = newState.timer; }
+                else if (newState.status !== 'counting') { const timerBg = document.getElementById('game-timer-bg'); if(timerBg && newState.status !== 'spinning') timerBg.innerText = ''; if(newState.status !== 'spinning' && timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
                 gState = newState;
-                const playersCountSpan = document.getElementById('game-players-count');
-                if(playersCountSpan) playersCountSpan.innerText = `Игроки: ${gState.players.length}/20`;
+                document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 renderBetsList();
                 const hasMyBet = gState.players.find(p => p.id === String(uId));
                 const cancelBtn = document.getElementById('btn-cancel-bet');
-                if(cancelBtn) {
-                    cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
-                }
-                if(gState.status === 'spinning' && !isSpinning) {
-                    isSpinning = true;
-                    runSpinAnimation(canvas.width);
-                } else if(gState.status !== 'spinning' && isSpinning) {
-                    isSpinning = false;
-                    if(animationFrameId) cancelAnimationFrame(animationFrameId);
-                    drawGameFrame();
-                } else if(gState.status !== 'spinning' && !isSpinning) {
-                    drawGameFrame();
-                }
+                if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
+                if(gState.status === 'spinning' && !isSpinning) { isSpinning = true; runSpinAnimation(); }
+                else if(gState.status !== 'spinning' && isSpinning) { isSpinning = false; if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; } drawGameFrame(); }
+                else if(gState.status !== 'spinning' && !isSpinning) drawGameFrame();
             } catch(e) { console.error(e); }
         }
-
         setInterval(pollGame, 1000);
 
-        function openBetConfirm(amt) {
-            betAmountTemp = amt;
-            document.getElementById('confirm-bet-amount').innerText = amt;
-            document.getElementById('confirm-bet-modal').classList.add('active');
-        }
-        function openCustomBet() {
-            document.getElementById('custom-bet-input').value = '';
-            document.getElementById('custom-bet-modal').classList.add('active');
-        }
-        function submitCustomBet() {
-            const v = parseFloat(document.getElementById('custom-bet-input').value);
-            if(v > 0) {
-                closeModal('custom-bet-modal');
-                openBetConfirm(v);
-            } else showAlert("Введите сумму больше 0");
-        }
-
+        function openBetConfirm(amt) { betAmountTemp = amt; document.getElementById('confirm-bet-amount').innerText = amt; document.getElementById('confirm-bet-modal').classList.add('active'); }
+        function openCustomBet() { document.getElementById('custom-bet-input').value = ''; document.getElementById('custom-bet-modal').classList.add('active'); }
+        function submitCustomBet() { const v = parseFloat(document.getElementById('custom-bet-input').value); if(v > 0) { closeModal('custom-bet-modal'); openBetConfirm(v); } else showAlert("Введите сумму больше 0"); }
         async function executeBet() {
             const btn = document.getElementById('btn-confirm-bet');
             if(btn) { btn.disabled = true; btn.innerText = 'Загрузка...'; }
-            if(userBalance < betAmountTemp) {
-                showAlert("Недостаточно средств на балансе!");
-                closeModal('confirm-bet-modal');
-                if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
-                return;
-            }
+            if(userBalance < betAmountTemp) { showAlert("Недостаточно средств на балансе!"); closeModal('confirm-bet-modal'); if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; } return; }
             try {
                 const r = await fetch(`${API_BASE}/game/bet`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId, username: uName, amount: betAmountTemp}) });
-                const d = await r.json();
-                closeModal('confirm-bet-modal');
-                if(d.success) {
-                    await updateBalance();
-                    await pollGame();
-                } else {
-                    let msg = "Ставка не принята";
-                    if (d.error === 'insufficient_funds') msg = "Недостаточно средств!";
-                    if (d.error === 'game_started') msg = "Игра уже началась, подождите!";
-                    if (d.error === 'room_full') msg = "В комнате уже 20 игроков!";
-                    showAlert(msg);
-                }
-            } catch(e) {
-                closeModal('confirm-bet-modal');
-                showAlert("Ошибка сети, попробуйте снова");
-            }
+                const d = await r.json(); closeModal('confirm-bet-modal');
+                if(d.success) { await updateBalance(); await pollGame(); }
+                else { let msg = "Ставка не принята"; if (d.error === 'insufficient_funds') msg = "Недостаточно средств!"; if (d.error === 'game_started') msg = "Игра уже началась, подождите!"; if (d.error === 'room_full') msg = "В комнате уже 20 игроков!"; showAlert(msg); }
+            } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети, попробуйте снова"); }
             if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
-
-        async function cancelGameBet() {
-            try {
-                await fetch(`${API_BASE}/game/cancel`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId}) });
-                updateBalance(); pollGame();
-            } catch(e) {}
-        }
+        async function cancelGameBet() { try { await fetch(`${API_BASE}/game/cancel`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: uId}) }); updateBalance(); pollGame(); } catch(e) {} }
 
         document.getElementById('cart-counter').innerText = cart.length;
-        updateBalance();
-        loadCatalog();
+        updateBalance(); loadCatalog();
         try { tg.expand(); tg.ready(); } catch(e) {}
     </script>
 </body>
