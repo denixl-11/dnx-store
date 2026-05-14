@@ -14,57 +14,45 @@
             --text-muted: #7a7a7c;
             --border-color: #222224;
         }
-
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { overflow-x: hidden; width: 100%; }
-
         body {
             background-color: var(--bg-main); color: var(--text-main);
             font-family: 'Inter', sans-serif; margin: 0;
             display: flex; flex-direction: column; align-items: center;
             min-height: 100vh; padding-bottom: 100px; -webkit-font-smoothing: antialiased;
         }
-
         header {
             width: 100%; padding: 20px; display: flex; justify-content: space-between;
             align-items: center; position: relative; border-bottom: 1px solid var(--border-color);
             background: rgba(10, 10, 12, 0.95); z-index: 50;
         }
-
         .header-left { display: flex; align-items: center; gap: 8px; }
         .avatar { width: 36px; height: 36px; border-radius: 50%; background: #222; object-fit: cover; border: 1px solid var(--border-color); }
         .username { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
-
         .header-right {
             background: rgba(203, 161, 83, 0.1); border: 1px solid var(--accent-gold);
             padding: 8px 12px; border-radius: 12px; cursor: pointer; transition: 0.2s;
         }
         .header-right:active { transform: scale(0.95); }
         .balance-text { color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; }
-
         .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; padding: 20px; box-sizing: border-box; }
         .item-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; }
         .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 12px; object-fit: cover; margin-bottom: 14px; cursor: pointer; }
         .item-name { font-size: 0.95rem; font-weight: 500; margin-bottom: 14px; color: var(--text-main); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
         .card-buttons { display: flex; width: 100%; gap: 8px; }
         .btn-buy-now { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 10px; height: 36px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; cursor: pointer; }
         .btn-add-cart { width: 40px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-
         .btn-main-action { width: 100%; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
         .btn-main-action:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-secondary { width: 100%; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 12px; height: 52px; font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer; }
-
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
         .tab-bar { position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85); backdrop-filter: blur(15px); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100; }
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
-
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
-
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap { position: relative; width: 90%; height: 25vh; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); background: #131315; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
         #gameCanvas {
@@ -76,27 +64,22 @@
         }
         .game-info-overlay { position: absolute; bottom: 8px; left: 12px; font-size: 0.65rem; color: rgba(255,255,255,0.4); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
         .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203, 161, 83, 0.2); pointer-events: none; }
-
         .game-controls { display: flex; gap: 12px; width: 90%; margin-top: 20px; }
         .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .game-btn-cancel { width: 90%; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
-
         .bets-list-container { width: 90%; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
         .bets-list-header { padding: 12px 15px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); text-align: center; letter-spacing: 1px; }
         .bets-list { max-height: 200px; overflow-y: auto; padding: 5px 15px; }
         .bet-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; align-items: center; }
         .bet-row:last-child { border-bottom: none; }
-
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; text-align: center; }
         .modal-title { font-weight: 700; font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px; text-transform: uppercase; }
         .input-dark { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 14px; border-radius: 10px; font-size: 1rem; margin-bottom: 20px; box-sizing: border-box; text-align: center; }
-
         .topup-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; width: 100%; max-width: 400px; margin-bottom: 20px; }
         .topup-btn { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 12px; height: 48px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
         .topup-btn.custom-btn { grid-column: span 3; border-color: var(--accent-gold); color: var(--accent-gold); }
-
         .nft-modal-sheet { position: fixed; bottom: -100%; left: 0; width: 100%; background: #0a0a0c; border-radius: 24px 24px 0 0; transition: bottom 0.4s; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; z-index: 1100; }
         .modal-overlay.active .nft-modal-sheet { bottom: 0; }
         .nft-modal-header-rocket { padding-top: 25px; display: flex; flex-direction: column; align-items: center; position: relative; }
@@ -105,13 +88,11 @@
         .trait-row { display: flex; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
         .trait-row .trait-name { color: var(--accent-gold); font-weight: 500; }
         .trait-row .trait-value { color: var(--accent-gold); font-weight: 600; }
-
         .cart-list { padding: 20px; }
         .cart-item { display: flex; align-items: center; gap: 15px; background: var(--bg-card); padding: 12px; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border-color); }
         .cart-item img { width: 50px; height: 50px; border-radius: 8px; }
         .cart-item-info { flex: 1; }
         .fixed-footer { position: fixed; bottom: 85px; width: 100%; padding: 0 20px; z-index: 90; box-sizing: border-box; }
-
         .modal-tg-btn {
             position: absolute;
             top: 15px;
@@ -138,7 +119,6 @@
         .modal-tg-btn:hover svg {
             stroke: var(--accent-gold);
         }
-
         .modal-buttons-row {
             display: flex;
             gap: 10px;
@@ -176,6 +156,30 @@
         }
         .modal-buttons-row .btn-cart-icon:hover {
             background: rgba(203, 161, 83, 0.1);
+        }
+        .winner-modal .winner-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--accent-gold);
+            margin-bottom: 16px;
+        }
+        .winner-modal .winner-name {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--accent-gold);
+            margin-bottom: 8px;
+        }
+        .winner-modal .winner-amount {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 20px;
+        }
+        .winner-modal .winner-amount span {
+            color: var(--accent-gold);
+            font-size: 1.5rem;
         }
     </style>
 </head>
@@ -291,6 +295,17 @@
         </div>
     </div>
 
+    <div id="winner-modal" class="modal-overlay winner-modal" onclick="closeWinnerModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div style="text-align: center;">
+                <div id="winner-avatar-container"></div>
+                <div class="winner-name" id="winner-name"></div>
+                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> ₽</div>
+                <button class="btn-main-action" onclick="closeWinnerModal()">Отлично!</button>
+            </div>
+        </div>
+    </div>
+
     <div id="custom-bet-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 class="modal-title">Своя ставка</h3>
@@ -357,9 +372,10 @@
 
         const uId = tg.initDataUnsafe?.user?.id || "guest_id";
         const uName = tg.initDataUnsafe?.user?.username || "Guest";
+        const uAvatar = tg.initDataUnsafe?.user?.photo_url || "";
         document.getElementById('username-display').innerText = uName;
-        if(tg.initDataUnsafe?.user?.photo_url) {
-            document.getElementById('avatar-img').src = tg.initDataUnsafe.user.photo_url;
+        if(uAvatar) {
+            document.getElementById('avatar-img').src = uAvatar;
         }
 
         function showAlert(msg) {
@@ -643,6 +659,7 @@
             loadInventory();
         }
 
+        // --- ИГРА ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15 };
@@ -745,12 +762,27 @@
             }, 1000);
         }
 
-        // Анимация: скорость до 2500, замедление до 0 за 12 секунд, зум после остановки
+        function showWinnerModal(winner) {
+            if(!winner) return;
+            const winnerName = winner.username || "Игрок";
+            const winAmount = winner.win_amount || 0;
+            document.getElementById('winner-name').innerText = winnerName;
+            document.getElementById('winner-amount').innerText = winAmount.toFixed(2);
+            const avatarContainer = document.getElementById('winner-avatar-container');
+            avatarContainer.innerHTML = `<img src="${uAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">`;
+            document.getElementById('winner-modal').classList.add('active');
+        }
+
+        function closeWinnerModal() {
+            document.getElementById('winner-modal').classList.remove('active');
+        }
+
+        // Анимация: скорость 4000-4500, зум за 3 секунды до остановки, пауза 2 секунды после остановки
         function runSpinAnimation(targetCanvasWidth) {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
 
             let currentX = canvas.width / 2;
-            let velocity = (Math.random() * 500 + 2000) * (Math.random() > 0.5 ? 1 : -1); // 2000-2500
+            let velocity = (Math.random() * 500 + 4000) * (Math.random() > 0.5 ? 1 : -1);
             const startTime = performance.now();
             const DURATION = 12000;
             const initialSpeed = Math.abs(velocity);
@@ -758,6 +790,7 @@
 
             let lastTimestamp = startTime;
             let finished = false;
+            let zoomStarted = false;
 
             function animate(now) {
                 if(finished) return;
@@ -768,28 +801,38 @@
                 }
                 lastTimestamp = now;
                 const elapsed = now - startTime;
+
+                // Зум за 3 секунды до окончания движения
+                if (!zoomStarted && (DURATION - elapsed) <= 3000) {
+                    zoomStarted = true;
+                    const originX = (currentX / canvas.width) * 100;
+                    canvas.style.transformOrigin = `${originX}% 50%`;
+                    canvas.style.transition = 'transform 2s cubic-bezier(0.2, 0.9, 0.4, 1.1)';
+                    canvas.style.transform = 'scale(2.5)';
+                }
+
                 if(elapsed >= DURATION) {
                     drawGameFrame(currentX);
                     animationFrameId = null;
-                    const pos = currentX / canvas.width;
-                    // Отправляем финальную позицию
-                    fetch(`${API_BASE}/game/finish`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({position: pos})
-                    }).catch(e => console.error("Finish error", e));
-
-                    // ЗУМ после остановки
+                    // Пауза 2 секунды, затем отправка результата и сброс зума
                     setTimeout(() => {
-                        const originX = (currentX / canvas.width) * 100;
-                        canvas.style.transformOrigin = `${originX}% 50%`;
-                        canvas.style.transform = "scale(2.5)";
-                        setTimeout(() => {
-                            canvas.style.transform = "scale(1)";
-                        }, 2000);
-                    }, 100);
-
-                    setTimeout(() => updateBalance(), 1200);
+                        const pos = currentX / canvas.width;
+                        fetch(`${API_BASE}/game/finish`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({position: pos})
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if(data.success && data.winner) {
+                                showWinnerModal(data.winner);
+                            }
+                            updateBalance();
+                        })
+                        .catch(e => console.error("Finish error", e));
+                        canvas.style.transform = 'scale(1)';
+                        canvas.style.transition = 'transform 0.5s ease';
+                    }, 2000);
                     finished = true;
                     return;
                 }
