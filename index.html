@@ -500,7 +500,7 @@
         }
         async function withdraw(id) { await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) }); showAlert("Запрос на вывод отправлен администратору!"); loadInventory(); }
 
-        // ---------------------------- ИГРА (синхронизированная) ----------------------------
+        // ---------------------------- ИГРА (ИСПРАВЛЕННАЯ АНИМАЦИЯ) ----------------------------
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner_x: null, last_winner: null };
@@ -605,20 +605,20 @@
         }
         function closeWinnerModal() { document.getElementById('winner-modal').classList.remove('active'); }
 
-        // АНИМАЦИЯ: параметры берутся из gState.spin_params (если есть)
+        // ГЛАВНОЕ ИСПРАВЛЕНИЕ: убираем зависимость от серверного времени
         function runSpinAnimation() {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            let currentX, velocity, startTime;
+            let currentX, velocity;
+            // Используем стартовые параметры с сервера (положение и скорость), но время старта — сейчас
             if (gState.spin_params && gState.spin_params.start_x !== undefined) {
                 currentX = gState.spin_params.start_x * canvas.width;
                 velocity = gState.spin_params.velocity;
-                startTime = gState.spin_params.start_time * 1000;
             } else {
-                // Fallback (как в оригинальном index2)
+                // Fallback
                 currentX = canvas.width / 2;
                 velocity = (Math.random() * 500 + 4000) * (Math.random() > 0.5 ? 1 : -1);
-                startTime = performance.now();
             }
+            const startTime = performance.now();   // <-- всегда локальное время старта
             const MOVE_DURATION = 10000;
             const PAUSE_DURATION = 2000;
             const initialSpeed = Math.abs(velocity);
@@ -634,7 +634,10 @@
             function animate(now) {
                 if(finished) return;
                 const dt = Math.min(100, now - lastTimestamp);
-                if(dt <= 0) { animationFrameId = requestAnimationFrame(animate); return; }
+                if(dt <= 0) {
+                    animationFrameId = requestAnimationFrame(animate);
+                    return;
+                }
                 lastTimestamp = now;
                 const elapsed = now - startTime;
                 if(elapsed >= MOVE_DURATION) {
@@ -670,7 +673,6 @@
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
                 gState = newState;
-                // Таймер
                 if (gState.status === 'counting' && gState.timer !== lastServerTimer) {
                     if (Math.abs(localTimer - gState.timer) > 1) startLocalTimer(gState.timer);
                     lastServerTimer = gState.timer;

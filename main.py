@@ -73,7 +73,8 @@ game_state = {
     "players": {},
     "pool": 0.0,
     "timer": 15,
-    "spin_params": None,          # {start_x, velocity, start_time}
+    # ИСПРАВЛЕНО: больше не храним start_time, он не нужен клиенту
+    "spin_params": None,          # {start_x, velocity}
     "winner_x": None,
     "last_winner": None
 }
@@ -160,18 +161,22 @@ async def game_worker():
                     game_state["status"] = "spinning"
                     start_x = random.uniform(0.0, 1.0)
                     velocity = random.choice([-1, 1]) * random.uniform(3000, 5000)
+                    # ИСПРАВЛЕНО: сохраняем только start_x и velocity, время начала спина отслеживаем локально
                     spin_start_time = asyncio.get_event_loop().time()
                     game_state["spin_params"] = {
                         "start_x": start_x,
-                        "velocity": velocity,
-                        "start_time": spin_start_time
+                        "velocity": velocity
+                        # больше не передаём start_time
                     }
                     winner_x = simulate_trajectory(start_x, velocity, move_duration=10.0)
                     game_state["winner_x"] = winner_x
+                    # Сохраняем время начала спина для серверной проверки длительности
+                    game_state["spin_start_time"] = spin_start_time
                     logging.info(f"SPIN: start_x={start_x}, velocity={velocity}, winner_x={winner_x}")
 
             elif game_state["status"] == "spinning":
-                if game_state["spin_params"] and asyncio.get_event_loop().time() - game_state["spin_params"]["start_time"] >= 12:
+                # Используем сохранённое spin_start_time (серверное время) для определения окончания анимации
+                if hasattr(game_state, "spin_start_time") and asyncio.get_event_loop().time() - game_state["spin_start_time"] >= 12:
                     winner_data = await finish_round(game_state["winner_x"], game_state["pool"], game_state["players"])
                     game_state["last_winner"] = winner_data
                     game_state = {
@@ -196,18 +201,19 @@ async def clear_last_winner():
 # --- API МЕТОДЫ ---
 async def handle_game_state(request):
     async with game_lock:
+        # ИСПРАВЛЕНО: отправляем только start_x и velocity, без start_time
         return web.json_response({
             "status": game_state["status"],
             "players": list(game_state["players"].values()),
             "pool": game_state["pool"],
             "timer": game_state["timer"],
-            "spin_params": game_state["spin_params"],
+            "spin_params": game_state["spin_params"],   # теперь это {"start_x": ..., "velocity": ...}
             "winner_x": game_state["winner_x"],
             "last_winner": game_state.get("last_winner")
         }, headers={"Access-Control-Allow-Origin": "*"})
 
 
-# Остальные хендлеры (копия из вашего main2.py, с небольшими правками strip)
+# Остальные хендлеры без изменений (приведены для полноты)
 async def handle_get_user(request):
     user_id = request.query.get('user_id')
     username = request.query.get('username', 'Unknown')
@@ -409,7 +415,7 @@ async def handle_game_cancel(request):
         return web.json_response({"success": False, "error": "cannot_cancel"}, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         logging.error(f"Cancel error: {e}")
-        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
 
 
 async def handle_game_finish(request):
