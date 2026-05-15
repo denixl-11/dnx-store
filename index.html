@@ -574,7 +574,7 @@
         let isSpinning = false;
         let animationFrameId = null;
         let timerInterval = null;
-        let lastShownWinnerId = localStorage.getItem('last_winner_id'); // запоминаем навсегда
+        let lastShownWinnerId = localStorage.getItem('last_winner_id');
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -588,9 +588,12 @@
         function drawGameFrame(ballX = null) {
             if(!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Всегда рисуем сектора, если есть игроки
             if(gState.players && gState.players.length > 0) {
                 let curX = 0;
-                gState.players.forEach(p => {
+                // Сервер отдаёт уже отсортированный по id список, но для надёжности сортируем
+                const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
+                sorted.forEach(p => {
                     const w = (p.amount / gState.pool) * canvas.width;
                     ctx.fillStyle = p.color;
                     ctx.fillRect(curX, 0, w, canvas.height);
@@ -635,7 +638,8 @@
             container.style.display = hasPlayers ? 'flex' : 'none';
             if (!hasPlayers) return;
             document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
-            const sorted = [...gState.players].sort((a,b) => b.amount - a.amount);
+            // Сортируем для соответствия секторам
+            const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
             list.innerHTML = sorted.map(p => `
                 <div class="bet-row">
                     <span style="display:flex; gap:8px;">
@@ -646,7 +650,7 @@
                 </div>`).join('');
         }
 
-        // Серверная физика (точная копия)
+        // Серверная физика
         function simulatePosition(initialSpeed, direction, elapsedMs, canvasW) {
             let x = canvasW / 2;
             let velocity = direction * initialSpeed;
@@ -678,7 +682,7 @@
                     const finalX = simulatePosition(initialSpeed, direction, duration, canvas.width);
                     drawGameFrame(finalX);
                     animationFrameId = null;
-                    fetchWinnerNow();
+                    fetchWinnerNow(); // немедленный запрос победителя
                     return;
                 }
                 const curX = simulatePosition(initialSpeed, direction, elapsed, canvas.width);

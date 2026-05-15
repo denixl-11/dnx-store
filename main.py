@@ -141,7 +141,8 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
     cumulative = 0.0
     winner_id = None
     winner_username = None
-    sorted_uids = list(players.keys())
+    # Сортируем ключи, чтобы сектора строились одинаково
+    sorted_uids = sorted(players.keys())
     for i, uid in enumerate(sorted_uids):
         p = players[uid]
         sector_start = cumulative
@@ -194,7 +195,8 @@ async def game_worker():
                     logging.info(f"Spinning: params={game_state['spin_params']}, target={target:.4f}")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(12)
+            # Ждём 10.5 секунд – клиент за 10 сек анимирует и сразу запросит победителя
+            await asyncio.sleep(10.5)
             async with game_lock:
                 if game_state["status"] == "spinning":
                     winner_data = await finish_round(
@@ -348,9 +350,11 @@ async def handle_request_withdraw(request):
 
 async def handle_game_state(request):
     async with game_lock:
+        # Отдаём игроков в том же порядке, в котором сервер считает сектора
+        sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
         resp = {
             "status": game_state["status"],
-            "players": list(game_state["players"].values()),
+            "players": sorted_players,
             "pool": game_state["pool"],
             "timer": game_state["timer"],
             "target_position": game_state.get("target_position"),
@@ -426,7 +430,7 @@ async def handle_game_finish(request):
 async def handle_get_requisites(request):
     return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# Callbacks админа
+# Callbacks админа (без изменений)
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
