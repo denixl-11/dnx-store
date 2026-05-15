@@ -1,10 +1,12 @@
 import asyncio
 import logging
 import os
-import psycopg2
 import json
 import random
-from decimal import Decimal
+import hashlib
+import hmac
+from urllib.parse import parse_qs
+import psycopg2
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -14,17 +16,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# --------------------- Настройки ---------------------
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 PAYMENT_REQUISITES = os.getenv("PAYMENT_REQUISITES", "Реквизиты скрыты/не настроены")
+WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
+CORS_ORIGIN = "https://denixl-11.github.io"  # ограничиваем CORS
 
 if not BOT_TOKEN:
     print("❌ КРИТИЧЕСКАЯ ОШИБКА: BOT_TOKEN не найден!")
     exit(1)
 
-WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
-
+# --------------------- База данных ---------------------
 DB_CONFIG = {
     "dbname": "neondb",
     "user": "neondb_owner",
@@ -38,10 +42,8 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
-
 
 def init_db():
     try:
@@ -54,103 +56,146 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                cur.execute("UPDATE users SET id = TRIM(id)")
-                try:
-                    cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
-                except Exception as e:
-                    logging.warning(f"Column number may already exist: {e}")
+                # гарантируем наличие колонок для NFT
+                cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
+                cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
                 conn.commit()
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
 
-
 init_db()
 
-# --- ЛОГИКА МИНИ-ИГРЫ ---
+# --------------------- Проверка Telegram Init Data ---------------------
+def verify_telegram_data(init_data_str: str) -> dict | None:
+    """Проверяет подпись initData и возвращает данные пользователя, если всё верно"""
+    if not init_data_str:
+        return None
+    try:
+        parsed = parse_qs(init_data_str)
+        # Валидация подписи
+        received_hash = parsed.pop('hash', [None])[0]
+        if not received_hash:
+            return None
+        # Сортируем поля
+        data_check_string = "\n".join(
+            f"{k}={v[0]}" for k, v in sorted(parsed.items())
+        )
+        # Генерируем секретный ключ
+        secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
+        mac = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        if mac != received_hash:
+            logging.warning("Invalid initData signature")
+            return None
+        # Извлекаем данные пользователя
+        user_data = parsed.get('user')
+        if not user_data:
+            return None
+        user = json.loads(user_data[0])
+        return {"id": str(user.get('id')), "username": user.get('username', 'Unknown')}
+    except Exception as e:
+        logging.error(f"InitData verification error: {e}")
+        return None
+
+def require_auth(handler):
+    """Декоратор для API‑эндпоинтов, требующих аутентификации"""
+    async def wrapper(request):
+        # Для OPTIONS запросов пропускаем
+        if request.method == "OPTIONS":
+            return await handler(request)
+        # Извлекаем initData из заголовков или параметров
+        init_data = request.headers.get('X-Telegram-Init-Data') or request.query.get('initData')
+        if not init_data:
+            # Попробуем из тела (для POST)
+            try:
+                body = await request.json()
+                init_data = body.get('initData')
+            except:
+                pass
+        if not init_data:
+            return web.json_response({"error": "unauthorized"}, status=401,
+                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        user = verify_telegram_data(init_data)
+        if not user:
+            return web.json_response({"error": "invalid_signature"}, status=401,
+                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        # Сохраняем пользователя в request для дальнейшего использования
+        request['telegram_user'] = user
+        return await handler(request)
+    return wrapper
+
+# --------------------- Игра ---------------------
 game_lock = asyncio.Lock()
 game_state = {
-    "status": "waiting",          # waiting, counting, spinning
-    "players": {},
+    "status": "waiting",         # waiting / counting / spinning
+    "players": {},               # uid -> {id, username, amount, color}
     "pool": 0.0,
     "timer": 15,
-    # ИСПРАВЛЕНО: больше не храним start_time, он не нужен клиенту
-    "spin_params": None,          # {start_x, velocity}
-    "winner_x": None,
-    "last_winner": None
+    "target_position": None,     # float 0..1 – задаётся сервером при старте spinning
+    "winner": None               # {user_id, username, win_amount} или None
 }
-
 
 def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
 
-
-def simulate_trajectory(start_x, velocity, move_duration=10.0, canvas_width=1000):
-    x = start_x * canvas_width
-    v = velocity
-    deceleration = abs(v) / move_duration
-    dt = 0.01
-    steps = int(move_duration / dt)
-    for _ in range(steps):
-        if v > 0:
-            v = max(0, v - deceleration * dt)
-        elif v < 0:
-            v = min(0, v + deceleration * dt)
-        x += v * dt
-        if x < 0:
-            x = -x
-            v = -v
-        elif x > canvas_width:
-            x = 2 * canvas_width - x
-            v = -v
-    norm_x = max(0.0, min(1.0, x / canvas_width))
-    return norm_x
-
-
-async def finish_round(winner_x, pool, players):
+async def finish_round(winner_x: float, pool: float, players: dict) -> dict | None:
+    """Определяет победителя на основе серверной позиции.
+       winner_x ∈ [0, 1) – доля ширины бара.
+       Возвращает словарь с user_id, username, win_amount или None при ошибке."""
     if pool <= 0 or not players:
-        logging.warning(f"finish_round: pool={pool}, players={players}")
+        logging.warning(f"finish_round: пустой пул или список игроков")
         return None
+    winner_x = max(0.0, min(1.0 - 1e-12, winner_x))  # чтобы не попасть ровно на 1.0
     cumulative = 0.0
     winner_id = None
     winner_username = None
-    for uid, p in sorted(players.items(), key=lambda x: x[0]):
+    sorted_uids = list(players.keys())
+    for i, uid in enumerate(sorted_uids):
+        p = players[uid]
         sector_start = cumulative
         sector_end = cumulative + (p["amount"] / pool)
-        if sector_start <= winner_x <= sector_end:
-            winner_id = str(uid).strip()
-            winner_username = p.get("username", "Игрок")
-            break
+        # для всех секторов, кроме последнего, используем строгое неравенство
+        if i == len(sorted_uids) - 1:
+            if sector_start <= winner_x <= sector_end + 1e-12:
+                winner_id = str(uid)
+                winner_username = p.get("username", "Игрок")
+                break
+        else:
+            if sector_start <= winner_x < sector_end:
+                winner_id = str(uid)
+                winner_username = p.get("username", "Игрок")
+                break
         cumulative = sector_end
-    if winner_id:
-        winner_bet = players[winner_id]["amount"]
-        others_bets = pool - winner_bet
-        profit = winner_bet + (others_bets * 0.7)
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT id, balance FROM users WHERE id = %s", (winner_id,))
-                    user = cur.fetchone()
-                    if not user:
-                        logging.error(f"User {winner_id} not found in DB!")
-                        return None
-                    cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
-                    rows = cur.rowcount
-                    conn.commit()
-                    logging.info(f"Balance updated for {winner_id}: +{profit} RUB. Rows: {rows}")
-            return {
-                "user_id": winner_id,
-                "username": winner_username,
-                "win_amount": profit
-            }
-        except Exception as e:
-            logging.error(f"DB error: {e}")
-            return None
-    else:
-        logging.warning(f"No winner found for position {winner_x}")
+
+    if not winner_id:
+        logging.warning(f"Победитель не определён для позиции {winner_x}")
         return None
 
+    winner_bet = players[winner_id]["amount"]
+    others_bets = pool - winner_bet
+    profit = winner_bet + (others_bets * 0.7)
+    logging.info(f"Победитель {winner_id} ставка={winner_bet}, остальные={others_bets}, прибыль={profit}")
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, balance FROM users WHERE id = %s", (winner_id,))
+                user = cur.fetchone()
+                if not user:
+                    logging.error(f"Пользователь {winner_id} не найден в БД")
+                    return None
+                cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
+                conn.commit()
+        return {
+            "user_id": winner_id,
+            "username": winner_username,
+            "win_amount": profit
+        }
+    except Exception as e:
+        logging.error(f"Ошибка БД при завершении игры: {e}")
+        return None
 
 async def game_worker():
+    """Фоновый процесс управления игрой"""
     global game_state
     while True:
         await asyncio.sleep(1)
@@ -158,101 +203,87 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
+                    # Запускаем спиннинг: генерируем случайную целевую позицию
                     game_state["status"] = "spinning"
-                    start_x = random.uniform(0.0, 1.0)
-                    velocity = random.choice([-1, 1]) * random.uniform(3000, 5000)
-                    # ИСПРАВЛЕНО: сохраняем только start_x и velocity, время начала спина отслеживаем локально
-                    spin_start_time = asyncio.get_event_loop().time()
-                    game_state["spin_params"] = {
-                        "start_x": start_x,
-                        "velocity": velocity
-                        # больше не передаём start_time
-                    }
-                    winner_x = simulate_trajectory(start_x, velocity, move_duration=10.0)
-                    game_state["winner_x"] = winner_x
-                    # Сохраняем время начала спина для серверной проверки длительности
-                    game_state["spin_start_time"] = spin_start_time
-                    logging.info(f"SPIN: start_x={start_x}, velocity={velocity}, winner_x={winner_x}")
+                    game_state["target_position"] = random.random()  # 0..1
+                    game_state["winner"] = None
+                    logging.info(f"Игра переходит в spinning, target_position={game_state['target_position']:.4f}")
 
-            elif game_state["status"] == "spinning":
-                # Используем сохранённое spin_start_time (серверное время) для определения окончания анимации
-                if hasattr(game_state, "spin_start_time") and asyncio.get_event_loop().time() - game_state["spin_start_time"] >= 12:
-                    winner_data = await finish_round(game_state["winner_x"], game_state["pool"], game_state["players"])
-                    game_state["last_winner"] = winner_data
-                    game_state = {
-                        "status": "waiting",
-                        "players": {},
-                        "pool": 0.0,
-                        "timer": 15,
-                        "spin_params": None,
-                        "winner_x": None,
-                        "last_winner": winner_data
-                    }
-                    asyncio.create_task(clear_last_winner())
+        if game_state["status"] == "spinning":
+            # Ждём 12 секунд (10 сек анимации + 2 сек паузы)
+            await asyncio.sleep(12)
+            async with game_lock:
+                if game_state["status"] == "spinning":
+                    winner_data = await finish_round(
+                        game_state["target_position"],
+                        game_state["pool"],
+                        game_state["players"]
+                    )
+                    # Сохраняем результат и сбрасываем состояние
+                    game_state["winner"] = winner_data
+                    # Оставляем target_position для фронта, чтобы анимация могла завершиться
+                    game_state["status"] = "waiting"
+                    game_state["players"] = {}
+                    game_state["pool"] = 0.0
+                    game_state["timer"] = 15
+                    logging.info(f"Игра завершена, победитель: {winner_data}")
 
+# --------------------- API ---------------------
+async def handle_options(request):
+    return web.Response(
+        headers={
+            "Access-Control-Allow-Origin": CORS_ORIGIN,
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, X-Telegram-Init-Data",
+        }
+    )
 
-async def clear_last_winner():
-    await asyncio.sleep(5)
-    async with game_lock:
-        if "last_winner" in game_state:
-            game_state["last_winner"] = None
-
-
-# --- API МЕТОДЫ ---
-async def handle_game_state(request):
-    async with game_lock:
-        # ИСПРАВЛЕНО: отправляем только start_x и velocity, без start_time
-        return web.json_response({
-            "status": game_state["status"],
-            "players": list(game_state["players"].values()),
-            "pool": game_state["pool"],
-            "timer": game_state["timer"],
-            "spin_params": game_state["spin_params"],   # теперь это {"start_x": ..., "velocity": ...}
-            "winner_x": game_state["winner_x"],
-            "last_winner": game_state.get("last_winner")
-        }, headers={"Access-Control-Allow-Origin": "*"})
-
-
-# Остальные хендлеры без изменений (приведены для полноты)
+@require_auth
 async def handle_get_user(request):
-    user_id = request.query.get('user_id')
-    username = request.query.get('username', 'Unknown')
-    if not user_id:
-        return web.json_response({"error": "no user"}, headers={"Access-Control-Allow-Origin": "*"})
+    user = request.get('telegram_user')
+    user_id = user['id']
+    username = user['username']
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     "INSERT INTO users (id, username) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
-                    (str(user_id).strip(), username))
-                cur.execute("SELECT balance FROM users WHERE id = %s", (str(user_id).strip(),))
-                user = cur.fetchone()
+                    (user_id, username))
+                cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
+                db_user = cur.fetchone()
                 conn.commit()
-                return web.json_response({"balance": float(user['balance']) if user else 0.0},
-                                         headers={"Access-Control-Allow-Origin": "*"})
+                balance = float(db_user['balance']) if db_user else 0.0
     except Exception as e:
         logging.error(f"Get user error: {e}")
-        return web.json_response({"balance": 0.0}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+        balance = 0.0
+    return web.json_response({"balance": balance},
+                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
+@require_auth
 async def handle_topup_request(request):
     try:
         data = await request.json()
-        user_id = str(data.get('userId')).strip()
-        username = data.get('username', 'Unknown')
+        user = request['telegram_user']
+        user_id = user['id']
+        username = user['username']
         amount = float(data.get('amount', 0))
 
-        admin_msg = f"💸 **Заявка на пополнение средств!**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} ₽\n\nПроверьте поступление по реквизитам."
+        admin_msg = (
+            f"💸 **Заявка на пополнение**\n"
+            f"👤 @{username} (ID: {user_id})\n"
+            f"💰 Сумма: {amount} ₽"
+        )
         admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"topup_no_{user_id}_{amount}"),
             InlineKeyboardButton(text="✅ Зачислить", callback_data=f"topup_yes_{user_id}_{amount}")
         ]])
         await bot.send_message(ADMIN_ID, admin_msg, reply_markup=admin_kb)
-        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": True},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Topup error: {e}")
-        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
-
+        return web.json_response({"success": False},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 async def handle_get_items(request):
     try:
@@ -268,25 +299,24 @@ async def handle_get_items(request):
                             item['traits'] = json.loads(traits_raw)
                         except:
                             item['traits'] = []
-                return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get items error: {e}")
-        return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response([], headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
+@require_auth
 async def handle_get_inventory(request):
-    user_id = request.query.get('user_id')
-    if not user_id:
-        return web.json_response([], headers={"Access-Control-Allow-Origin": "*"})
+    user = request['telegram_user']
+    user_id = user['id']
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    "SELECT id, name, image_url, nft_link, status, traits, number FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен')",
-                    (str(user_id).strip(),))
+                    "SELECT id, name, image_url, nft_link, status, traits, number FROM items WHERE buyer_id = %s AND status IN ('Продан', 'withdrawn', 'Выведен', 'pending_withdraw')",
+                    (user_id,))
                 items = cur.fetchall()
                 for item in items:
-                    if item['status'] == 'Выведен':
+                    if item['status'] in ('Выведен', 'withdrawn'):
                         item['status'] = 'withdrawn'
                     traits_raw = item.get('traits')
                     if isinstance(traits_raw, str):
@@ -294,92 +324,138 @@ async def handle_get_inventory(request):
                             item['traits'] = json.loads(traits_raw)
                         except:
                             item['traits'] = []
-                return web.json_response(items, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Inventory error: {e}")
-        return web.json_response([], headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response([], headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
+@require_auth
 async def handle_buy(request):
     try:
         data = await request.json()
+        user = request['telegram_user']
+        user_id = user['id']
         item_ids = data.get('items', [])
-        user_id = str(data.get('userId')).strip()
+
         if not item_ids:
-            return web.json_response({"success": False, "error": "no_items"}, headers={"Access-Control-Allow-Origin": "*"})
+            return web.json_response({"success": False, "error": "no_items"},
+                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("SELECT id, price FROM items WHERE id = ANY(%s) AND status = 'Доступен'", (item_ids,))
                 items = cur.fetchall()
-                if len(items) == len(item_ids):
-                    total_price = sum(i['price'] for i in items)
-                    cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
-                    user = cur.fetchone()
-                    if user and float(user['balance']) >= float(total_price):
-                        cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (total_price, user_id))
-                        cur.execute(
-                            "UPDATE items SET status = 'Продан', buyer_id = %s, last_event = 'approved' WHERE id = ANY(%s)",
-                            (user_id, item_ids))
-                        conn.commit()
-                        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
-                    else:
-                        return web.json_response({"success": False, "error": "insufficient_funds"},
-                                                 headers={"Access-Control-Allow-Origin": "*"})
-                return web.json_response({"success": False, "error": "items_unavailable"},
-                                         headers={"Access-Control-Allow-Origin": "*"})
+
+                if len(items) != len(item_ids):
+                    return web.json_response({"success": False, "error": "items_unavailable"},
+                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+                total_price = sum(i['price'] for i in items)
+                cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
+                db_user = cur.fetchone()
+                if not db_user or float(db_user['balance']) < float(total_price):
+                    return web.json_response({"success": False, "error": "insufficient_funds"},
+                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+                cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (total_price, user_id))
+                cur.execute(
+                    "UPDATE items SET status = 'Продан', buyer_id = %s, last_event = 'approved' WHERE id = ANY(%s)",
+                    (user_id, item_ids))
+                conn.commit()
+        return web.json_response({"success": True},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Buy error: {e}")
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": False}, status=500,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
+@require_auth
 async def handle_request_withdraw(request):
     try:
         data = await request.json()
+        user = request['telegram_user']
+        user_id = user['id']
+        username = user['username']
         item_id = data.get('itemId')
-        user_id = str(data.get('userId')).strip()
-        username = data.get('username', 'Unknown')
+
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Проверяем, что товар принадлежит пользователю и статус = 'Продан'
                 cur.execute(
                     "SELECT id, name, nft_link FROM items WHERE id = %s AND buyer_id = %s AND status = 'Продан'",
                     (item_id, user_id))
                 item = cur.fetchone()
-                if item:
-                    admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
-                        InlineKeyboardButton(text="❌ Отклонить", callback_data=f"with_no_{user_id}_{item['id']}"),
-                        InlineKeyboardButton(text="✅ Вывести", callback_data=f"with_yes_{user_id}_{item['id']}")
-                    ]])
-                    msg = f"📤 **Новый запрос на вывод NFT!**\n👤 @{username} (ID: {user_id})\n📦 Товар: {item['name']} (ID: {item['id']})\n🔗 Ссылка: {item['nft_link']}"
-                    await bot.send_message(ADMIN_ID, msg, reply_markup=admin_kb, disable_web_page_preview=True)
-                    return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
-        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": "*"})
+                if not item:
+                    return web.json_response({"success": False, "error": "not_found_or_not_owned"},
+                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+                # Меняем статус на pending_withdraw, чтобы избежать повторных заявок
+                cur.execute(
+                    "UPDATE items SET status = 'pending_withdraw', last_event = 'withdraw_requested' WHERE id = %s",
+                    (item_id,))
+                conn.commit()
+
+        admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"with_no_{user_id}_{item_id}"),
+            InlineKeyboardButton(text="✅ Вывести", callback_data=f"with_yes_{user_id}_{item_id}")
+        ]])
+        msg = (
+            f"📤 **Запрос на вывод NFT**\n"
+            f"👤 @{username} (ID: {user_id})\n"
+            f"📦 Товар: {item['name']} (ID: {item['id']})\n"
+            f"🔗 Ссылка: {item['nft_link']}"
+        )
+        await bot.send_message(ADMIN_ID, msg, reply_markup=admin_kb, disable_web_page_preview=True)
+        return web.json_response({"success": True},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Withdraw request error: {e}")
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": False}, status=500,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+async def handle_game_state(request):
+    async with game_lock:
+        resp = {
+            "status": game_state["status"],
+            "players": list(game_state["players"].values()),
+            "pool": game_state["pool"],
+            "timer": game_state["timer"],
+            "target_position": game_state.get("target_position"),
+            "winner": game_state.get("winner")
+        }
+    return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+@require_auth
 async def handle_game_bet(request):
     global game_state
     try:
         data = await request.json()
-        user_id = str(data.get('userId')).strip()
-        username = data.get('username', 'Player')
+        user = request['telegram_user']
+        user_id = user['id']
+        username = user['username']
         amount = float(data.get('amount', 0))
+
         if amount <= 0:
-            return web.json_response({"success": False, "error": "invalid_amount"}, headers={"Access-Control-Allow-Origin": "*"})
+            return web.json_response({"success": False, "error": "invalid_amount"},
+                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
         async with game_lock:
-            if game_state["status"] != "waiting" and game_state["status"] != "counting":
-                return web.json_response({"success": False, "error": "game_started"}, headers={"Access-Control-Allow-Origin": "*"})
+            if game_state["status"] not in ("waiting", "counting"):
+                return web.json_response({"success": False, "error": "game_started"},
+                                         headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
             if len(game_state["players"]) >= 20 and user_id not in game_state["players"]:
-                return web.json_response({"success": False, "error": "room_full"}, headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"success": False, "error": "room_full"},
+                                         headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
-                    user = cur.fetchone()
-                    if not user or float(user['balance']) < amount:
-                        return web.json_response({"success": False, "error": "insufficient_funds"}, headers={"Access-Control-Allow-Origin": "*"})
+                    db_user = cur.fetchone()
+                    if not db_user or float(db_user['balance']) < amount:
+                        return web.json_response({"success": False, "error": "insufficient_funds"},
+                                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
                     conn.commit()
+
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
@@ -388,20 +464,27 @@ async def handle_game_bet(request):
                     "amount": amount, "color": generate_color()
                 }
             game_state["pool"] += amount
+
+            # Если набралось минимум 2 игрока и игра ещё не запущена – запускаем отсчёт
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
-        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+
+        return web.json_response({"success": True},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Bet error: {e}")
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": False}, status=500,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
+@require_auth
 async def handle_game_cancel(request):
     global game_state
     try:
         data = await request.json()
-        user_id = str(data.get('userId')).strip()
+        user = request['telegram_user']
+        user_id = user['id']
+
         async with game_lock:
             if len(game_state["players"]) == 1 and user_id in game_state["players"]:
                 refund = game_state["players"][user_id]["amount"]
@@ -411,28 +494,28 @@ async def handle_game_cancel(request):
                         conn.commit()
                 game_state["players"] = {}
                 game_state["pool"] = 0.0
-                return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
-        return web.json_response({"success": False, "error": "cannot_cancel"}, headers={"Access-Control-Allow-Origin": "*"})
+                return web.json_response({"success": True},
+                                         headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        return web.json_response({"success": False, "error": "cannot_cancel"},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Cancel error: {e}")
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": "*"})
+        return web.json_response({"success": False}, status=500,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
+# Эндпоинт /game/finish больше не используется (вся логика на сервере)
+# Оставляем заглушку для обратной совместимости
 async def handle_game_finish(request):
-    return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
+    # Возвращаем текущее состояние (вдруг старый клиент вызовет)
+    return web.json_response({"success": True, "message": "Finish handled by server"},
+                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
+@require_auth
 async def handle_get_requisites(request):
-    return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": "*"})
+    return web.json_response({"req": PAYMENT_REQUISITES},
+                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
-async def handle_options(request):
-    return web.Response(
-        headers={"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                 "Access-Control-Allow-Headers": "Content-Type"})
-
-
-# --- CALLBACKS ДЛЯ АДМИНА ---
+# --------------------- Callbacks админа ---------------------
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
@@ -445,17 +528,16 @@ async def admin_topup_approve(callback: types.CallbackQuery):
             with conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO users (id, balance) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET balance = users.balance + EXCLUDED.balance",
-                    (uid.strip(), float(amount)))
+                    (uid, float(amount)))
                 conn.commit()
         await callback.message.edit_text(f"✅ Баланс пополнен на {amount} ₽!")
         try:
-            await bot.send_message(uid.strip(), f"💰 Ваш баланс успешно пополнен на {amount} ₽!")
+            await bot.send_message(uid, f"💰 Ваш баланс успешно пополнен на {amount} ₽!")
         except:
             pass
     except Exception as e:
         logging.error(f"Topup approve error: {e}")
         await callback.answer("Ошибка при пополнении")
-
 
 @dp.callback_query(F.data.startswith("topup_no_"))
 async def admin_topup_reject(callback: types.CallbackQuery):
@@ -466,10 +548,9 @@ async def admin_topup_reject(callback: types.CallbackQuery):
     _, _, uid, amount = parts
     await callback.message.edit_text(f"❌ Заявка на {amount} ₽ отклонена.")
     try:
-        await bot.send_message(uid.strip(), f"❌ Отказ: заявка на пополнение {amount} ₽ отклонена.")
+        await bot.send_message(uid, f"❌ Отказ: заявка на пополнение {amount} ₽ отклонена.")
     except:
         pass
-
 
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
@@ -483,17 +564,16 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
-                    (int(item_id), uid.strip()))
+                    (int(item_id), uid))
                 conn.commit()
         await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
         try:
-            await bot.send_message(uid.strip(), f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
+            await bot.send_message(uid, f"🎉 Ваш запрос на вывод NFT (ID: {item_id}) успешно выполнен! Проверьте кошелек.")
         except:
             pass
     except Exception as e:
         logging.error(f"Withdraw approve error: {e}")
         await callback.answer("Ошибка при выводе")
-
 
 @dp.callback_query(F.data.startswith("with_no_"))
 async def admin_withdraw_reject(callback: types.CallbackQuery):
@@ -505,18 +585,18 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("UPDATE items SET last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
-                            (int(item_id), uid.strip()))
+                cur.execute(
+                    "UPDATE items SET status = 'Продан', last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
+                    (int(item_id), uid))
                 conn.commit()
         await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
         try:
-            await bot.send_message(uid.strip(), f"❌ Отказ: вывод NFT (ID: {item_id}) отклонен администратором.")
+            await bot.send_message(uid, f"❌ Отказ: вывод NFT (ID: {item_id}) отклонен администратором.")
         except:
             pass
     except Exception as e:
         logging.error(f"Withdraw reject error: {e}")
         await callback.answer("Ошибка при отклонении")
-
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -524,9 +604,9 @@ async def cmd_start(message: types.Message):
         inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]])
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
 
-
-# --- ЗАПУСК ---
+# --------------------- Запуск приложения ---------------------
 app = web.Application()
+# Регистрируем маршруты
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)
 app.router.add_get('/inventory', handle_get_inventory)
@@ -537,9 +617,8 @@ app.router.add_post('/request-withdraw', handle_request_withdraw)
 app.router.add_get('/game/state', handle_game_state)
 app.router.add_post('/game/bet', handle_game_bet)
 app.router.add_post('/game/cancel', handle_game_cancel)
-app.router.add_post('/game/finish', handle_game_finish)
+app.router.add_post('/game/finish', handle_game_finish)  # заглушка
 app.router.add_options('/{tail:.*}', handle_options)
-
 
 async def main():
     asyncio.create_task(game_worker())
@@ -548,7 +627,6 @@ async def main():
     await runner.setup()
     await web.TCPSite(runner, '0.0.0.0', port).start()
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
