@@ -6,7 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* ========== СТИЛИ (полностью из вашего index2.html, без изменений) ========== */
+        /* ========== ПОЛНЫЙ КОМПЛЕКТ СТИЛЕЙ ========== */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -18,22 +18,38 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { overflow-x: hidden; width: 100%; }
         body {
-            background-color: var(--bg-main); color: var(--text-main);
-            font-family: 'Inter', sans-serif; margin: 0;
-            display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; padding-bottom: 100px; -webkit-font-smoothing: antialiased;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding-bottom: 100px;
+            -webkit-font-smoothing: antialiased;
         }
         header {
-            width: 100%; padding: 20px; display: flex; justify-content: space-between;
-            align-items: center; position: relative; border-bottom: 1px solid var(--border-color);
-            background: rgba(10, 10, 12, 0.95); z-index: 50;
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(10, 10, 12, 0.95);
+            z-index: 50;
         }
         .header-left { display: flex; align-items: center; gap: 8px; }
         .avatar { width: 36px; height: 36px; border-radius: 50%; background: #222; object-fit: cover; border: 1px solid var(--border-color); }
         .username { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
         .header-right {
-            background: rgba(203, 161, 83, 0.1); border: 1px solid var(--accent-gold);
-            padding: 8px 12px; border-radius: 12px; cursor: pointer; transition: 0.2s;
+            background: rgba(203, 161, 83, 0.1);
+            border: 1px solid var(--accent-gold);
+            padding: 8px 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.2s;
         }
         .header-right:active { transform: scale(0.95); }
         .balance-text { color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; }
@@ -51,9 +67,16 @@
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .tab-bar {
-            position: fixed; bottom: 0; width: 100%; background: rgba(10, 10, 12, 0.85);
-            backdrop-filter: blur(15px); border-top: 1px solid var(--border-color);
-            display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: rgba(10, 10, 12, 0.85);
+            backdrop-filter: blur(15px);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 20px 0 25px 0;
+            z-index: 100;
         }
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
@@ -93,9 +116,19 @@
         .cart-item-info { flex: 1; }
         .fixed-footer { position: fixed; bottom: 85px; width: 100%; padding: 0 20px; z-index: 90; box-sizing: border-box; }
         .modal-tg-btn {
-            position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.4);
-            border-radius: 50%; width: 36px; height: 36px; display: flex;
-            align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; z-index: 10;
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+            z-index: 10;
         }
         .modal-tg-btn:hover { background: rgba(203, 161, 83, 0.3); }
         .modal-tg-btn svg { width: 20px; height: 20px; stroke: white; stroke-width: 1.8; fill: none; }
@@ -111,7 +144,7 @@
     </style>
 </head>
 <body>
-    <!-- ========== ВСЯ РАЗМЕТКА (идентична вашему index2.html) ========== -->
+
     <header>
         <div class="header-left">
             <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">
@@ -287,7 +320,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // ========== ОСНОВНЫЕ ПЕРЕМЕННЫЕ И ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (как в index2.html) ==========
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
 
@@ -589,8 +621,7 @@
             function animate(nowMs) {
                 const elapsed = (nowMs - startTimeMs) / 1000;
                 if (elapsed >= MOVE_DURATION) {
-                    const finalX = gState.winner_x * canvasWidth;
-                    drawGameFrame(finalX);
+                    drawGameFrame(gState.winner_x * canvasWidth);
                     animationFrameId = null;
                     return;
                 }
@@ -600,7 +631,6 @@
                     return;
                 }
                 lastTimestamp = nowMs;
-                // Симуляция с начала до elapsed
                 let simX = startXpx;
                 let simV = velocity;
                 let simT = 0;
@@ -634,9 +664,8 @@
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
                 gState = newState;
-                console.log("Game state:", gState); // для отладки
+                console.log("Game state:", gState);
 
-                // Таймер
                 if (gState.status === 'counting') {
                     if (gState.timer !== localTimer) startLocalTimer(gState.timer);
                 } else if (timerInterval) {
@@ -673,7 +702,6 @@
         }
         setInterval(pollGame, 1000);
 
-        // Остальные функции для ставок
         function openBetConfirm(amt) { betAmountTemp = amt; document.getElementById('confirm-bet-amount').innerText = amt; document.getElementById('confirm-bet-modal').classList.add('active'); }
         function openCustomBet() { document.getElementById('custom-bet-input').value = ''; document.getElementById('custom-bet-modal').classList.add('active'); }
         function submitCustomBet() { const v = parseFloat(document.getElementById('custom-bet-input').value); if(v > 0) { closeModal('custom-bet-modal'); openBetConfirm(v); } else showAlert("Введите сумму больше 0"); }
