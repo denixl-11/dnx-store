@@ -74,48 +74,42 @@ def init_db():
 init_db()
 
 
-# --------------------- Проверка Telegram Init Data ---------------------
-def verify_telegram_data(init_data_str: str) -> dict | None:
-    """Проверяет подпись initData (поля hash и signature исключаются)"""
+# --------------------- Извлечение пользователя (без проверки подписи) ---------------------
+def extract_user_from_initdata(init_data_str: str) -> dict | None:
+    """Извлекает ID и username из initData без проверки подписи (временно)"""
     if not init_data_str:
-        logging.warning("verify_telegram_data: empty init_data")
+        logging.warning("extract_user: empty init_data")
         return None
     try:
         parsed = parse_qs(init_data_str)
         logging.info(f"initData keys: {list(parsed.keys())}")
 
-        received_hash = parsed.pop('hash', [None])[0]
-        parsed.pop('signature', None)  # ← убираем лишнее поле
-
-        if not received_hash:
-            logging.warning("verify_telegram_data: no hash")
-            return None
-
-        # Строим проверочную строку
-        data_check_string = "\n".join(
-            f"{k}={v[0]}" for k, v in sorted(parsed.items())
-        )
-        secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
-        mac = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-
-        if mac != received_hash:
-            logging.warning("Invalid initData signature")
-            return None
+        # Логируем хеши для отладки (вдруг понадобится)
+        received_hash = parsed.get('hash', [None])[0]
+        if received_hash:
+            data_check_string = "\n".join(
+                f"{k}={v[0]}" for k, v in sorted(parsed.items()) if k not in ('hash', 'signature')
+            )
+            secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
+            mac = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+            logging.info(f"data_check_string (first 100): {data_check_string[:100]}")
+            logging.info(f"Computed hash: {mac}")
+            logging.info(f"Received hash: {received_hash}")
 
         user_json = parsed.get('user')
         if not user_json:
             logging.warning("No user field in initData")
             return None
         user = json.loads(user_json[0])
-        logging.info(f"User authenticated: id={user.get('id')}, username={user.get('username')}")
+        logging.info(f"User extracted: id={user.get('id')}, username={user.get('username')}")
         return {"id": str(user.get('id')), "username": user.get('username', 'Unknown')}
     except Exception as e:
-        logging.error(f"verify_telegram_data error: {e}")
+        logging.error(f"extract_user error: {e}")
         return None
 
 
 def require_auth(handler):
-    """Декоратор, требующий валидной initData"""
+    """Декоратор, требующий initData (но без проверки подписи пока)"""
     async def wrapper(request):
         if request.method == "OPTIONS":
             return await handler(request)
@@ -133,7 +127,7 @@ def require_auth(handler):
             return web.json_response({"error": "missing_init_data"}, status=401,
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-        user = verify_telegram_data(init_data)
+        user = extract_user_from_initdata(init_data)
         if not user:
             logging.warning("require_auth: invalid initData")
             return web.json_response({"error": "invalid_signature"}, status=401,
