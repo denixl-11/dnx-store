@@ -6,7 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* ========== СТИЛИ (как в index2.html) ========== */
+        /* ========== СТИЛИ (ПОЛНОСТЬЮ ИЗ index2.html, БЕЗ ИЗМЕНЕНИЙ) ========== */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -320,7 +320,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (ИЗ index2.html) ==========
         const tg = window.Telegram.WebApp;
         const API_BASE = 'https://dnx-shop.onrender.com';
 
@@ -501,7 +500,7 @@
         }
         async function withdraw(id) { await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) }); showAlert("Запрос на вывод отправлен администратору!"); loadInventory(); }
 
-        // ======================== ИГРА (с синхронизацией и падбэком) ========================
+        // ---------------------------- ИГРА (синхронизированная, с параметрами от сервера) ----------------------------
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner_x: null, last_winner: null };
@@ -566,10 +565,7 @@
         function renderBetsList() {
             const container = document.getElementById('bets-list-container');
             const list = document.getElementById('game-bets-list');
-            if(!gState.players || gState.players.length === 0) {
-                if(container) container.style.display = 'none';
-                return;
-            }
+            if(!gState.players || gState.players.length === 0) { if(container) container.style.display = 'none'; return; }
             if(container) container.style.display = 'flex';
             document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
             const sorted = [...gState.players].sort((a,b) => b.amount - a.amount);
@@ -606,61 +602,27 @@
         }
         function closeWinnerModal() { document.getElementById('winner-modal').classList.remove('active'); }
 
-        // АНИМАЦИЯ ПО ПАРАМЕТРАМ СЕРВЕРА (упрощённая, но с плавным движением)
-        function runSpinAnimation(params, canvasWidth) {
+        // АНИМАЦИЯ (полностью такая же, как в index2.html, но параметры берутся из gState.spin_params)
+        function runSpinAnimation() {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            if (!params || params.start_x === undefined) {
-                console.warn("Нет параметров анимации от сервера, используем fallback");
-                runSpinAnimationFallback();
-                return;
+            // Если есть параметры от сервера, используем их; иначе генерируем случайные (для совместимости)
+            let currentX, velocity, startTime;
+            if (gState.spin_params && gState.spin_params.start_x !== undefined) {
+                currentX = gState.spin_params.start_x * canvas.width;
+                velocity = gState.spin_params.velocity;
+                startTime = gState.spin_params.start_time * 1000;
+            } else {
+                // fallback: как в оригинальном index2
+                currentX = canvas.width / 2;
+                velocity = (Math.random() * 500 + 4000) * (Math.random() > 0.5 ? 1 : -1);
+                startTime = performance.now();
             }
-            const { start_x, winner_x, start_time } = params;
-            const startX = start_x * canvasWidth;
-            const targetX = winner_x * canvasWidth;
-            const startTimeMs = start_time * 1000;
             const MOVE_DURATION = 10000; // 10 секунд движения
             const PAUSE_DURATION = 2000;  // 2 секунды паузы
-            let finished = false;
-
-            function animate(nowMs) {
-                if(finished) return;
-                const elapsed = nowMs - startTimeMs;
-                if (elapsed >= MOVE_DURATION + PAUSE_DURATION) {
-                    drawGameFrame(targetX);
-                    animationFrameId = null;
-                    finished = true;
-                    return;
-                }
-                if (elapsed < MOVE_DURATION) {
-                    const progress = elapsed / MOVE_DURATION;
-                    // easeOutCubic для плавной остановки
-                    const eased = 1 - Math.pow(1 - progress, 3);
-                    const currentX = startX + (targetX - startX) * eased;
-                    drawGameFrame(currentX);
-                } else {
-                    // пауза после движения
-                    drawGameFrame(targetX);
-                }
-                animationFrameId = requestAnimationFrame(animate);
-            }
-            animationFrameId = requestAnimationFrame(animate);
-        }
-
-        // FALLBACK АНИМАЦИЯ (как в index2.html, со случайными параметрами)
-        function runSpinAnimationFallback() {
-            if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            let currentX = canvas.width / 2;
-            let velocity = (Math.random() * 500 + 4000) * (Math.random() > 0.5 ? 1 : -1);
-            const startTime = performance.now();
-            const MOVE_DURATION = 10000;
-            const PAUSE_DURATION = 2000;
             const initialSpeed = Math.abs(velocity);
             function getSpeedFactor(progress) {
-                if (progress <= 0.5) {
-                    return 1 - 0.8 * (progress / 0.5);
-                } else {
-                    return 0.2 * (1 - (progress - 0.5) / 0.5);
-                }
+                if (progress <= 0.5) return 1 - 0.8 * (progress / 0.5);
+                else return 0.2 * (1 - (progress - 0.5) / 0.5);
             }
             let lastTimestamp = startTime;
             let finished = false;
@@ -671,16 +633,20 @@
                 if(dt <= 0) { animationFrameId = requestAnimationFrame(animate); return; }
                 lastTimestamp = now;
                 const elapsed = now - startTime;
-                if(elapsed >= MOVE_DURATION) {
+                if (elapsed >= MOVE_DURATION) {
                     finalX = currentX;
                     drawGameFrame(finalX);
                     animationFrameId = null;
+                    // ВАЖНО: больше не отправляем finish на сервер – сервер сам определяет победителя.
+                    // Но для совместимости оставляем, но это не критично.
                     setTimeout(() => {
-                        const pos = finalX / canvas.width;
-                        fetch(`${API_BASE}/game/finish`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({position: pos}) })
-                        .then(res => res.json())
-                        .then(data => { if(data.success && data.winner) showWinnerModal(data.winner); updateBalance(); })
-                        .catch(e => console.error("Finish error", e));
+                        // Отправка финальной позиции не требуется, но оставим для старых версий
+                        if (!gState.spin_params) {
+                            const pos = finalX / canvas.width;
+                            fetch(`${API_BASE}/game/finish`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({position: pos}) })
+                            .catch(e => console.error("Finish error", e));
+                        }
+                        updateBalance();
                     }, PAUSE_DURATION);
                     finished = true;
                     return;
@@ -700,7 +666,7 @@
                 drawGameFrame(currentX);
                 animationFrameId = requestAnimationFrame(animate);
             }
-            lastTimestamp = performance.now();
+            lastTimestamp = startTime;
             animationFrameId = requestAnimationFrame(animate);
         }
 
@@ -709,8 +675,7 @@
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
                 gState = newState;
-                console.log("Game state:", gState);
-
+                // Таймер
                 if (gState.status === 'counting' && gState.timer !== lastServerTimer) {
                     if (Math.abs(localTimer - gState.timer) > 1) startLocalTimer(gState.timer);
                     lastServerTimer = gState.timer;
@@ -732,17 +697,7 @@
 
                 if (gState.status === 'spinning' && !isSpinning) {
                     isSpinning = true;
-                    if (gState.spin_params && gState.winner_x !== null) {
-                        // Создаём объект для анимации, так как в spin_params нет winner_x, но он есть в gState
-                        const animParams = {
-                            start_x: gState.spin_params.start_x,
-                            winner_x: gState.winner_x,
-                            start_time: gState.spin_params.start_time
-                        };
-                        runSpinAnimation(animParams, canvas.width);
-                    } else {
-                        runSpinAnimationFallback();
-                    }
+                    runSpinAnimation();
                 } else if (gState.status !== 'spinning' && isSpinning) {
                     isSpinning = false;
                     if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
