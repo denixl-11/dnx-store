@@ -76,7 +76,6 @@ init_db()
 
 # --------------------- Извлечение пользователя (без проверки подписи) ---------------------
 def extract_user_from_initdata(init_data_str: str) -> dict | None:
-    """Извлекает ID и username из initData без проверки подписи (временно)"""
     if not init_data_str:
         logging.warning("extract_user: empty init_data")
         return None
@@ -138,6 +137,34 @@ def require_auth(handler):
     return wrapper
 
 
+# --------------------- Серверная физика (копия клиентской) ---------------------
+CANVAS_WIDTH = 1000  # виртуальная ширина для расчётов
+
+def simulate_spin(initial_speed: float, direction: int, duration_ms=10000, dt=16):
+    """Возвращает финальную позицию (0..1) после 10 сек движения"""
+    x = CANVAS_WIDTH / 2
+    velocity = direction * initial_speed
+    elapsed = 0
+    while elapsed < duration_ms:
+        progress = elapsed / duration_ms
+        # функция замедления (как на фронте)
+        if progress <= 0.5:
+            speed_factor = 1 - 0.8 * (progress / 0.5)
+        else:
+            speed_factor = 0.2 * (1 - (progress - 0.5) / 0.5)
+        step = (1 if velocity > 0 else -1) * initial_speed * speed_factor * (dt / 1000)
+        x += step
+        # отскоки с потерей 10% энергии
+        if x <= 0:
+            x = 0
+            velocity = abs(velocity) * 0.9
+        elif x >= CANVAS_WIDTH:
+            x = CANVAS_WIDTH
+            velocity = -abs(velocity) * 0.9
+        elapsed += dt
+    return x / CANVAS_WIDTH  # 0..1
+
+
 # --------------------- Игра ---------------------
 game_lock = asyncio.Lock()
 game_state = {
@@ -146,7 +173,9 @@ game_state = {
     "pool": 0.0,
     "timer": 15,
     "target_position": None,
-    "winner": None
+    "spin_params": None,          # {"initialSpeed": float, "direction": 1 или -1}
+    "winner": None,
+    "last_winner_id": None        # чтобы не показывать повторно
 }
 
 
@@ -207,13 +236,22 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
+                    # Генерация параметров физики
+                    initial_speed = random.uniform(4000, 4500)
+                    direction = 1 if random.random() > 0.5 else -1
+                    # Симулируем до остановки
+                    target = simulate_spin(initial_speed, direction)
+                    game_state["spin_params"] = {
+                        "initialSpeed": initial_speed,
+                        "direction": direction
+                    }
+                    game_state["target_position"] = target
                     game_state["status"] = "spinning"
-                    game_state["target_position"] = random.random()
                     game_state["winner"] = None
-                    logging.info(f"Spinning target: {game_state['target_position']:.4f}")
+                    logging.info(f"Spinning: params={game_state['spin_params']}, target={target:.4f}")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(12)
+            await asyncio.sleep(12)  # 10 сек движения + 2 сек паузы
             async with game_lock:
                 if game_state["status"] == "spinning":
                     winner_data = await finish_round(
@@ -222,6 +260,7 @@ async def game_worker():
                         game_state["players"]
                     )
                     game_state["winner"] = winner_data
+                    game_state["last_winner_id"] = winner_data["user_id"] if winner_data else None
                     game_state["status"] = "waiting"
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
@@ -394,7 +433,9 @@ async def handle_game_state(request):
             "pool": game_state["pool"],
             "timer": game_state["timer"],
             "target_position": game_state.get("target_position"),
-            "winner": game_state.get("winner")
+            "spin_params": game_state.get("spin_params"),
+            "winner": game_state.get("winner"),
+            "last_winner_id": game_state.get("last_winner_id")
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
