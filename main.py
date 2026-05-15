@@ -74,39 +74,40 @@ def init_db():
 init_db()
 
 
-# --------------------- Проверка initData (временно без подписи) ---------------------
+# --------------------- Проверка Telegram Init Data ---------------------
 def verify_telegram_data(init_data_str: str) -> dict | None:
-    """Временно: извлекает пользователя без проверки подписи + логирует данные для отладки"""
+    """Проверяет подпись initData (поля hash и signature исключаются)"""
     if not init_data_str:
         logging.warning("verify_telegram_data: empty init_data")
         return None
     try:
         parsed = parse_qs(init_data_str)
-        # Логируем все ключи, которые пришли
         logging.info(f"initData keys: {list(parsed.keys())}")
 
-        # Проверка подписи (временно отключена, но логируем вычисления)
         received_hash = parsed.pop('hash', [None])[0]
-        if received_hash:
-            # Строим строку для проверки
-            data_check_string = "\n".join(
-                f"{k}={v[0]}" for k, v in sorted(parsed.items())
-            )
-            secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
-            mac = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        parsed.pop('signature', None)  # ← убираем лишнее поле
 
-            # Логируем первые 100 символов строки и оба хеша
-            logging.info(f"data_check_string (first 100): {data_check_string[:100]}")
-            logging.info(f"Computed hash: {mac}")
-            logging.info(f"Received hash: {received_hash}")
+        if not received_hash:
+            logging.warning("verify_telegram_data: no hash")
+            return None
 
-        # Извлекаем пользователя (без проверки подписи)
+        # Строим проверочную строку
+        data_check_string = "\n".join(
+            f"{k}={v[0]}" for k, v in sorted(parsed.items())
+        )
+        secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
+        mac = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+        if mac != received_hash:
+            logging.warning("Invalid initData signature")
+            return None
+
         user_json = parsed.get('user')
         if not user_json:
             logging.warning("No user field in initData")
             return None
         user = json.loads(user_json[0])
-        logging.info(f"User extracted: id={user.get('id')}, username={user.get('username')}")
+        logging.info(f"User authenticated: id={user.get('id')}, username={user.get('username')}")
         return {"id": str(user.get('id')), "username": user.get('username', 'Unknown')}
     except Exception as e:
         logging.error(f"verify_telegram_data error: {e}")
@@ -114,7 +115,7 @@ def verify_telegram_data(init_data_str: str) -> dict | None:
 
 
 def require_auth(handler):
-    """Декоратор, требующий валидный initData"""
+    """Декоратор, требующий валидной initData"""
     async def wrapper(request):
         if request.method == "OPTIONS":
             return await handler(request)

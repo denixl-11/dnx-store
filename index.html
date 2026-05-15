@@ -6,6 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* Все стили без изменений, как в предыдущей версии */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -244,7 +245,7 @@
         <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
-    <!-- NFT Detail Modal -->
+    <!-- Модальные окна (NFT, победитель, ставки, пополнение, алерт) без изменений -->
     <div id="nft-detail-overlay" class="modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;">
@@ -276,7 +277,6 @@
         </div>
     </div>
 
-    <!-- Winner Modal -->
     <div id="winner-modal" class="modal-overlay winner-modal" onclick="closeWinnerModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div style="text-align: center;">
@@ -288,7 +288,6 @@
         </div>
     </div>
 
-    <!-- Custom bet modal -->
     <div id="custom-bet-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 class="modal-title">Своя ставка</h3>
@@ -298,7 +297,6 @@
         </div>
     </div>
 
-    <!-- Custom amount modal -->
     <div id="custom-amount-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 class="modal-title">Своя сумма</h3>
@@ -308,7 +306,6 @@
         </div>
     </div>
 
-    <!-- Alert Modal -->
     <div id="alert-modal" class="modal-overlay">
         <div class="modal-content" style="padding-top: 32px;">
             <div id="alert-msg" style="margin-bottom: 24px; font-weight: 500;"></div>
@@ -316,7 +313,6 @@
         </div>
     </div>
 
-    <!-- Confirm Bet Modal -->
     <div id="confirm-bet-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 class="modal-title">Подтверждение</h3>
@@ -326,7 +322,6 @@
         </div>
     </div>
 
-    <!-- Topup Modal -->
     <div id="topup-modal" class="modal-overlay">
         <div class="modal-content">
             <h3 class="modal-title">ПОПОЛНЕНИЕ НА <span id="display-topup-amount">0</span> ₽</h3>
@@ -347,17 +342,17 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // ---------- Инициализация Telegram ----------
+        // ---------- Telegram ----------
         const tg = window.Telegram.WebApp;
+        tg.ready();
         const API_BASE = 'https://dnx-shop.onrender.com';
         const initData = tg.initData || '';
-        // Можно использовать tg.initDataUnsafe для отображения имени и аватара
         const userDisplayName = tg.initDataUnsafe?.user?.username || "Guest";
         const userAvatar = tg.initDataUnsafe?.user?.photo_url || "";
         document.getElementById('username-display').innerText = userDisplayName;
         if(userAvatar) document.getElementById('avatar-img').src = userAvatar;
 
-        // ---------- Хелпер для запросов с авторизацией ----------
+        // Хелпер запросов с авторизацией
         async function apiFetch(url, options = {}) {
             const headers = {
                 'Content-Type': 'application/json',
@@ -365,10 +360,14 @@
                 ...(options.headers || {})
             };
             const response = await fetch(url, { ...options, headers });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || `HTTP ${response.status}`);
+            }
             return response.json();
         }
 
-        // ---------- Глобальные переменные ----------
+        // Глобальные переменные
         let userBalance = 0.0;
         let cart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
         let currentCatalog = [];
@@ -376,7 +375,6 @@
         let pendingTopupAmount = 0;
         let betAmountTemp = 0;
 
-        // ---------- UI уведомления ----------
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
             document.getElementById('alert-modal').classList.add('active');
@@ -387,7 +385,6 @@
             if(el) el.classList.remove('active');
         }
 
-        // ---------- Навигация ----------
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.querySelectorAll('.tab-bar .tab-item').forEach(t => t.classList.remove('active'));
@@ -400,22 +397,20 @@
             if(id === 'cart') renderCart();
         }
 
-        // ---------- Баланс ----------
         async function updateBalance() {
             try {
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
-                document.getElementById('header-balance').innerText = userBalance.toFixed(2) + ' ₽';
-                document.getElementById('big-balance').innerText = userBalance.toFixed(2) + ' ₽';
             } catch(e) {
                 console.error("Balance update failed", e);
+                userBalance = 0;
             }
+            document.getElementById('header-balance').innerText = userBalance.toFixed(2) + ' ₽';
+            document.getElementById('big-balance').innerText = userBalance.toFixed(2) + ' ₽';
         }
 
-        // ---------- Каталог ----------
         async function loadCatalog() {
             try {
-                // GET /items без авторизации (public)
                 const res = await fetch(`${API_BASE}/items`);
                 currentCatalog = await res.json();
                 const container = document.getElementById('catalog-list');
@@ -436,7 +431,7 @@
 
         function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 
-        // ---------- NFT Detail Modal ----------
+        // NFT модалка
         function openNftModal(id) {
             const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
             if(!item) return;
@@ -468,7 +463,7 @@
                 document.getElementById('nft-detail-overlay').classList.remove('active');
         }
 
-        // ---------- Корзина ----------
+        // Корзина
         function addToCart(item) {
             if(!cart.find(c => c.id === item.id)) {
                 cart.push(item);
@@ -504,14 +499,11 @@
             renderCart();
         }
 
-        // ---------- Покупка ----------
+        // Покупка
         async function buyItem(itemId, price) {
             if(userBalance < price) { showAlert("Недостаточно средств. Пополните баланс."); return; }
             try {
-                const data = await apiFetch(`${API_BASE}/buy`, {
-                    method: 'POST',
-                    body: JSON.stringify({items: [itemId]})
-                });
+                const data = await apiFetch(`${API_BASE}/buy`, { method: 'POST', body: JSON.stringify({items: [itemId]}) });
                 if(data.success) {
                     showAlert("Успешная покупка! NFT добавлен в инвентарь.");
                     await updateBalance();
@@ -523,16 +515,12 @@
                 }
             } catch(e) { showAlert("Ошибка сети"); }
         }
-
         async function buyCart() {
             const total = cart.reduce((s, c) => s + Number(c.price), 0);
             if(userBalance < total) { showAlert("Недостаточно средств. Пополните баланс."); return; }
             const ids = cart.map(c => c.id);
             try {
-                const data = await apiFetch(`${API_BASE}/buy`, {
-                    method: 'POST',
-                    body: JSON.stringify({items: ids})
-                });
+                const data = await apiFetch(`${API_BASE}/buy`, { method: 'POST', body: JSON.stringify({items: ids}) });
                 if(data.success) {
                     showAlert("Корзина успешно оплачена!");
                     cart = [];
@@ -547,7 +535,7 @@
             } catch(e) { showAlert("Ошибка сети"); }
         }
 
-        // ---------- Пополнение ----------
+        // Пополнение
         document.getElementById('terms-checkbox')?.addEventListener('change', function() {
             const chkSpan = document.getElementById('custom-chk');
             if(chkSpan) {
@@ -557,7 +545,6 @@
                 chkSpan.style.background = this.checked ? 'var(--accent-gold)' : 'transparent';
             }
         });
-
         function initTopup(amount) {
             if (amount < 50) { showAlert("Минимальная сумма 50 ₽"); return; }
             pendingTopupAmount = amount;
@@ -580,7 +567,6 @@
             const btn = document.getElementById('btn-send-topup');
             if(btn) btn.disabled = true;
             document.getElementById('topup-modal').classList.add('active');
-            // Загружаем реквизиты
             try {
                 const data = await apiFetch(`${API_BASE}/req`);
                 document.getElementById('req-text').innerText = "Реквизиты: " + data.req;
@@ -589,15 +575,15 @@
         async function sendTopup() {
             if(!pendingTopupAmount || pendingTopupAmount < 50) return;
             closeModal('topup-modal');
-            await apiFetch(`${API_BASE}/topup`, {
-                method: 'POST',
-                body: JSON.stringify({amount: pendingTopupAmount})
-            });
-            showAlert("Заявка отправлена. Ожидайте зачисления.");
+            try {
+                const data = await apiFetch(`${API_BASE}/topup`, { method: 'POST', body: JSON.stringify({amount: pendingTopupAmount}) });
+                if(data.success) showAlert("Заявка отправлена. Ожидайте зачисления.");
+                else showAlert("Ошибка при отправке заявки.");
+            } catch(e) { showAlert(`Ошибка: ${e.message}`); }
             await updateBalance();
         }
 
-        // ---------- Инвентарь ----------
+        // Инвентарь
         function switchInv(el, type) {
             document.querySelectorAll('#page-inventory .tab-item').forEach(t => {
                 t.classList.remove('active');
@@ -614,18 +600,18 @@
             try {
                 const data = await apiFetch(`${API_BASE}/inventory`);
                 inventoryData = data;
-                const activeItems = inventoryData.filter(i => i.status !== 'withdrawn');
-                const withdrawnItems = inventoryData.filter(i => i.status === 'withdrawn');
-                document.getElementById('inventory-active-container').innerHTML = activeItems.length
-                    ? activeItems.map(i => `
+                const active = inventoryData.filter(i => i.status !== 'withdrawn');
+                const withdrawn = inventoryData.filter(i => i.status === 'withdrawn');
+                document.getElementById('inventory-active-container').innerHTML = active.length
+                    ? active.map(i => `
                         <div class="item-card">
                             <img src="${i.image_url}" class="item-image" onclick="openNftModal('${i.id}')">
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button>
                         </div>`).join('')
                     : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
-                document.getElementById('inventory-history-container').innerHTML = withdrawnItems.length
-                    ? withdrawnItems.map(i => `
+                document.getElementById('inventory-history-container').innerHTML = withdrawn.length
+                    ? withdrawn.map(i => `
                         <div class="item-card" style="opacity:0.5">
                             <img src="${i.image_url}" class="item-image" style="filter:grayscale(100%)">
                             <div class="item-name">${escapeHtml(i.name)}</div>
@@ -635,10 +621,7 @@
             } catch(e) { console.error(e); }
         }
         async function withdraw(id) {
-            await apiFetch(`${API_BASE}/request-withdraw`, {
-                method: 'POST',
-                body: JSON.stringify({itemId: id})
-            });
+            await apiFetch(`${API_BASE}/request-withdraw`, { method: 'POST', body: JSON.stringify({itemId: id}) });
             showAlert("Запрос на вывод отправлен администратору!");
             loadInventory();
         }
@@ -730,32 +713,68 @@
                 </div>`).join('');
         }
 
-        // Новая анимация: плавное движение к target_position (0..1) с easing
-        function runSpinAnimation(targetPosition) {
-            if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            const targetX = targetPosition * canvas.width;
-            const startX = canvas.width / 2; // начинаем всегда из центра
-            const duration = 10000; // 10 сек
+        // ---------- АНИМАЦИЯ (как раньше, но с фиксацией на target_position) ----------
+        function runSpinAnimation(targetPos) {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            const targetX = targetPos * canvas.width;
+            let currentX = canvas.width / 2;
+            let velocity = (Math.random() * 500 + 4000) * (Math.random() > 0.5 ? 1 : -1);
             const startTime = performance.now();
+            const MOVE_DURATION = 10000;  // 10 секунд движения
+            const PAUSE_DURATION = 2000;  // 2 секунды паузы
+            const initialSpeed = Math.abs(velocity);
 
-            function animate(now) {
-                const elapsed = now - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                const eased = easeOutCubic(progress);
-                const currentX = startX + (targetX - startX) * eased;
-                drawGameFrame(currentX);
-                if(progress < 1) {
-                    animationFrameId = requestAnimationFrame(animate);
+            function getSpeedFactor(progress) {
+                // первые 50% времени быстро тормозим до 20% скорости, потом ещё тише
+                if (progress <= 0.5) {
+                    return 1 - 0.8 * (progress / 0.5);
                 } else {
-                    drawGameFrame(targetX);
-                    animationFrameId = null;
+                    return 0.2 * (1 - (progress - 0.5) / 0.5);
                 }
             }
-            animationFrameId = requestAnimationFrame(animate);
-        }
 
-        function easeOutCubic(t) {
-            return 1 - Math.pow(1 - t, 3);
+            let lastTimestamp = startTime;
+            let finished = false;
+
+            function animate(now) {
+                if (finished) return;
+                const dt = Math.min(100, now - lastTimestamp);
+                if (dt <= 0) { animationFrameId = requestAnimationFrame(animate); return; }
+                lastTimestamp = now;
+                const elapsed = now - startTime;
+
+                if (elapsed >= MOVE_DURATION) {
+                    // Конец движения — мгновенно ставим на target
+                    drawGameFrame(targetX);
+                    animationFrameId = null;
+                    setTimeout(() => {
+                        // ничего не делаем, сервер сам пришлёт winner
+                    }, PAUSE_DURATION);
+                    finished = true;
+                    return;
+                }
+
+                let progress = elapsed / MOVE_DURATION;
+                let speedFactor = getSpeedFactor(progress);
+                let currentSpeed = initialSpeed * speedFactor;
+                let step = (velocity > 0 ? 1 : -1) * currentSpeed * (dt / 1000);
+                currentX += step;
+
+                // Отскок от стенок
+                if (currentX <= 0) {
+                    currentX = 0;
+                    velocity = Math.abs(velocity) * 0.9;
+                } else if (currentX >= canvas.width) {
+                    currentX = canvas.width;
+                    velocity = -Math.abs(velocity) * 0.9;
+                }
+
+                drawGameFrame(currentX);
+                animationFrameId = requestAnimationFrame(animate);
+            }
+
+            lastTimestamp = performance.now();
+            animationFrameId = requestAnimationFrame(animate);
         }
 
         function showWinnerModal(winner) {
@@ -774,7 +793,6 @@
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
-                // Обновляем таймер только если counting
                 if (newState.status === 'counting' && newState.timer !== gState.timer) {
                     gState.timer = newState.timer;
                     document.getElementById('game-timer-bg').innerText = newState.timer;
@@ -795,7 +813,8 @@
                 gState = newState;
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 renderBetsList();
-                const hasMyBet = gState.players.find(p => p.id === String(tg.initDataUnsafe?.user?.id));
+                const myId = String(tg.initDataUnsafe?.user?.id);
+                const hasMyBet = gState.players.find(p => p.id === myId);
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
 
@@ -811,11 +830,8 @@
                     drawGameFrame();
                 }
 
-                // Если сервер вернул победителя – показываем модалку и обновляем баланс
                 if(gState.winner && gState.status !== 'spinning') {
                     showWinnerModal(gState.winner);
-                    // Сбрасываем winner в состоянии? Сервер его обнулит после чтения, но можем просто не показывать повторно
-                    // Чтобы не показывать второй раз, можно сохранить id последнего показанного победителя
                     await updateBalance();
                 }
             } catch(e) { console.error("Game poll error", e); }
@@ -833,34 +849,24 @@
         }
         function submitCustomBet() {
             const v = parseFloat(document.getElementById('custom-bet-input').value);
-            if(v > 0) {
-                closeModal('custom-bet-modal');
-                openBetConfirm(v);
-            } else showAlert("Введите сумму больше 0");
+            if(v > 0) { closeModal('custom-bet-modal'); openBetConfirm(v); }
+            else showAlert("Введите сумму больше 0");
         }
         async function executeBet() {
             const btn = document.getElementById('btn-confirm-bet');
             if(btn) { btn.disabled = true; btn.innerText = 'Загрузка...'; }
             try {
-                const data = await apiFetch(`${API_BASE}/game/bet`, {
-                    method: 'POST',
-                    body: JSON.stringify({amount: betAmountTemp})
-                });
+                const data = await apiFetch(`${API_BASE}/game/bet`, { method: 'POST', body: JSON.stringify({amount: betAmountTemp}) });
                 closeModal('confirm-bet-modal');
-                if(data.success) {
-                    await updateBalance();
-                    pollGame(); // сразу обновим состояние
-                } else {
+                if(data.success) { await updateBalance(); pollGame(); }
+                else {
                     let msg = "Ставка не принята";
                     if(data.error === 'insufficient_funds') msg = "Недостаточно средств!";
                     if(data.error === 'game_started') msg = "Игра уже началась, подождите!";
                     if(data.error === 'room_full') msg = "В комнате уже 20 игроков!";
                     showAlert(msg);
                 }
-            } catch(e) {
-                closeModal('confirm-bet-modal');
-                showAlert("Ошибка сети, попробуйте снова");
-            }
+            } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети, попробуйте снова"); }
             if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
         async function cancelGameBet() {
@@ -869,11 +875,11 @@
             pollGame();
         }
 
-        // ---------- Инициализация ----------
+        // Инициализация
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
-        try { tg.expand(); tg.ready(); } catch(e) {}
+        try { tg.expand(); } catch(e) {}
     </script>
 </body>
 </html>
