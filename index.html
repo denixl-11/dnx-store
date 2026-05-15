@@ -6,7 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* ========== СТИЛИ (ПОЛНОСТЬЮ ИЗ index2.html) ========== */
+        /* ========== ВСЕ СТИЛИ ИЗ ВАШЕГО index2.html (БЕЗ ИЗМЕНЕНИЙ) ========== */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -144,7 +144,7 @@
     </style>
 </head>
 <body>
-    <!-- ========== ВСЯ РАЗМЕТКА (как в index2.html) ========== -->
+
     <header>
         <div class="header-left">
             <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">
@@ -500,7 +500,7 @@
         }
         async function withdraw(id) { await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) }); showAlert("Запрос на вывод отправлен администратору!"); loadInventory(); }
 
-        // ---------------------------- ИГРА (синхронизированная, с параметрами от сервера, но с родной анимацией) ----------------------------
+        // ---------------------------- ИГРА (синхронизированная) ----------------------------
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner_x: null, last_winner: null };
@@ -565,7 +565,10 @@
         function renderBetsList() {
             const container = document.getElementById('bets-list-container');
             const list = document.getElementById('game-bets-list');
-            if(!gState.players || gState.players.length === 0) { if(container) container.style.display = 'none'; return; }
+            if(!gState.players || gState.players.length === 0) {
+                if(container) container.style.display = 'none';
+                return;
+            }
             if(container) container.style.display = 'flex';
             document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
             const sorted = [...gState.players].sort((a,b) => b.amount - a.amount);
@@ -602,26 +605,22 @@
         }
         function closeWinnerModal() { document.getElementById('winner-modal').classList.remove('active'); }
 
-        // АНИМАЦИЯ (полностью скопирована из index2.html, но параметры startX, velocity, startTime берутся из gState.spin_params, если они есть)
+        // АНИМАЦИЯ: параметры берутся из gState.spin_params (если есть)
         function runSpinAnimation() {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-
-            // Определяем параметры движения
             let currentX, velocity, startTime;
             if (gState.spin_params && gState.spin_params.start_x !== undefined) {
-                // Используем параметры от сервера
                 currentX = gState.spin_params.start_x * canvas.width;
                 velocity = gState.spin_params.velocity;
                 startTime = gState.spin_params.start_time * 1000;
             } else {
-                // Fallback: как в оригинальном index2
+                // Fallback (как в оригинальном index2)
                 currentX = canvas.width / 2;
                 velocity = (Math.random() * 500 + 4000) * (Math.random() > 0.5 ? 1 : -1);
                 startTime = performance.now();
             }
-
-            const MOVE_DURATION = 10000; // 10 секунд движения
-            const PAUSE_DURATION = 2000;  // 2 секунды паузы
+            const MOVE_DURATION = 10000;
+            const PAUSE_DURATION = 2000;
             const initialSpeed = Math.abs(velocity);
             function getSpeedFactor(progress) {
                 if (progress <= 0.5) {
@@ -632,7 +631,6 @@
             }
             let lastTimestamp = startTime;
             let finished = false;
-            let finalX = null;
             function animate(now) {
                 if(finished) return;
                 const dt = Math.min(100, now - lastTimestamp);
@@ -640,18 +638,11 @@
                 lastTimestamp = now;
                 const elapsed = now - startTime;
                 if(elapsed >= MOVE_DURATION) {
-                    finalX = currentX;
-                    drawGameFrame(finalX);
+                    drawGameFrame(currentX);
                     animationFrameId = null;
-                    // Отправка finish не нужна, но оставим для fallback
-                    if (!gState.spin_params) {
-                        setTimeout(() => {
-                            const pos = finalX / canvas.width;
-                            fetch(`${API_BASE}/game/finish`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({position: pos}) })
-                            .catch(e => console.error("Finish error", e));
-                        }, PAUSE_DURATION);
-                    }
-                    setTimeout(() => updateBalance(), PAUSE_DURATION + 500);
+                    setTimeout(() => {
+                        updateBalance();
+                    }, PAUSE_DURATION);
                     finished = true;
                     return;
                 }
@@ -691,14 +682,11 @@
                         timerInterval = null;
                     }
                 }
-
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 renderBetsList();
-
                 const hasMyBet = gState.players.find(p => p.id === String(uId));
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
-
                 if (gState.status === 'spinning' && !isSpinning) {
                     isSpinning = true;
                     runSpinAnimation();
@@ -709,7 +697,6 @@
                 } else if (gState.status !== 'spinning' && !isSpinning) {
                     drawGameFrame();
                 }
-
                 if (gState.last_winner && !window._winnerShown) {
                     window._winnerShown = true;
                     showWinnerModal(gState.last_winner);

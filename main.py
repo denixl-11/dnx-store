@@ -4,6 +4,7 @@ import os
 import psycopg2
 import json
 import random
+from decimal import Decimal
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -83,7 +84,6 @@ def generate_color():
 
 
 def simulate_trajectory(start_x, velocity, move_duration=10.0, canvas_width=1000):
-    """Симулирует движение с отскоками и линейным замедлением, возвращает финальную позицию (0..1)."""
     x = start_x * canvas_width
     v = velocity
     deceleration = abs(v) / move_duration
@@ -106,7 +106,6 @@ def simulate_trajectory(start_x, velocity, move_duration=10.0, canvas_width=1000
 
 
 async def finish_round(winner_x, pool, players):
-    """Определяет победителя, начисляет выигрыш и возвращает данные о победителе"""
     if pool <= 0 or not players:
         logging.warning(f"finish_round: pool={pool}, players={players}")
         return None
@@ -159,9 +158,8 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-                    # Генерация случайных параметров траектории (как в index2, но на сервере)
-                    start_x = random.uniform(0.0, 1.0)               # случайная начальная позиция
-                    velocity = random.choice([-1, 1]) * random.uniform(3000, 5000)  # скорость и направление
+                    start_x = random.uniform(0.0, 1.0)
+                    velocity = random.choice([-1, 1]) * random.uniform(3000, 5000)
                     spin_start_time = asyncio.get_event_loop().time()
                     game_state["spin_params"] = {
                         "start_x": start_x,
@@ -170,10 +168,9 @@ async def game_worker():
                     }
                     winner_x = simulate_trajectory(start_x, velocity, move_duration=10.0)
                     game_state["winner_x"] = winner_x
-                    logging.info(f"Spinning: start_x={start_x}, velocity={velocity}, winner_x={winner_x}")
+                    logging.info(f"SPIN: start_x={start_x}, velocity={velocity}, winner_x={winner_x}")
 
             elif game_state["status"] == "spinning":
-                # Ждём 12 секунд (10 сек движения + 2 сек паузы)
                 if game_state["spin_params"] and asyncio.get_event_loop().time() - game_state["spin_params"]["start_time"] >= 12:
                     winner_data = await finish_round(game_state["winner_x"], game_state["pool"], game_state["players"])
                     game_state["last_winner"] = winner_data
@@ -210,12 +207,7 @@ async def handle_game_state(request):
         }, headers={"Access-Control-Allow-Origin": "*"})
 
 
-# Остальные хендлеры (handle_get_user, handle_topup_request, ...) полностью копируются из main2.py
-# Я привожу их без изменений, как в вашем рабочем файле.
-# Для краткости я не буду дублировать все 100 строк, но в реальном файле они должны быть.
-# Они точно такие же, как в вашем main2.py. Убедитесь, что они есть.
-# Ниже я вставлю их для полноты, но в ответе они будут.
-
+# Остальные хендлеры (копия из вашего main2.py, с небольшими правками strip)
 async def handle_get_user(request):
     user_id = request.query.get('user_id')
     username = request.query.get('username', 'Unknown')
@@ -307,21 +299,16 @@ async def handle_buy(request):
         data = await request.json()
         item_ids = data.get('items', [])
         user_id = str(data.get('userId')).strip()
-
         if not item_ids:
             return web.json_response({"success": False, "error": "no_items"}, headers={"Access-Control-Allow-Origin": "*"})
-
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("SELECT id, price FROM items WHERE id = ANY(%s) AND status = 'Доступен'", (item_ids,))
                 items = cur.fetchall()
-
                 if len(items) == len(item_ids):
                     total_price = sum(i['price'] for i in items)
-
                     cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
                     user = cur.fetchone()
-
                     if user and float(user['balance']) >= float(total_price):
                         cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (total_price, user_id))
                         cur.execute(
@@ -345,7 +332,6 @@ async def handle_request_withdraw(request):
         item_id = data.get('itemId')
         user_id = str(data.get('userId')).strip()
         username = data.get('username', 'Unknown')
-
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
@@ -373,26 +359,21 @@ async def handle_game_bet(request):
         user_id = str(data.get('userId')).strip()
         username = data.get('username', 'Player')
         amount = float(data.get('amount', 0))
-
         if amount <= 0:
             return web.json_response({"success": False, "error": "invalid_amount"}, headers={"Access-Control-Allow-Origin": "*"})
-
         async with game_lock:
             if game_state["status"] != "waiting" and game_state["status"] != "counting":
                 return web.json_response({"success": False, "error": "game_started"}, headers={"Access-Control-Allow-Origin": "*"})
             if len(game_state["players"]) >= 20 and user_id not in game_state["players"]:
                 return web.json_response({"success": False, "error": "room_full"}, headers={"Access-Control-Allow-Origin": "*"})
-
             with get_db_connection() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
                     user = cur.fetchone()
                     if not user or float(user['balance']) < amount:
                         return web.json_response({"success": False, "error": "insufficient_funds"}, headers={"Access-Control-Allow-Origin": "*"})
-
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
                     conn.commit()
-
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
@@ -400,13 +381,10 @@ async def handle_game_bet(request):
                     "id": user_id, "username": username,
                     "amount": amount, "color": generate_color()
                 }
-
             game_state["pool"] += amount
-
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
-
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
     except Exception as e:
         logging.error(f"Bet error: {e}")
@@ -418,7 +396,6 @@ async def handle_game_cancel(request):
     try:
         data = await request.json()
         user_id = str(data.get('userId')).strip()
-
         async with game_lock:
             if len(game_state["players"]) == 1 and user_id in game_state["players"]:
                 refund = game_state["players"][user_id]["amount"]
@@ -436,7 +413,6 @@ async def handle_game_cancel(request):
 
 
 async def handle_game_finish(request):
-    # Устаревший эндпоинт, оставлен для совместимости
     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
 
 
@@ -450,7 +426,7 @@ async def handle_options(request):
                  "Access-Control-Allow-Headers": "Content-Type"})
 
 
-# --- CALLBACKS ДЛЯ АДМИНА (без изменений) ---
+# --- CALLBACKS ДЛЯ АДМИНА ---
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
