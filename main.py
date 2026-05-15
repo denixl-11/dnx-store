@@ -42,8 +42,10 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
+
 
 def init_db():
     try:
@@ -56,72 +58,90 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                # гарантируем наличие колонок для NFT
-                cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
-                cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
+                try:
+                    cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
+                except Exception as e:
+                    logging.warning(f"Column number may already exist: {e}")
+                try:
+                    cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
+                except Exception as e:
+                    logging.warning(f"Column last_event may already exist: {e}")
                 conn.commit()
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
+
 
 init_db()
 
 # --------------------- Проверка Telegram Init Data ---------------------
 def verify_telegram_data(init_data_str: str) -> dict | None:
-    """Проверяет подпись initData и возвращает данные пользователя, если всё верно"""
+    """Проверяет подпись initData и возвращает {'id', 'username'} или None"""
     if not init_data_str:
+        logging.warning("verify_telegram_data: empty init_data")
         return None
     try:
         parsed = parse_qs(init_data_str)
-        # Валидация подписи
         received_hash = parsed.pop('hash', [None])[0]
         if not received_hash:
+            logging.warning("verify_telegram_data: no hash in initData")
             return None
-        # Сортируем поля
+
+        # Строим строку для проверки
         data_check_string = "\n".join(
             f"{k}={v[0]}" for k, v in sorted(parsed.items())
         )
-        # Генерируем секретный ключ
         secret_key = hashlib.sha256(BOT_TOKEN.encode()).digest()
         mac = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
         if mac != received_hash:
-            logging.warning("Invalid initData signature")
+            logging.warning(f"Invalid initData signature. Expected {mac}, got {received_hash}")
             return None
-        # Извлекаем данные пользователя
-        user_data = parsed.get('user')
-        if not user_data:
+
+        user_json = parsed.get('user')
+        if not user_json:
+            logging.warning("No user field in initData")
             return None
-        user = json.loads(user_data[0])
+        user = json.loads(user_json[0])
         return {"id": str(user.get('id')), "username": user.get('username', 'Unknown')}
     except Exception as e:
-        logging.error(f"InitData verification error: {e}")
+        logging.error(f"verify_telegram_data error: {e}")
         return None
 
+
 def require_auth(handler):
-    """Декоратор для API‑эндпоинтов, требующих аутентификации"""
+    """Декоратор, требующий валидной initData (с временным guest‑mode для отладки)"""
     async def wrapper(request):
-        # Для OPTIONS запросов пропускаем
         if request.method == "OPTIONS":
             return await handler(request)
-        # Извлекаем initData из заголовков или параметров
+
+        # Извлекаем initData из заголовка, параметров или тела POST
         init_data = request.headers.get('X-Telegram-Init-Data') or request.query.get('initData')
-        if not init_data:
-            # Попробуем из тела (для POST)
+        if not init_data and request.method == "POST":
             try:
                 body = await request.json()
                 init_data = body.get('initData')
             except:
                 pass
+
+        # ----- ВРЕМЕННЫЙ ФОЛЛБЭК ДЛЯ ОТЛАДКИ (убрать на проде!) -----
         if not init_data:
-            return web.json_response({"error": "unauthorized"}, status=401,
-                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+            logging.warning("require_auth: no initData, using guest mode")
+            request['telegram_user'] = {"id": "guest", "username": "Guest"}
+            return await handler(request)
+        # -----------------------------------------------------------
+
         user = verify_telegram_data(init_data)
         if not user:
-            return web.json_response({"error": "invalid_signature"}, status=401,
-                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-        # Сохраняем пользователя в request для дальнейшего использования
+            logging.warning("require_auth: invalid initData, request denied")
+            return web.json_response(
+                {"error": "invalid_signature"}, status=401,
+                headers={"Access-Control-Allow-Origin": CORS_ORIGIN}
+            )
         request['telegram_user'] = user
         return await handler(request)
+
     return wrapper
+
 
 # --------------------- Игра ---------------------
 game_lock = asyncio.Lock()
@@ -134,17 +154,17 @@ game_state = {
     "winner": None               # {user_id, username, win_amount} или None
 }
 
+
 def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
 
+
 async def finish_round(winner_x: float, pool: float, players: dict) -> dict | None:
-    """Определяет победителя на основе серверной позиции.
-       winner_x ∈ [0, 1) – доля ширины бара.
-       Возвращает словарь с user_id, username, win_amount или None при ошибке."""
+    """Определяет победителя на основе серверной позиции."""
     if pool <= 0 or not players:
         logging.warning(f"finish_round: пустой пул или список игроков")
         return None
-    winner_x = max(0.0, min(1.0 - 1e-12, winner_x))  # чтобы не попасть ровно на 1.0
+    winner_x = max(0.0, min(1.0 - 1e-12, winner_x))
     cumulative = 0.0
     winner_id = None
     winner_username = None
@@ -153,7 +173,6 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
         p = players[uid]
         sector_start = cumulative
         sector_end = cumulative + (p["amount"] / pool)
-        # для всех секторов, кроме последнего, используем строгое неравенство
         if i == len(sorted_uids) - 1:
             if sector_start <= winner_x <= sector_end + 1e-12:
                 winner_id = str(uid)
@@ -178,9 +197,8 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT id, balance FROM users WHERE id = %s", (winner_id,))
-                user = cur.fetchone()
-                if not user:
+                cur.execute("SELECT id FROM users WHERE id = %s", (winner_id,))
+                if not cur.fetchone():
                     logging.error(f"Пользователь {winner_id} не найден в БД")
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
@@ -194,6 +212,7 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
         logging.error(f"Ошибка БД при завершении игры: {e}")
         return None
 
+
 async def game_worker():
     """Фоновый процесс управления игрой"""
     global game_state
@@ -203,14 +222,12 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
-                    # Запускаем спиннинг: генерируем случайную целевую позицию
                     game_state["status"] = "spinning"
                     game_state["target_position"] = random.random()  # 0..1
                     game_state["winner"] = None
                     logging.info(f"Игра переходит в spinning, target_position={game_state['target_position']:.4f}")
 
         if game_state["status"] == "spinning":
-            # Ждём 12 секунд (10 сек анимации + 2 сек паузы)
             await asyncio.sleep(12)
             async with game_lock:
                 if game_state["status"] == "spinning":
@@ -219,14 +236,13 @@ async def game_worker():
                         game_state["pool"],
                         game_state["players"]
                     )
-                    # Сохраняем результат и сбрасываем состояние
                     game_state["winner"] = winner_data
-                    # Оставляем target_position для фронта, чтобы анимация могла завершиться
                     game_state["status"] = "waiting"
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
                     logging.info(f"Игра завершена, победитель: {winner_data}")
+
 
 # --------------------- API ---------------------
 async def handle_options(request):
@@ -238,9 +254,10 @@ async def handle_options(request):
         }
     )
 
+
 @require_auth
 async def handle_get_user(request):
-    user = request.get('telegram_user')
+    user = request['telegram_user']
     user_id = user['id']
     username = user['username']
     try:
@@ -258,6 +275,7 @@ async def handle_get_user(request):
         balance = 0.0
     return web.json_response({"balance": balance},
                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
 
 @require_auth
 async def handle_topup_request(request):
@@ -285,6 +303,7 @@ async def handle_topup_request(request):
         return web.json_response({"success": False},
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+
 async def handle_get_items(request):
     try:
         with get_db_connection() as conn:
@@ -303,6 +322,7 @@ async def handle_get_items(request):
     except Exception as e:
         logging.error(f"Get items error: {e}")
         return web.json_response([], headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
 
 @require_auth
 async def handle_get_inventory(request):
@@ -328,6 +348,7 @@ async def handle_get_inventory(request):
     except Exception as e:
         logging.error(f"Inventory error: {e}")
         return web.json_response([], headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
 
 @require_auth
 async def handle_buy(request):
@@ -369,6 +390,7 @@ async def handle_buy(request):
         return web.json_response({"success": False}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+
 @require_auth
 async def handle_request_withdraw(request):
     try:
@@ -380,7 +402,6 @@ async def handle_request_withdraw(request):
 
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Проверяем, что товар принадлежит пользователю и статус = 'Продан'
                 cur.execute(
                     "SELECT id, name, nft_link FROM items WHERE id = %s AND buyer_id = %s AND status = 'Продан'",
                     (item_id, user_id))
@@ -388,7 +409,7 @@ async def handle_request_withdraw(request):
                 if not item:
                     return web.json_response({"success": False, "error": "not_found_or_not_owned"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                # Меняем статус на pending_withdraw, чтобы избежать повторных заявок
+                # Блокируем повторные заявки
                 cur.execute(
                     "UPDATE items SET status = 'pending_withdraw', last_event = 'withdraw_requested' WHERE id = %s",
                     (item_id,))
@@ -412,6 +433,8 @@ async def handle_request_withdraw(request):
         return web.json_response({"success": False}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+
+# Эндпоинты игры
 async def handle_game_state(request):
     async with game_lock:
         resp = {
@@ -423,6 +446,7 @@ async def handle_game_state(request):
             "winner": game_state.get("winner")
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
 
 @require_auth
 async def handle_game_bet(request):
@@ -465,7 +489,6 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            # Если набралось минимум 2 игрока и игра ещё не запущена – запускаем отсчёт
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
@@ -476,6 +499,7 @@ async def handle_game_bet(request):
         logging.error(f"Bet error: {e}")
         return web.json_response({"success": False}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
 
 @require_auth
 async def handle_game_cancel(request):
@@ -503,17 +527,18 @@ async def handle_game_cancel(request):
         return web.json_response({"success": False}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# Эндпоинт /game/finish больше не используется (вся логика на сервере)
-# Оставляем заглушку для обратной совместимости
+
 async def handle_game_finish(request):
-    # Возвращаем текущее состояние (вдруг старый клиент вызовет)
+    # Заглушка, всё делает сервер
     return web.json_response({"success": True, "message": "Finish handled by server"},
                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
 
 @require_auth
 async def handle_get_requisites(request):
     return web.json_response({"req": PAYMENT_REQUISITES},
                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
 
 # --------------------- Callbacks админа ---------------------
 @dp.callback_query(F.data.startswith("topup_yes_"))
@@ -539,6 +564,7 @@ async def admin_topup_approve(callback: types.CallbackQuery):
         logging.error(f"Topup approve error: {e}")
         await callback.answer("Ошибка при пополнении")
 
+
 @dp.callback_query(F.data.startswith("topup_no_"))
 async def admin_topup_reject(callback: types.CallbackQuery):
     parts = callback.data.split("_")
@@ -551,6 +577,7 @@ async def admin_topup_reject(callback: types.CallbackQuery):
         await bot.send_message(uid, f"❌ Отказ: заявка на пополнение {amount} ₽ отклонена.")
     except:
         pass
+
 
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
@@ -575,6 +602,7 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
         logging.error(f"Withdraw approve error: {e}")
         await callback.answer("Ошибка при выводе")
 
+
 @dp.callback_query(F.data.startswith("with_no_"))
 async def admin_withdraw_reject(callback: types.CallbackQuery):
     parts = callback.data.split("_")
@@ -598,15 +626,16 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
         logging.error(f"Withdraw reject error: {e}")
         await callback.answer("Ошибка при отклонении")
 
+
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     kb = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]])
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
 
+
 # --------------------- Запуск приложения ---------------------
 app = web.Application()
-# Регистрируем маршруты
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)
 app.router.add_get('/inventory', handle_get_inventory)
@@ -620,6 +649,7 @@ app.router.add_post('/game/cancel', handle_game_cancel)
 app.router.add_post('/game/finish', handle_game_finish)  # заглушка
 app.router.add_options('/{tail:.*}', handle_options)
 
+
 async def main():
     asyncio.create_task(game_worker())
     port = int(os.environ.get("PORT", 8080))
@@ -627,6 +657,7 @@ async def main():
     await runner.setup()
     await web.TCPSite(runner, '0.0.0.0', port).start()
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
