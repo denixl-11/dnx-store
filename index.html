@@ -134,19 +134,10 @@
         .fixed-footer { position: fixed; bottom: 85px; width: 100%; padding: 0 20px; z-index: 90; box-sizing: border-box; }
 
         .modal-tg-btn {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            background: rgba(0,0,0,0.4);
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: 0.2s;
-            z-index: 10;
+            position: absolute; top: 15px; left: 15px;
+            background: rgba(0,0,0,0.4); border-radius: 50%;
+            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.2s; z-index: 10;
         }
         .modal-tg-btn:hover { background: rgba(203, 161, 83, 0.3); }
         .modal-tg-btn svg { width: 20px; height: 20px; stroke: white; stroke-width: 1.8; fill: none; }
@@ -248,9 +239,7 @@
     <div id="nft-detail-overlay" class="modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+                <svg viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
             <div style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10;" onclick="closeNftModal(true)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -290,55 +279,32 @@
 
     <!-- Custom bet modal -->
     <div id="custom-bet-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 class="modal-title">Своя ставка</h3>
-            <input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма ₽">
-            <button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button>
-            <button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button>
-        </div>
+        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма ₽"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
     </div>
 
     <!-- Custom amount modal -->
     <div id="custom-amount-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 class="modal-title">Своя сумма</h3>
-            <input type="number" id="custom-amount-input" class="input-dark" placeholder="Сумма от 50 ₽">
-            <button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button>
-            <button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button>
-        </div>
+        <div class="modal-content"><h3 class="modal-title">Своя сумма</h3><input type="number" id="custom-amount-input" class="input-dark" placeholder="Сумма от 50 ₽"><button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button><button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button></div>
     </div>
 
     <!-- Alert Modal -->
     <div id="alert-modal" class="modal-overlay">
-        <div class="modal-content" style="padding-top: 32px;">
-            <div id="alert-msg" style="margin-bottom: 24px; font-weight: 500;"></div>
-            <button class="btn-main-action" style="height: 44px;" onclick="closeModal('alert-modal')">Понятно</button>
-        </div>
+        <div class="modal-content" style="padding-top: 32px;"><div id="alert-msg" style="margin-bottom: 24px; font-weight: 500;"></div><button class="btn-main-action" style="height: 44px;" onclick="closeModal('alert-modal')">Понятно</button></div>
     </div>
 
     <!-- Confirm Bet Modal -->
     <div id="confirm-bet-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 class="modal-title">Подтверждение</h3>
-            <p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> ₽?</p>
-            <button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button>
-            <button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button>
-        </div>
+        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> ₽?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
     </div>
 
     <!-- Topup Modal -->
     <div id="topup-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 class="modal-title">ПОПОЛНЕНИЕ НА <span id="display-topup-amount">0</span> ₽</h3>
-            <ul style="font-size: 0.8rem; color: var(--text-muted); text-align: left; padding-left: 16px; margin-bottom: 20px;">
-                <li>Заявки без фактического перевода блокируются.</li>
-                <li>Обработка занимает до 15 минут.</li>
-            </ul>
-            <div style="font-size: 0.85rem; color: var(--text-main); margin-bottom: 20px; font-weight: bold; word-break: break-all;" id="req-text">Загрузка реквизитов...</div>
-            <label style="display: flex; align-items: center; font-size: 0.8rem; text-align:left; cursor: pointer; gap: 10px; margin-bottom: 20px;">
+        <div class="modal-content"><h3 class="modal-title">ПОПОЛНЕНИЕ НА <span id="display-topup-amount">0</span> ₽</h3>
+            <ul style="font-size:0.8rem;color:var(--text-muted);text-align:left;padding-left:16px;margin-bottom:20px;"><li>Заявки без фактического перевода блокируются.</li><li>Обработка занимает до 15 минут.</li></ul>
+            <div style="font-size:0.85rem;color:var(--text-main);margin-bottom:20px;font-weight:bold;word-break:break-all;" id="req-text">Загрузка реквизитов...</div>
+            <label style="display:flex;align-items:center;font-size:0.8rem;text-align:left;cursor:pointer;gap:10px;margin-bottom:20px;">
                 <input type="checkbox" id="terms-checkbox" onchange="document.getElementById('btn-send-topup').disabled = !this.checked;" style="display:none;">
-                <span style="width:22px; height:22px; border:2px solid var(--border-color); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0;" id="custom-chk"></span>
-                Я подтверждаю перевод
+                <span style="width:22px;height:22px;border:2px solid var(--border-color);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;" id="custom-chk"></span> Я подтверждаю перевод
             </label>
             <button class="btn-main-action" id="btn-send-topup" onclick="sendTopup()" disabled>Отправить заявку</button>
             <button class="btn-secondary" onclick="closeModal('topup-modal')">Отмена</button>
@@ -382,10 +348,7 @@
             document.getElementById('alert-modal').classList.add('active');
             try { tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
         }
-        function closeModal(id) {
-            const el = document.getElementById(id);
-            if(el) el.classList.remove('active');
-        }
+        function closeModal(id) { const el = document.getElementById(id); if(el) el.classList.remove('active'); }
 
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
@@ -403,10 +366,7 @@
             try {
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
-            } catch(e) {
-                console.error("Balance update failed", e);
-                userBalance = 0;
-            }
+            } catch(e) { console.error(e); userBalance = 0; }
             document.getElementById('header-balance').innerText = userBalance.toFixed(2) + ' ₽';
             document.getElementById('big-balance').innerText = userBalance.toFixed(2) + ' ₽';
         }
@@ -415,8 +375,7 @@
             try {
                 const res = await fetch(`${API_BASE}/items`);
                 currentCatalog = await res.json();
-                const container = document.getElementById('catalog-list');
-                container.innerHTML = currentCatalog.map(item => `
+                document.getElementById('catalog-list').innerHTML = currentCatalog.map(item => `
                     <div class="item-card">
                         <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
                         <div class="item-name">${escapeHtml(item.name)}</div>
@@ -426,13 +385,13 @@
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                             </button>
                         </div>
-                    </div>
-                `).join('');
+                    </div>`).join('');
             } catch(e) { console.error(e); }
         }
 
         function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 
+        // --- NFT Modal ---
         function openNftModal(id) {
             const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
             if(!item) return;
@@ -464,6 +423,7 @@
                 document.getElementById('nft-detail-overlay').classList.remove('active');
         }
 
+        // --- Cart ---
         function addToCart(item) {
             if(!cart.find(c => c.id === item.id)) {
                 cart.push(item);
@@ -495,6 +455,7 @@
         }
         function removeFromCart(index) { cart.splice(index,1); localStorage.setItem('dnx_cart', JSON.stringify(cart)); renderCart(); }
 
+        // --- Buy ---
         async function buyItem(itemId, price) {
             if(userBalance < price) { showAlert("Недостаточно средств. Пополните баланс."); return; }
             try {
@@ -530,6 +491,7 @@
             } catch(e) { showAlert("Ошибка сети"); }
         }
 
+        // --- Topup ---
         document.getElementById('terms-checkbox')?.addEventListener('change', function() {
             const chkSpan = document.getElementById('custom-chk');
             if(chkSpan) {
@@ -568,6 +530,7 @@
             await updateBalance();
         }
 
+        // --- Inventory ---
         function switchInv(el, type) {
             document.querySelectorAll('#page-inventory .tab-item').forEach(t => { t.classList.remove('active'); t.style.borderColor='transparent'; t.style.color='var(--text-muted)'; });
             el.classList.add('active'); el.style.borderColor='var(--accent-gold)'; el.style.color='var(--accent-gold)';
@@ -611,7 +574,7 @@
         let isSpinning = false;
         let animationFrameId = null;
         let timerInterval = null;
-        let lastShownWinnerId = null;
+        let lastShownWinnerId = localStorage.getItem('last_winner_id'); // запоминаем навсегда
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -625,28 +588,28 @@
         function drawGameFrame(ballX = null) {
             if(!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if(!gState.players || gState.players.length === 0) {
+            if(gState.players && gState.players.length > 0) {
+                let curX = 0;
+                gState.players.forEach(p => {
+                    const w = (p.amount / gState.pool) * canvas.width;
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(curX, 0, w, canvas.height);
+                    ctx.fillStyle = "rgba(0,0,0,0.5)";
+                    ctx.fillRect(curX, canvas.height-40, w, 40);
+                    ctx.fillStyle = "#fff";
+                    ctx.font = "24px Inter";
+                    ctx.textAlign = "center";
+                    ctx.fillText(p.username.substring(0,6), curX + w/2, canvas.height - 12);
+                    curX += w;
+                });
+            } else {
                 ctx.fillStyle = "rgba(255,255,255,0.05)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = "#555";
                 ctx.font = "30px Inter";
                 ctx.textAlign = "center";
                 ctx.fillText("Ждем ставки...", canvas.width/2, canvas.height/2);
-                return;
             }
-            let curX = 0;
-            gState.players.forEach(p => {
-                const w = (p.amount / gState.pool) * canvas.width;
-                ctx.fillStyle = p.color;
-                ctx.fillRect(curX, 0, w, canvas.height);
-                ctx.fillStyle = "rgba(0,0,0,0.5)";
-                ctx.fillRect(curX, canvas.height-40, w, 40);
-                ctx.fillStyle = "#fff";
-                ctx.font = "24px Inter";
-                ctx.textAlign = "center";
-                ctx.fillText(p.username.substring(0,6), curX + w/2, canvas.height - 12);
-                curX += w;
-            });
             if(ballX !== null && ballX !== undefined) {
                 ctx.beginPath();
                 ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
@@ -668,14 +631,12 @@
         function renderBetsList() {
             const container = document.getElementById('bets-list-container');
             const list = document.getElementById('game-bets-list');
-            if(!gState.players || gState.players.length === 0) {
-                if(container) container.style.display = 'none';
-                return;
-            }
-            if(container) container.style.display = 'flex';
+            const hasPlayers = gState.players && gState.players.length > 0;
+            container.style.display = hasPlayers ? 'flex' : 'none';
+            if (!hasPlayers) return;
             document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
             const sorted = [...gState.players].sort((a,b) => b.amount - a.amount);
-            if(list) list.innerHTML = sorted.map(p => `
+            list.innerHTML = sorted.map(p => `
                 <div class="bet-row">
                     <span style="display:flex; gap:8px;">
                         <span style="width:12px; height:12px; border-radius:50%; background:${p.color};"></span>
@@ -717,6 +678,7 @@
                     const finalX = simulatePosition(initialSpeed, direction, duration, canvas.width);
                     drawGameFrame(finalX);
                     animationFrameId = null;
+                    fetchWinnerNow();
                     return;
                 }
                 const curX = simulatePosition(initialSpeed, direction, elapsed, canvas.width);
@@ -724,6 +686,19 @@
                 animationFrameId = requestAnimationFrame(animate);
             }
             animationFrameId = requestAnimationFrame(animate);
+        }
+
+        async function fetchWinnerNow() {
+            try {
+                const res = await fetch(`${API_BASE}/game/state`);
+                const state = await res.json();
+                if (state.winner && state.last_winner_id && state.last_winner_id !== lastShownWinnerId) {
+                    lastShownWinnerId = state.last_winner_id;
+                    localStorage.setItem('last_winner_id', lastShownWinnerId);
+                    showWinnerModal(state.winner);
+                    await updateBalance();
+                }
+            } catch(e) { console.error(e); }
         }
 
         function showWinnerModal(winner) {
@@ -778,8 +753,9 @@
                     drawGameFrame();
                 }
 
-                if (gState.winner && gState.last_winner_id !== lastShownWinnerId && gState.status !== 'spinning') {
+                if (gState.winner && gState.last_winner_id && gState.last_winner_id !== lastShownWinnerId && gState.status !== 'spinning') {
                     lastShownWinnerId = gState.last_winner_id;
+                    localStorage.setItem('last_winner_id', lastShownWinnerId);
                     showWinnerModal(gState.winner);
                     await updateBalance();
                 }
