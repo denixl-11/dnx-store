@@ -4,6 +4,7 @@ import os
 import psycopg2
 import json
 import random
+from decimal import Decimal
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -72,8 +73,8 @@ game_state = {
     "players": {},
     "pool": 0.0,
     "timer": 15,
+    "spin_params": None,   # {start_x, velocity, start_time}
     "winner_x": None,
-    "spin_start_time": None,
     "last_winner": None
 }
 
@@ -82,15 +83,14 @@ def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
 
 
-def simulate_trajectory(canvas_width=1000, move_duration=10.0):
+def simulate_trajectory(start_x, velocity, move_duration=10.0, canvas_width=1000):
     """
-    Симуляция движения шарика с отскоками и линейным замедлением.
-    Начальная позиция x=0, начальная скорость v=4000 вправо.
-    Возвращает нормализованную позицию остановки (0..1).
+    Симуляция движения с отскоками и линейным замедлением.
+    Возвращает нормализованную позицию (0..1) после move_duration секунд.
     """
-    x = 0.0
-    v = 4000.0
-    deceleration = v / move_duration
+    x = start_x * canvas_width
+    v = velocity
+    deceleration = abs(v) / move_duration
     dt = 0.01
     steps = int(move_duration / dt)
     for _ in range(steps):
@@ -105,7 +105,8 @@ def simulate_trajectory(canvas_width=1000, move_duration=10.0):
         elif x > canvas_width:
             x = 2 * canvas_width - x
             v = -v
-    return x / canvas_width
+    norm_x = max(0.0, min(1.0, x / canvas_width))
+    return norm_x
 
 
 async def finish_round():
@@ -119,7 +120,7 @@ async def finish_round():
     cumulative = 0.0
     winner_id = None
     winner_username = None
-    for uid, p in players.items():
+    for uid, p in sorted(players.items(), key=lambda x: x[0]):
         sector_start = cumulative
         sector_end = cumulative + (p["amount"] / pool)
         if sector_start <= winner_x <= sector_end:
@@ -142,7 +143,7 @@ async def finish_round():
                     cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
                     rows = cur.rowcount
                     conn.commit()
-                    logging.info(f"Balance updated for {winner_id}: +{profit} RUB. Rows affected: {rows}")
+                    logging.info(f"Balance updated for {winner_id}: +{profit} RUB. Rows: {rows}")
             return {
                 "user_id": winner_id,
                 "username": winner_username,
@@ -165,12 +166,21 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
                     game_state["status"] = "spinning"
-                    winner_x = simulate_trajectory()
+                    # Генерируем параметры анимации
+                    start_x = random.uniform(0.0, 1.0)
+                    velocity = random.choice([-1, 1]) * random.uniform(3000, 5000)
+                    spin_start_time = asyncio.get_event_loop().time()
+                    game_state["spin_params"] = {
+                        "start_x": start_x,
+                        "velocity": velocity,
+                        "start_time": spin_start_time
+                    }
+                    winner_x = simulate_trajectory(start_x, velocity, move_duration=10.0)
                     game_state["winner_x"] = winner_x
-                    game_state["spin_start_time"] = asyncio.get_event_loop().time()
-                    logging.info(f"Game spinning started, winner_x={winner_x}")
+                    logging.info(f"Spin start: start_x={start_x}, velocity={velocity}, winner_x={winner_x}")
+
             elif game_state["status"] == "spinning":
-                if game_state["spin_start_time"] and asyncio.get_event_loop().time() - game_state["spin_start_time"] >= 12:
+                if game_state["spin_params"] and asyncio.get_event_loop().time() - game_state["spin_params"]["start_time"] >= 12:
                     winner_data = await finish_round()
                     game_state["last_winner"] = winner_data
                     game_state = {
@@ -178,8 +188,8 @@ async def game_worker():
                         "players": {},
                         "pool": 0.0,
                         "timer": 15,
+                        "spin_params": None,
                         "winner_x": None,
-                        "spin_start_time": None,
                         "last_winner": winner_data
                     }
                     asyncio.create_task(clear_last_winner())
@@ -200,8 +210,8 @@ async def handle_game_state(request):
             "players": list(game_state["players"].values()),
             "pool": game_state["pool"],
             "timer": game_state["timer"],
+            "spin_params": game_state["spin_params"],
             "winner_x": game_state["winner_x"],
-            "spin_start_time": game_state["spin_start_time"],
             "last_winner": game_state.get("last_winner")
         }, headers={"Access-Control-Allow-Origin": "*"})
 
@@ -410,7 +420,7 @@ async def handle_game_cancel(request):
 
 
 async def handle_game_finish(request):
-    # Не используется, оставлен для совместимости
+    # Не используется
     return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": "*"})
 
 

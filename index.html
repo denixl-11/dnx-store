@@ -520,10 +520,10 @@
         }
         async function withdraw(id) { await fetch(`${API_BASE}/request-withdraw`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({itemId: id, userId: uId, username: uName}) }); showAlert("Запрос на вывод отправлен администратору!"); loadInventory(); }
 
-        // ======================== НОВАЯ СИНХРОНИЗИРОВАННАЯ ИГРА ========================
+        // ---------------------------- СИНХРОНИЗИРОВАННАЯ ИГРА ----------------------------
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, winner_x: null, spin_start_time: null, last_winner: null };
+        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner_x: null, last_winner: null };
         let isSpinning = false;
         let animationFrameId = null;
 
@@ -592,11 +592,6 @@
             if(list) list.innerHTML = sorted.map(p => `<div class="bet-row"><span style="display:flex; gap:8px;"><span style="width:12px; height:12px; border-radius:50%; background:${p.color};"></span><span>${escapeHtml(p.username)}</span></span><span style="color:var(--accent-gold);">${p.amount} ₽</span></div>`).join('');
         }
 
-        function startLocalTimer(val) {
-            const timerBg = document.getElementById('game-timer-bg');
-            if(timerBg) timerBg.innerText = val;
-        }
-
         function showWinnerModal(winner) {
             if(!winner) return;
             document.getElementById('winner-name').innerText = winner.username;
@@ -606,27 +601,55 @@
         }
         function closeWinnerModal() { document.getElementById('winner-modal').classList.remove('active'); }
 
-        // Анимация, синхронизированная по spin_start_time
-        function runSpinAnimation(targetX, startTimeSec) {
+        // Анимация с использованием параметров от сервера (start_x, velocity, start_time)
+        function runSpinAnimation(params, canvasWidth) {
             if(animationFrameId) cancelAnimationFrame(animationFrameId);
-            const MOVE_DURATION = 10;   // 10 секунд движения
-            const PAUSE_DURATION = 2;    // 2 секунды паузы (на сервере)
-            const startTimeMs = startTimeSec * 1000;
+            const { start_x, velocity, start_time } = params;
+            const MOVE_DURATION = 10;
+            const startXpx = start_x * canvasWidth;
+            let lastTimestamp = performance.now();
+            let startTimeMs = start_time * 1000;
             function animate() {
-                const nowMs = Date.now();
-                let elapsed = (nowMs - startTimeMs) / 1000;
-                if (elapsed >= MOVE_DURATION + PAUSE_DURATION) {
-                    drawGameFrame(targetX);
+                const nowMs = performance.now();
+                const elapsed = (nowMs - startTimeMs) / 1000;
+                if (elapsed >= MOVE_DURATION) {
+                    drawGameFrame(gState.winner_x * canvasWidth);
                     animationFrameId = null;
                     return;
                 }
-                let moveProgress = Math.min(1, Math.max(0, elapsed / MOVE_DURATION));
-                // easeOutCubic – плавная остановка
-                let eased = 1 - Math.pow(1 - moveProgress, 3);
-                let x = targetX * eased;
-                drawGameFrame(x);
+                let dt = Math.min(0.05, (nowMs - lastTimestamp) / 1000);
+                if (dt <= 0) {
+                    animationFrameId = requestAnimationFrame(animate);
+                    return;
+                }
+                lastTimestamp = nowMs;
+                // Симуляция с самого начала для точной позиции
+                let simX = startXpx;
+                let simV = velocity;
+                const deceleration = Math.abs(velocity) / MOVE_DURATION;
+                let simT = 0;
+                const step = 0.01;
+                while (simT < elapsed) {
+                    let stepDt = Math.min(step, elapsed - simT);
+                    if (simV > 0) {
+                        simV = Math.max(0, simV - deceleration * stepDt);
+                    } else if (simV < 0) {
+                        simV = Math.min(0, simV + deceleration * stepDt);
+                    }
+                    simX += simV * stepDt;
+                    if (simX < 0) {
+                        simX = -simX;
+                        simV = -simV;
+                    } else if (simX > canvasWidth) {
+                        simX = 2 * canvasWidth - simX;
+                        simV = -simV;
+                    }
+                    simT += stepDt;
+                }
+                drawGameFrame(simX);
                 animationFrameId = requestAnimationFrame(animate);
             }
+            lastTimestamp = performance.now();
             animationFrameId = requestAnimationFrame(animate);
         }
 
@@ -634,20 +657,14 @@
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
-                // Обновляем глобальное состояние
                 gState = newState;
 
-                // Отображаем таймер (без локального отсчёта, строго с сервера)
                 const timerBg = document.getElementById('game-timer-bg');
                 if(timerBg) {
-                    if (gState.status === 'counting') {
-                        timerBg.innerText = gState.timer;
-                    } else if (gState.status !== 'spinning') {
-                        timerBg.innerText = '';
-                    }
+                    if (gState.status === 'counting') timerBg.innerText = gState.timer;
+                    else if (gState.status !== 'spinning') timerBg.innerText = '';
                 }
 
-                // Обновляем список игроков
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 renderBetsList();
 
@@ -655,11 +672,9 @@
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
 
-                // Запуск анимации, если статус spinning и есть данные
-                if (gState.status === 'spinning' && !isSpinning && gState.winner_x !== null && gState.spin_start_time !== null) {
+                if (gState.status === 'spinning' && !isSpinning && gState.spin_params && gState.winner_x !== null) {
                     isSpinning = true;
-                    const targetX = gState.winner_x * canvas.width;
-                    runSpinAnimation(targetX, gState.spin_start_time);
+                    runSpinAnimation(gState.spin_params, canvas.width);
                 } else if (gState.status !== 'spinning' && isSpinning) {
                     isSpinning = false;
                     if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
@@ -668,7 +683,6 @@
                     drawGameFrame();
                 }
 
-                // Показываем модалку победителя, если есть last_winner
                 if (gState.last_winner && !window._winnerShown) {
                     window._winnerShown = true;
                     showWinnerModal(gState.last_winner);
