@@ -152,6 +152,14 @@
         .winner-modal .winner-name { font-size: 1.4rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 8px; }
         .winner-modal .winner-amount { font-size: 1.2rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; }
         .winner-modal .winner-amount span { color: var(--accent-gold); font-size: 1.5rem; }
+
+        .game-number-display {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
     </style>
 </head>
 <body>
@@ -173,6 +181,7 @@
                 <div class="game-info-overlay" id="game-players-count">Игроки: 0/20</div>
                 <div class="game-timer-overlay" id="game-timer-bg"></div>
             </div>
+            <div class="game-number-display" id="game-number-display">Игра #0</div>
             <div class="game-controls">
                 <button class="game-btn" onclick="openBetConfirm(50)">+50 ₽</button>
                 <button class="game-btn" onclick="openCustomBet()">Своя сумма</button>
@@ -571,11 +580,11 @@
         // ========== ИГРА ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, last_winner_id: null, round_id: null };
+        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, round_id: null, game_number: 0 };
         let isSpinning = false;
         let animationFrameId = null;
         let timerInterval = null;
-        let lastShownRoundId = localStorage.getItem('last_round_id'); // ключ меняется каждый раунд
+        let lastShownRoundId = null; // инициализируем при первом опросе
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -677,7 +686,6 @@
                 const state = await res.json();
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId) {
                     lastShownRoundId = state.round_id;
-                    localStorage.setItem('last_round_id', lastShownRoundId);
                     showWinnerModal(state.winner);
                     await updateBalance();
                 }
@@ -700,6 +708,14 @@
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
+
+                // Инициализация lastShownRoundId при первом опросе
+                if (lastShownRoundId === null) {
+                    lastShownRoundId = newState.round_id;
+                }
+
+                // Номер игры
+                document.getElementById('game-number-display').innerText = `Игра #${newState.game_number || 0}`;
 
                 // Таймер
                 if (newState.status === 'counting') {
@@ -726,7 +742,6 @@
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 renderBetsList();
 
-                // Мгновенная отрисовка поля
                 if (!isSpinning) drawGameFrame();
 
                 const myId = String(tg.initDataUnsafe?.user?.id);
@@ -743,10 +758,9 @@
                     drawGameFrame();
                 }
 
-                // Показ окна победителя для каждого нового раунда
+                // Показ победителя только для нового раунда
                 if (gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
                     lastShownRoundId = gState.round_id;
-                    localStorage.setItem('last_round_id', lastShownRoundId);
                     showWinnerModal(gState.winner);
                     await updateBalance();
                 }

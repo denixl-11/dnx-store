@@ -119,6 +119,14 @@ def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000,
     frames.append(x / 1000)
     return frames
 
+# 20 ярких не сливающихся цветов
+PLAYER_COLORS = [
+    "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF",
+    "#FFA500", "#800080", "#008000", "#000080", "#FF4500", "#2E8B57",
+    "#DC143C", "#00CED1", "#FFD700", "#ADFF2F", "#1E90FF", "#FF69B4",
+    "#7FFF00", "#D2691E"
+]
+
 # Игра
 game_lock = asyncio.Lock()
 game_state = {
@@ -130,14 +138,11 @@ game_state = {
     "spin_params": None,
     "winner": None,
     "last_winner_id": None,
-    "round_id": None          # уникальный ID раунда
+    "round_id": None,
+    "game_number": 0
 }
 
-def generate_color():
-    return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
-
 async def get_user_photo(user_id: int) -> str | None:
-    """Возвращает URL аватарки пользователя или None"""
     try:
         photos = await bot.get_user_profile_photos(user_id, limit=1)
         if photos.total_count == 0:
@@ -216,11 +221,12 @@ async def game_worker():
                         "target_position": target
                     }
                     game_state["target_position"] = target
-                    game_state["round_id"] = random.randint(1, 10**9)  # уникальный ID раунда
+                    game_state["round_id"] = random.randint(1, 10**9)
+                    game_state["game_number"] += 1
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning: target={target:.4f}, round_id={game_state['round_id']}")
+                    logging.info(f"Spinning: target={target:.4f}, round_id={game_state['round_id']}, game_number={game_state['game_number']}")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(10.2)
@@ -386,7 +392,8 @@ async def handle_game_state(request):
             "spin_params": game_state.get("spin_params"),
             "winner": game_state.get("winner"),
             "last_winner_id": game_state.get("last_winner_id"),
-            "round_id": game_state.get("round_id")
+            "round_id": game_state.get("round_id"),
+            "game_number": game_state.get("game_number", 0)
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -417,9 +424,10 @@ async def handle_game_bet(request):
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
+                color = PLAYER_COLORS[len(game_state["players"]) % 20]
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
-                    "amount": amount, "color": generate_color()
+                    "amount": amount, "color": color
                 }
             game_state["pool"] += amount
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
