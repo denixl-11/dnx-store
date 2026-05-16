@@ -97,12 +97,13 @@ def require_auth(handler):
         return await handler(request)
     return wrapper
 
-# Предрассчёт траектории
-def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000, dt=16):
-    x = 500
+# Серверная физика
+CANVAS_WIDTH = 1000
+
+def simulate_spin(initial_speed: float, direction: int, duration_ms=10000, dt=16):
+    x = CANVAS_WIDTH / 2
     velocity = direction * initial_speed
     elapsed = 0
-    frames = []
     while elapsed < duration_ms:
         progress = elapsed / duration_ms
         speed_factor = 1 - 0.8 * (progress / 0.5) if progress <= 0.5 else 0.2 * (1 - (progress - 0.5) / 0.5)
@@ -111,21 +112,11 @@ def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000,
         if x <= 0:
             x = 0
             velocity = abs(velocity) * 0.9
-        elif x >= 1000:
-            x = 1000
+        elif x >= CANVAS_WIDTH:
+            x = CANVAS_WIDTH
             velocity = -abs(velocity) * 0.9
-        frames.append(x / 1000)
         elapsed += dt
-    frames.append(x / 1000)
-    return frames
-
-# 20 ярких не сливающихся цветов
-PLAYER_COLORS = [
-    "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF",
-    "#FFA500", "#800080", "#008000", "#000080", "#FF4500", "#2E8B57",
-    "#DC143C", "#00CED1", "#FFD700", "#ADFF2F", "#1E90FF", "#FF69B4",
-    "#7FFF00", "#D2691E"
-]
+    return x / CANVAS_WIDTH
 
 # Игра
 game_lock = asyncio.Lock()
@@ -134,25 +125,13 @@ game_state = {
     "players": {},
     "pool": 0.0,
     "timer": 15,
-    "target_position": None,
-    "spin_params": None,
+    "spin_params": None,   # {"initialSpeed": float, "direction": 1 или -1}
     "winner": None,
-    "last_winner_id": None,
-    "round_id": None,
-    "game_number": 0
+    "last_winner_id": None
 }
 
-async def get_user_photo(user_id: int) -> str | None:
-    try:
-        photos = await bot.get_user_profile_photos(user_id, limit=1)
-        if photos.total_count == 0:
-            return None
-        file_id = photos.photos[0][-1].file_id
-        file = await bot.get_file(file_id)
-        return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
-    except Exception as e:
-        logging.error(f"Failed to get photo for user {user_id}: {e}")
-        return None
+def generate_color():
+    return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
 
 async def finish_round(winner_x: float, pool: float, players: dict) -> dict | None:
     if pool <= 0 or not players:
@@ -182,9 +161,6 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
     winner_bet = players[winner_id]["amount"]
     others_bets = pool - winner_bet
     profit = winner_bet + (others_bets * 0.7)
-
-    photo_url = await get_user_photo(int(winner_id))
-
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -193,13 +169,7 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
                 conn.commit()
-        return {
-            "user_id": winner_id,
-            "username": winner_username,
-            "win_amount": profit,
-            "photo_url": photo_url,
-            "round_id": game_state["round_id"]
-        }
+        return {"user_id": winner_id, "username": winner_username, "win_amount": profit}
     except Exception as e:
         logging.error(f"DB error finish_round: {e}")
         return None
@@ -214,22 +184,16 @@ async def game_worker():
                 if game_state["timer"] <= 0:
                     initial_speed = random.uniform(4000, 4500)
                     direction = 1 if random.random() > 0.5 else -1
-                    trajectory = generate_trajectory(initial_speed, direction)
-                    target = trajectory[-1]
-                    game_state["spin_params"] = {
-                        "trajectory": trajectory,
-                        "target_position": target
-                    }
+                    target = simulate_spin(initial_speed, direction)
+                    game_state["spin_params"] = {"initialSpeed": initial_speed, "direction": direction}
                     game_state["target_position"] = target
-                    game_state["round_id"] = random.randint(1, 10**9)
-                    game_state["game_number"] += 1
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning: target={target:.4f}, round_id={game_state['round_id']}, game_number={game_state['game_number']}")
+                    logging.info(f"Spinning: params={game_state['spin_params']}, target={target:.4f}")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(10.2)
+            await asyncio.sleep(9.5)   # чуть раньше конца анимации, чтобы баланс обновился сразу
             async with game_lock:
                 if game_state["status"] == "spinning":
                     winner_data = await finish_round(
@@ -391,9 +355,7 @@ async def handle_game_state(request):
             "timer": game_state["timer"],
             "spin_params": game_state.get("spin_params"),
             "winner": game_state.get("winner"),
-            "last_winner_id": game_state.get("last_winner_id"),
-            "round_id": game_state.get("round_id"),
-            "game_number": game_state.get("game_number", 0)
+            "last_winner_id": game_state.get("last_winner_id")
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -424,10 +386,9 @@ async def handle_game_bet(request):
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
-                color = PLAYER_COLORS[len(game_state["players"]) % 20]
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
-                    "amount": amount, "color": color
+                    "amount": amount, "color": generate_color()
                 }
             game_state["pool"] += amount
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
