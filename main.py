@@ -138,14 +138,14 @@ def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
 
 async def get_user_photo(user_id: int) -> str | None:
+    """Возвращает URL аватарки пользователя или None"""
     try:
         photos = await bot.get_user_profile_photos(user_id, limit=1)
         if photos.total_count == 0:
             return None
         file_id = photos.photos[0][-1].file_id
         file = await bot.get_file(file_id)
-        file_path = file.file_path
-        return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+        return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
     except Exception as e:
         logging.error(f"Failed to get photo for user {user_id}: {e}")
         return None
