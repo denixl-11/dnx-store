@@ -97,13 +97,13 @@ def require_auth(handler):
         return await handler(request)
     return wrapper
 
-# Серверная физика
-CANVAS_WIDTH = 1000
-
-def simulate_spin(initial_speed: float, direction: int, duration_ms=10000, dt=16):
-    x = CANVAS_WIDTH / 2
+# Предрассчёт траектории в нормализованных координатах (0..1)
+def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000, dt=16):
+    """Возвращает список позиций 0..1 за всё время с шагом dt"""
+    x = 500  # используем фиксированную виртуальную ширину 1000, центр = 500
     velocity = direction * initial_speed
     elapsed = 0
+    frames = []
     while elapsed < duration_ms:
         progress = elapsed / duration_ms
         speed_factor = 1 - 0.8 * (progress / 0.5) if progress <= 0.5 else 0.2 * (1 - (progress - 0.5) / 0.5)
@@ -112,11 +112,14 @@ def simulate_spin(initial_speed: float, direction: int, duration_ms=10000, dt=16
         if x <= 0:
             x = 0
             velocity = abs(velocity) * 0.9
-        elif x >= CANVAS_WIDTH:
-            x = CANVAS_WIDTH
+        elif x >= 1000:
+            x = 1000
             velocity = -abs(velocity) * 0.9
+        frames.append(x / 1000)  # нормализуем
         elapsed += dt
-    return x / CANVAS_WIDTH
+    # Добавляем последнюю точку, чтобы гарантировать точный финиш
+    frames.append(x / 1000)
+    return frames
 
 # Игра
 game_lock = asyncio.Lock()
@@ -126,7 +129,7 @@ game_state = {
     "pool": 0.0,
     "timer": 15,
     "target_position": None,
-    "spin_params": None,
+    "spin_params": None,       # теперь содержит trajectory и target_position
     "winner": None,
     "last_winner_id": None
 }
@@ -141,7 +144,6 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
     cumulative = 0.0
     winner_id = None
     winner_username = None
-    # Сортируем ключи, чтобы сектора строились одинаково
     sorted_uids = sorted(players.keys())
     for i, uid in enumerate(sorted_uids):
         p = players[uid]
@@ -186,17 +188,21 @@ async def game_worker():
                 if game_state["timer"] <= 0:
                     initial_speed = random.uniform(4000, 4500)
                     direction = 1 if random.random() > 0.5 else -1
-                    target = simulate_spin(initial_speed, direction)
-                    game_state["spin_params"] = {"initialSpeed": initial_speed, "direction": direction}
+                    trajectory = generate_trajectory(initial_speed, direction)
+                    target = trajectory[-1]  # последняя точка
+                    game_state["spin_params"] = {
+                        "trajectory": trajectory,
+                        "target_position": target
+                    }
                     game_state["target_position"] = target
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning: params={game_state['spin_params']}, target={target:.4f}")
+                    logging.info(f"Spinning: target={target:.4f}, frames={len(trajectory)}")
 
         if game_state["status"] == "spinning":
-            # Ждём 10.5 секунд – клиент за 10 сек анимирует и сразу запросит победителя
-            await asyncio.sleep(10.5)
+            # Ждём чуть дольше длительности анимации, чтобы клиент точно получил winner
+            await asyncio.sleep(10.2)
             async with game_lock:
                 if game_state["status"] == "spinning":
                     winner_data = await finish_round(
@@ -350,14 +356,13 @@ async def handle_request_withdraw(request):
 
 async def handle_game_state(request):
     async with game_lock:
-        # Отдаём игроков в том же порядке, в котором сервер считает сектора
+        # Отдаём игроков отсортированными по ID
         sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
         resp = {
             "status": game_state["status"],
             "players": sorted_players,
             "pool": game_state["pool"],
             "timer": game_state["timer"],
-            "target_position": game_state.get("target_position"),
             "spin_params": game_state.get("spin_params"),
             "winner": game_state.get("winner"),
             "last_winner_id": game_state.get("last_winner_id")

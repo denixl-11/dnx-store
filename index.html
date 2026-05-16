@@ -357,6 +357,7 @@
             if(pageEl) pageEl.classList.add('page-active');
             const tabEl = document.getElementById('tab-' + id);
             if(tabEl) tabEl.classList.add('active');
+            if(id === 'game') { resizeCanvas(); drawGameFrame(); }
             if(id === 'store') loadCatalog();
             if(id === 'inventory') loadInventory();
             if(id === 'cart') renderCart();
@@ -570,7 +571,7 @@
         // ========== ИГРА ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, target_position: null, spin_params: null, winner: null, last_winner_id: null };
+        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, last_winner_id: null };
         let isSpinning = false;
         let animationFrameId = null;
         let timerInterval = null;
@@ -580,10 +581,10 @@
             const rect = canvas.parentElement.getBoundingClientRect();
             canvas.width = rect.width * 2;
             canvas.height = rect.height * 2;
-            drawGameFrame();
         }
-        window.addEventListener('resize', resizeCanvas);
-        setTimeout(resizeCanvas, 100);
+        window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
+        // При загрузке и переключении на вкладку игры вызываем
+        setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
         function drawGameFrame(ballX = null) {
             if(!ctx) return;
@@ -591,7 +592,7 @@
             // Всегда рисуем сектора, если есть игроки
             if(gState.players && gState.players.length > 0) {
                 let curX = 0;
-                // Сервер отдаёт уже отсортированный по id список, но для надёжности сортируем
+                // Сервер отдаёт уже отсортированный список, но для гарантии сортируем по id
                 const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
                 sorted.forEach(p => {
                     const w = (p.amount / gState.pool) * canvas.width;
@@ -638,7 +639,6 @@
             container.style.display = hasPlayers ? 'flex' : 'none';
             if (!hasPlayers) return;
             document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
-            // Сортируем для соответствия секторам
             const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
             list.innerHTML = sorted.map(p => `
                 <div class="bet-row">
@@ -650,43 +650,26 @@
                 </div>`).join('');
         }
 
-        // Серверная физика
-        function simulatePosition(initialSpeed, direction, elapsedMs, canvasW) {
-            let x = canvasW / 2;
-            let velocity = direction * initialSpeed;
-            const dt = 16;
-            let simTime = 0;
-            while (simTime < elapsedMs) {
-                const progress = simTime / 10000;
-                let speedFactor;
-                if (progress <= 0.5) speedFactor = 1 - 0.8 * (progress / 0.5);
-                else speedFactor = 0.2 * (1 - (progress - 0.5) / 0.5);
-                const step = (velocity > 0 ? 1 : -1) * initialSpeed * speedFactor * (dt / 1000);
-                x += step;
-                if (x <= 0) { x = 0; velocity = Math.abs(velocity) * 0.9; }
-                else if (x >= canvasW) { x = canvasW; velocity = -Math.abs(velocity) * 0.9; }
-                simTime += dt;
-            }
-            return x;
-        }
-
+        // Анимация по готовой траектории
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            const { initialSpeed, direction } = params;
+            const trajectory = params.trajectory;  // массив позиций 0..1
             const startTime = performance.now();
-            const duration = 10000;
+            const frameDuration = 16; // длительность одного кадра в мс (серверный шаг)
 
             function animate(now) {
                 const elapsed = now - startTime;
-                if (elapsed >= duration) {
-                    const finalX = simulatePosition(initialSpeed, direction, duration, canvas.width);
-                    drawGameFrame(finalX);
+                const frameIndex = Math.floor(elapsed / frameDuration);
+                if (frameIndex >= trajectory.length) {
+                    // Последний кадр
+                    const finalPos = trajectory[trajectory.length-1] * canvas.width;
+                    drawGameFrame(finalPos);
                     animationFrameId = null;
-                    fetchWinnerNow(); // немедленный запрос победителя
+                    fetchWinnerNow();
                     return;
                 }
-                const curX = simulatePosition(initialSpeed, direction, elapsed, canvas.width);
-                drawGameFrame(curX);
+                const pos = trajectory[frameIndex] * canvas.width;
+                drawGameFrame(pos);
                 animationFrameId = requestAnimationFrame(animate);
             }
             animationFrameId = requestAnimationFrame(animate);
@@ -710,7 +693,7 @@
             document.getElementById('winner-name').innerText = winner.username;
             document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
             document.getElementById('winner-avatar-container').innerHTML = `
-                <img src="${userAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">`;
+                <img src="${userAvatar}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,...'">`;
             document.getElementById('winner-modal').classList.add('active');
         }
         function closeWinnerModal() {
@@ -748,7 +731,7 @@
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
 
-                if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
+                if (gState.status === 'spinning' && !isSpinning && gState.spin_params && gState.spin_params.trajectory) {
                     isSpinning = true;
                     runSpinAnimation(gState.spin_params);
                 } else if (gState.status !== 'spinning' && isSpinning) {
@@ -762,6 +745,11 @@
                     localStorage.setItem('last_winner_id', lastShownWinnerId);
                     showWinnerModal(gState.winner);
                     await updateBalance();
+                }
+
+                // Если игра в статусе waiting и нет игроков, но canvas не отрисован – перерисовываем
+                if (gState.status === 'waiting' && gState.players.length === 0) {
+                    drawGameFrame();
                 }
             } catch(e) { console.error("Game poll error", e); }
         }
@@ -807,6 +795,8 @@
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
+        // Начальная отрисовка игры
+        pollGame();
         try { tg.expand(); } catch(e) {}
     </script>
 </body>
