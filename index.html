@@ -647,25 +647,42 @@
                 </div>`).join('');
         }
 
-        // Анимация по готовой траектории
+        function simulatePosition(initialSpeed, direction, elapsedMs, canvasW) {
+            let x = canvasW / 2;
+            let velocity = direction * initialSpeed;
+            const dt = 16;
+            let simTime = 0;
+            while (simTime < elapsedMs) {
+                const progress = simTime / 10000;
+                let speedFactor;
+                if (progress <= 0.5) speedFactor = 1 - 0.8 * (progress / 0.5);
+                else speedFactor = 0.2 * (1 - (progress - 0.5) / 0.5);
+                const step = (velocity > 0 ? 1 : -1) * initialSpeed * speedFactor * (dt / 1000);
+                x += step;
+                if (x <= 0) { x = 0; velocity = Math.abs(velocity) * 0.9; }
+                else if (x >= canvasW) { x = canvasW; velocity = -Math.abs(velocity) * 0.9; }
+                simTime += dt;
+            }
+            return x;
+        }
+
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            const trajectory = params.trajectory;
+            const { initialSpeed, direction } = params;
             const startTime = performance.now();
-            const frameDuration = 16; // мс на кадр (серверный шаг)
+            const duration = 10000;
 
             function animate(now) {
                 const elapsed = now - startTime;
-                const frameIndex = Math.floor(elapsed / frameDuration);
-                if (frameIndex >= trajectory.length) {
-                    const finalPos = trajectory[trajectory.length-1] * canvas.width;
-                    drawGameFrame(finalPos);
+                if (elapsed >= duration) {
+                    const finalX = simulatePosition(initialSpeed, direction, duration, canvas.width);
+                    drawGameFrame(finalX);
                     animationFrameId = null;
                     fetchWinnerNow();
                     return;
                 }
-                const pos = trajectory[frameIndex] * canvas.width;
-                drawGameFrame(pos);
+                const curX = simulatePosition(initialSpeed, direction, elapsed, canvas.width);
+                drawGameFrame(curX);
                 animationFrameId = requestAnimationFrame(animate);
             }
             animationFrameId = requestAnimationFrame(animate);
@@ -701,7 +718,7 @@
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
 
-                // Таймер всегда показываем при counting
+                // Таймер показываем сразу при counting
                 if (newState.status === 'counting') {
                     gState.timer = newState.timer;
                     document.getElementById('game-timer-bg').innerText = newState.timer;
@@ -729,7 +746,7 @@
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting') ? 'block' : 'none';
 
-                if (gState.status === 'spinning' && !isSpinning && gState.spin_params && gState.spin_params.trajectory) {
+                if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
                     isSpinning = true;
                     runSpinAnimation(gState.spin_params);
                 } else if (gState.status !== 'spinning' && isSpinning) {
@@ -746,7 +763,6 @@
                     await updateBalance();
                 }
 
-                // На случай, если игроков нет, перерисовываем фон
                 if (gState.players.length === 0 && gState.status === 'waiting') {
                     drawGameFrame();
                 }

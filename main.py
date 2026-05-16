@@ -97,13 +97,13 @@ def require_auth(handler):
         return await handler(request)
     return wrapper
 
-# Предрассчёт траектории в нормализованных координатах (0..1)
-def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000, dt=16):
-    """Возвращает список позиций 0..1 за всё время с шагом dt"""
-    x = 500  # виртуальная ширина 1000, центр = 500
+# Серверная физика
+CANVAS_WIDTH = 1000
+
+def simulate_spin(initial_speed: float, direction: int, duration_ms=10000, dt=16):
+    x = CANVAS_WIDTH / 2
     velocity = direction * initial_speed
     elapsed = 0
-    frames = []
     while elapsed < duration_ms:
         progress = elapsed / duration_ms
         speed_factor = 1 - 0.8 * (progress / 0.5) if progress <= 0.5 else 0.2 * (1 - (progress - 0.5) / 0.5)
@@ -112,13 +112,11 @@ def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000,
         if x <= 0:
             x = 0
             velocity = abs(velocity) * 0.9
-        elif x >= 1000:
-            x = 1000
+        elif x >= CANVAS_WIDTH:
+            x = CANVAS_WIDTH
             velocity = -abs(velocity) * 0.9
-        frames.append(x / 1000)
         elapsed += dt
-    frames.append(x / 1000)  # финальная точка
-    return frames
+    return x / CANVAS_WIDTH
 
 # Игра
 game_lock = asyncio.Lock()
@@ -127,7 +125,8 @@ game_state = {
     "players": {},
     "pool": 0.0,
     "timer": 15,
-    "spin_params": None,       # содержит trajectory и target_position
+    "target_position": None,
+    "spin_params": None,   # {"initialSpeed": float, "direction": 1 или -1}
     "winner": None,
     "last_winner_id": None
 }
@@ -186,20 +185,17 @@ async def game_worker():
                 if game_state["timer"] <= 0:
                     initial_speed = random.uniform(4000, 4500)
                     direction = 1 if random.random() > 0.5 else -1
-                    trajectory = generate_trajectory(initial_speed, direction)
-                    target = trajectory[-1]
-                    game_state["spin_params"] = {
-                        "trajectory": trajectory,
-                        "target_position": target
-                    }
+                    target = simulate_spin(initial_speed, direction)
+                    game_state["spin_params"] = {"initialSpeed": initial_speed, "direction": direction}
+                    game_state["target_position"] = target
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning: target={target:.4f}, frames={len(trajectory)}")
+                    logging.info(f"Spinning: params={game_state['spin_params']}, target={target:.4f}")
 
         if game_state["status"] == "spinning":
-            # Чуть раньше окончания анимации, чтобы клиент успел получить winner
-            await asyncio.sleep(9.9)
+            # Чуть раньше конца анимации, чтобы клиент успел получить winner
+            await asyncio.sleep(9.5)
             async with game_lock:
                 if game_state["status"] == "spinning":
                     winner_data = await finish_round(
@@ -215,7 +211,7 @@ async def game_worker():
                     game_state["timer"] = 15
                     logging.info(f"Round finished, winner: {winner_data}")
 
-# API (без изменений, кроме handle_game_state – отдаёт отсортированных игроков)
+# API
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
