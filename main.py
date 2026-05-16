@@ -97,10 +97,9 @@ def require_auth(handler):
         return await handler(request)
     return wrapper
 
-# Предрассчёт траектории в нормализованных координатах (0..1)
+# Предрассчёт траектории
 def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000, dt=16):
-    """Возвращает список позиций 0..1 за всё время с шагом dt"""
-    x = 500  # используем фиксированную виртуальную ширину 1000, центр = 500
+    x = 500
     velocity = direction * initial_speed
     elapsed = 0
     frames = []
@@ -115,9 +114,8 @@ def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000,
         elif x >= 1000:
             x = 1000
             velocity = -abs(velocity) * 0.9
-        frames.append(x / 1000)  # нормализуем
+        frames.append(x / 1000)
         elapsed += dt
-    # Добавляем последнюю точку, чтобы гарантировать точный финиш
     frames.append(x / 1000)
     return frames
 
@@ -129,13 +127,27 @@ game_state = {
     "pool": 0.0,
     "timer": 15,
     "target_position": None,
-    "spin_params": None,       # теперь содержит trajectory и target_position
+    "spin_params": None,
     "winner": None,
-    "last_winner_id": None
+    "last_winner_id": None,
+    "round_id": None          # уникальный ID раунда
 }
 
 def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
+
+async def get_user_photo(user_id: int) -> str | None:
+    """Возвращает URL аватарки пользователя или None"""
+    try:
+        photos = await bot.get_user_profile_photos(user_id, limit=1)
+        if photos.total_count == 0:
+            return None
+        file_id = photos.photos[0][-1].file_id
+        file = await bot.get_file(file_id)
+        return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+    except Exception as e:
+        logging.error(f"Failed to get photo for user {user_id}: {e}")
+        return None
 
 async def finish_round(winner_x: float, pool: float, players: dict) -> dict | None:
     if pool <= 0 or not players:
@@ -165,6 +177,9 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
     winner_bet = players[winner_id]["amount"]
     others_bets = pool - winner_bet
     profit = winner_bet + (others_bets * 0.7)
+
+    photo_url = await get_user_photo(int(winner_id))
+
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -173,7 +188,13 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
                 conn.commit()
-        return {"user_id": winner_id, "username": winner_username, "win_amount": profit}
+        return {
+            "user_id": winner_id,
+            "username": winner_username,
+            "win_amount": profit,
+            "photo_url": photo_url,
+            "round_id": game_state["round_id"]
+        }
     except Exception as e:
         logging.error(f"DB error finish_round: {e}")
         return None
@@ -189,19 +210,19 @@ async def game_worker():
                     initial_speed = random.uniform(4000, 4500)
                     direction = 1 if random.random() > 0.5 else -1
                     trajectory = generate_trajectory(initial_speed, direction)
-                    target = trajectory[-1]  # последняя точка
+                    target = trajectory[-1]
                     game_state["spin_params"] = {
                         "trajectory": trajectory,
                         "target_position": target
                     }
                     game_state["target_position"] = target
+                    game_state["round_id"] = random.randint(1, 10**9)  # уникальный ID раунда
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning: target={target:.4f}, frames={len(trajectory)}")
+                    logging.info(f"Spinning: target={target:.4f}, round_id={game_state['round_id']}")
 
         if game_state["status"] == "spinning":
-            # Ждём чуть дольше длительности анимации, чтобы клиент точно получил winner
             await asyncio.sleep(10.2)
             async with game_lock:
                 if game_state["status"] == "spinning":
@@ -356,7 +377,6 @@ async def handle_request_withdraw(request):
 
 async def handle_game_state(request):
     async with game_lock:
-        # Отдаём игроков отсортированными по ID
         sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
         resp = {
             "status": game_state["status"],
@@ -365,7 +385,8 @@ async def handle_game_state(request):
             "timer": game_state["timer"],
             "spin_params": game_state.get("spin_params"),
             "winner": game_state.get("winner"),
-            "last_winner_id": game_state.get("last_winner_id")
+            "last_winner_id": game_state.get("last_winner_id"),
+            "round_id": game_state.get("round_id")
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
