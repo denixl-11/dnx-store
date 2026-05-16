@@ -571,11 +571,11 @@
         // ========== ИГРА ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, last_winner_id: null };
+        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, last_winner_id: null, round_id: null };
         let isSpinning = false;
         let animationFrameId = null;
         let timerInterval = null;
-        let lastShownWinnerId = localStorage.getItem('last_winner_id');
+        let lastShownRoundId = localStorage.getItem('last_round_id'); // ключ меняется каждый раунд
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -675,9 +675,9 @@
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
-                if (state.winner && state.last_winner_id && state.last_winner_id !== lastShownWinnerId) {
-                    lastShownWinnerId = state.last_winner_id;
-                    localStorage.setItem('last_winner_id', lastShownWinnerId);
+                if (state.winner && state.round_id && state.round_id !== lastShownRoundId) {
+                    lastShownRoundId = state.round_id;
+                    localStorage.setItem('last_round_id', lastShownRoundId);
                     showWinnerModal(state.winner);
                     await updateBalance();
                 }
@@ -688,7 +688,6 @@
             if(!winner) return;
             document.getElementById('winner-name').innerText = winner.username;
             document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
-            // Аватар победителя из photo_url, иначе заглушка
             const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+';
             document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+'>`;
             document.getElementById('winner-modal').classList.add('active');
@@ -727,7 +726,7 @@
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 renderBetsList();
 
-                // Мгновенно перерисовываем поле, если не идёт анимация
+                // Мгновенная отрисовка поля
                 if (!isSpinning) drawGameFrame();
 
                 const myId = String(tg.initDataUnsafe?.user?.id);
@@ -744,10 +743,10 @@
                     drawGameFrame();
                 }
 
-                // Победитель
-                if (gState.winner && gState.last_winner_id && gState.last_winner_id !== lastShownWinnerId && gState.status !== 'spinning') {
-                    lastShownWinnerId = gState.last_winner_id;
-                    localStorage.setItem('last_winner_id', lastShownWinnerId);
+                // Показ окна победителя для каждого нового раунда
+                if (gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
+                    lastShownRoundId = gState.round_id;
+                    localStorage.setItem('last_round_id', lastShownRoundId);
                     showWinnerModal(gState.winner);
                     await updateBalance();
                 }
