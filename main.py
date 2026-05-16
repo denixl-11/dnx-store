@@ -137,6 +137,19 @@ game_state = {
 def generate_color():
     return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
 
+async def get_user_photo(user_id: int) -> str | None:
+    try:
+        photos = await bot.get_user_profile_photos(user_id, limit=1)
+        if photos.total_count == 0:
+            return None
+        file_id = photos.photos[0][-1].file_id
+        file = await bot.get_file(file_id)
+        file_path = file.file_path
+        return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+    except Exception as e:
+        logging.error(f"Failed to get photo for user {user_id}: {e}")
+        return None
+
 async def finish_round(winner_x: float, pool: float, players: dict) -> dict | None:
     if pool <= 0 or not players:
         return None
@@ -165,6 +178,10 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
     winner_bet = players[winner_id]["amount"]
     others_bets = pool - winner_bet
     profit = winner_bet + (others_bets * 0.7)
+
+    # Получаем фото победителя
+    photo_url = await get_user_photo(int(winner_id))
+
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -173,7 +190,12 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
                 conn.commit()
-        return {"user_id": winner_id, "username": winner_username, "win_amount": profit}
+        return {
+            "user_id": winner_id,
+            "username": winner_username,
+            "win_amount": profit,
+            "photo_url": photo_url
+        }
     except Exception as e:
         logging.error(f"DB error finish_round: {e}")
         return None
@@ -356,7 +378,6 @@ async def handle_request_withdraw(request):
 
 async def handle_game_state(request):
     async with game_lock:
-        # Отдаём игроков отсортированными по ID
         sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
         resp = {
             "status": game_state["status"],
