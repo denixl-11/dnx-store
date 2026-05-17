@@ -138,7 +138,8 @@ game_state = {
     "spin_params": None,
     "winner": None,
     "last_winner_id": None,
-    "round_id": None
+    "round_id": None,
+    "game_number": 0          # счётчик игр
 }
 
 async def get_user_photo(user_id: int) -> str | None:
@@ -221,10 +222,11 @@ async def game_worker():
                     }
                     game_state["target_position"] = target
                     game_state["round_id"] = random.randint(1, 10**9)
+                    game_state["game_number"] += 1
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning: target={target:.4f}, round_id={game_state['round_id']}")
+                    logging.info(f"Spinning: target={target:.4f}, round_id={game_state['round_id']}, game_number={game_state['game_number']}")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(10.2)
@@ -390,7 +392,8 @@ async def handle_game_state(request):
             "spin_params": game_state.get("spin_params"),
             "winner": game_state.get("winner"),
             "last_winner_id": game_state.get("last_winner_id"),
-            "round_id": game_state.get("round_id")
+            "round_id": game_state.get("round_id"),
+            "game_number": game_state.get("game_number", 0)
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -403,7 +406,9 @@ async def handle_game_bet(request):
         user_id = user['id']
         username = user['username']
         amount = float(data.get('amount', 0))
-        if amount <= 0:
+        if amount < 10:
+            return web.json_response({"success": False, "error": "min_bet"}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        if amount != int(amount):
             return web.json_response({"success": False, "error": "invalid_amount"}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         async with game_lock:
             if game_state["status"] not in ("waiting", "counting"):
@@ -421,11 +426,10 @@ async def handle_game_bet(request):
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
-                # Выбираем случайный цвет, не занятый другими игроками
                 occupied_colors = {p["color"] for p in game_state["players"].values()}
                 available = [c for c in PLAYER_COLORS if c not in occupied_colors]
                 if not available:
-                    available = PLAYER_COLORS  # на случай, если все цвета использованы (маловероятно)
+                    available = PLAYER_COLORS
                 color = random.choice(available)
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,

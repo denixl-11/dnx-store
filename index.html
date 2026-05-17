@@ -95,7 +95,28 @@
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap { position: relative; width: 90%; height: 25vh; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); background: #131315; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
         #gameCanvas { width: 100%; height: 100%; display: block; }
-        .game-info-overlay { position: absolute; bottom: 8px; left: 12px; font-size: 0.65rem; color: rgba(255,255,255,0.4); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        .game-info-overlay {
+            position: absolute;
+            bottom: 8px;
+            left: 12px;
+            font-size: 0.65rem;
+            color: rgba(255,255,255,0.4);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+        .game-number-overlay {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.65rem;
+            color: rgba(255,255,255,0.4);
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
         .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203, 161, 83, 0.2); pointer-events: none; }
 
         .game-controls { display: flex; gap: 12px; width: 90%; margin-top: 20px; }
@@ -171,10 +192,11 @@
             <div class="game-canvas-wrap">
                 <canvas id="gameCanvas"></canvas>
                 <div class="game-info-overlay" id="game-players-count">Игроки: 0/20</div>
+                <div class="game-number-overlay" id="game-number-display">#0</div>
                 <div class="game-timer-overlay" id="game-timer-bg"></div>
             </div>
             <div class="game-controls">
-                <button class="game-btn" onclick="openBetConfirm(50)">+50 ₽</button>
+                <button class="game-btn" onclick="openBetConfirm(10)">+10 ₽</button>
                 <button class="game-btn" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
@@ -279,7 +301,7 @@
 
     <!-- Custom bet modal -->
     <div id="custom-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма ₽"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма от 10 ₽"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
     </div>
 
     <!-- Custom amount modal -->
@@ -571,7 +593,7 @@
         // ========== ИГРА ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, last_winner_id: null, round_id: null };
+        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, last_winner_id: null, round_id: null, game_number: 0 };
         let isSpinning = false;
         let animationFrameId = null;
         let timerInterval = null;
@@ -740,6 +762,7 @@
 
                 gState = newState;
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
+                document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
                 renderBetsList();
 
                 if (!isSpinning) drawGameFrame();
@@ -785,9 +808,13 @@
             document.getElementById('custom-bet-modal').classList.add('active');
         }
         function submitCustomBet() {
-            const v = parseFloat(document.getElementById('custom-bet-input').value);
-            if(v > 0) { closeModal('custom-bet-modal'); openBetConfirm(v); }
-            else showAlert("Введите сумму больше 0");
+            const v = parseInt(document.getElementById('custom-bet-input').value, 10);
+            if (!v || isNaN(v) || v < 10 || v !== Number(document.getElementById('custom-bet-input').value)) {
+                showAlert("Введите целое число от 10 ₽");
+                return;
+            }
+            closeModal('custom-bet-modal');
+            openBetConfirm(v);
         }
         async function executeBet() {
             const btn = document.getElementById('btn-confirm-bet');
@@ -801,6 +828,8 @@
                     if(data.error === 'insufficient_funds') msg = "Недостаточно средств!";
                     else if(data.error === 'game_started') msg = "Игра уже началась!";
                     else if(data.error === 'room_full') msg = "Слишком много игроков!";
+                    else if(data.error === 'min_bet') msg = "Минимальная ставка 10 ₽";
+                    else if(data.error === 'invalid_amount') msg = "Ставка должна быть целым числом";
                     showAlert(msg);
                 }
             } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети"); }
