@@ -575,7 +575,8 @@
         let isSpinning = false;
         let animationFrameId = null;
         let timerInterval = null;
-        let lastShownRoundId = localStorage.getItem('last_round_id'); // ключ меняется каждый раунд
+        let lastShownRoundId = localStorage.getItem('last_round_id');
+        let initialGameStateLoaded = false;   // первый опрос не показывает победителя
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -675,7 +676,7 @@
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
-                if (state.winner && state.round_id && state.round_id !== lastShownRoundId) {
+                if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     lastShownRoundId = state.round_id;
                     localStorage.setItem('last_round_id', lastShownRoundId);
                     showWinnerModal(state.winner);
@@ -684,6 +685,7 @@
             } catch(e) { console.error(e); }
         }
 
+        let winnerTimer = null;
         function showWinnerModal(winner) {
             if(!winner) return;
             document.getElementById('winner-name').innerText = winner.username;
@@ -691,15 +693,30 @@
             const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+';
             document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+'>`;
             document.getElementById('winner-modal').classList.add('active');
+            if (winnerTimer) clearTimeout(winnerTimer);
+            winnerTimer = setTimeout(() => {
+                closeWinnerModal();
+                winnerTimer = null;
+            }, 2500);
         }
         function closeWinnerModal() {
             document.getElementById('winner-modal').classList.remove('active');
+            if (winnerTimer) { clearTimeout(winnerTimer); winnerTimer = null; }
         }
 
         async function pollGame() {
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
+
+                // Первый опрос – просто запоминаем round_id, не показываем окно
+                if (!initialGameStateLoaded) {
+                    initialGameStateLoaded = true;
+                    if (newState.round_id) {
+                        lastShownRoundId = newState.round_id;
+                        localStorage.setItem('last_round_id', lastShownRoundId);
+                    }
+                }
 
                 // Таймер
                 if (newState.status === 'counting') {
@@ -726,7 +743,6 @@
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 renderBetsList();
 
-                // Мгновенная отрисовка поля
                 if (!isSpinning) drawGameFrame();
 
                 const myId = String(tg.initDataUnsafe?.user?.id);
@@ -743,12 +759,14 @@
                     drawGameFrame();
                 }
 
-                // Показ окна победителя для каждого нового раунда
-                if (gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
-                    lastShownRoundId = gState.round_id;
-                    localStorage.setItem('last_round_id', lastShownRoundId);
-                    showWinnerModal(gState.winner);
-                    await updateBalance();
+                // Показ победителя только во вкладке игры и после завершения раунда
+                if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
+                    if (document.getElementById('page-game').classList.contains('page-active')) {
+                        lastShownRoundId = gState.round_id;
+                        localStorage.setItem('last_round_id', lastShownRoundId);
+                        showWinnerModal(gState.winner);
+                        await updateBalance();
+                    }
                 }
 
                 if (gState.players.length === 0 && gState.status === 'waiting') {

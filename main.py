@@ -119,6 +119,14 @@ def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000,
     frames.append(x / 1000)
     return frames
 
+# 20 нежных, но различимых цветов
+PLAYER_COLORS = [
+    "#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9", "#BAE1FF",
+    "#D4BAFF", "#FFB3DE", "#B3FFE0", "#FFD9B3", "#B3D9FF",
+    "#E6B3FF", "#B3FFB3", "#FFB3B3", "#B3B3FF", "#FFE0B3",
+    "#B3FFD9", "#D9B3FF", "#FFB3D9", "#B3E0FF", "#E0FFB3"
+]
+
 # Игра
 game_lock = asyncio.Lock()
 game_state = {
@@ -130,14 +138,10 @@ game_state = {
     "spin_params": None,
     "winner": None,
     "last_winner_id": None,
-    "round_id": None          # уникальный ID раунда
+    "round_id": None
 }
 
-def generate_color():
-    return f"#{random.randint(50, 200):02x}{random.randint(50, 200):02x}{random.randint(50, 200):02x}"
-
 async def get_user_photo(user_id: int) -> str | None:
-    """Возвращает URL аватарки пользователя или None"""
     try:
         photos = await bot.get_user_profile_photos(user_id, limit=1)
         if photos.total_count == 0:
@@ -216,7 +220,7 @@ async def game_worker():
                         "target_position": target
                     }
                     game_state["target_position"] = target
-                    game_state["round_id"] = random.randint(1, 10**9)  # уникальный ID раунда
+                    game_state["round_id"] = random.randint(1, 10**9)
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
@@ -417,9 +421,10 @@ async def handle_game_bet(request):
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
+                color = PLAYER_COLORS[len(game_state["players"]) % 20]
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
-                    "amount": amount, "color": generate_color()
+                    "amount": amount, "color": color
                 }
             game_state["pool"] += amount
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
@@ -456,7 +461,7 @@ async def handle_game_finish(request):
 async def handle_get_requisites(request):
     return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# Callbacks админа (без изменений)
+# Callbacks админа
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
