@@ -176,26 +176,19 @@
             align-items: center;
             gap: 4px;
         }
-        .history-list-container {
-            width: 90%;
-            margin-top: 12px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            display: none;
-            flex-direction: column;
-            overflow: hidden;
+        .history-modal-list {
+            width: 100%;
             max-height: 300px;
             overflow-y: auto;
         }
-        .history-row {
+        .history-modal-row {
             display: flex;
             justify-content: space-between;
-            padding: 10px 15px;
+            padding: 10px 0;
             border-bottom: 1px solid rgba(255,255,255,0.05);
-            font-size: 0.8rem;
+            font-size: 0.85rem;
         }
-        .history-row:last-child { border-bottom: none; }
+        .history-modal-row:last-child { border-bottom: none; }
     </style>
 </head>
 <body>
@@ -213,7 +206,7 @@
     <div id="page-game" class="page">
         <div class="game-container">
             <div style="width:90%; display:flex; justify-content: flex-end; margin-bottom: 4px;">
-                <div class="history-btn" onclick="toggleHistory()">
+                <div class="history-btn" onclick="openHistoryModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     История
                 </div>
@@ -234,10 +227,6 @@
             <div class="bets-list-container" id="bets-list-container">
                 <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color: var(--accent-gold);">0 ₽</span>)</div>
                 <div class="bets-list" id="game-bets-list"></div>
-            </div>
-            <div class="history-list-container" id="history-list-container">
-                <div class="history-row" style="font-weight:600; color:var(--accent-gold);"><span>Игра</span><span>Победитель</span><span>Выигрыш</span></div>
-                <div id="history-list-inner"></div>
             </div>
         </div>
     </div>
@@ -331,6 +320,15 @@
                 <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> ₽</div>
                 <button class="btn-main-action" onclick="closeWinnerModal()">Отлично!</button>
             </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="history-modal" class="modal-overlay" onclick="closeModal('history-modal')">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 360px;">
+            <h3 class="modal-title">История игр</h3>
+            <div class="history-modal-list" id="history-modal-list-inner">Загрузка...</div>
+            <button class="btn-secondary" style="margin-top: 16px;" onclick="closeModal('history-modal')">Закрыть</button>
         </div>
     </div>
 
@@ -626,24 +624,26 @@
         }
 
         // --- История игр ---
-        async function toggleHistory() {
-            const container = document.getElementById('history-list-container');
-            if (container.style.display === 'flex') {
-                container.style.display = 'none';
-                return;
-            }
+        async function openHistoryModal() {
+            const modal = document.getElementById('history-modal');
+            const list = document.getElementById('history-modal-list-inner');
+            list.innerHTML = 'Загрузка...';
+            modal.classList.add('active');
             try {
-                const res = await fetch(`${API_BASE}/game/history`);
-                const history = await res.json();
-                const inner = document.getElementById('history-list-inner');
-                inner.innerHTML = history.map(h => `
-                    <div class="history-row">
+                const data = await apiFetch(`${API_BASE}/game/history`);
+                if (!data || data.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">История пуста</div>';
+                    return;
+                }
+                list.innerHTML = data.map(h => `
+                    <div class="history-modal-row">
                         <span>#${h.game_number}</span>
                         <span>${escapeHtml(h.winner_name)}</span>
-                        <span style="color:var(--accent-gold)">${h.win_amount} ₽</span>
+                        <span style="color:var(--accent-gold)">${parseFloat(h.win_amount).toFixed(2)} ₽</span>
                     </div>`).join('');
-                container.style.display = 'flex';
-            } catch(e) { console.error(e); }
+            } catch(e) {
+                list.innerHTML = 'Ошибка загрузки';
+            }
         }
 
         // ========== ИГРА ==========

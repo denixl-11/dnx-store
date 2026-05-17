@@ -56,7 +56,6 @@ def init_db():
                 """)
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
-                # Новая таблица истории игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -129,7 +128,7 @@ def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000,
     frames.append(x / 1000)
     return frames
 
-# Обновлённая палитра из 20 хорошо различимых нежных цветов
+# Палитра из 20 хорошо различимых нежных цветов
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
     "#A0C4FF", "#BDB2FF", "#FFC6FF", "#FFC09F", "#F3FFB6",
@@ -203,14 +202,12 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
                 conn.commit()
-        # Запись в историю игр
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO game_history (game_number, winner_name, win_amount) VALUES (%s, %s, %s)",
                     (game_state["game_number"], winner_username, profit)
                 )
-                # Удаляем лишние записи, оставляя последние 100
                 cur.execute("DELETE FROM game_history WHERE id NOT IN (SELECT id FROM game_history ORDER BY game_number DESC LIMIT 100)")
                 conn.commit()
         return {
@@ -486,6 +483,7 @@ async def handle_game_cancel(request):
 async def handle_game_finish(request):
     return web.json_response({"success": True, "message": "Server handles finish"}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+@require_auth
 async def handle_game_history(request):
     try:
         with get_db_connection() as conn:
@@ -500,7 +498,7 @@ async def handle_game_history(request):
 async def handle_get_requisites(request):
     return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# Callbacks админа (без изменений)
+# Callbacks админа
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
