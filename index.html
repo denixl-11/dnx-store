@@ -576,7 +576,7 @@
         let animationFrameId = null;
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
-        let initialGameStateLoaded = false;   // первый опрос не показывает победителя
+        let initialGameStateLoaded = false;
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -709,7 +709,6 @@
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
 
-                // Первый опрос – просто запоминаем round_id, не показываем окно
                 if (!initialGameStateLoaded) {
                     initialGameStateLoaded = true;
                     if (newState.round_id) {
@@ -759,7 +758,7 @@
                     drawGameFrame();
                 }
 
-                // Показ победителя только во вкладке игры и после завершения раунда
+                // Победитель
                 if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
                     if (document.getElementById('page-game').classList.contains('page-active')) {
                         lastShownRoundId = gState.round_id;

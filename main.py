@@ -421,7 +421,12 @@ async def handle_game_bet(request):
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
             else:
-                color = PLAYER_COLORS[len(game_state["players"]) % 20]
+                # Выбираем случайный цвет, не занятый другими игроками
+                occupied_colors = {p["color"] for p in game_state["players"].values()}
+                available = [c for c in PLAYER_COLORS if c not in occupied_colors]
+                if not available:
+                    available = PLAYER_COLORS  # на случай, если все цвета использованы (маловероятно)
+                color = random.choice(available)
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
                     "amount": amount, "color": color
