@@ -56,6 +56,16 @@ def init_db():
                 """)
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
+                # Новая таблица истории игр
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS game_history (
+                        id SERIAL PRIMARY KEY,
+                        game_number INT,
+                        winner_name TEXT,
+                        win_amount NUMERIC,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
                 conn.commit()
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
@@ -119,12 +129,12 @@ def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000,
     frames.append(x / 1000)
     return frames
 
-# 20 нежных, но различимых цветов
+# Обновлённая палитра из 20 хорошо различимых нежных цветов
 PLAYER_COLORS = [
-    "#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9", "#BAE1FF",
-    "#D4BAFF", "#FFB3DE", "#B3FFE0", "#FFD9B3", "#B3D9FF",
-    "#E6B3FF", "#B3FFB3", "#FFB3B3", "#B3B3FF", "#FFE0B3",
-    "#B3FFD9", "#D9B3FF", "#FFB3D9", "#B3E0FF", "#E0FFB3"
+    "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
+    "#A0C4FF", "#BDB2FF", "#FFC6FF", "#FFC09F", "#F3FFB6",
+    "#B5EAD7", "#C7CEEA", "#FFDAC1", "#E2F0CB", "#B5D8FF",
+    "#D0BFFF", "#FFB3C6", "#AFCBFF", "#FFC8A2", "#C1E1C1"
 ]
 
 # Игра
@@ -139,7 +149,7 @@ game_state = {
     "winner": None,
     "last_winner_id": None,
     "round_id": None,
-    "game_number": 0          # счётчик игр
+    "game_number": 0
 }
 
 async def get_user_photo(user_id: int) -> str | None:
@@ -192,6 +202,16 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                 if not cur.fetchone():
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
+                conn.commit()
+        # Запись в историю игр
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO game_history (game_number, winner_name, win_amount) VALUES (%s, %s, %s)",
+                    (game_state["game_number"], winner_username, profit)
+                )
+                # Удаляем лишние записи, оставляя последние 100
+                cur.execute("DELETE FROM game_history WHERE id NOT IN (SELECT id FROM game_history ORDER BY game_number DESC LIMIT 100)")
                 conn.commit()
         return {
             "user_id": winner_id,
@@ -466,11 +486,21 @@ async def handle_game_cancel(request):
 async def handle_game_finish(request):
     return web.json_response({"success": True, "message": "Server handles finish"}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+async def handle_game_history(request):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT game_number, winner_name, win_amount FROM game_history ORDER BY game_number DESC LIMIT 100")
+                rows = cur.fetchall()
+        return web.json_response(rows, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
 @require_auth
 async def handle_get_requisites(request):
     return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# Callbacks админа
+# Callbacks админа (без изменений)
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
@@ -542,6 +572,7 @@ app.router.add_get('/game/state', handle_game_state)
 app.router.add_post('/game/bet', handle_game_bet)
 app.router.add_post('/game/cancel', handle_game_cancel)
 app.router.add_post('/game/finish', handle_game_finish)
+app.router.add_get('/game/history', handle_game_history)
 app.router.add_options('/{tail:.*}', handle_options)
 
 async def main():
