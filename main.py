@@ -6,6 +6,7 @@ import random
 import hashlib
 import hmac
 from urllib.parse import parse_qs
+from decimal import Decimal
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
@@ -490,15 +491,24 @@ async def handle_game_history(request):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("SELECT game_number, winner_name, win_amount FROM game_history ORDER BY game_number DESC LIMIT 100")
                 rows = cur.fetchall()
-        return web.json_response(rows, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        # Преобразуем Decimal в float
+        result = []
+        for row in rows:
+            result.append({
+                "game_number": row["game_number"],
+                "winner_name": row["winner_name"],
+                "win_amount": float(row["win_amount"])
+            })
+        return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
+        logging.error(f"Game history error: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
 async def handle_get_requisites(request):
     return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# Callbacks админа
+# Callbacks админа (без изменений)
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")

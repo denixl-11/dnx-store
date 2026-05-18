@@ -163,10 +163,11 @@
         .winner-modal .winner-amount { font-size: 1.2rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; }
         .winner-modal .winner-amount span { color: var(--accent-gold); font-size: 1.5rem; }
 
+        /* Обновлённая кнопка истории – серая */
         .history-btn {
-            background: rgba(203, 161, 83, 0.15);
-            border: 1px solid var(--accent-gold);
-            color: var(--accent-gold);
+            background: rgba(122,122,124,0.1);
+            border: 1px solid var(--text-muted);
+            color: var(--text-muted);
             border-radius: 8px;
             padding: 4px 10px;
             font-size: 0.75rem;
@@ -623,7 +624,7 @@
             loadInventory();
         }
 
-        // --- История игр ---
+        // --- История игр (модальное окно) ---
         async function openHistoryModal() {
             const modal = document.getElementById('history-modal');
             const list = document.getElementById('history-modal-list-inner');
@@ -639,7 +640,7 @@
                     <div class="history-modal-row">
                         <span>#${h.game_number}</span>
                         <span>${escapeHtml(h.winner_name)}</span>
-                        <span style="color:var(--accent-gold)">${parseFloat(h.win_amount).toFixed(2)} ₽</span>
+                        <span style="color:var(--accent-gold)">${h.win_amount.toFixed(2)} ₽</span>
                     </div>`).join('');
             } catch(e) {
                 list.innerHTML = 'Ошибка загрузки';
