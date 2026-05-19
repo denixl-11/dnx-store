@@ -256,9 +256,6 @@
             padding: 4px 10px;
             border-radius: 8px;
         }
-        .confirm-buy-modal .modal-content {
-            text-align: center;
-        }
         .confirm-buy-item-preview {
             display: flex;
             align-items: center;
@@ -394,7 +391,7 @@
         </div>
     </div>
 
-    <!-- Winner Modal -->
+    <!-- Winner Modal (полностью восстановлен) -->
     <div id="winner-modal" class="modal-overlay winner-modal" onclick="closeWinnerModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div style="text-align: center;">
@@ -500,7 +497,7 @@
         let inventoryData = [];
         let pendingTopupAmount = 0;
         let betAmountTemp = 0;
-        let pendingBuyItem = null; // хранит { id, price, name, image_url } для подтверждения
+        let pendingBuyItem = null;
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
@@ -759,14 +756,15 @@
                 if (!leaders || leaders.length === 0) {
                     listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">Пока никто не побеждал</div>';
                 } else {
-                    // Показываем топ-10
+                    // Призовая NFT – первая доступная из каталога (можно заменить на фиксированную)
                     const prizeImg = currentCatalog.length > 0 ? currentCatalog[0].image_url : 'data:image/svg+xml;base64,...';
+                    const prizeId = currentCatalog.length > 0 ? currentCatalog[0].id : '';
                     listEl.innerHTML = leaders.slice(0,10).map(p => `
                         <div class="leaderboard-row">
                             <div class="leaderboard-rank">#${p.rank}</div>
                             <div class="leaderboard-name">${escapeHtml(p.username)}</div>
                             <div class="leaderboard-wins">${p.wins} побед</div>
-                            <img class="leaderboard-nft" src="${prizeImg}" onclick="openNftModal('${currentCatalog.length ? currentCatalog[0].id : ''}')" />
+                            <img class="leaderboard-nft" src="${prizeImg}" onclick="${prizeId ? `openNftModal('${prizeId}')` : ''}" />
                         </div>`).join('');
                 }
             } catch(e) {

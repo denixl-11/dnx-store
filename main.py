@@ -66,7 +66,7 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
-                # Таблица лидеров
+                # Таблица лидеров (победы)
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS leaderboard (
                         user_id VARCHAR(255) PRIMARY KEY,
@@ -85,18 +85,15 @@ def init_db():
                 cur.execute("SELECT end_time FROM season WHERE id = 1")
                 season = cur.fetchone()
                 if not season:
-                    # Московское время (UTC+3)
                     moscow_now = datetime.now(timezone.utc) + timedelta(hours=3)
                     end = moscow_now + timedelta(days=14)
                     cur.execute("INSERT INTO season (id, end_time) VALUES (1, %s)", (end,))
                 else:
-                    # Проверяем, не истёк ли сезон
                     end_time = season[0]
                     if end_time.tzinfo is None:
                         end_time = end_time.replace(tzinfo=timezone.utc)
                     now = datetime.now(timezone.utc)
                     if end_time < now:
-                        # Сезон истёк, обновляем и сбрасываем лидеров
                         moscow_now = now + timedelta(hours=3)
                         new_end = moscow_now + timedelta(days=14)
                         cur.execute("UPDATE season SET end_time = %s WHERE id = 1", (new_end,))
@@ -189,7 +186,7 @@ game_state = {
     "winner": None,
     "last_winner_id": None,
     "round_id": None,
-    "game_number": 0   # будет переопределён при старте
+    "game_number": 0   # будет переопределено в init_db
 }
 
 async def get_user_photo(user_id: int) -> str | None:
@@ -548,7 +545,6 @@ async def handle_game_history(request):
         logging.error(f"Game history error: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# Новый эндпоинт: таблица лидеров
 @require_auth
 async def handle_leaderboard(request):
     try:
@@ -568,7 +564,6 @@ async def handle_leaderboard(request):
         logging.error(f"Leaderboard error: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# Новый эндпоинт: состояние сезона
 @require_auth
 async def handle_season_state(request):
     try:
@@ -578,14 +573,11 @@ async def handle_season_state(request):
                 row = cur.fetchone()
                 if row:
                     end_time = row["end_time"]
-                    # Убедимся, что timezone aware
                     if end_time.tzinfo is None:
                         end_time = end_time.replace(tzinfo=timezone.utc)
-                    end_timestamp = end_time.timestamp() * 1000  # миллисекунды
-                    return web.json_response({"end_time": end_timestamp}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+                    return web.json_response({"end_time": end_time.timestamp() * 1000}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
-        logging.error(f"Season state error: {e}")
         return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
