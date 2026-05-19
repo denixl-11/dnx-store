@@ -81,7 +81,7 @@ def init_db():
                         end_time TIMESTAMPTZ
                     )
                 """)
-                # Инициализация сезона, если нет
+                # Инициализация сезона
                 cur.execute("SELECT end_time FROM season WHERE id = 1")
                 season = cur.fetchone()
                 if not season:
@@ -98,7 +98,7 @@ def init_db():
                         new_end = moscow_now + timedelta(days=14)
                         cur.execute("UPDATE season SET end_time = %s WHERE id = 1", (new_end,))
                         cur.execute("DELETE FROM leaderboard")
-                # Устанавливаем номер последней игры
+                # Номер последней игры из истории
                 cur.execute("SELECT MAX(game_number) FROM game_history")
                 max_num = cur.fetchone()[0]
                 global game_state
@@ -166,7 +166,7 @@ def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000,
     frames.append(x / 1000)
     return frames
 
-# Палитра из 20 хорошо различимых нежных цветов
+# Палитра
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
     "#A0C4FF", "#BDB2FF", "#FFC6FF", "#FFC09F", "#F3FFB6",
