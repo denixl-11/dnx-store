@@ -163,7 +163,8 @@
         .winner-modal .winner-amount { font-size: 1.2rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; }
         .winner-modal .winner-amount span { color: var(--accent-gold); font-size: 1.5rem; }
 
-        .history-btn, .leaderboard-btn {
+        /* Обновлённая кнопка истории – серая */
+        .history-btn {
             background: rgba(122,122,124,0.1);
             border: 1px solid var(--text-muted);
             color: var(--text-muted);
@@ -176,97 +177,19 @@
             align-items: center;
             gap: 4px;
         }
-        .leaderboard-bar {
-            background: linear-gradient(135deg, rgba(203,161,83,0.15), rgba(203,161,83,0.05));
-            border: 1px solid var(--accent-gold);
-            border-radius: 12px;
-            padding: 8px 16px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: var(--accent-gold);
-            cursor: pointer;
-            text-align: center;
+        .history-modal-list {
             width: 100%;
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-        .leaderboard-full-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--bg-main);
-            z-index: 2000;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
+            max-height: 300px;
             overflow-y: auto;
         }
-        .leaderboard-top-row {
+        .history-modal-row {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.85rem;
         }
-        .leaderboard-table {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .leaderboard-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 12px;
-            border: 1px solid var(--border-color);
-        }
-        .leaderboard-rank {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: var(--accent-gold);
-            min-width: 28px;
-            text-align: center;
-        }
-        .leaderboard-name {
-            flex: 1;
-            font-weight: 600;
-        }
-        .leaderboard-wins {
-            color: var(--text-muted);
-            font-size: 0.8rem;
-        }
-        .leaderboard-nft {
-            width: 44px;
-            height: 44px;
-            border-radius: 8px;
-            object-fit: cover;
-            cursor: pointer;
-            border: 1px solid var(--border-color);
-        }
-        .season-timer {
-            font-size: 0.8rem;
-            color: var(--accent-gold);
-            background: rgba(203,161,83,0.1);
-            padding: 4px 10px;
-            border-radius: 8px;
-        }
-        .confirm-buy-item-preview {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .confirm-buy-item-preview img {
-            width: 60px;
-            height: 60px;
-            border-radius: 10px;
-        }
+        .history-modal-row:last-child { border-bottom: none; }
     </style>
 </head>
 <body>
@@ -283,8 +206,7 @@
 
     <div id="page-game" class="page">
         <div class="game-container">
-            <div style="width:90%; display:flex; justify-content: space-between; margin-bottom: 4px;">
-                <div class="leaderboard-btn" onclick="openLeaderboardModal()">🏆 Лидеры</div>
+            <div style="width:90%; display:flex; justify-content: flex-end; margin-bottom: 4px;">
                 <div class="history-btn" onclick="openHistoryModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     История
@@ -311,8 +233,7 @@
     </div>
 
     <div id="page-store" class="page page-active">
-        <div style="padding: 12px 20px; display: flex; gap: 10px; align-items: center; justify-content: space-between;">
-            <div class="leaderboard-bar" onclick="openLeaderboardModal()">🏆 ТАБЛИЦА ЛИДЕРОВ</div>
+        <div style="padding: 15px 20px; display: flex; justify-content: flex-end;">
             <div class="cart-btn-header" onclick="showPage('cart')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
@@ -412,26 +333,6 @@
         </div>
     </div>
 
-    <!-- Confirm Buy Modal -->
-    <div id="confirm-buy-modal" class="modal-overlay">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <h3 class="modal-title">Подтверждение покупки</h3>
-            <div class="confirm-buy-item-preview" id="confirm-buy-item-info"></div>
-            <button class="btn-main-action" id="confirm-buy-btn" onclick="confirmBuy()">Купить</button>
-            <button class="btn-secondary" onclick="closeModal('confirm-buy-modal')">Отмена</button>
-        </div>
-    </div>
-
-    <!-- Leaderboard Fullscreen Modal -->
-    <div id="leaderboard-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-main); z-index:2000; flex-direction:column; padding:20px; overflow-y:auto;">
-        <div class="leaderboard-top-row">
-            <h2 style="color:var(--accent-gold); font-size:1.5rem;">🏆 Лидеры сезона</h2>
-            <button style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;" onclick="closeLeaderboardModal()">✕</button>
-        </div>
-        <div class="season-timer" id="season-timer-display" style="margin-bottom:20px; text-align:center;">Загрузка...</div>
-        <div id="leaderboard-list" class="leaderboard-table">Загрузка...</div>
-    </div>
-
     <!-- Custom bet modal -->
     <div id="custom-bet-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма от 10 ₽"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
@@ -497,7 +398,6 @@
         let inventoryData = [];
         let pendingTopupAmount = 0;
         let betAmountTemp = 0;
-        let pendingBuyItem = null;
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
@@ -537,7 +437,7 @@
                         <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
                         <div class="item-name">${escapeHtml(item.name)}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="confirmBuyItem('${item.id}', ${item.price}, '${escapeHtml(item.name)}', '${item.image_url}')">${item.price} ₽</button>
+                            <button class="btn-buy-now" onclick="buyItem('${item.id}', ${item.price})">${item.price} ₽</button>
                             <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                             </button>
@@ -565,7 +465,7 @@
                 '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
             const buyBtn = document.getElementById('nft-modal-btn-buy');
             buyBtn.innerHTML = `КУПИТЬ ЗА ${item.price || 0} ₽`;
-            buyBtn.onclick = () => { closeNftModal(true); confirmBuyItem(item.id, item.price, item.name, item.image_url); };
+            buyBtn.onclick = () => { closeNftModal(true); buyItem(item.id, item.price); };
             const cartBtn = document.getElementById('nft-modal-btn-cart');
             cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
             const tgBtn = document.getElementById('nft-tg-link-btn');
@@ -612,36 +512,40 @@
         }
         function removeFromCart(index) { cart.splice(index,1); localStorage.setItem('dnx_cart', JSON.stringify(cart)); renderCart(); }
 
-        // --- Buy with confirmation ---
-        function confirmBuyItem(id, price, name, image_url) {
-            pendingBuyItem = { id, price, name, image_url };
-            document.getElementById('confirm-buy-item-info').innerHTML = `
-                <img src="${image_url}" />
-                <div style="text-align:left;">
-                    <div style="font-weight:600;">${name}</div>
-                    <div style="color:var(--accent-gold);">${price} ₽</div>
-                </div>`;
-            document.getElementById('confirm-buy-modal').classList.add('active');
-        }
-        async function confirmBuy() {
-            if(!pendingBuyItem) return;
-            const { id, price } = pendingBuyItem;
-            if(userBalance < price) { showAlert("Недостаточно средств. Пополните баланс."); closeModal('confirm-buy-modal'); return; }
+        // --- Buy ---
+        async function buyItem(itemId, price) {
+            if(userBalance < price) { showAlert("Недостаточно средств. Пополните баланс."); return; }
             try {
-                const data = await apiFetch(`${API_BASE}/buy`, { method: 'POST', body: JSON.stringify({items: [id]}) });
+                const data = await apiFetch(`${API_BASE}/buy`, { method: 'POST', body: JSON.stringify({items: [itemId]}) });
                 if(data.success) {
                     showAlert("Успешная покупка! NFT добавлен в инвентарь.");
-                    closeModal('confirm-buy-modal');
                     await updateBalance();
                     loadCatalog();
                     loadInventory();
                 } else {
                     showAlert(data.error === 'insufficient_funds' ? "Недостаточно средств!" : "Товар уже недоступен.");
-                    closeModal('confirm-buy-modal');
                     loadCatalog();
                 }
-            } catch(e) { showAlert("Ошибка сети"); closeModal('confirm-buy-modal'); }
-            pendingBuyItem = null;
+            } catch(e) { showAlert("Ошибка сети"); }
+        }
+        async function buyCart() {
+            const total = cart.reduce((s, c) => s + Number(c.price), 0);
+            if(userBalance < total) { showAlert("Недостаточно средств. Пополните баланс."); return; }
+            const ids = cart.map(c => c.id);
+            try {
+                const data = await apiFetch(`${API_BASE}/buy`, { method: 'POST', body: JSON.stringify({items: ids}) });
+                if(data.success) {
+                    showAlert("Корзина успешно оплачена!");
+                    cart = [];
+                    localStorage.setItem('dnx_cart', '[]');
+                    renderCart();
+                    await updateBalance();
+                    loadInventory();
+                } else {
+                    showAlert("Ошибка оплаты. Возможно часть товаров уже недоступна.");
+                    loadCatalog();
+                }
+            } catch(e) { showAlert("Ошибка сети"); }
         }
 
         // --- Topup ---
@@ -743,78 +647,7 @@
             }
         }
 
-        // --- Лидеры и сезон ---
-        let seasonTimerInterval = null;
-
-        async function openLeaderboardModal() {
-            const modal = document.getElementById('leaderboard-modal');
-            modal.style.display = 'flex';
-            // Загружаем данные лидеров
-            try {
-                const leaders = await apiFetch(`${API_BASE}/leaderboard`);
-                const listEl = document.getElementById('leaderboard-list');
-                if (!leaders || leaders.length === 0) {
-                    listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">Пока никто не побеждал</div>';
-                } else {
-                    // Призовая NFT – первый доступный предмет из каталога
-                    const prizeImg = currentCatalog.length > 0 ? currentCatalog[0].image_url : 'data:image/svg+xml;base64,...';
-                    const prizeId = currentCatalog.length > 0 ? currentCatalog[0].id : '';
-                    listEl.innerHTML = leaders.slice(0,10).map(p => `
-                        <div class="leaderboard-row">
-                            <div class="leaderboard-rank">#${p.rank}</div>
-                            <div class="leaderboard-name">${escapeHtml(p.username)}</div>
-                            <div class="leaderboard-wins">${p.wins} побед</div>
-                            <img class="leaderboard-nft" src="${prizeImg}" onclick="${prizeId ? `openNftModal('${prizeId}')` : ''}" />
-                        </div>`).join('');
-                }
-            } catch(e) {
-                document.getElementById('leaderboard-list').innerHTML = 'Ошибка загрузки';
-            }
-
-            // Загружаем время конца сезона и запускаем таймер
-            try {
-                const season = await apiFetch(`${API_BASE}/season/state`);
-                if (season && season.end_time) {
-                    startSeasonTimer(season.end_time);
-                } else {
-                    document.getElementById('season-timer-display').innerText = 'Сезон не задан';
-                }
-            } catch(e) {
-                document.getElementById('season-timer-display').innerText = 'Ошибка таймера';
-            }
-        }
-
-        function closeLeaderboardModal() {
-            document.getElementById('leaderboard-modal').style.display = 'none';
-            if (seasonTimerInterval) {
-                clearInterval(seasonTimerInterval);
-                seasonTimerInterval = null;
-            }
-        }
-
-        function startSeasonTimer(endTimeMs) {
-            if (seasonTimerInterval) clearInterval(seasonTimerInterval);
-            const updateTimer = () => {
-                const now = Date.now();
-                const remaining = endTimeMs - now;
-                const displayEl = document.getElementById('season-timer-display');
-                if (remaining <= 0) {
-                    displayEl.innerText = 'Сезон завершён!';
-                    clearInterval(seasonTimerInterval);
-                    seasonTimerInterval = null;
-                    return;
-                }
-                const days = Math.floor(remaining / 86400000);
-                const hours = Math.floor((remaining % 86400000) / 3600000);
-                const minutes = Math.floor((remaining % 3600000) / 60000);
-                const seconds = Math.floor((remaining % 60000) / 1000);
-                displayEl.innerText = `⏳ До конца сезона: ${days}д ${hours}ч ${minutes}м ${seconds}с`;
-            };
-            updateTimer();
-            seasonTimerInterval = setInterval(updateTimer, 1000);
-        }
-
-        // ========== ИГРА (БЕЗ ИЗМЕНЕНИЙ) ==========
+        // ========== ИГРА ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, last_winner_id: null, round_id: null, game_number: 0 };
@@ -937,7 +770,7 @@
             document.getElementById('winner-name').innerText = winner.username;
             document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
             const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+';
-            document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,...'">`;
+            document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+'>`;
             document.getElementById('winner-modal').classList.add('active');
             if (winnerTimer) clearTimeout(winnerTimer);
             winnerTimer = setTimeout(() => {
