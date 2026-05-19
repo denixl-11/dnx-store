@@ -391,7 +391,7 @@
         </div>
     </div>
 
-    <!-- Winner Modal (полностью восстановлен) -->
+    <!-- Winner Modal -->
     <div id="winner-modal" class="modal-overlay winner-modal" onclick="closeWinnerModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div style="text-align: center;">
@@ -548,7 +548,7 @@
 
         function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 
-        // --- NFT Modal (без изменений) ---
+        // --- NFT Modal ---
         function openNftModal(id) {
             const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
             if(!item) return;
@@ -580,7 +580,7 @@
                 document.getElementById('nft-detail-overlay').classList.remove('active');
         }
 
-        // --- Cart (без изменений) ---
+        // --- Cart ---
         function addToCart(item) {
             if(!cart.find(c => c.id === item.id)) {
                 cart.push(item);
@@ -644,7 +644,7 @@
             pendingBuyItem = null;
         }
 
-        // --- Topup (без изменений) ---
+        // --- Topup ---
         document.getElementById('terms-checkbox')?.addEventListener('change', function() {
             const chkSpan = document.getElementById('custom-chk');
             if(chkSpan) {
@@ -683,7 +683,7 @@
             await updateBalance();
         }
 
-        // --- Inventory (без изменений) ---
+        // --- Inventory ---
         function switchInv(el, type) {
             document.querySelectorAll('#page-inventory .tab-item').forEach(t => { t.classList.remove('active'); t.style.borderColor='transparent'; t.style.color='var(--text-muted)'; });
             el.classList.add('active'); el.style.borderColor='var(--accent-gold)'; el.style.color='var(--accent-gold)';
@@ -756,7 +756,7 @@
                 if (!leaders || leaders.length === 0) {
                     listEl.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px;">Пока никто не побеждал</div>';
                 } else {
-                    // Призовая NFT – первая доступная из каталога (можно заменить на фиксированную)
+                    // Призовая NFT – первый доступный предмет из каталога
                     const prizeImg = currentCatalog.length > 0 ? currentCatalog[0].image_url : 'data:image/svg+xml;base64,...';
                     const prizeId = currentCatalog.length > 0 ? currentCatalog[0].id : '';
                     listEl.innerHTML = leaders.slice(0,10).map(p => `
