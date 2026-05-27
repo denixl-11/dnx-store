@@ -216,7 +216,7 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
                 conn.commit()
-        # Сохраняем игру в БД
+        # Сохраняем игру в БД и увеличиваем счётчик после завершения
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -224,6 +224,10 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                     (game_state["game_number"], winner_username, profit)
                 )
                 cur.execute("DELETE FROM game_history WHERE id NOT IN (SELECT id FROM game_history ORDER BY game_number DESC LIMIT 100)")
+                # Увеличиваем номер игры после завершения раунда
+                cur.execute("UPDATE game_counter SET last_game_number = last_game_number + 1 WHERE id = 1 RETURNING last_game_number")
+                new_num = cur.fetchone()[0]
+                game_state["game_number"] = new_num
                 conn.commit()
         return {
             "user_id": winner_id,
@@ -254,13 +258,7 @@ async def game_worker():
                     }
                     game_state["target_position"] = target
                     game_state["round_id"] = random.randint(1, 10**9)
-                    # Атомарно увеличиваем счётчик в БД
-                    with get_db_connection() as conn:
-                        with conn.cursor() as cur:
-                            cur.execute("UPDATE game_counter SET last_game_number = last_game_number + 1 WHERE id = 1 RETURNING last_game_number")
-                            new_num = cur.fetchone()[0]
-                            game_state["game_number"] = new_num
-                            conn.commit()
+                    # Номер игры НЕ увеличиваем здесь
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
@@ -281,9 +279,10 @@ async def game_worker():
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
+                    # game_number уже увеличен в finish_round
                     logging.info(f"Round finished, winner: {winner_data}")
 
-# API (полностью без изменений, кроме handle_game_state – уже отдаёт game_number)
+# API (без изменений)
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,

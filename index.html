@@ -6,6 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* Все стили без изменений */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -229,7 +230,7 @@
             </div>
             <div class="game-info-row">
                 <span id="game-players-count">Игроки: 0/20</span>
-                <span id="game-number-display">#0</span>
+                <span id="game-number-display">#...</span>
             </div>
             <div class="game-controls">
                 <button class="game-btn" onclick="openBetConfirm(10)">+10 ₽</button>
@@ -435,7 +436,11 @@
             if(pageEl) pageEl.classList.add('page-active');
             const tabEl = document.getElementById('tab-' + id);
             if(tabEl) tabEl.classList.add('active');
-            if(id === 'game') { resizeCanvas(); drawGameFrame(); }
+            if(id === 'game') {
+                resizeCanvas();
+                drawGameFrame();
+                pollGame(); // немедленный запрос, чтобы обновить номер
+            }
             if(id === 'store') loadCatalog();
             if(id === 'inventory') loadInventory();
             if(id === 'cart') renderCart();
@@ -789,7 +794,7 @@
             document.getElementById('winner-name').innerText = winner.username;
             document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
             const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+';
-            document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+'>`;
+            document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,...'">`;
             document.getElementById('winner-modal').classList.add('active');
             if (winnerTimer) clearTimeout(winnerTimer);
             winnerTimer = setTimeout(() => {
