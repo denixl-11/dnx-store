@@ -66,7 +66,7 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
-                # Восстанавливаем номер последней игры из истории
+                # ----- ВАЖНО: номер игры всегда подхватывается из БД -----
                 cur.execute("SELECT MAX(game_number) FROM game_history")
                 max_num = cur.fetchone()[0]
                 global game_state
@@ -154,7 +154,7 @@ game_state = {
     "winner": None,
     "last_winner_id": None,
     "round_id": None,
-    "game_number": 0   # будет переопределено в init_db
+    "game_number": 0   # будет сразу переопределено в init_db
 }
 
 async def get_user_photo(user_id: int) -> str | None:
@@ -208,6 +208,7 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
                 conn.commit()
+        # Сохраняем игру в БД
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -245,6 +246,7 @@ async def game_worker():
                     }
                     game_state["target_position"] = target
                     game_state["round_id"] = random.randint(1, 10**9)
+                    # Увеличиваем номер игры
                     game_state["game_number"] += 1
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
@@ -266,6 +268,7 @@ async def game_worker():
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
+                    # game_number НЕ сбрасываем!
                     logging.info(f"Round finished, winner: {winner_data}")
 
 # API
