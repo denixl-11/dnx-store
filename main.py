@@ -44,6 +44,21 @@ dp = Dispatcher()
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
+# Игра (объявлена до init_db, чтобы избежать ошибки)
+game_lock = asyncio.Lock()
+game_state = {
+    "status": "waiting",
+    "players": {},
+    "pool": 0.0,
+    "timer": 15,
+    "target_position": None,
+    "spin_params": None,
+    "winner": None,
+    "last_winner_id": None,
+    "round_id": None,
+    "game_number": 0   # будет переопределено в init_db
+}
+
 def init_db():
     try:
         with get_db_connection() as conn:
@@ -149,21 +164,6 @@ PLAYER_COLORS = [
     "#B5EAD7", "#C7CEEA", "#FFDAC1", "#E2F0CB", "#B5D8FF",
     "#D0BFFF", "#FFB3C6", "#AFCBFF", "#FFC8A2", "#C1E1C1"
 ]
-
-# Игра
-game_lock = asyncio.Lock()
-game_state = {
-    "status": "waiting",
-    "players": {},
-    "pool": 0.0,
-    "timer": 15,
-    "target_position": None,
-    "spin_params": None,
-    "winner": None,
-    "last_winner_id": None,
-    "round_id": None,
-    "game_number": 0   # будет переопределено в init_db
-}
 
 async def get_user_photo(user_id: int) -> str | None:
     try:
