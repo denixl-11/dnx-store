@@ -66,6 +66,11 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
+                # Восстанавливаем номер последней игры из истории
+                cur.execute("SELECT MAX(game_number) FROM game_history")
+                max_num = cur.fetchone()[0]
+                global game_state
+                game_state["game_number"] = max_num if max_num else 0
                 conn.commit()
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
@@ -149,7 +154,7 @@ game_state = {
     "winner": None,
     "last_winner_id": None,
     "round_id": None,
-    "game_number": 0
+    "game_number": 0   # будет переопределено в init_db
 }
 
 async def get_user_photo(user_id: int) -> str | None:
@@ -491,7 +496,6 @@ async def handle_game_history(request):
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("SELECT game_number, winner_name, win_amount FROM game_history ORDER BY game_number DESC LIMIT 100")
                 rows = cur.fetchall()
-        # Преобразуем Decimal в float
         result = []
         for row in rows:
             result.append({
