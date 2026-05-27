@@ -163,7 +163,6 @@
         .winner-modal .winner-amount { font-size: 1.2rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; }
         .winner-modal .winner-amount span { color: var(--accent-gold); font-size: 1.5rem; }
 
-        /* Обновлённая кнопка истории – серая */
         .history-btn {
             background: rgba(122,122,124,0.1);
             border: 1px solid var(--text-muted);
@@ -191,7 +190,6 @@
         }
         .history-modal-row:last-child { border-bottom: none; }
 
-        /* Стили для подтверждения покупки */
         .confirm-buy-item-preview {
             display: flex;
             align-items: center;
@@ -346,7 +344,7 @@
         </div>
     </div>
 
-    <!-- Подтверждение покупки -->
+    <!-- Confirm Buy Modal -->
     <div id="confirm-buy-modal" class="modal-overlay">
         <div class="modal-content" onclick="event.stopPropagation()">
             <h3 class="modal-title">Подтверждение покупки</h3>
@@ -421,7 +419,7 @@
         let inventoryData = [];
         let pendingTopupAmount = 0;
         let betAmountTemp = 0;
-        let pendingBuyItem = null; // { id, price, name, image_url }
+        let pendingBuyItem = null;
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;

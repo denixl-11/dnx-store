@@ -66,12 +66,20 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
-                # ----- ВАЖНО: номер игры всегда подхватывается из БД -----
-                cur.execute("SELECT MAX(game_number) FROM game_history")
-                max_num = cur.fetchone()[0]
+                # Таблица для счётчика игр (одна строка)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS game_counter (
+                        id INT PRIMARY KEY DEFAULT 1,
+                        last_game_number INT NOT NULL DEFAULT 0
+                    )
+                """)
+                cur.execute("INSERT INTO game_counter (id, last_game_number) VALUES (1, 0) ON CONFLICT (id) DO NOTHING")
+                cur.execute("SELECT last_game_number FROM game_counter WHERE id = 1")
+                last_num = cur.fetchone()[0]
                 global game_state
-                game_state["game_number"] = max_num if max_num else 0
+                game_state["game_number"] = last_num
                 conn.commit()
+                logging.info(f"Game number initialized to {last_num}")
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
 
@@ -154,7 +162,7 @@ game_state = {
     "winner": None,
     "last_winner_id": None,
     "round_id": None,
-    "game_number": 0   # будет сразу переопределено в init_db
+    "game_number": 0   # будет переопределено в init_db
 }
 
 async def get_user_photo(user_id: int) -> str | None:
@@ -246,8 +254,13 @@ async def game_worker():
                     }
                     game_state["target_position"] = target
                     game_state["round_id"] = random.randint(1, 10**9)
-                    # Увеличиваем номер игры
-                    game_state["game_number"] += 1
+                    # Атомарно увеличиваем счётчик в БД
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("UPDATE game_counter SET last_game_number = last_game_number + 1 WHERE id = 1 RETURNING last_game_number")
+                            new_num = cur.fetchone()[0]
+                            game_state["game_number"] = new_num
+                            conn.commit()
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
@@ -268,10 +281,9 @@ async def game_worker():
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    # game_number НЕ сбрасываем!
                     logging.info(f"Round finished, winner: {winner_data}")
 
-# API
+# API (полностью без изменений, кроме handle_game_state – уже отдаёт game_number)
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
