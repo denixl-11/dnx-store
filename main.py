@@ -7,6 +7,7 @@ import hashlib
 import hmac
 from urllib.parse import parse_qs
 from decimal import Decimal
+from datetime import datetime, timezone, timedelta
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
@@ -44,7 +45,7 @@ dp = Dispatcher()
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
-# Игра (объявлена до init_db, чтобы избежать ошибки)
+# Глобальный game_state
 game_lock = asyncio.Lock()
 game_state = {
     "status": "waiting",
@@ -56,7 +57,7 @@ game_state = {
     "winner": None,
     "last_winner_id": None,
     "round_id": None,
-    "game_number": 0   # будет переопределено в init_db
+    "game_number": 0
 }
 
 def init_db():
@@ -81,7 +82,6 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
-                # Таблица для счётчика игр (одна строка)
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_counter (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -91,8 +91,24 @@ def init_db():
                 cur.execute("INSERT INTO game_counter (id, last_game_number) VALUES (1, 0) ON CONFLICT (id) DO NOTHING")
                 cur.execute("SELECT last_game_number FROM game_counter WHERE id = 1")
                 last_num = cur.fetchone()[0]
-                global game_state
                 game_state["game_number"] = last_num
+
+                # Новые таблицы
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS leaderboard (
+                        user_id VARCHAR(255) PRIMARY KEY,
+                        username VARCHAR(255),
+                        wins INT DEFAULT 0
+                    )
+                """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS season (
+                        id INT PRIMARY KEY DEFAULT 1,
+                        end_time TIMESTAMPTZ
+                    )
+                """)
+                cur.execute("INSERT INTO season (id, end_time) VALUES (1, '2026-06-30 15:00:00+00') ON CONFLICT (id) DO NOTHING")
+
                 conn.commit()
                 logging.info(f"Game number initialized to {last_num}")
     except Exception as e:
@@ -157,7 +173,6 @@ def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000,
     frames.append(x / 1000)
     return frames
 
-# Палитра из 20 хорошо различимых нежных цветов
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
     "#A0C4FF", "#BDB2FF", "#FFC6FF", "#FFC09F", "#F3FFB6",
@@ -215,8 +230,12 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                 if not cur.fetchone():
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
+                # Обновляем лидеров
+                cur.execute("""
+                    INSERT INTO leaderboard (user_id, username, wins) VALUES (%s, %s, 1)
+                    ON CONFLICT (user_id) DO UPDATE SET wins = leaderboard.wins + 1, username = EXCLUDED.username
+                """, (winner_id, winner_username))
                 conn.commit()
-        # Сохраняем игру в БД и увеличиваем счётчик после завершения
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
@@ -224,7 +243,6 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                     (game_state["game_number"], winner_username, profit)
                 )
                 cur.execute("DELETE FROM game_history WHERE id NOT IN (SELECT id FROM game_history ORDER BY game_number DESC LIMIT 100)")
-                # Увеличиваем номер игры после завершения раунда
                 cur.execute("UPDATE game_counter SET last_game_number = last_game_number + 1 WHERE id = 1 RETURNING last_game_number")
                 new_num = cur.fetchone()[0]
                 game_state["game_number"] = new_num
@@ -258,7 +276,6 @@ async def game_worker():
                     }
                     game_state["target_position"] = target
                     game_state["round_id"] = random.randint(1, 10**9)
-                    # Номер игры НЕ увеличиваем здесь
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
@@ -279,10 +296,9 @@ async def game_worker():
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    # game_number уже увеличен в finish_round
                     logging.info(f"Round finished, winner: {winner_data}")
 
-# API (без изменений)
+# API
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
@@ -523,6 +539,44 @@ async def handle_game_history(request):
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
+async def handle_leaderboard(request):
+    user_id = request['telegram_user']['id']
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Топ-5
+                cur.execute("SELECT username, wins FROM leaderboard ORDER BY wins DESC LIMIT 5")
+                top_rows = cur.fetchall()
+                # Строка пользователя
+                cur.execute("SELECT username, wins FROM leaderboard WHERE user_id = %s", (user_id,))
+                user_row = cur.fetchone()
+        result = {"top": [], "user": None}
+        for r in top_rows:
+            result["top"].append({"username": r["username"], "wins": r["wins"]})
+        if user_row:
+            result["user"] = {"username": user_row["username"], "wins": user_row["wins"]}
+        return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        logging.error(f"Leaderboard error: {e}")
+        return web.json_response({"top": [], "user": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+@require_auth
+async def handle_season_state(request):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT end_time FROM season WHERE id = 1")
+                row = cur.fetchone()
+                if row:
+                    end_time = row["end_time"]
+                    if end_time.tzinfo is None:
+                        end_time = end_time.replace(tzinfo=timezone.utc)
+                    return web.json_response({"end_time": end_time.timestamp() * 1000}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+@require_auth
 async def handle_get_requisites(request):
     return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -599,6 +653,8 @@ app.router.add_post('/game/bet', handle_game_bet)
 app.router.add_post('/game/cancel', handle_game_cancel)
 app.router.add_post('/game/finish', handle_game_finish)
 app.router.add_get('/game/history', handle_game_history)
+app.router.add_get('/leaderboard', handle_leaderboard)
+app.router.add_get('/season/state', handle_season_state)
 app.router.add_options('/{tail:.*}', handle_options)
 
 async def main():

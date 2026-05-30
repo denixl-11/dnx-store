@@ -6,7 +6,6 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* Все стили без изменений */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -202,6 +201,100 @@
             height: 60px;
             border-radius: 10px;
         }
+
+        /* Стили лидеров и сезона */
+        .leaderboard-bar {
+            width: 90%;
+            background: linear-gradient(135deg, rgba(203,161,83,0.2), rgba(203,161,83,0.05));
+            border: 1px solid var(--accent-gold);
+            border-radius: 12px;
+            padding: 10px 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--accent-gold);
+            font-weight: 700;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+        .leaderboard-bar:hover { background: linear-gradient(135deg, rgba(203,161,83,0.3), rgba(203,161,83,0.1)); }
+        .leaderboard-bar span:last-child {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
+        .leaderboard-fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-main);
+            z-index: 2000;
+            padding: 20px;
+            overflow-y: auto;
+            display: none;
+        }
+        .leaderboard-fullscreen.active { display: block; }
+
+        .leaderboard-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .season-timer {
+            background: rgba(203,161,83,0.1);
+            border: 1px solid var(--accent-gold);
+            border-radius: 8px;
+            padding: 8px 14px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--accent-gold);
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .leaderboard-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+        }
+        .leaderboard-rank {
+            font-weight: 700;
+            color: var(--accent-gold);
+            width: 24px;
+            text-align: center;
+        }
+        .leaderboard-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        .leaderboard-wins {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-right: 6px;
+        }
+        .leaderboard-nft {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+        }
     </style>
 </head>
 <body>
@@ -218,6 +311,12 @@
 
     <div id="page-game" class="page">
         <div class="game-container">
+            <!-- Кнопка лидеров -->
+            <div class="leaderboard-bar" onclick="openLeaderboardModal()">
+                <span>🏆 Лидеры сезона</span>
+                <span id="leaderboard-preview">...</span>
+            </div>
+
             <div style="width:90%; display:flex; justify-content: flex-end; margin-bottom: 4px;">
                 <div class="history-btn" onclick="openHistoryModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -389,6 +488,16 @@
         </div>
     </div>
 
+    <!-- Leaderboard Fullscreen Modal -->
+    <div id="leaderboard-modal" class="leaderboard-fullscreen">
+        <div class="leaderboard-top">
+            <h2 style="color:var(--accent-gold); font-size:1.5rem;">🏆 Лидеры сезона</h2>
+            <button style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;" onclick="closeLeaderboardModal()">✕</button>
+        </div>
+        <div class="season-timer" id="season-timer-display">Загрузка...</div>
+        <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
+    </div>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
@@ -439,7 +548,8 @@
             if(id === 'game') {
                 resizeCanvas();
                 drawGameFrame();
-                pollGame(); // немедленный запрос, чтобы обновить номер
+                pollGame(); // немедленный запрос, чтобы обновить номер и лидеров
+                loadLeaderboardPreview();
             }
             if(id === 'store') loadCatalog();
             if(id === 'inventory') loadInventory();
@@ -671,6 +781,93 @@
             }
         }
 
+        // --- Лидеры и сезон ---
+        async function loadLeaderboardPreview() {
+            try {
+                const data = await apiFetch(`${API_BASE}/leaderboard`);
+                const previewEl = document.getElementById('leaderboard-preview');
+                if (data && data.user) {
+                    previewEl.innerText = `${data.user.wins} побед`;
+                } else {
+                    previewEl.innerText = '0 побед';
+                }
+            } catch(e) {
+                document.getElementById('leaderboard-preview').innerText = '...';
+            }
+        }
+
+        let seasonTimerInterval = null;
+
+        async function openLeaderboardModal() {
+            document.getElementById('leaderboard-modal').classList.add('active');
+            try {
+                const data = await apiFetch(`${API_BASE}/leaderboard`);
+                const listEl = document.getElementById('leaderboard-list');
+                // В качестве приза показываем первый предмет из каталога (позже можно заменить на конкретный ID)
+                const prizeItem = currentCatalog.length > 0 ? currentCatalog[0] : null;
+                let html = '';
+                if (data.top && data.top.length > 0) {
+                    data.top.forEach((p, idx) => {
+                        html += `
+                            <div class="leaderboard-row">
+                                <div class="leaderboard-rank">#${idx+1}</div>
+                                <div class="leaderboard-name">${escapeHtml(p.username)}</div>
+                                <div class="leaderboard-wins">${p.wins} поб.</div>
+                                ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" onclick="event.stopPropagation(); openNftModal('${prizeItem.id}')" />` : ''}
+                            </div>`;
+                    });
+                }
+                if (data.user) {
+                    html += `<div class="leaderboard-row" style="border: 1px solid var(--accent-gold);">
+                        <div class="leaderboard-rank">Вы</div>
+                        <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
+                        <div class="leaderboard-wins">${data.user.wins} поб.</div>
+                        ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" onclick="event.stopPropagation(); openNftModal('${prizeItem.id}')" />` : ''}
+                    </div>`;
+                }
+                listEl.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Нет данных</div>';
+
+                const season = await apiFetch(`${API_BASE}/season/state`);
+                if (season && season.end_time) {
+                    startSeasonTimer(season.end_time);
+                } else {
+                    document.getElementById('season-timer-display').innerText = 'Сезон не задан';
+                }
+            } catch(e) {
+                document.getElementById('leaderboard-list').innerHTML = 'Ошибка загрузки';
+            }
+        }
+
+        function closeLeaderboardModal() {
+            document.getElementById('leaderboard-modal').classList.remove('active');
+            if (seasonTimerInterval) {
+                clearInterval(seasonTimerInterval);
+                seasonTimerInterval = null;
+            }
+        }
+
+        function startSeasonTimer(endTimeMs) {
+            if (seasonTimerInterval) clearInterval(seasonTimerInterval);
+            const update = () => {
+                const now = Date.now();
+                const diff = endTimeMs - now;
+                const displayEl = document.getElementById('season-timer-display');
+                if (diff <= 0) {
+                    displayEl.innerText = 'Сезон завершён';
+                    clearInterval(seasonTimerInterval);
+                    seasonTimerInterval = null;
+                    return;
+                }
+                const days = Math.floor(diff / 86400000);
+                const hours = Math.floor((diff % 86400000) / 3600000);
+                const minutes = Math.floor((diff % 3600000) / 60000);
+                const seconds = Math.floor((diff % 60000) / 1000);
+                displayEl.innerText = `⏳ До конца сезона: ${days}д ${hours}ч ${minutes}м ${seconds}с`;
+            };
+            update();
+            seasonTimerInterval = setInterval(update, 1000);
+        }
+
         // ========== ИГРА ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -794,7 +991,7 @@
             document.getElementById('winner-name').innerText = winner.username;
             document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
             const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+';
-            document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,...'">`;
+            document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+'>`;
             document.getElementById('winner-modal').classList.add('active');
             if (winnerTimer) clearTimeout(winnerTimer);
             winnerTimer = setTimeout(() => {
@@ -875,9 +1072,16 @@
                 if (gState.players.length === 0 && gState.status === 'waiting') {
                     drawGameFrame();
                 }
+
+                // Периодическое обновление превью лидеров (раз в 30 сек)
+                if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
+                    loadLeaderboardPreview();
+                    lastLeaderboardUpdate = Date.now();
+                }
             } catch(e) { console.error("Game poll error", e); }
         }
         setInterval(pollGame, 1000);
+        let lastLeaderboardUpdate = 0;
 
         function openBetConfirm(amt) {
             betAmountTemp = amt;
@@ -922,9 +1126,11 @@
             pollGame();
         }
 
+        // Инициализация
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
+        loadLeaderboardPreview();
         pollGame();
         try { tg.expand(); } catch(e) {}
     </script>
