@@ -266,7 +266,6 @@
         .leaderboard-wins { color: var(--text-muted); font-size: 0.8rem; margin-right: 6px; }
         .leaderboard-nft { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid var(--border-color); }
 
-        /* Стили модалки приза */
         .prize-modal-content {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -487,7 +486,7 @@
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
     </div>
 
-    <!-- Модалка приза -->
+    <!-- Prize Modal (fixed) -->
     <div id="prize-detail-overlay" class="modal-overlay" onclick="closePrizeModal(event)">
         <div class="prize-modal-content" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="prize-tg-link-btn" style="display: none; top: 10px; left: 10px;">
@@ -588,7 +587,6 @@
 
         function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 
-        // --- NFT Modal ---
         function openNftModal(id) {
             const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
             if(!item) return;
@@ -620,7 +618,6 @@
                 document.getElementById('nft-detail-overlay').classList.remove('active');
         }
 
-        // --- Cart ---
         function addToCart(item) {
             if(!cart.find(c => c.id === item.id)) {
                 cart.push(item);
@@ -652,7 +649,6 @@
         }
         function removeFromCart(index) { cart.splice(index,1); localStorage.setItem('dnx_cart', JSON.stringify(cart)); renderCart(); }
 
-        // --- Buy with confirmation ---
         function confirmBuyItem(id, price, name, image_url) {
             pendingBuyItem = { id, price, name, image_url };
             document.getElementById('confirm-buy-item-info').innerHTML = `
@@ -685,7 +681,6 @@
             pendingBuyItem = null;
         }
 
-        // --- Topup ---
         document.getElementById('terms-checkbox')?.addEventListener('change', function() {
             const chkSpan = document.getElementById('custom-chk');
             if(chkSpan) {
@@ -724,7 +719,6 @@
             await updateBalance();
         }
 
-        // --- Inventory ---
         function switchInv(el, type) {
             document.querySelectorAll('#page-inventory .tab-item').forEach(t => { t.classList.remove('active'); t.style.borderColor='transparent'; t.style.color='var(--text-muted)'; });
             el.classList.add('active'); el.style.borderColor='var(--accent-gold)'; el.style.color='var(--accent-gold)';
@@ -761,7 +755,6 @@
             loadInventory();
         }
 
-        // --- История игр ---
         async function openHistoryModal() {
             const modal = document.getElementById('history-modal');
             const list = document.getElementById('history-modal-list-inner');
@@ -866,7 +859,7 @@
                                 <div class="leaderboard-rank">#${idx+1}</div>
                                 <div class="leaderboard-name">${escapeHtml(p.username)}</div>
                                 <div class="leaderboard-wins">${p.wins} поб.</div>
-                                ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" onclick="event.stopPropagation(); openPrizeModal(prizeItem)" />` : ''}
+                                ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" style="pointer-events:auto;" onclick="event.stopPropagation(); openPrizeModal(prizeItem)" />` : ''}
                             </div>`;
                     });
                 }
@@ -875,7 +868,7 @@
                         <div class="leaderboard-rank">Вы</div>
                         <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
                         <div class="leaderboard-wins">${data.user.wins} поб.</div>
-                        ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" onclick="event.stopPropagation(); openPrizeModal(prizeItem)" />` : ''}
+                        ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" style="pointer-events:auto;" onclick="event.stopPropagation(); openPrizeModal(prizeItem)" />` : ''}
                     </div>`;
                 }
                 listEl.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Нет данных</div>';
@@ -1042,7 +1035,7 @@
             if(!winner) return;
             document.getElementById('winner-name').innerText = winner.username;
             document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
-            const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+';
+            const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,...';
             document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,...'">`;
             document.getElementById('winner-modal').classList.add('active');
             if (winnerTimer) clearTimeout(winnerTimer);
@@ -1169,9 +1162,11 @@
             } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети"); }
             if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
-        async function cancelGameBet() {
-            await apiFetch(`${API_BASE}/game/cancel`, { method: 'POST', body: JSON.stringify({}) });
-            await updateBalance();
+        // Исправлена задержка отмены ставки
+        function cancelGameBet() {
+            document.getElementById('btn-cancel-bet').style.display = 'none';
+            apiFetch(`${API_BASE}/game/cancel`, { method: 'POST', body: JSON.stringify({}) });
+            updateBalance();
             pollGame();
         }
 
