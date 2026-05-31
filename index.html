@@ -291,7 +291,7 @@
 
     <header>
         <div class="header-left">
-            <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,...">
+            <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">
             <div class="username" id="username-display">User</div>
         </div>
         <div class="header-right" onclick="showPage('balance')">
@@ -301,7 +301,6 @@
 
     <div id="page-game" class="page">
         <div class="game-container">
-            <!-- Кнопка лидеров -->
             <div class="leaderboard-bar" onclick="openLeaderboardModal()">
                 <span>🏆 Лидеры сезона</span>
                 <span id="leaderboard-preview">...</span>
@@ -383,7 +382,7 @@
         <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
-    <!-- NFT Detail Modal (без изменений) -->
+    <!-- NFT Detail Modal -->
     <div id="nft-detail-overlay" class="modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;">
@@ -488,10 +487,9 @@
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
     </div>
 
-    <!-- Модалка приза (только характеристики + Telegram + OK) -->
+    <!-- Модалка приза -->
     <div id="prize-detail-overlay" class="modal-overlay" onclick="closePrizeModal(event)">
         <div class="prize-modal-content" onclick="event.stopPropagation()">
-            <!-- Иконка Telegram в левом верхнем углу -->
             <div class="modal-tg-btn" id="prize-tg-link-btn" style="display: none; top: 10px; left: 10px;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
@@ -763,7 +761,7 @@
             loadInventory();
         }
 
-        // --- История игр (модальное окно) ---
+        // --- История игр ---
         async function openHistoryModal() {
             const modal = document.getElementById('history-modal');
             const list = document.getElementById('history-modal-list-inner');
@@ -802,7 +800,6 @@
             }
         }
 
-        // Открытие модалки приза (исправлено)
         function openPrizeModal(prizeItem) {
             if (!prizeItem) return;
             document.getElementById('prize-modal-img').src = prizeItem.image_url;
@@ -1004,7 +1001,6 @@
                 </div>`).join('');
         }
 
-        // Анимация по готовой траектории
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const trajectory = params.trajectory;
@@ -1046,7 +1042,7 @@
             if(!winner) return;
             document.getElementById('winner-name').innerText = winner.username;
             document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
-            const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,...';
+            const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+';
             document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,...'">`;
             document.getElementById('winner-modal').classList.add('active');
             if (winnerTimer) clearTimeout(winnerTimer);
@@ -1073,7 +1069,6 @@
                     }
                 }
 
-                // Таймер
                 if (newState.status === 'counting') {
                     if (!timerInterval || newState.timer !== gState.timer) {
                         gState.timer = newState.timer;
@@ -1115,7 +1110,6 @@
                     drawGameFrame();
                 }
 
-                // Победитель
                 if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
                     if (document.getElementById('page-game').classList.contains('page-active')) {
                         lastShownRoundId = gState.round_id;
@@ -1129,7 +1123,6 @@
                     drawGameFrame();
                 }
 
-                // Периодическое обновление превью лидеров (раз в 30 сек)
                 if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
                     loadLeaderboardPreview();
                     lastLeaderboardUpdate = Date.now();
@@ -1182,7 +1175,6 @@
             pollGame();
         }
 
-        // Инициализация
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
