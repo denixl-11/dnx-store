@@ -266,7 +266,6 @@
         .leaderboard-wins { color: var(--text-muted); font-size: 0.8rem; margin-right: 6px; }
         .leaderboard-nft { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid var(--border-color); }
 
-        /* ИСПРАВЛЕНИЕ Z-INDEX для призового окна */
         #prize-detail-overlay { z-index: 3000; }
 
         .prize-modal-content {
@@ -489,7 +488,7 @@
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
     </div>
 
-    <!-- Prize Modal (ИСПРАВЛЕН z-index) -->
+    <!-- Prize Modal -->
     <div id="prize-detail-overlay" class="modal-overlay" onclick="closePrizeModal(event)">
         <div class="prize-modal-content" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="prize-tg-link-btn" style="display: none; top: 10px; left: 10px;">
@@ -535,6 +534,7 @@
         let pendingTopupAmount = 0;
         let betAmountTemp = 0;
         let pendingBuyItem = null;
+        let currentPrizeItem = null; // глобальный приз
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
@@ -781,8 +781,6 @@
         }
 
         // --- Призы ---
-        let currentPrizeItems = [];
-
         async function loadPrizeItems() {
             try {
                 const res = await fetch(`${API_BASE}/prize/items`);
@@ -796,12 +794,12 @@
             }
         }
 
-        function openPrizeModal(prizeItem) {
-            if (!prizeItem) return;
-            document.getElementById('prize-modal-img').src = prizeItem.image_url;
-            document.getElementById('prize-modal-title').innerText = prizeItem.name;
-            document.getElementById('prize-modal-number').innerText = prizeItem.number ? `#${prizeItem.number}` : '';
-            let traits = prizeItem.traits || [];
+        function openPrizeModal() {
+            if (!currentPrizeItem) return;
+            document.getElementById('prize-modal-img').src = currentPrizeItem.image_url;
+            document.getElementById('prize-modal-title').innerText = currentPrizeItem.name;
+            document.getElementById('prize-modal-number').innerText = currentPrizeItem.number ? `#${currentPrizeItem.number}` : '';
+            let traits = currentPrizeItem.traits || [];
             if (typeof traits === 'string') {
                 try { traits = JSON.parse(traits); } catch(e) { traits = []; }
             }
@@ -810,11 +808,11 @@
                 '<p style="color:var(--text-muted);">Нет характеристик</p>';
 
             const tgBtn = document.getElementById('prize-tg-link-btn');
-            if (prizeItem.nft_link) {
+            if (currentPrizeItem.nft_link) {
                 tgBtn.style.display = 'flex';
                 tgBtn.onclick = (e) => {
                     e.stopPropagation();
-                    window.open(prizeItem.nft_link, '_blank');
+                    window.open(currentPrizeItem.nft_link, '_blank');
                 };
             } else {
                 tgBtn.style.display = 'none';
@@ -846,10 +844,11 @@
 
         async function openLeaderboardModal() {
             document.getElementById('leaderboard-modal').classList.add('active');
-            if (currentPrizeItems.length === 0) {
+            // загружаем призы, если ещё не загружены
+            if (!currentPrizeItems.length) {
                 await loadPrizeItems();
             }
-            const prizeItem = currentPrizeItems.length > 0 ? currentPrizeItems[0] : null;
+            currentPrizeItem = currentPrizeItems.length > 0 ? currentPrizeItems[0] : null;
 
             try {
                 const data = await apiFetch(`${API_BASE}/leaderboard`);
@@ -862,7 +861,7 @@
                                 <div class="leaderboard-rank">#${idx+1}</div>
                                 <div class="leaderboard-name">${escapeHtml(p.username)}</div>
                                 <div class="leaderboard-wins">${p.wins} поб.</div>
-                                ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" style="pointer-events:auto;" onclick="event.stopPropagation(); openPrizeModal(prizeItem)" />` : ''}
+                                ${currentPrizeItem ? `<img class="leaderboard-nft" src="${currentPrizeItem.image_url}" style="pointer-events:auto;" onclick="event.stopPropagation(); openPrizeModal()" />` : ''}
                             </div>`;
                     });
                 }
@@ -871,7 +870,7 @@
                         <div class="leaderboard-rank">Вы</div>
                         <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
                         <div class="leaderboard-wins">${data.user.wins} поб.</div>
-                        ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" style="pointer-events:auto;" onclick="event.stopPropagation(); openPrizeModal(prizeItem)" />` : ''}
+                        ${currentPrizeItem ? `<img class="leaderboard-nft" src="${currentPrizeItem.image_url}" style="pointer-events:auto;" onclick="event.stopPropagation(); openPrizeModal()" />` : ''}
                     </div>`;
                 }
                 listEl.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Нет данных</div>';
@@ -1165,15 +1164,14 @@
             } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети"); }
             if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
+
         // МГНОВЕННАЯ ОТМЕНА БЕЗ ПРОЛАГА
         function cancelGameBet() {
-            // немедленно скрываем кнопку и очищаем локальное состояние игроков
             document.getElementById('btn-cancel-bet').style.display = 'none';
             gState.players = [];
             gState.pool = 0;
             drawGameFrame();
             renderBetsList();
-            // отправляем запрос на сервер и обновляем баланс/состояние в фоне
             apiFetch(`${API_BASE}/game/cancel`, { method: 'POST', body: JSON.stringify({}) });
             updateBalance();
             pollGame();
