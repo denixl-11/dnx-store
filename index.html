@@ -202,7 +202,6 @@
             border-radius: 10px;
         }
 
-        /* Стили лидеров и сезона */
         .leaderboard-bar {
             width: 90%;
             background: linear-gradient(135deg, rgba(203,161,83,0.2), rgba(203,161,83,0.05));
@@ -217,13 +216,8 @@
             color: var(--accent-gold);
             font-weight: 700;
             font-size: 0.9rem;
-            transition: background 0.2s;
         }
-        .leaderboard-bar:hover { background: linear-gradient(135deg, rgba(203,161,83,0.3), rgba(203,161,83,0.1)); }
-        .leaderboard-bar span:last-child {
-            font-size: 0.8rem;
-            opacity: 0.9;
-        }
+        .leaderboard-bar span:last-child { font-size: 0.8rem; opacity: 0.9; }
 
         .leaderboard-fullscreen {
             position: fixed;
@@ -255,14 +249,9 @@
             font-size: 0.8rem;
             color: var(--accent-gold);
             margin-bottom: 20px;
-            font-weight: 500;
         }
 
-        .leaderboard-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
+        .leaderboard-list { display: flex; flex-direction: column; gap: 8px; }
         .leaderboard-row {
             display: flex;
             align-items: center;
@@ -272,36 +261,37 @@
             padding: 10px 14px;
             border: 1px solid var(--border-color);
         }
-        .leaderboard-rank {
-            font-weight: 700;
-            color: var(--accent-gold);
-            width: 24px;
-            text-align: center;
-        }
-        .leaderboard-name {
-            flex: 1;
-            font-weight: 500;
-        }
-        .leaderboard-wins {
-            color: var(--text-muted);
-            font-size: 0.8rem;
-            margin-right: 6px;
-        }
-        .leaderboard-nft {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            object-fit: cover;
-            cursor: pointer;
+        .leaderboard-rank { font-weight: 700; color: var(--accent-gold); width: 24px; text-align: center; }
+        .leaderboard-name { flex: 1; font-weight: 500; }
+        .leaderboard-wins { color: var(--text-muted); font-size: 0.8rem; margin-right: 6px; }
+        .leaderboard-nft { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid var(--border-color); }
+
+        /* Стили модалки приза */
+        .prize-modal-content {
+            background: var(--bg-card);
             border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            position: relative;
+            padding: 20px;
         }
+        .prize-modal-img {
+            width: 200px;
+            height: 200px;
+            border-radius: 16px;
+            object-fit: cover;
+            margin-bottom: 16px;
+        }
+        .prize-modal-traits { margin: 12px 0; }
     </style>
 </head>
 <body>
 
     <header>
         <div class="header-left">
-            <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">
+            <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,...">
             <div class="username" id="username-display">User</div>
         </div>
         <div class="header-right" onclick="showPage('balance')">
@@ -393,7 +383,7 @@
         <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
-    <!-- NFT Detail Modal -->
+    <!-- NFT Detail Modal (без изменений) -->
     <div id="nft-detail-overlay" class="modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;">
@@ -498,6 +488,21 @@
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
     </div>
 
+    <!-- Модалка приза (только характеристики + Telegram + OK) -->
+    <div id="prize-detail-overlay" class="modal-overlay" onclick="closePrizeModal(event)">
+        <div class="prize-modal-content" onclick="event.stopPropagation()">
+            <!-- Иконка Telegram в левом верхнем углу -->
+            <div class="modal-tg-btn" id="prize-tg-link-btn" style="display: none; top: 10px; left: 10px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <img id="prize-modal-img" class="prize-modal-img" src="" />
+            <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-main);" id="prize-modal-title"></div>
+            <div style="color: var(--text-muted); font-size: 0.9rem;" id="prize-modal-number"></div>
+            <div class="prize-modal-traits" id="prize-modal-traits"></div>
+            <button class="btn-main-action" onclick="closePrizeModal()">ОК</button>
+        </div>
+    </div>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
@@ -548,7 +553,7 @@
             if(id === 'game') {
                 resizeCanvas();
                 drawGameFrame();
-                pollGame(); // немедленный запрос, чтобы обновить номер и лидеров
+                pollGame();
                 loadLeaderboardPreview();
             }
             if(id === 'store') loadCatalog();
@@ -781,6 +786,54 @@
             }
         }
 
+        // --- Призы ---
+        let currentPrizeItems = [];
+
+        async function loadPrizeItems() {
+            try {
+                const res = await fetch(`${API_BASE}/prize/items`);
+                if (res.ok) {
+                    currentPrizeItems = await res.json();
+                } else {
+                    currentPrizeItems = [];
+                }
+            } catch(e) {
+                currentPrizeItems = [];
+            }
+        }
+
+        // Открытие модалки приза (исправлено)
+        function openPrizeModal(prizeItem) {
+            if (!prizeItem) return;
+            document.getElementById('prize-modal-img').src = prizeItem.image_url;
+            document.getElementById('prize-modal-title').innerText = prizeItem.name;
+            document.getElementById('prize-modal-number').innerText = prizeItem.number ? `#${prizeItem.number}` : '';
+            let traits = prizeItem.traits || [];
+            if (typeof traits === 'string') {
+                try { traits = JSON.parse(traits); } catch(e) { traits = []; }
+            }
+            document.getElementById('prize-modal-traits').innerHTML = traits.length ?
+                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
+                '<p style="color:var(--text-muted);">Нет характеристик</p>';
+
+            const tgBtn = document.getElementById('prize-tg-link-btn');
+            if (prizeItem.nft_link) {
+                tgBtn.style.display = 'flex';
+                tgBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    window.open(prizeItem.nft_link, '_blank');
+                };
+            } else {
+                tgBtn.style.display = 'none';
+            }
+            document.getElementById('prize-detail-overlay').classList.add('active');
+        }
+
+        function closePrizeModal(event) {
+            if (event && event.target !== document.getElementById('prize-detail-overlay') && event.target.id !== 'prize-detail-overlay') return;
+            document.getElementById('prize-detail-overlay').classList.remove('active');
+        }
+
         // --- Лидеры и сезон ---
         async function loadLeaderboardPreview() {
             try {
@@ -800,11 +853,14 @@
 
         async function openLeaderboardModal() {
             document.getElementById('leaderboard-modal').classList.add('active');
+            if (currentPrizeItems.length === 0) {
+                await loadPrizeItems();
+            }
+            const prizeItem = currentPrizeItems.length > 0 ? currentPrizeItems[0] : null;
+
             try {
                 const data = await apiFetch(`${API_BASE}/leaderboard`);
                 const listEl = document.getElementById('leaderboard-list');
-                // В качестве приза показываем первый предмет из каталога (позже можно заменить на конкретный ID)
-                const prizeItem = currentCatalog.length > 0 ? currentCatalog[0] : null;
                 let html = '';
                 if (data.top && data.top.length > 0) {
                     data.top.forEach((p, idx) => {
@@ -813,7 +869,7 @@
                                 <div class="leaderboard-rank">#${idx+1}</div>
                                 <div class="leaderboard-name">${escapeHtml(p.username)}</div>
                                 <div class="leaderboard-wins">${p.wins} поб.</div>
-                                ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" onclick="event.stopPropagation(); openNftModal('${prizeItem.id}')" />` : ''}
+                                ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" onclick="event.stopPropagation(); openPrizeModal(prizeItem)" />` : ''}
                             </div>`;
                     });
                 }
@@ -822,7 +878,7 @@
                         <div class="leaderboard-rank">Вы</div>
                         <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
                         <div class="leaderboard-wins">${data.user.wins} поб.</div>
-                        ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" onclick="event.stopPropagation(); openNftModal('${prizeItem.id}')" />` : ''}
+                        ${prizeItem ? `<img class="leaderboard-nft" src="${prizeItem.image_url}" onclick="event.stopPropagation(); openPrizeModal(prizeItem)" />` : ''}
                     </div>`;
                 }
                 listEl.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Нет данных</div>';
@@ -990,8 +1046,8 @@
             if(!winner) return;
             document.getElementById('winner-name').innerText = winner.username;
             document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
-            const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+';
-            document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+'>`;
+            const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,...';
+            document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,...'">`;
             document.getElementById('winner-modal').classList.add('active');
             if (winnerTimer) clearTimeout(winnerTimer);
             winnerTimer = setTimeout(() => {
@@ -1130,6 +1186,7 @@
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
+        loadPrizeItems();
         loadLeaderboardPreview();
         pollGame();
         try { tg.expand(); } catch(e) {}

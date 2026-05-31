@@ -64,6 +64,7 @@ def init_db():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # Пользователи
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
@@ -71,8 +72,10 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
+                # Предметы (товары)
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
+                # История игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -82,6 +85,7 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
+                # Счётчик игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_counter (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -93,7 +97,7 @@ def init_db():
                 last_num = cur.fetchone()[0]
                 game_state["game_number"] = last_num
 
-                # Новые таблицы
+                # Лидеры
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS leaderboard (
                         user_id VARCHAR(255) PRIMARY KEY,
@@ -101,16 +105,29 @@ def init_db():
                         wins INT DEFAULT 0
                     )
                 """)
+                # Сезон
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS season (
                         id INT PRIMARY KEY DEFAULT 1,
                         end_time TIMESTAMPTZ
                     )
                 """)
+                # Вставляем дефолтный конец сезона, если нет
                 cur.execute("INSERT INTO season (id, end_time) VALUES (1, '2026-06-30 15:00:00+00') ON CONFLICT (id) DO NOTHING")
 
+                # Призы для лидеров
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS prize_items (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        image_url TEXT NOT NULL,
+                        nft_link TEXT NOT NULL DEFAULT '',
+                        traits JSONB DEFAULT '[]'::jsonb
+                    )
+                """)
+
                 conn.commit()
-                logging.info(f"Game number initialized to {last_num}")
+                logging.info(f"База данных инициализирована. Номер игры: {last_num}")
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
 
@@ -544,10 +561,8 @@ async def handle_leaderboard(request):
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Топ-5
                 cur.execute("SELECT username, wins FROM leaderboard ORDER BY wins DESC LIMIT 5")
                 top_rows = cur.fetchall()
-                # Строка пользователя
                 cur.execute("SELECT username, wins FROM leaderboard WHERE user_id = %s", (user_id,))
                 user_row = cur.fetchone()
         result = {"top": [], "user": None}
@@ -575,6 +590,24 @@ async def handle_season_state(request):
         return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+async def handle_get_prize_items(request):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT id, name, image_url, nft_link, traits FROM prize_items ORDER BY id")
+                items = cur.fetchall()
+                for item in items:
+                    traits = item.get('traits')
+                    if isinstance(traits, str):
+                        try:
+                            item['traits'] = json.loads(traits)
+                        except:
+                            item['traits'] = []
+        return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        logging.error(f"Prize items error: {e}")
+        return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
 async def handle_get_requisites(request):
@@ -655,6 +688,7 @@ app.router.add_post('/game/finish', handle_game_finish)
 app.router.add_get('/game/history', handle_game_history)
 app.router.add_get('/leaderboard', handle_leaderboard)
 app.router.add_get('/season/state', handle_season_state)
+app.router.add_get('/prize/items', handle_get_prize_items)
 app.router.add_options('/{tail:.*}', handle_options)
 
 async def main():
