@@ -535,7 +535,9 @@
         let betAmountTemp = 0;
         let pendingBuyItem = null;
         let currentPrizeItem = null;
-        let cancelInProgress = false; // флаг для мгновенной отмены
+
+        // Глобальный флаг для мгновенной отмены (только одна декларация!)
+        let cancelInProgress = false;
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
@@ -782,6 +784,8 @@
         }
 
         // --- Призы ---
+        let currentPrizeItems = [];
+
         async function loadPrizeItems() {
             try {
                 const res = await fetch(`${API_BASE}/prize/items`);
@@ -845,7 +849,7 @@
 
         async function openLeaderboardModal() {
             document.getElementById('leaderboard-modal').classList.add('active');
-            if (!currentPrizeItems.length) {
+            if (currentPrizeItems.length === 0) {
                 await loadPrizeItems();
             }
             currentPrizeItem = currentPrizeItems.length > 0 ? currentPrizeItems[0] : null;
@@ -925,7 +929,6 @@
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
         let initialGameStateLoaded = false;
-        let cancelInProgress = false;   // флаг для мгновенной отмены
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -1085,7 +1088,7 @@
                     document.getElementById('game-timer-bg').innerText = '';
                 }
 
-                // Не обновляем список игроков, если идёт отмена
+                // Не обновляем players, если идёт отмена
                 if (!cancelInProgress) {
                     gState.players = newState.players;
                     gState.pool = newState.pool;
@@ -1187,7 +1190,6 @@
             renderBetsList();
             apiFetch(`${API_BASE}/game/cancel`, { method: 'POST', body: JSON.stringify({}) })
                 .then(() => {
-                    // как только сервер подтвердит отмену, разблокируем обновление
                     cancelInProgress = false;
                     updateBalance();
                     pollGame();
