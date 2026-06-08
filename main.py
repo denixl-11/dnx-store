@@ -3,6 +3,7 @@ import logging
 import os
 import json
 import random
+import math
 import hashlib
 import hmac
 from urllib.parse import parse_qs
@@ -64,7 +65,6 @@ def init_db():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Пользователи
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
@@ -72,10 +72,8 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                # Предметы (товары)
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
-                # История игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -85,7 +83,6 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
-                # Счётчик игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_counter (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -97,7 +94,6 @@ def init_db():
                 last_num = cur.fetchone()[0]
                 game_state["game_number"] = last_num
 
-                # Лидеры
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS leaderboard (
                         user_id VARCHAR(255) PRIMARY KEY,
@@ -105,17 +101,13 @@ def init_db():
                         wins INT DEFAULT 0
                     )
                 """)
-                # Сезон
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS season (
                         id INT PRIMARY KEY DEFAULT 1,
                         end_time TIMESTAMPTZ
                     )
                 """)
-                # Вставляем дефолтный конец сезона, если нет
                 cur.execute("INSERT INTO season (id, end_time) VALUES (1, '2026-06-30 15:00:00+00') ON CONFLICT (id) DO NOTHING")
-
-                # Призы для лидеров
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS prize_items (
                         id SERIAL PRIMARY KEY,
@@ -125,9 +117,8 @@ def init_db():
                         traits JSONB DEFAULT '[]'::jsonb
                     )
                 """)
-
                 conn.commit()
-                logging.info(f"База данных инициализирована. Номер игры: {last_num}")
+                logging.info(f"DB initialized. Game number: {last_num}")
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
 
@@ -168,26 +159,55 @@ def require_auth(handler):
         return await handler(request)
     return wrapper
 
-# Предрассчёт траектории
-def generate_trajectory(initial_speed: float, direction: int, duration_ms=10000, dt=16):
-    x = 500
-    velocity = direction * initial_speed
-    elapsed = 0
+# Новая двумерная физика
+def generate_2d_trajectory(duration_ms=10000, dt=16):
+    """Возвращает список точек [{x: float 0..1, y: float 0..1}] за всё время симуляции."""
+    # Начальная позиция – случайная точка на поле (исключая границы)
+    x = random.uniform(0.1, 0.9) * 1000
+    y = random.uniform(0.1, 0.9) * 1000
+
+    # Начальная скорость 4000-4500 пикселей/сек в случайном направлении
+    angle = random.uniform(0, 2 * math.pi)
+    speed = random.uniform(4000, 4500)
+    vx = math.cos(angle) * speed
+    vy = math.sin(angle) * speed
+
     frames = []
+    elapsed = 0
     while elapsed < duration_ms:
         progress = elapsed / duration_ms
-        speed_factor = 1 - 0.8 * (progress / 0.5) if progress <= 0.5 else 0.2 * (1 - (progress - 0.5) / 0.5)
-        step = (1 if velocity > 0 else -1) * initial_speed * speed_factor * (dt / 1000)
-        x += step
+        # Функция замедления (как раньше)
+        if progress <= 0.5:
+            speed_factor = 1 - 0.8 * (progress / 0.5)
+        else:
+            speed_factor = 0.2 * (1 - (progress - 0.5) / 0.5)
+
+        step_x = vx * speed_factor * (dt / 1000)
+        step_y = vy * speed_factor * (dt / 1000)
+
+        x += step_x
+        y += step_y
+
+        # Отскоки от стен (потери 10% энергии)
         if x <= 0:
             x = 0
-            velocity = abs(velocity) * 0.9
+            vx = abs(vx) * 0.9
         elif x >= 1000:
             x = 1000
-            velocity = -abs(velocity) * 0.9
-        frames.append(x / 1000)
+            vx = -abs(vx) * 0.9
+
+        if y <= 0:
+            y = 0
+            vy = abs(vy) * 0.9
+        elif y >= 1000:
+            y = 1000
+            vy = -abs(vy) * 0.9
+
+        frames.append({"x": x / 1000, "y": y / 1000})
         elapsed += dt
-    frames.append(x / 1000)
+
+    # Финальная точка
+    frames.append({"x": x / 1000, "y": y / 1000})
     return frames
 
 PLAYER_COLORS = [
@@ -247,7 +267,6 @@ async def finish_round(winner_x: float, pool: float, players: dict) -> dict | No
                 if not cur.fetchone():
                     return None
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
-                # Обновляем лидеров
                 cur.execute("""
                     INSERT INTO leaderboard (user_id, username, wins) VALUES (%s, %s, 1)
                     ON CONFLICT (user_id) DO UPDATE SET wins = leaderboard.wins + 1, username = EXCLUDED.username
@@ -283,20 +302,19 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
-                    initial_speed = random.uniform(4000, 4500)
-                    direction = 1 if random.random() > 0.5 else -1
-                    trajectory = generate_trajectory(initial_speed, direction)
-                    target = trajectory[-1]
+                    trajectory = generate_2d_trajectory()
+                    # target_position – x последней точки
+                    target_x = trajectory[-1]["x"]
                     game_state["spin_params"] = {
                         "trajectory": trajectory,
-                        "target_position": target
+                        "target_position": target_x
                     }
-                    game_state["target_position"] = target
+                    game_state["target_position"] = target_x
                     game_state["round_id"] = random.randint(1, 10**9)
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning: target={target:.4f}, round_id={game_state['round_id']}, game_number={game_state['game_number']}")
+                    logging.info(f"Spinning 2D: target_x={target_x:.4f}, round_id={game_state['round_id']}, game_number={game_state['game_number']}")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(10.2)
@@ -315,7 +333,7 @@ async def game_worker():
                     game_state["timer"] = 15
                     logging.info(f"Round finished, winner: {winner_data}")
 
-# API
+# API (все эндпоинты как в последней стабильной версии, без изменений)
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,

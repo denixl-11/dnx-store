@@ -535,8 +535,6 @@
         let betAmountTemp = 0;
         let pendingBuyItem = null;
         let currentPrizeItem = null;
-
-        // Глобальный флаг для мгновенной отмены (только одна декларация!)
         let cancelInProgress = false;
 
         function showAlert(msg) {
@@ -920,7 +918,7 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // ========== ИГРА ==========
+        // ========== ИГРА (обновлённая 2D анимация) ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, last_winner_id: null, round_id: null, game_number: 0 };
@@ -929,6 +927,7 @@
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
         let initialGameStateLoaded = false;
+        let prevBallPos = null;
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -938,9 +937,10 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
-        function drawGameFrame(ballX = null) {
+        function drawGameFrame(ballPos = null) {
             if(!ctx) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
             if(gState.players && gState.players.length > 0) {
                 let curX = 0;
                 const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
@@ -964,21 +964,34 @@
                 ctx.textAlign = "center";
                 ctx.fillText("Ждем ставки...", canvas.width/2, canvas.height/2);
             }
-            if(ballX !== null && ballX !== undefined) {
+
+            if(ballPos) {
+                const bx = ballPos.x * canvas.width;
+                const by = ballPos.y * canvas.height;
+
+                if(prevBallPos) {
+                    const angle = Math.atan2(by - prevBallPos.y * canvas.height, bx - prevBallPos.x * canvas.width);
+                    const arrowLen = 25;
+                    ctx.beginPath();
+                    ctx.moveTo(bx, by);
+                    ctx.lineTo(bx + Math.cos(angle) * arrowLen, by + Math.sin(angle) * arrowLen);
+                    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                }
+
                 ctx.beginPath();
-                ctx.arc(ballX, canvas.height/2, 20, 0, Math.PI*2);
+                ctx.arc(bx, by, 20, 0, Math.PI*2);
                 ctx.fillStyle = "#fff";
                 ctx.shadowColor = "#fff";
                 ctx.shadowBlur = 15;
                 ctx.fill();
                 ctx.shadowBlur = 0;
                 ctx.closePath();
-                ctx.beginPath();
-                ctx.moveTo(ballX, 0);
-                ctx.lineTo(ballX, canvas.height);
-                ctx.strokeStyle = "rgba(255,255,255,0.8)";
-                ctx.lineWidth = 4;
-                ctx.stroke();
+
+                prevBallPos = ballPos;
+            } else {
+                prevBallPos = null;
             }
         }
 
@@ -1005,18 +1018,19 @@
             const trajectory = params.trajectory;
             const startTime = performance.now();
             const frameDuration = 16;
+            prevBallPos = null;
 
             function animate(now) {
                 const elapsed = now - startTime;
                 const frameIndex = Math.floor(elapsed / frameDuration);
                 if (frameIndex >= trajectory.length) {
-                    const finalPos = trajectory[trajectory.length-1] * canvas.width;
+                    const finalPos = trajectory[trajectory.length-1];
                     drawGameFrame(finalPos);
                     animationFrameId = null;
                     fetchWinnerNow();
                     return;
                 }
-                const pos = trajectory[frameIndex] * canvas.width;
+                const pos = trajectory[frameIndex];
                 drawGameFrame(pos);
                 animationFrameId = requestAnimationFrame(animate);
             }
@@ -1088,7 +1102,6 @@
                     document.getElementById('game-timer-bg').innerText = '';
                 }
 
-                // Не обновляем players, если идёт отмена
                 if (!cancelInProgress) {
                     gState.players = newState.players;
                     gState.pool = newState.pool;
@@ -1180,7 +1193,7 @@
             if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
 
-        // МГНОВЕННАЯ ОТМЕНА БЕЗ ПРОЛАГА
+        // МГНОВЕННАЯ ОТМЕНА
         function cancelGameBet() {
             cancelInProgress = true;
             document.getElementById('btn-cancel-bet').style.display = 'none';
