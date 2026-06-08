@@ -918,16 +918,19 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // ========== ИГРА (обновлённая 2D анимация) ==========
+        // ========== ИГРА ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        let gState = { players: [], pool: 0, status: 'waiting', timer: 15, spin_params: null, winner: null, last_winner_id: null, round_id: null, game_number: 0 };
+        let gState = {
+            players: [], pool: 0, status: 'waiting', timer: 15,
+            spin_params: null, winner: null, last_winner_id: null,
+            round_id: null, game_number: 0, sectors: null
+        };
         let isSpinning = false;
         let animationFrameId = null;
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
         let initialGameStateLoaded = false;
-        let prevBallPos = null;
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -937,40 +940,62 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
+        function pointOnBounds(angle, cw, ch) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            const tx = (cos > 0) ? cw / cos : 0;
+            const ty = (sin > 0) ? ch / sin : 0;
+            if (tx < ty) return { x: cw, y: cw * Math.tan(angle) };
+            else return { x: ch / Math.tan(angle), y: ch };
+        }
+
         function drawGameFrame(ballPos = null) {
             if(!ctx) return;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const cw = canvas.width;
+            const ch = canvas.height;
+            ctx.clearRect(0, 0, cw, ch);
 
-            if(gState.players && gState.players.length > 0) {
+            if(gState.sectors && gState.sectors.length > 0) {
+                const origin = { x: 0, y: ch };
+                for (const sec of gState.sectors) {
+                    const p1 = pointOnBounds(sec.angle_start, cw, ch);
+                    const p2 = pointOnBounds(sec.angle_end, cw, ch);
+                    ctx.fillStyle = sec.color;
+                    ctx.beginPath();
+                    ctx.moveTo(origin.x, origin.y);
+                    ctx.lineTo(p1.x, ch - p1.y);
+                    ctx.lineTo(p2.x, ch - p2.y);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            } else if (gState.players && gState.players.length > 0) {
                 let curX = 0;
                 const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
                 sorted.forEach(p => {
-                    const w = (p.amount / gState.pool) * canvas.width;
+                    const w = (p.amount / gState.pool) * cw;
                     ctx.fillStyle = p.color;
-                    ctx.fillRect(curX, 0, w, canvas.height);
-                    ctx.fillStyle = "rgba(0,0,0,0.5)";
-                    ctx.fillRect(curX, canvas.height-40, w, 40);
-                    ctx.fillStyle = "#fff";
-                    ctx.font = "24px Inter";
-                    ctx.textAlign = "center";
-                    ctx.fillText(p.username.substring(0,6), curX + w/2, canvas.height - 12);
+                    ctx.fillRect(curX, 0, w, ch);
                     curX += w;
                 });
             } else {
                 ctx.fillStyle = "rgba(255,255,255,0.05)";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillRect(0, 0, cw, ch);
                 ctx.fillStyle = "#555";
                 ctx.font = "30px Inter";
                 ctx.textAlign = "center";
-                ctx.fillText("Ждем ставки...", canvas.width/2, canvas.height/2);
+                ctx.fillText("Ждем ставки...", cw/2, ch/2);
             }
 
-            if(ballPos) {
-                const bx = ballPos.x * canvas.width;
-                const by = ballPos.y * canvas.height;
-
-                if(prevBallPos) {
-                    const angle = Math.atan2(by - prevBallPos.y * canvas.height, bx - prevBallPos.x * canvas.width);
+            if (ballPos) {
+                const bx = ballPos.x * cw;
+                const by = (1 - ballPos.y) * ch;
+                if (ballPos.prev) {
+                    const px = ballPos.prev.x * cw;
+                    const py = (1 - ballPos.prev.y) * ch;
+                    const angle = Math.atan2(by - py, bx - px);
                     const arrowLen = 25;
                     ctx.beginPath();
                     ctx.moveTo(bx, by);
@@ -979,7 +1004,6 @@
                     ctx.lineWidth = 2.5;
                     ctx.stroke();
                 }
-
                 ctx.beginPath();
                 ctx.arc(bx, by, 20, 0, Math.PI*2);
                 ctx.fillStyle = "#fff";
@@ -988,10 +1012,6 @@
                 ctx.fill();
                 ctx.shadowBlur = 0;
                 ctx.closePath();
-
-                prevBallPos = ballPos;
-            } else {
-                prevBallPos = null;
             }
         }
 
@@ -1015,24 +1035,42 @@
 
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            const trajectory = params.trajectory;
             const startTime = performance.now();
-            const frameDuration = 16;
-            prevBallPos = null;
+            const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
+            let prevPos = null;
 
             function animate(now) {
                 const elapsed = now - startTime;
-                const frameIndex = Math.floor(elapsed / frameDuration);
-                if (frameIndex >= trajectory.length) {
+
+                if (elapsed < spinDuration) {
+                    const t = elapsed / spinDuration;
+                    const currentAngleSpeed = spinAngleSpeed * (1 - t);
+                    const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
+                    const ball = { x: startPos.x, y: startPos.y, angle };
+                    drawGameFrame(ball);
+                    animationFrameId = requestAnimationFrame(animate);
+                } else if (elapsed < spinDuration + 5000) {
+                    const motionElapsed = elapsed - spinDuration;
+                    const frameIndex = Math.floor(motionElapsed / 16);
+                    if (frameIndex >= trajectory.length) {
+                        const finalPos = trajectory[trajectory.length-1];
+                        drawGameFrame(finalPos);
+                        animationFrameId = null;
+                        fetchWinnerNow();
+                        return;
+                    }
+                    const pos = trajectory[frameIndex];
+                    if (prevPos) pos.prev = prevPos;
+                    else pos.prev = startPos;
+                    drawGameFrame(pos);
+                    prevPos = pos;
+                    animationFrameId = requestAnimationFrame(animate);
+                } else {
                     const finalPos = trajectory[trajectory.length-1];
                     drawGameFrame(finalPos);
                     animationFrameId = null;
                     fetchWinnerNow();
-                    return;
                 }
-                const pos = trajectory[frameIndex];
-                drawGameFrame(pos);
-                animationFrameId = requestAnimationFrame(animate);
             }
             animationFrameId = requestAnimationFrame(animate);
         }
@@ -1112,6 +1150,7 @@
                 gState.last_winner_id = newState.last_winner_id;
                 gState.round_id = newState.round_id;
                 gState.game_number = newState.game_number;
+                gState.sectors = newState.sectors;
 
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
@@ -1124,7 +1163,7 @@
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
 
-                if (gState.status === 'spinning' && !isSpinning && gState.spin_params && gState.spin_params.trajectory) {
+                if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
                     isSpinning = true;
                     runSpinAnimation(gState.spin_params);
                 } else if (gState.status !== 'spinning' && isSpinning) {
@@ -1193,7 +1232,6 @@
             if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
 
-        // МГНОВЕННАЯ ОТМЕНА
         function cancelGameBet() {
             cancelInProgress = true;
             document.getElementById('btn-cancel-bet').style.display = 'none';

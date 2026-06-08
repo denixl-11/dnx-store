@@ -46,7 +46,6 @@ dp = Dispatcher()
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
 
-# Глобальный game_state
 game_lock = asyncio.Lock()
 game_state = {
     "status": "waiting",
@@ -58,7 +57,8 @@ game_state = {
     "winner": None,
     "last_winner_id": None,
     "round_id": None,
-    "game_number": 0
+    "game_number": 0,
+    "sectors": None       # будет хранить список секторов для текущего раунда
 }
 
 def init_db():
@@ -159,57 +159,124 @@ def require_auth(handler):
         return await handler(request)
     return wrapper
 
-# Новая двумерная физика
-def generate_2d_trajectory(duration_ms=10000, dt=16):
-    """Возвращает список точек [{x: float 0..1, y: float 0..1}] за всё время симуляции."""
-    # Начальная позиция – случайная точка на поле (исключая границы)
-    x = random.uniform(0.1, 0.9) * 1000
-    y = random.uniform(0.1, 0.9) * 1000
+# ------------------------------------------------------------
+# Генерация секторов (треугольники от левого нижнего угла)
+# ------------------------------------------------------------
+def angle_from_area(area: float) -> float:
+    """Возвращает угол (рад) для заданной кумулятивной доли площади (0..1)."""
+    if area <= 0.5:
+        return math.atan(2 * area)
+    else:
+        return math.pi/2 - math.atan(2 * (1 - area))
 
-    # Начальная скорость 4000-4500 пикселей/сек в случайном направлении
-    angle = random.uniform(0, 2 * math.pi)
-    speed = random.uniform(4000, 4500)
+def build_sectors(players_dict: dict) -> list:
+    """
+    players_dict: {uid: {id, username, amount, color}}
+    Возвращает список секторов: [{player_id, username, color, angle_start, angle_end}]
+    Углы в радианах, от 0 до pi/2 (левый нижний угол).
+    """
+    if not players_dict:
+        return []
+    # сортируем по убыванию ставки
+    sorted_players = sorted(players_dict.values(), key=lambda p: p["amount"], reverse=True)
+    total = sum(p["amount"] for p in sorted_players)
+    sectors = []
+    cum_angle = 0.0
+    for p in sorted_players:
+        share = p["amount"] / total
+        cum_angle += share
+        angle_end = angle_from_area(cum_angle)
+        sectors.append({
+            "player_id": p["id"],
+            "username": p["username"],
+            "color": p["color"],
+            "angle_start": sectors[-1]["angle_end"] if sectors else 0.0,
+            "angle_end": angle_end
+        })
+    return sectors
+
+# ------------------------------------------------------------
+# Генерация траектории с фазой вращения
+# ------------------------------------------------------------
+def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
+    """Возвращает список {x,y} для фазы движения."""
+    x = start_x
+    y = start_y
     vx = math.cos(angle) * speed
     vy = math.sin(angle) * speed
-
     frames = []
     elapsed = 0
     while elapsed < duration_ms:
         progress = elapsed / duration_ms
-        # Функция замедления (как раньше)
         if progress <= 0.5:
             speed_factor = 1 - 0.8 * (progress / 0.5)
         else:
             speed_factor = 0.2 * (1 - (progress - 0.5) / 0.5)
-
         step_x = vx * speed_factor * (dt / 1000)
         step_y = vy * speed_factor * (dt / 1000)
-
         x += step_x
         y += step_y
-
-        # Отскоки от стен (потери 10% энергии)
+        # отскоки
         if x <= 0:
             x = 0
             vx = abs(vx) * 0.9
         elif x >= 1000:
             x = 1000
             vx = -abs(vx) * 0.9
-
         if y <= 0:
             y = 0
             vy = abs(vy) * 0.9
         elif y >= 1000:
             y = 1000
             vy = -abs(vy) * 0.9
-
         frames.append({"x": x / 1000, "y": y / 1000})
         elapsed += dt
-
-    # Финальная точка
     frames.append({"x": x / 1000, "y": y / 1000})
     return frames
 
+def generate_spin_params(players_dict: dict):
+    # 1. Сектора
+    sectors = build_sectors(players_dict)
+
+    # 2. Начальная позиция (внутри квадрата, не слишком близко к краям)
+    start_x = random.uniform(0.1, 0.9) * 1000
+    start_y = random.uniform(0.1, 0.9) * 1000
+
+    # 3. Параметры вращения
+    spin_duration = 5000  # мс
+    spin_angle_start = random.uniform(0, 2 * math.pi)  # начальное направление стрелки
+    spin_angle_speed = random.uniform(0.5 * math.pi, 1.5 * math.pi)  # рад/с
+
+    # 4. Конечный угол после вращения
+    # при линейном замедлении: пройденный угол = 0.5 * начальная_угловая_скорость * время
+    angle_total = 0.5 * spin_angle_speed * (spin_duration / 1000)
+    final_angle = spin_angle_start + angle_total
+
+    # 5. Скорость движения (в 2.2 раза больше базовой)
+    base_speed = random.uniform(4000, 4500)
+    motion_speed = base_speed * 2.2
+
+    # 6. Траектория движения (5 сек)
+    motion_trajectory = generate_motion_trajectory(
+        start_x, start_y, final_angle, motion_speed, 5000, dt=16
+    )
+    # target_position = x последней точки (для определения победителя)
+    final_point = motion_trajectory[-1]
+    target_x = final_point["x"]
+
+    return {
+        "startPos": {"x": start_x / 1000, "y": start_y / 1000},
+        "spinDuration": spin_duration,
+        "spinAngleStart": spin_angle_start,
+        "spinAngleSpeed": spin_angle_speed,
+        "trajectory": motion_trajectory,
+        "target_position": target_x,
+        "sectors": sectors
+    }
+
+# ------------------------------------------------------------
+# Игровая механика
+# ------------------------------------------------------------
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
     "#A0C4FF", "#BDB2FF", "#FFC6FF", "#FFC09F", "#F3FFB6",
@@ -229,31 +296,26 @@ async def get_user_photo(user_id: int) -> str | None:
         logging.error(f"Failed to get photo for user {user_id}: {e}")
         return None
 
-async def finish_round(winner_x: float, pool: float, players: dict) -> dict | None:
-    if pool <= 0 or not players:
+async def finish_round(final_point: dict, pool: float, players: dict, sectors: list) -> dict | None:
+    """Определяет победителя по попаданию в треугольный сектор."""
+    if not final_point or not sectors:
         return None
-    winner_x = max(0.0, min(1.0 - 1e-12, winner_x))
-    cumulative = 0.0
+    # переводим координаты в математическую систему (Y вверх)
+    x = final_point["x"]
+    y = 1 - final_point["y"]  # инвертируем Y
+    angle = math.atan2(y, x)  # угол относительно левого нижнего угла (0,0)
+    if angle < 0:
+        angle = 0
+    # ищем сектор
     winner_id = None
-    winner_username = None
-    sorted_uids = sorted(players.keys())
-    for i, uid in enumerate(sorted_uids):
-        p = players[uid]
-        sector_start = cumulative
-        sector_end = cumulative + (p["amount"] / pool)
-        if i == len(sorted_uids) - 1:
-            if sector_start <= winner_x <= sector_end + 1e-12:
-                winner_id = str(uid)
-                winner_username = p.get("username", "Игрок")
-                break
-        else:
-            if sector_start <= winner_x < sector_end:
-                winner_id = str(uid)
-                winner_username = p.get("username", "Игрок")
-                break
-        cumulative = sector_end
+    for sec in sectors:
+        if sec["angle_start"] <= angle <= sec["angle_end"]:
+            winner_id = sec["player_id"]
+            winner_username = sec["username"]
+            break
     if not winner_id:
         return None
+
     winner_bet = players[winner_id]["amount"]
     others_bets = pool - winner_bet
     profit = winner_bet + (others_bets * 0.7)
@@ -302,28 +364,26 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
-                    trajectory = generate_2d_trajectory()
-                    # target_position – x последней точки
-                    target_x = trajectory[-1]["x"]
-                    game_state["spin_params"] = {
-                        "trajectory": trajectory,
-                        "target_position": target_x
-                    }
-                    game_state["target_position"] = target_x
+                    spin_params = generate_spin_params(game_state["players"])
+                    game_state["spin_params"] = spin_params
+                    game_state["sectors"] = spin_params["sectors"]
+                    game_state["target_position"] = spin_params["target_position"]
                     game_state["round_id"] = random.randint(1, 10**9)
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning 2D: target_x={target_x:.4f}, round_id={game_state['round_id']}, game_number={game_state['game_number']}")
+                    logging.info(f"Spinning 2D with sectors: target_x={spin_params['target_position']:.4f}")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(10.2)
             async with game_lock:
                 if game_state["status"] == "spinning":
+                    final_point = game_state["spin_params"]["trajectory"][-1]
                     winner_data = await finish_round(
-                        game_state["target_position"],
+                        final_point,
                         game_state["pool"],
-                        game_state["players"]
+                        game_state["players"],
+                        game_state["sectors"]
                     )
                     game_state["winner"] = winner_data
                     game_state["last_winner_id"] = winner_data["user_id"] if winner_data else None
@@ -331,9 +391,10 @@ async def game_worker():
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
+                    game_state["sectors"] = None
                     logging.info(f"Round finished, winner: {winner_data}")
 
-# API (все эндпоинты как в последней стабильной версии, без изменений)
+# ------------------- API (без изменений в остальном) -------------------
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
@@ -481,7 +542,8 @@ async def handle_game_state(request):
             "winner": game_state.get("winner"),
             "last_winner_id": game_state.get("last_winner_id"),
             "round_id": game_state.get("round_id"),
-            "game_number": game_state.get("game_number", 0)
+            "game_number": game_state.get("game_number", 0),
+            "sectors": game_state.get("sectors")   # для отрисовки
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
