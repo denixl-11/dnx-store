@@ -14,10 +14,8 @@
             --text-muted: #7a7a7c;
             --border-color: #222224;
         }
-
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { overflow-x: hidden; width: 100%; }
-
         body {
             background-color: var(--bg-main);
             color: var(--text-main);
@@ -30,7 +28,6 @@
             padding-bottom: 100px;
             -webkit-font-smoothing: antialiased;
         }
-
         header {
             width: 100%;
             padding: 20px;
@@ -42,11 +39,9 @@
             background: rgba(10, 10, 12, 0.95);
             z-index: 50;
         }
-
         .header-left { display: flex; align-items: center; gap: 8px; }
         .avatar { width: 36px; height: 36px; border-radius: 50%; background: #222; object-fit: cover; border: 1px solid var(--border-color); }
         .username { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
-
         .header-right {
             background: rgba(203, 161, 83, 0.1);
             border: 1px solid var(--accent-gold);
@@ -57,24 +52,19 @@
         }
         .header-right:active { transform: scale(0.95); }
         .balance-text { color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; }
-
         .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; padding: 20px; box-sizing: border-box; }
         .item-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; }
         .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 12px; object-fit: cover; margin-bottom: 14px; cursor: pointer; }
         .item-name { font-size: 0.95rem; font-weight: 500; margin-bottom: 14px; color: var(--text-main); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
         .card-buttons { display: flex; width: 100%; gap: 8px; }
         .btn-buy-now { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 10px; height: 36px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; cursor: pointer; }
         .btn-add-cart { width: 40px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-
         .btn-main-action { width: 100%; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
         .btn-main-action:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-secondary { width: 100%; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 12px; height: 52px; font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer; }
-
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
         .tab-bar {
             position: fixed;
             bottom: 0;
@@ -89,9 +79,7 @@
         }
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
-
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
-
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap { position: relative; width: 90%; height: 25vh; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); background: #131315; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
         #gameCanvas { width: 100%; height: 100%; display: block; }
@@ -107,27 +95,22 @@
             letter-spacing: 0.5px;
         }
         .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203, 161, 83, 0.2); pointer-events: none; }
-
         .game-controls { display: flex; gap: 12px; width: 90%; margin-top: 16px; }
         .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .game-btn-cancel { width: 90%; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
-
         .bets-list-container { width: 90%; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
         .bets-list-header { padding: 12px 15px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); text-align: center; letter-spacing: 1px; }
         .bets-list { max-height: 200px; overflow-y: auto; padding: 5px 15px; }
         .bet-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; align-items: center; }
         .bet-row:last-child { border-bottom: none; }
-
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; text-align: center; }
         .modal-title { font-weight: 700; font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px; text-transform: uppercase; }
         .input-dark { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 14px; border-radius: 10px; font-size: 1rem; margin-bottom: 20px; box-sizing: border-box; text-align: center; }
-
         .topup-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; width: 100%; max-width: 400px; margin-bottom: 20px; }
         .topup-btn { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 12px; height: 48px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
         .topup-btn.custom-btn { grid-column: span 3; border-color: var(--accent-gold); color: var(--accent-gold); }
-
         .nft-modal-sheet { position: fixed; bottom: -100%; left: 0; width: 100%; background: #0a0a0c; border-radius: 24px 24px 0 0; transition: bottom 0.4s; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; z-index: 1100; }
         .modal-overlay.active .nft-modal-sheet { bottom: 0; }
         .nft-modal-header-rocket { padding-top: 25px; display: flex; flex-direction: column; align-items: center; position: relative; }
@@ -136,13 +119,11 @@
         .trait-row { display: flex; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
         .trait-row .trait-name { color: var(--accent-gold); font-weight: 500; }
         .trait-row .trait-value { color: var(--accent-gold); font-weight: 600; }
-
         .cart-list { padding: 20px; }
         .cart-item { display: flex; align-items: center; gap: 15px; background: var(--bg-card); padding: 12px; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border-color); }
         .cart-item img { width: 50px; height: 50px; border-radius: 8px; }
         .cart-item-info { flex: 1; }
         .fixed-footer { position: fixed; bottom: 85px; width: 100%; padding: 0 20px; z-index: 90; box-sizing: border-box; }
-
         .modal-tg-btn {
             position: absolute; top: 15px; left: 15px;
             background: rgba(0,0,0,0.4); border-radius: 50%;
@@ -152,17 +133,14 @@
         .modal-tg-btn:hover { background: rgba(203, 161, 83, 0.3); }
         .modal-tg-btn svg { width: 20px; height: 20px; stroke: white; stroke-width: 1.8; fill: none; }
         .modal-tg-btn:hover svg { stroke: var(--accent-gold); }
-
         .modal-buttons-row { display: flex; gap: 10px; align-items: stretch; }
         .modal-buttons-row .btn-buy-modal { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; }
         .modal-buttons-row .btn-cart-icon { width: 52px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 12px; height: 52px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .modal-buttons-row .btn-cart-icon svg { stroke: var(--accent-gold); width: 24px; height: 24px; }
-
         .winner-modal .winner-avatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-gold); margin-bottom: 16px; }
         .winner-modal .winner-name { font-size: 1.4rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 8px; }
         .winner-modal .winner-amount { font-size: 1.2rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; }
         .winner-modal .winner-amount span { color: var(--accent-gold); font-size: 1.5rem; }
-
         .history-btn {
             background: rgba(122,122,124,0.1);
             border: 1px solid var(--text-muted);
@@ -176,32 +154,11 @@
             align-items: center;
             gap: 4px;
         }
-        .history-modal-list {
-            width: 100%;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .history-modal-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            font-size: 0.85rem;
-        }
+        .history-modal-list { width: 100%; max-height: 300px; overflow-y: auto; }
+        .history-modal-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
         .history-modal-row:last-child { border-bottom: none; }
-
-        .confirm-buy-item-preview {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .confirm-buy-item-preview img {
-            width: 60px;
-            height: 60px;
-            border-radius: 10px;
-        }
-
+        .confirm-buy-item-preview { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .confirm-buy-item-preview img { width: 60px; height: 60px; border-radius: 10px; }
         .leaderboard-bar {
             width: 90%;
             background: linear-gradient(135deg, rgba(203,161,83,0.2), rgba(203,161,83,0.05));
@@ -218,7 +175,6 @@
             font-size: 0.9rem;
         }
         .leaderboard-bar span:last-child { font-size: 0.8rem; opacity: 0.9; }
-
         .leaderboard-fullscreen {
             position: fixed;
             top: 0;
@@ -232,14 +188,7 @@
             display: none;
         }
         .leaderboard-fullscreen.active { display: block; }
-
-        .leaderboard-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-
+        .leaderboard-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
         .season-timer {
             background: rgba(203,161,83,0.1);
             border: 1px solid var(--accent-gold);
@@ -250,7 +199,6 @@
             color: var(--accent-gold);
             margin-bottom: 20px;
         }
-
         .leaderboard-list { display: flex; flex-direction: column; gap: 8px; }
         .leaderboard-row {
             display: flex;
@@ -265,9 +213,7 @@
         .leaderboard-name { flex: 1; font-weight: 500; }
         .leaderboard-wins { color: var(--text-muted); font-size: 0.8rem; margin-right: 6px; }
         .leaderboard-nft { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid var(--border-color); }
-
         #prize-detail-overlay { z-index: 3000; }
-
         .prize-modal-content {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -278,14 +224,12 @@
             position: relative;
             padding: 20px;
         }
-        .prize-modal-img {
-            width: 200px;
-            height: 200px;
-            border-radius: 16px;
-            object-fit: cover;
-            margin-bottom: 16px;
-        }
+        .prize-modal-img { width: 200px; height: 200px; border-radius: 16px; object-fit: cover; margin-bottom: 16px; }
         .prize-modal-traits { margin: 12px 0; }
+        /* Исправления для отображения секторов */
+        .game-canvas-wrap canvas {
+            image-rendering: pixelated; /* для чёткости */
+        }
     </style>
 </head>
 <body>
@@ -504,6 +448,9 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
+        // ====================================================================
+        //  ОСНОВНАЯ ЛОГИКА (без изменений, кроме игровой части)
+        // ====================================================================
         const tg = window.Telegram.WebApp;
         tg.ready();
         const API_BASE = 'https://dnx-shop.onrender.com';
@@ -918,7 +865,9 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // ========== ИГРА ==========
+        // ====================================================================
+        //  ИГРОВАЯ ЧАСТЬ (ПОЛНОСТЬЮ ПЕРЕПИСАНА)
+        // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = {
@@ -940,38 +889,56 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
+        // Новая функция отрисовки секторов на основе углов (от левого нижнего угла)
+        function drawSectors(sectors, cw, ch) {
+            if (!sectors || sectors.length === 0) return;
+            const origin = { x: 0, y: ch };
+            for (const sec of sectors) {
+                const a1 = sec.angle_start;
+                const a2 = sec.angle_end;
+                // Вычисляем точки на границах прямоугольника
+                const p1 = pointOnBounds(a1, cw, ch);
+                const p2 = pointOnBounds(a2, cw, ch);
+                ctx.beginPath();
+                ctx.moveTo(origin.x, origin.y);
+                ctx.lineTo(p1.x, ch - p1.y);
+                ctx.lineTo(p2.x, ch - p2.y);
+                ctx.closePath();
+                ctx.fillStyle = sec.color || '#888';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+
         function pointOnBounds(angle, cw, ch) {
+            // Возвращает точку на границе прямоугольника для заданного угла (0..π/2)
             const cos = Math.cos(angle);
             const sin = Math.sin(angle);
-            const tx = (cos > 0) ? cw / cos : 0;
-            const ty = (sin > 0) ? ch / sin : 0;
-            if (tx < ty) return { x: cw, y: cw * Math.tan(angle) };
-            else return { x: ch / Math.tan(angle), y: ch };
+            // Если угол 0 -> точка на нижней границе (x = cw, y=0)
+            if (angle === 0) return { x: cw, y: 0 };
+            // Проверяем пересечение с правой или верхней границей
+            const tx = cw / cos;   // время до правой стены
+            const ty = ch / sin;   // время до верхней стены
+            if (tx < ty) {
+                return { x: cw, y: cw * Math.tan(angle) };
+            } else {
+                return { x: ch / Math.tan(angle), y: ch };
+            }
         }
 
         function drawGameFrame(ballPos = null) {
-            if(!ctx) return;
+            if (!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
 
-            if(gState.sectors && gState.sectors.length > 0) {
-                const origin = { x: 0, y: ch };
-                for (const sec of gState.sectors) {
-                    const p1 = pointOnBounds(sec.angle_start, cw, ch);
-                    const p2 = pointOnBounds(sec.angle_end, cw, ch);
-                    ctx.fillStyle = sec.color;
-                    ctx.beginPath();
-                    ctx.moveTo(origin.x, origin.y);
-                    ctx.lineTo(p1.x, ch - p1.y);
-                    ctx.lineTo(p2.x, ch - p2.y);
-                    ctx.closePath();
-                    ctx.fill();
-                    ctx.strokeStyle = "rgba(0,0,0,0.3)";
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-                }
+            // Рисуем сектора (если есть)
+            if (gState.sectors && gState.sectors.length > 0) {
+                drawSectors(gState.sectors, cw, ch);
             } else if (gState.players && gState.players.length > 0) {
+                // fallback: если секторов нет, но есть игроки – рисуем полосы
                 let curX = 0;
                 const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
                 sorted.forEach(p => {
@@ -989,29 +956,62 @@
                 ctx.fillText("Ждем ставки...", cw/2, ch/2);
             }
 
+            // Рисуем шарик со стрелкой
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
-                if (ballPos.prev) {
-                    const px = ballPos.prev.x * cw;
-                    const py = (1 - ballPos.prev.y) * ch;
-                    const angle = Math.atan2(by - py, bx - px);
-                    const arrowLen = 25;
+                // Стрелка направления (по углу)
+                if (ballPos.angle !== undefined && ballPos.angle !== null && !isNaN(ballPos.angle)) {
+                    const arrowLen = 30;
+                    const endX = bx + arrowLen * Math.cos(ballPos.angle);
+                    const endY = by - arrowLen * Math.sin(ballPos.angle);
                     ctx.beginPath();
                     ctx.moveTo(bx, by);
-                    ctx.lineTo(bx + Math.cos(angle) * arrowLen, by + Math.sin(angle) * arrowLen);
-                    ctx.strokeStyle = "rgba(255,255,255,0.7)";
-                    ctx.lineWidth = 2.5;
+                    ctx.lineTo(endX, endY);
+                    ctx.strokeStyle = "#FF4444";
+                    ctx.lineWidth = 4;
                     ctx.stroke();
+                    // Наконечник
+                    const a1 = ballPos.angle - 0.4;
+                    const a2 = ballPos.angle + 0.4;
+                    ctx.beginPath();
+                    ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX - 8 * Math.cos(a1), endY + 8 * Math.sin(a1));
+                    ctx.lineTo(endX - 8 * Math.cos(a2), endY + 8 * Math.sin(a2));
+                    ctx.closePath();
+                    ctx.fillStyle = "#FF4444";
+                    ctx.fill();
+                } else {
+                    // Если угла нет, рисуем маленькую стрелку вверх
+                    ctx.beginPath();
+                    ctx.moveTo(bx, by);
+                    ctx.lineTo(bx, by - 30);
+                    ctx.strokeStyle = "#FF4444";
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(bx, by - 30);
+                    ctx.lineTo(bx - 6, by - 20);
+                    ctx.lineTo(bx + 6, by - 20);
+                    ctx.closePath();
+                    ctx.fillStyle = "#FF4444";
+                    ctx.fill();
                 }
+
+                // Сам шарик
+                ctx.shadowColor = 'rgba(255,255,255,0.3)';
+                ctx.shadowBlur = 20;
                 ctx.beginPath();
-                ctx.arc(bx, by, 20, 0, Math.PI*2);
-                ctx.fillStyle = "#fff";
-                ctx.shadowColor = "#fff";
-                ctx.shadowBlur = 15;
+                ctx.arc(bx, by, 18, 0, 2 * Math.PI);
+                const grad = ctx.createRadialGradient(bx-6, by-6, 2, bx, by, 20);
+                grad.addColorStop(0, '#FFEE88');
+                grad.addColorStop(1, '#E8A020');
+                ctx.fillStyle = grad;
                 ctx.fill();
                 ctx.shadowBlur = 0;
-                ctx.closePath();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.stroke();
             }
         }
 
@@ -1033,41 +1033,48 @@
                 </div>`).join('');
         }
 
+        // Новая функция анимации спина, использующая траекторию с углами
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const startTime = performance.now();
             const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
             let prevPos = null;
 
+            // Функция интерполяции между кадрами траектории
+            function getInterpolatedTrajectoryPoint(progress) {
+                if (!trajectory || trajectory.length === 0) return startPos;
+                const totalFrames = trajectory.length;
+                const frameIndex = Math.min(Math.floor(progress * totalFrames), totalFrames - 1);
+                return trajectory[frameIndex];
+            }
+
             function animate(now) {
                 const elapsed = now - startTime;
 
                 if (elapsed < spinDuration) {
+                    // Фаза вращения: используем начальные параметры для отображения кручения
                     const t = elapsed / spinDuration;
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
                     const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
-                    const ball = { x: startPos.x, y: startPos.y, angle };
+                    // Позиция остаётся на старте, но с изменяющимся углом
+                    const ball = { x: startPos.x, y: startPos.y, angle: angle };
                     drawGameFrame(ball);
                     animationFrameId = requestAnimationFrame(animate);
                 } else if (elapsed < spinDuration + 5000) {
+                    // Фаза движения по траектории
                     const motionElapsed = elapsed - spinDuration;
-                    const frameIndex = Math.floor(motionElapsed / 16);
-                    if (frameIndex >= trajectory.length) {
-                        const finalPos = trajectory[trajectory.length-1];
-                        drawGameFrame(finalPos);
-                        animationFrameId = null;
-                        fetchWinnerNow();
-                        return;
+                    const progress = Math.min(motionElapsed / 5000, 1);
+                    const pos = getInterpolatedTrajectoryPoint(progress);
+                    if (pos) {
+                        // Добавляем угол из траектории
+                        const ball = { x: pos.x, y: pos.y, angle: pos.angle };
+                        drawGameFrame(ball);
                     }
-                    const pos = trajectory[frameIndex];
-                    if (prevPos) pos.prev = prevPos;
-                    else pos.prev = startPos;
-                    drawGameFrame(pos);
-                    prevPos = pos;
                     animationFrameId = requestAnimationFrame(animate);
                 } else {
-                    const finalPos = trajectory[trajectory.length-1];
-                    drawGameFrame(finalPos);
+                    // Завершение
+                    const finalPos = trajectory[trajectory.length-1] || startPos;
+                    drawGameFrame({ x: finalPos.x, y: finalPos.y, angle: finalPos.angle });
                     animationFrameId = null;
                     fetchWinnerNow();
                 }
@@ -1252,6 +1259,7 @@
                 });
         }
 
+        // Инициализация
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
