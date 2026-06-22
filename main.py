@@ -19,15 +19,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# ========== КОНФИГУРАЦИЯ (из .env) ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 PAYMENT_REQUISITES = os.getenv("PAYMENT_REQUISITES", "Реквизиты скрыты")
-WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
-CORS_ORIGIN = "https://denixl-11.github.io"
+WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"   # ваш фронтенд
+CORS_ORIGIN = "https://denixl-11.github.io"             # ваш домен
 
 if not BOT_TOKEN:
-    print("❌ BOT_TOKEN не найден!")
+    print("❌ BOT_TOKEN не найден! Создайте .env файл.")
     exit(1)
 
 DB_CONFIG = {

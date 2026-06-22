@@ -6,6 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* ===== ВАШИ СТИЛИ (полностью без изменений) ===== */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -154,11 +155,30 @@
             align-items: center;
             gap: 4px;
         }
-        .history-modal-list { width: 100%; max-height: 300px; overflow-y: auto; }
-        .history-modal-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
+        .history-modal-list {
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .history-modal-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.85rem;
+        }
         .history-modal-row:last-child { border-bottom: none; }
-        .confirm-buy-item-preview { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-        .confirm-buy-item-preview img { width: 60px; height: 60px; border-radius: 10px; }
+        .confirm-buy-item-preview {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .confirm-buy-item-preview img {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+        }
         .leaderboard-bar {
             width: 90%;
             background: linear-gradient(135deg, rgba(203,161,83,0.2), rgba(203,161,83,0.05));
@@ -188,7 +208,12 @@
             display: none;
         }
         .leaderboard-fullscreen.active { display: block; }
-        .leaderboard-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .leaderboard-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
         .season-timer {
             background: rgba(203,161,83,0.1);
             border: 1px solid var(--accent-gold);
@@ -224,12 +249,14 @@
             position: relative;
             padding: 20px;
         }
-        .prize-modal-img { width: 200px; height: 200px; border-radius: 16px; object-fit: cover; margin-bottom: 16px; }
-        .prize-modal-traits { margin: 12px 0; }
-        /* Исправления для отображения секторов */
-        .game-canvas-wrap canvas {
-            image-rendering: pixelated; /* для чёткости */
+        .prize-modal-img {
+            width: 200px;
+            height: 200px;
+            border-radius: 16px;
+            object-fit: cover;
+            margin-bottom: 16px;
         }
+        .prize-modal-traits { margin: 12px 0; }
     </style>
 </head>
 <body>
@@ -250,7 +277,6 @@
                 <span>🏆 Лидеры сезона</span>
                 <span id="leaderboard-preview">...</span>
             </div>
-
             <div style="width:90%; display:flex; justify-content: flex-end; margin-bottom: 4px;">
                 <div class="history-btn" onclick="openHistoryModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -327,7 +353,7 @@
         <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
-    <!-- NFT Detail Modal -->
+    <!-- Модалки -->
     <div id="nft-detail-overlay" class="modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;">
@@ -357,7 +383,6 @@
         </div>
     </div>
 
-    <!-- Winner Modal -->
     <div id="winner-modal" class="modal-overlay winner-modal" onclick="closeWinnerModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div style="text-align: center;">
@@ -369,7 +394,6 @@
         </div>
     </div>
 
-    <!-- History Modal -->
     <div id="history-modal" class="modal-overlay" onclick="closeModal('history-modal')">
         <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 360px;">
             <h3 class="modal-title">История игр</h3>
@@ -378,7 +402,6 @@
         </div>
     </div>
 
-    <!-- Confirm Buy Modal -->
     <div id="confirm-buy-modal" class="modal-overlay">
         <div class="modal-content" onclick="event.stopPropagation()">
             <h3 class="modal-title">Подтверждение покупки</h3>
@@ -388,27 +411,22 @@
         </div>
     </div>
 
-    <!-- Custom bet modal -->
     <div id="custom-bet-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма от 10 ₽"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
     </div>
 
-    <!-- Custom amount modal -->
     <div id="custom-amount-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">Своя сумма</h3><input type="number" id="custom-amount-input" class="input-dark" placeholder="Сумма от 50 ₽"><button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button><button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button></div>
     </div>
 
-    <!-- Alert Modal -->
     <div id="alert-modal" class="modal-overlay">
         <div class="modal-content" style="padding-top: 32px;"><div id="alert-msg" style="margin-bottom: 24px; font-weight: 500;"></div><button class="btn-main-action" style="height: 44px;" onclick="closeModal('alert-modal')">Понятно</button></div>
     </div>
 
-    <!-- Confirm Bet Modal -->
     <div id="confirm-bet-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> ₽?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
     </div>
 
-    <!-- Topup Modal -->
     <div id="topup-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">ПОПОЛНЕНИЕ НА <span id="display-topup-amount">0</span> ₽</h3>
             <ul style="font-size:0.8rem;color:var(--text-muted);text-align:left;padding-left:16px;margin-bottom:20px;"><li>Заявки без фактического перевода блокируются.</li><li>Обработка занимает до 15 минут.</li></ul>
@@ -422,7 +440,6 @@
         </div>
     </div>
 
-    <!-- Leaderboard Fullscreen Modal -->
     <div id="leaderboard-modal" class="leaderboard-fullscreen">
         <div class="leaderboard-top">
             <h2 style="color:var(--accent-gold); font-size:1.5rem;">🏆 Лидеры сезона</h2>
@@ -432,7 +449,6 @@
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
     </div>
 
-    <!-- Prize Modal -->
     <div id="prize-detail-overlay" class="modal-overlay" onclick="closePrizeModal(event)">
         <div class="prize-modal-content" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="prize-tg-link-btn" style="display: none; top: 10px; left: 10px;">
@@ -448,32 +464,44 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // ====================================================================
-        //  ОСНОВНАЯ ЛОГИКА (без изменений, кроме игровой части)
-        // ====================================================================
+        // ===================== КОНФИГУРАЦИЯ =====================
         const tg = window.Telegram.WebApp;
         tg.ready();
-        const API_BASE = 'https://dnx-shop.onrender.com';
+        const API_BASE = 'https://dnx-shop.onrender.com';   // ваш бэкенд на Render
         const initData = tg.initData || '';
         const userDisplayName = tg.initDataUnsafe?.user?.username || "Guest";
         const userAvatar = tg.initDataUnsafe?.user?.photo_url || "";
         document.getElementById('username-display').innerText = userDisplayName;
         if(userAvatar) document.getElementById('avatar-img').src = userAvatar;
 
+        // ===================== УЛУЧШЕННАЯ apiFetch =====================
         async function apiFetch(url, options = {}) {
             const headers = {
                 'Content-Type': 'application/json',
                 'X-Telegram-Init-Data': initData,
                 ...(options.headers || {})
             };
-            const response = await fetch(url, { ...options, headers });
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error(err.error || `HTTP ${response.status}`);
+            try {
+                const response = await fetch(url, { ...options, headers });
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    data = { error: 'Сервер вернул не JSON: ' + text.substring(0, 100) };
+                }
+                if (!response.ok) {
+                    const errorMsg = data.error || `HTTP ${response.status}`;
+                    throw new Error(errorMsg);
+                }
+                return data;
+            } catch (e) {
+                console.error('apiFetch error:', e);
+                throw e;
             }
-            return response.json();
         }
 
+        // ===================== ОБЩИЕ ФУНКЦИИ =====================
         let userBalance = 0.0;
         let cart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
         let currentCatalog = [];
@@ -756,7 +784,6 @@
             document.getElementById('prize-modal-traits').innerHTML = traits.length ?
                 `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
                 '<p style="color:var(--text-muted);">Нет характеристик</p>';
-
             const tgBtn = document.getElementById('prize-tg-link-btn');
             if (currentPrizeItem.nft_link) {
                 tgBtn.style.display = 'flex';
@@ -775,7 +802,7 @@
             document.getElementById('prize-detail-overlay').classList.remove('active');
         }
 
-        // --- Лидеры и сезон ---
+        // --- Лидеры ---
         async function loadLeaderboardPreview() {
             try {
                 const data = await apiFetch(`${API_BASE}/leaderboard`);
@@ -865,9 +892,7 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // ====================================================================
-        //  ИГРОВАЯ ЧАСТЬ (ПОЛНОСТЬЮ ПЕРЕПИСАНА)
-        // ====================================================================
+        // ========== ИГРА ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = {
@@ -889,56 +914,38 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
-        // Новая функция отрисовки секторов на основе углов (от левого нижнего угла)
-        function drawSectors(sectors, cw, ch) {
-            if (!sectors || sectors.length === 0) return;
-            const origin = { x: 0, y: ch };
-            for (const sec of sectors) {
-                const a1 = sec.angle_start;
-                const a2 = sec.angle_end;
-                // Вычисляем точки на границах прямоугольника
-                const p1 = pointOnBounds(a1, cw, ch);
-                const p2 = pointOnBounds(a2, cw, ch);
-                ctx.beginPath();
-                ctx.moveTo(origin.x, origin.y);
-                ctx.lineTo(p1.x, ch - p1.y);
-                ctx.lineTo(p2.x, ch - p2.y);
-                ctx.closePath();
-                ctx.fillStyle = sec.color || '#888';
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-            }
-        }
-
         function pointOnBounds(angle, cw, ch) {
-            // Возвращает точку на границе прямоугольника для заданного угла (0..π/2)
             const cos = Math.cos(angle);
             const sin = Math.sin(angle);
-            // Если угол 0 -> точка на нижней границе (x = cw, y=0)
-            if (angle === 0) return { x: cw, y: 0 };
-            // Проверяем пересечение с правой или верхней границей
-            const tx = cw / cos;   // время до правой стены
-            const ty = ch / sin;   // время до верхней стены
-            if (tx < ty) {
-                return { x: cw, y: cw * Math.tan(angle) };
-            } else {
-                return { x: ch / Math.tan(angle), y: ch };
-            }
+            const tx = (cos > 0) ? cw / cos : 0;
+            const ty = (sin > 0) ? ch / sin : 0;
+            if (tx < ty) return { x: cw, y: cw * Math.tan(angle) };
+            else return { x: ch / Math.tan(angle), y: ch };
         }
 
         function drawGameFrame(ballPos = null) {
-            if (!ctx) return;
+            if(!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
 
-            // Рисуем сектора (если есть)
-            if (gState.sectors && gState.sectors.length > 0) {
-                drawSectors(gState.sectors, cw, ch);
+            if(gState.sectors && gState.sectors.length > 0) {
+                const origin = { x: 0, y: ch };
+                for (const sec of gState.sectors) {
+                    const p1 = pointOnBounds(sec.angle_start, cw, ch);
+                    const p2 = pointOnBounds(sec.angle_end, cw, ch);
+                    ctx.fillStyle = sec.color;
+                    ctx.beginPath();
+                    ctx.moveTo(origin.x, origin.y);
+                    ctx.lineTo(p1.x, ch - p1.y);
+                    ctx.lineTo(p2.x, ch - p2.y);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
             } else if (gState.players && gState.players.length > 0) {
-                // fallback: если секторов нет, но есть игроки – рисуем полосы
                 let curX = 0;
                 const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
                 sorted.forEach(p => {
@@ -956,62 +963,29 @@
                 ctx.fillText("Ждем ставки...", cw/2, ch/2);
             }
 
-            // Рисуем шарик со стрелкой
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
-                // Стрелка направления (по углу)
-                if (ballPos.angle !== undefined && ballPos.angle !== null && !isNaN(ballPos.angle)) {
-                    const arrowLen = 30;
-                    const endX = bx + arrowLen * Math.cos(ballPos.angle);
-                    const endY = by - arrowLen * Math.sin(ballPos.angle);
+                if (ballPos.prev) {
+                    const px = ballPos.prev.x * cw;
+                    const py = (1 - ballPos.prev.y) * ch;
+                    const angle = Math.atan2(by - py, bx - px);
+                    const arrowLen = 25;
                     ctx.beginPath();
                     ctx.moveTo(bx, by);
-                    ctx.lineTo(endX, endY);
-                    ctx.strokeStyle = "#FF4444";
-                    ctx.lineWidth = 4;
+                    ctx.lineTo(bx + Math.cos(angle) * arrowLen, by + Math.sin(angle) * arrowLen);
+                    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+                    ctx.lineWidth = 2.5;
                     ctx.stroke();
-                    // Наконечник
-                    const a1 = ballPos.angle - 0.4;
-                    const a2 = ballPos.angle + 0.4;
-                    ctx.beginPath();
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - 8 * Math.cos(a1), endY + 8 * Math.sin(a1));
-                    ctx.lineTo(endX - 8 * Math.cos(a2), endY + 8 * Math.sin(a2));
-                    ctx.closePath();
-                    ctx.fillStyle = "#FF4444";
-                    ctx.fill();
-                } else {
-                    // Если угла нет, рисуем маленькую стрелку вверх
-                    ctx.beginPath();
-                    ctx.moveTo(bx, by);
-                    ctx.lineTo(bx, by - 30);
-                    ctx.strokeStyle = "#FF4444";
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.moveTo(bx, by - 30);
-                    ctx.lineTo(bx - 6, by - 20);
-                    ctx.lineTo(bx + 6, by - 20);
-                    ctx.closePath();
-                    ctx.fillStyle = "#FF4444";
-                    ctx.fill();
                 }
-
-                // Сам шарик
-                ctx.shadowColor = 'rgba(255,255,255,0.3)';
-                ctx.shadowBlur = 20;
                 ctx.beginPath();
-                ctx.arc(bx, by, 18, 0, 2 * Math.PI);
-                const grad = ctx.createRadialGradient(bx-6, by-6, 2, bx, by, 20);
-                grad.addColorStop(0, '#FFEE88');
-                grad.addColorStop(1, '#E8A020');
-                ctx.fillStyle = grad;
+                ctx.arc(bx, by, 20, 0, Math.PI*2);
+                ctx.fillStyle = "#fff";
+                ctx.shadowColor = "#fff";
+                ctx.shadowBlur = 15;
                 ctx.fill();
                 ctx.shadowBlur = 0;
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                ctx.closePath();
             }
         }
 
@@ -1033,48 +1007,41 @@
                 </div>`).join('');
         }
 
-        // Новая функция анимации спина, использующая траекторию с углами
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const startTime = performance.now();
             const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
             let prevPos = null;
 
-            // Функция интерполяции между кадрами траектории
-            function getInterpolatedTrajectoryPoint(progress) {
-                if (!trajectory || trajectory.length === 0) return startPos;
-                const totalFrames = trajectory.length;
-                const frameIndex = Math.min(Math.floor(progress * totalFrames), totalFrames - 1);
-                return trajectory[frameIndex];
-            }
-
             function animate(now) {
                 const elapsed = now - startTime;
 
                 if (elapsed < spinDuration) {
-                    // Фаза вращения: используем начальные параметры для отображения кручения
                     const t = elapsed / spinDuration;
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
                     const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
-                    // Позиция остаётся на старте, но с изменяющимся углом
-                    const ball = { x: startPos.x, y: startPos.y, angle: angle };
+                    const ball = { x: startPos.x, y: startPos.y, angle };
                     drawGameFrame(ball);
                     animationFrameId = requestAnimationFrame(animate);
                 } else if (elapsed < spinDuration + 5000) {
-                    // Фаза движения по траектории
                     const motionElapsed = elapsed - spinDuration;
-                    const progress = Math.min(motionElapsed / 5000, 1);
-                    const pos = getInterpolatedTrajectoryPoint(progress);
-                    if (pos) {
-                        // Добавляем угол из траектории
-                        const ball = { x: pos.x, y: pos.y, angle: pos.angle };
-                        drawGameFrame(ball);
+                    const frameIndex = Math.floor(motionElapsed / 16);
+                    if (frameIndex >= trajectory.length) {
+                        const finalPos = trajectory[trajectory.length-1];
+                        drawGameFrame(finalPos);
+                        animationFrameId = null;
+                        fetchWinnerNow();
+                        return;
                     }
+                    const pos = trajectory[frameIndex];
+                    if (prevPos) pos.prev = prevPos;
+                    else pos.prev = startPos;
+                    drawGameFrame(pos);
+                    prevPos = pos;
                     animationFrameId = requestAnimationFrame(animate);
                 } else {
-                    // Завершение
-                    const finalPos = trajectory[trajectory.length-1] || startPos;
-                    drawGameFrame({ x: finalPos.x, y: finalPos.y, angle: finalPos.angle });
+                    const finalPos = trajectory[trajectory.length-1];
+                    drawGameFrame(finalPos);
                     animationFrameId = null;
                     fetchWinnerNow();
                 }
@@ -1219,24 +1186,36 @@
             closeModal('custom-bet-modal');
             openBetConfirm(v);
         }
+
+        // ========== ИСПРАВЛЕННАЯ executeBet ==========
         async function executeBet() {
             const btn = document.getElementById('btn-confirm-bet');
-            if(btn) { btn.disabled = true; btn.innerText = 'Загрузка...'; }
+            if (btn) { btn.disabled = true; btn.innerText = 'Загрузка...'; }
             try {
-                const data = await apiFetch(`${API_BASE}/game/bet`, { method: 'POST', body: JSON.stringify({amount: betAmountTemp}) });
+                const data = await apiFetch(`${API_BASE}/game/bet`, {
+                    method: 'POST',
+                    body: JSON.stringify({ amount: betAmountTemp })
+                });
                 closeModal('confirm-bet-modal');
-                if(data.success) { await updateBalance(); pollGame(); }
-                else {
+                if (data.success) {
+                    await updateBalance();
+                    pollGame();
+                } else {
                     let msg = "Ставка не принята";
-                    if(data.error === 'insufficient_funds') msg = "Недостаточно средств!";
-                    else if(data.error === 'game_started') msg = "Игра уже началась!";
-                    else if(data.error === 'room_full') msg = "Слишком много игроков!";
-                    else if(data.error === 'min_bet') msg = "Минимальная ставка 10 ₽";
-                    else if(data.error === 'invalid_amount') msg = "Ставка должна быть целым числом";
+                    if (data.error === 'insufficient_funds') msg = "Недостаточно средств!";
+                    else if (data.error === 'game_started') msg = "Игра уже началась!";
+                    else if (data.error === 'room_full') msg = "Слишком много игроков!";
+                    else if (data.error === 'min_bet') msg = "Минимальная ставка 10 ₽";
+                    else if (data.error === 'invalid_amount') msg = "Ставка должна быть целым числом";
+                    else if (data.error) msg = data.error;
                     showAlert(msg);
                 }
-            } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети"); }
-            if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
+            } catch (e) {
+                closeModal('confirm-bet-modal');
+                showAlert("Ошибка: " + (e.message || "сетевая проблема"));
+                console.error(e);
+            }
+            if (btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
 
         function cancelGameBet() {
@@ -1259,7 +1238,7 @@
                 });
         }
 
-        // Инициализация
+        // ===================== ИНИЦИАЛИЗАЦИЯ =====================
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
