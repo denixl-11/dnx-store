@@ -58,7 +58,7 @@ game_state = {
     "last_winner_id": None,
     "round_id": None,
     "game_number": 0,
-    "sectors": None       # будет хранить список секторов для текущего раунда
+    "sectors": None
 }
 
 def init_db():
@@ -163,29 +163,26 @@ def require_auth(handler):
 # Генерация секторов (треугольники от левого нижнего угла)
 # ------------------------------------------------------------
 def angle_from_area(area: float) -> float:
-    """Возвращает угол (рад) для заданной кумулятивной доли площади (0..1)."""
     if area <= 0.5:
         return math.atan(2 * area)
     else:
         return math.pi/2 - math.atan(2 * (1 - area))
 
 def build_sectors(players_dict: dict) -> list:
-    """
-    players_dict: {uid: {id, username, amount, color}}
-    Возвращает список секторов: [{player_id, username, color, angle_start, angle_end}]
-    Углы в радианах, от 0 до pi/2 (левый нижний угол).
-    """
     if not players_dict:
         return []
-    # сортируем по убыванию ставки
     sorted_players = sorted(players_dict.values(), key=lambda p: p["amount"], reverse=True)
     total = sum(p["amount"] for p in sorted_players)
     sectors = []
     cum_angle = 0.0
-    for p in sorted_players:
+    for i, p in enumerate(sorted_players):
         share = p["amount"] / total
         cum_angle += share
-        angle_end = angle_from_area(cum_angle)
+        # Фиксируем конец последнего сектора точно на π/2
+        if i == len(sorted_players) - 1:
+            angle_end = math.pi / 2
+        else:
+            angle_end = angle_from_area(min(cum_angle, 1.0))
         sectors.append({
             "player_id": p["id"],
             "username": p["username"],
@@ -199,7 +196,6 @@ def build_sectors(players_dict: dict) -> list:
 # Генерация траектории с фазой вращения
 # ------------------------------------------------------------
 def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
-    """Возвращает список {x,y} для фазы движения."""
     x = start_x
     y = start_y
     vx = math.cos(angle) * speed
@@ -216,7 +212,6 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
         step_y = vy * speed_factor * (dt / 1000)
         x += step_x
         y += step_y
-        # отскоки
         if x <= 0:
             x = 0
             vx = abs(vx) * 0.9
@@ -235,32 +230,24 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
     return frames
 
 def generate_spin_params(players_dict: dict):
-    # 1. Сектора
+    # Сектора генерируются заранее, но для страховки пересоздадим
     sectors = build_sectors(players_dict)
-
-    # 2. Начальная позиция (внутри квадрата, не слишком близко к краям)
     start_x = random.uniform(0.1, 0.9) * 1000
     start_y = random.uniform(0.1, 0.9) * 1000
 
-    # 3. Параметры вращения
-    spin_duration = 5000  # мс
-    spin_angle_start = random.uniform(0, 2 * math.pi)  # начальное направление стрелки
-    spin_angle_speed = random.uniform(0.5 * math.pi, 1.5 * math.pi)  # рад/с
+    spin_duration = 5000  # мс – вращение на месте
+    spin_angle_start = random.uniform(0, 2 * math.pi)
+    spin_angle_speed = random.uniform(0.5 * math.pi, 1.5 * math.pi)
 
-    # 4. Конечный угол после вращения
-    # при линейном замедлении: пройденный угол = 0.5 * начальная_угловая_скорость * время
     angle_total = 0.5 * spin_angle_speed * (spin_duration / 1000)
     final_angle = spin_angle_start + angle_total
 
-    # 5. Скорость движения (в 2.2 раза больше базовой)
     base_speed = random.uniform(4000, 4500)
     motion_speed = base_speed * 2.2
 
-    # 6. Траектория движения (5 сек)
     motion_trajectory = generate_motion_trajectory(
         start_x, start_y, final_angle, motion_speed, 5000, dt=16
     )
-    # target_position = x последней точки (для определения победителя)
     final_point = motion_trajectory[-1]
     target_x = final_point["x"]
 
@@ -297,16 +284,13 @@ async def get_user_photo(user_id: int) -> str | None:
         return None
 
 async def finish_round(final_point: dict, pool: float, players: dict, sectors: list) -> dict | None:
-    """Определяет победителя по попаданию в треугольный сектор."""
     if not final_point or not sectors:
         return None
-    # переводим координаты в математическую систему (Y вверх)
     x = final_point["x"]
-    y = 1 - final_point["y"]  # инвертируем Y
-    angle = math.atan2(y, x)  # угол относительно левого нижнего угла (0,0)
+    y = 1 - final_point["y"]
+    angle = math.atan2(y, x)
     if angle < 0:
         angle = 0
-    # ищем сектор
     winner_id = None
     for sec in sectors:
         if sec["angle_start"] <= angle <= sec["angle_end"]:
@@ -543,7 +527,7 @@ async def handle_game_state(request):
             "last_winner_id": game_state.get("last_winner_id"),
             "round_id": game_state.get("round_id"),
             "game_number": game_state.get("game_number", 0),
-            "sectors": game_state.get("sectors")   # для отрисовки
+            "sectors": game_state.get("sectors")   # теперь всегда актуальны
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -586,9 +570,15 @@ async def handle_game_bet(request):
                     "amount": amount, "color": color
                 }
             game_state["pool"] += amount
+
+            # ---------- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: пересчёт секторов ----------
+            if game_state["status"] == "counting":
+                game_state["sectors"] = build_sectors(game_state["players"])
+            # Если игра только началась (переход waiting -> counting)
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
+                game_state["sectors"] = build_sectors(game_state["players"])
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -608,6 +598,8 @@ async def handle_game_cancel(request):
                         conn.commit()
                 game_state["players"] = {}
                 game_state["pool"] = 0.0
+                game_state["sectors"] = None
+                game_state["status"] = "waiting"
                 return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         return web.json_response({"success": False, "error": "cannot_cancel"}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
