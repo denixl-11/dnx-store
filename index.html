@@ -504,9 +504,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // ====================================================================
-        //  ПОЛНЫЙ СКРИПТ С ИСПРАВЛЕННОЙ ИГРОВОЙ ЛОГИКОЙ
-        // ====================================================================
         const tg = window.Telegram.WebApp;
         tg.ready();
         const API_BASE = 'https://dnx-shop.onrender.com';
@@ -921,7 +918,9 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // ===================== ИГРА (исправленная) =====================
+        // ====================================================================
+        //  ИГРОВАЯ ЛОГИКА (исправленная)
+        // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = {
@@ -943,7 +942,6 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
-        // Вспомогательная функция для границ треугольников
         function pointOnBounds(angle, cw, ch) {
             const cos = Math.cos(angle);
             const sin = Math.sin(angle);
@@ -953,7 +951,6 @@
             else return { x: ch / Math.tan(angle), y: ch };
         }
 
-        // Отрисовка
         function drawGameFrame(ballPos = null) {
             if(!ctx) return;
             const cw = canvas.width;
@@ -966,7 +963,7 @@
                 for (const sec of gState.sectors) {
                     const p1 = pointOnBounds(sec.angle_start, cw, ch);
                     const p2 = pointOnBounds(sec.angle_end, cw, ch);
-                    ctx.fillStyle = sec.color;
+                    ctx.fillStyle = sec.color || '#888';
                     ctx.beginPath();
                     ctx.moveTo(origin.x, origin.y);
                     ctx.lineTo(p1.x, ch - p1.y);
@@ -996,13 +993,13 @@
                 ctx.fillText("Ждем ставки...", cw/2, ch/2);
             }
 
-            // 2. Шарик и стрелка
+            // 2. Шарик и стрелка (только в фазе вращения)
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
 
-                // Стрелка направления (если есть угол)
-                if (ballPos.angle !== undefined) {
+                // Стрелка – только если задан угол и НЕ задан prev (т.е. вращение)
+                if (ballPos.angle !== undefined && !ballPos.prev) {
                     const angle = ballPos.angle;
                     const arrowLen = 35;
                     const endX = bx + Math.cos(angle) * arrowLen;
@@ -1011,30 +1008,6 @@
                     ctx.moveTo(bx, by);
                     ctx.lineTo(endX, endY);
                     ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-                    // наконечник
-                    const headLen = 10;
-                    const headAngle = 0.4;
-                    ctx.beginPath();
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - headLen * Math.cos(angle - headAngle), endY - headLen * Math.sin(angle - headAngle));
-                    ctx.lineTo(endX - headLen * Math.cos(angle + headAngle), endY - headLen * Math.sin(angle + headAngle));
-                    ctx.closePath();
-                    ctx.fillStyle = "#fff";
-                    ctx.fill();
-                } else if (ballPos.prev) {
-                    // если нет угла, рисуем по движению
-                    const px = ballPos.prev.x * cw;
-                    const py = (1 - ballPos.prev.y) * ch;
-                    const angle = Math.atan2(by - py, bx - px);
-                    const arrowLen = 35;
-                    const endX = bx + Math.cos(angle) * arrowLen;
-                    const endY = by + Math.sin(angle) * arrowLen;
-                    ctx.beginPath();
-                    ctx.moveTo(bx, by);
-                    ctx.lineTo(endX, endY);
-                    ctx.strokeStyle = "rgba(255,255,255,0.9)";
                     ctx.lineWidth = 3;
                     ctx.stroke();
                     const headLen = 10;
@@ -1060,7 +1033,6 @@
             }
         }
 
-        // Анимация: вращение на месте (5с) + полёт (5с)
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const startTime = performance.now();
@@ -1071,7 +1043,7 @@
                 const elapsed = now - startTime;
 
                 if (elapsed < spinDuration) {
-                    // Вращение на месте (5 сек)
+                    // Фаза вращения (5 сек)
                     const t = elapsed / spinDuration;
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
                     const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
@@ -1079,7 +1051,7 @@
                     drawGameFrame(ball);
                     animationFrameId = requestAnimationFrame(animate);
                 } else if (elapsed < spinDuration + 5000) {
-                    // Движение по траектории (5 сек)
+                    // Фаза движения (5 сек) – стрелка не рисуется
                     const motionElapsed = elapsed - spinDuration;
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
@@ -1105,7 +1077,6 @@
             animationFrameId = requestAnimationFrame(animate);
         }
 
-        // Запрос победителя после окончания анимации
         async function fetchWinnerNow() {
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
@@ -1138,7 +1109,6 @@
             if (winnerTimer) { clearTimeout(winnerTimer); winnerTimer = null; }
         }
 
-        // Опрос состояния игры
         async function pollGame() {
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
@@ -1182,7 +1152,7 @@
                 gState.last_winner_id = newState.last_winner_id;
                 gState.round_id = newState.round_id;
                 gState.game_number = newState.game_number;
-                gState.sectors = newState.sectors; // теперь приходят с сервера
+                gState.sectors = newState.sectors;
 
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
@@ -1244,7 +1214,6 @@
                 </div>`).join('');
         }
 
-        // Ставки
         function openBetConfirm(amt) {
             betAmountTemp = amt;
             document.getElementById('confirm-bet-amount').innerText = amt;
@@ -1303,7 +1272,6 @@
                 });
         }
 
-        // Инициализация
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();

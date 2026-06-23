@@ -173,21 +173,36 @@ def build_sectors(players_dict: dict) -> list:
         return []
     sorted_players = sorted(players_dict.values(), key=lambda p: p["amount"], reverse=True)
     total = sum(p["amount"] for p in sorted_players)
+    if total == 0:
+        return []
     sectors = []
     cum_angle = 0.0
+    # Минимальный угол, чтобы сектор был виден (например, 0.001 рад)
+    MIN_ANGLE = 0.001
     for i, p in enumerate(sorted_players):
         share = p["amount"] / total
         cum_angle += share
-        # Фиксируем конец последнего сектора точно на π/2
+        # Вычисляем угол, но не даём ему быть меньше MIN_ANGLE
         if i == len(sorted_players) - 1:
             angle_end = math.pi / 2
         else:
             angle_end = angle_from_area(min(cum_angle, 1.0))
+            # Если угол меньше предыдущего + MIN_ANGLE, поднимаем
+            if sectors and angle_end < sectors[-1]["angle_end"] + MIN_ANGLE:
+                angle_end = sectors[-1]["angle_end"] + MIN_ANGLE
+        # Если это первый сектор, угол_начала = 0, иначе берём предыдущий конец
+        start = sectors[-1]["angle_end"] if sectors else 0.0
+        # Если угол_конца <= угол_начала, увеличиваем конец
+        if angle_end <= start:
+            angle_end = start + MIN_ANGLE
+        # Для последнего сектора принудительно ставим π/2
+        if i == len(sorted_players) - 1:
+            angle_end = math.pi / 2
         sectors.append({
             "player_id": p["id"],
             "username": p["username"],
             "color": p["color"],
-            "angle_start": sectors[-1]["angle_end"] if sectors else 0.0,
+            "angle_start": start,
             "angle_end": angle_end
         })
     return sectors
@@ -230,14 +245,14 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
     return frames
 
 def generate_spin_params(players_dict: dict):
-    # Сектора генерируются заранее, но для страховки пересоздадим
     sectors = build_sectors(players_dict)
     start_x = random.uniform(0.1, 0.9) * 1000
     start_y = random.uniform(0.1, 0.9) * 1000
 
-    spin_duration = 5000  # мс – вращение на месте
+    spin_duration = 5000  # 5 секунд вращения на месте
+    # Начальная угловая скорость увеличена в 3 раза (было 0.5π..1.5π, теперь 1.5π..4.5π)
+    spin_angle_speed = random.uniform(1.5 * math.pi, 4.5 * math.pi)
     spin_angle_start = random.uniform(0, 2 * math.pi)
-    spin_angle_speed = random.uniform(0.5 * math.pi, 1.5 * math.pi)
 
     angle_total = 0.5 * spin_angle_speed * (spin_duration / 1000)
     final_angle = spin_angle_start + angle_total
@@ -378,7 +393,7 @@ async def game_worker():
                     game_state["sectors"] = None
                     logging.info(f"Round finished, winner: {winner_data}")
 
-# ------------------- API (без изменений в остальном) -------------------
+# ------------------- API (без изменений) -------------------
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
@@ -527,7 +542,7 @@ async def handle_game_state(request):
             "last_winner_id": game_state.get("last_winner_id"),
             "round_id": game_state.get("round_id"),
             "game_number": game_state.get("game_number", 0),
-            "sectors": game_state.get("sectors")   # теперь всегда актуальны
+            "sectors": game_state.get("sectors")
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -563,7 +578,8 @@ async def handle_game_bet(request):
                 occupied_colors = {p["color"] for p in game_state["players"].values()}
                 available = [c for c in PLAYER_COLORS if c not in occupied_colors]
                 if not available:
-                    available = PLAYER_COLORS
+                    # если все цвета заняты, генерируем случайный
+                    available = ["#" + ''.join(random.choices('0123456789ABCDEF', k=6))]
                 color = random.choice(available)
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
@@ -571,10 +587,8 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            # ---------- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: пересчёт секторов ----------
             if game_state["status"] == "counting":
                 game_state["sectors"] = build_sectors(game_state["players"])
-            # Если игра только началась (переход waiting -> counting)
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
