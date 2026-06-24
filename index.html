@@ -505,12 +505,11 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         // ====================================================================
-        //  ПОЛНЫЙ СКРИПТ – ВСЕ ФУНКЦИИ МАГАЗИНА, КОРЗИНЫ, БАЛАНСА И ИГРЫ
-        //  С ПОДДЕРЖКОЙ ПОЛИГОНОВ ВОРОНОГО
+        //  ПОЛНЫЙ СКРИПТ – МАГАЗИН, КОРЗИНА, БАЛАНС И ИГРА
         // ====================================================================
         const tg = window.Telegram.WebApp;
         tg.ready();
-        const API_BASE = 'https://dnx-shop.onrender.com';
+        const API_BASE = 'https://dnx-shop.onrender.com'; // ← замените на URL вашего бэкенда при необходимости
         const initData = tg.initData || '';
         const userDisplayName = tg.initDataUnsafe?.user?.username || "Guest";
         const userAvatar = tg.initDataUnsafe?.user?.photo_url || "";
@@ -688,6 +687,33 @@
                 }
             } catch(e) { showAlert("Ошибка сети"); closeModal('confirm-buy-modal'); }
             pendingBuyItem = null;
+        }
+
+        // Функция оплаты всей корзины
+        async function buyCart() {
+            if (cart.length === 0) return;
+            const itemIds = cart.map(item => item.id);
+            const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
+            if (userBalance < totalPrice) {
+                showAlert('Недостаточно средств');
+                return;
+            }
+            try {
+                const data = await apiFetch(`${API_BASE}/buy`, { method: 'POST', body: JSON.stringify({ items: itemIds }) });
+                if (data.success) {
+                    showAlert('Корзина оплачена!');
+                    cart = [];
+                    localStorage.removeItem('dnx_cart');
+                    renderCart();
+                    await updateBalance();
+                    loadCatalog();
+                    loadInventory();
+                } else {
+                    showAlert(data.error === 'insufficient_funds' ? 'Недостаточно средств' : 'Товары недоступны');
+                }
+            } catch(e) {
+                showAlert('Ошибка сети');
+            }
         }
 
         document.getElementById('terms-checkbox')?.addEventListener('change', function() {
@@ -947,7 +973,7 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
-        // Отрисовка полигонов (без fallback-прямоугольников)
+        // Отрисовка полигонов
         function drawGameFrame(ballPos = null) {
             if(!ctx) return;
             const cw = canvas.width;
@@ -981,7 +1007,7 @@
                 ctx.fillText("Загрузка поля...", cw/2, ch/2);
             }
 
-            // Шарик и стрелка (без изменений)
+            // Шарик и стрелка
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
@@ -1137,7 +1163,7 @@
                 gState.last_winner_id = newState.last_winner_id;
                 gState.round_id = newState.round_id;
                 gState.game_number = newState.game_number;
-                gState.polygons = newState.polygons;  // <- теперь полигоны
+                gState.polygons = newState.polygons;
 
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
