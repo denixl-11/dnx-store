@@ -1,4 +1,1 @@
 libgeos-dev
-libblas-dev
-liblapack-dev
-gfortran
