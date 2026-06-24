@@ -1029,7 +1029,7 @@
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
 
-                // Стрелка показывается только во время вращения
+                // Стрелка показывается только во время вращения и паузы
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const angle = ballPos.angle;
                     const arrowLen = 35;
@@ -1070,7 +1070,8 @@
             const startTime = performance.now();
             const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
             let prevPos = null;
-            let finalAngle = null;
+            // Угол для стрелки: после вращения вычисляем точный угол по первой точке траектории
+            let pauseAngle = null;
 
             function animate(now) {
                 const elapsed = now - startTime;
@@ -1079,15 +1080,21 @@
                 if (elapsed < spinDuration) {
                     const t = elapsed / spinDuration;
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
-                    finalAngle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
-                    const ball = { x: startPos.x, y: startPos.y, angle: finalAngle };
+                    const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
+                    pauseAngle = angle;  // запоминаем последний угол
+                    const ball = { x: startPos.x, y: startPos.y, angle };
                     drawGameFrame(ball, highlightPolygonId);
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 // Фаза паузы (spinDuration .. spinDuration + 1000)
                 else if (elapsed < spinDuration + 1000) {
-                    // Шарик неподвижен, стрелка показывает последнее направление
-                    const ball = { x: startPos.x, y: startPos.y, angle: finalAngle };
+                    // Если ещё не вычислен точный угол – берём из первой точки траектории
+                    if (pauseAngle === null && trajectory.length > 0) {
+                        const firstMove = trajectory[0];
+                        pauseAngle = Math.atan2(firstMove.y - startPos.y, firstMove.x - startPos.x);
+                    }
+                    const angle = pauseAngle || 0;
+                    const ball = { x: startPos.x, y: startPos.y, angle };
                     drawGameFrame(ball, highlightPolygonId);
                     animationFrameId = requestAnimationFrame(animate);
                 }
@@ -1096,7 +1103,6 @@
                     const motionElapsed = elapsed - (spinDuration + 1000);
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
-                        // Достигли конца траектории
                         const finalPos = trajectory[trajectory.length-1];
                         drawGameFrame(finalPos, highlightPolygonId);
                         animationFrameId = null;
@@ -1129,14 +1135,17 @@
                     lastShownRoundId = state.round_id;
                     localStorage.setItem('last_round_id', lastShownRoundId);
 
+                    // Полигоны могут быть ещё доступны через last_polygons на сервере
+                    if (state.polygons) {
+                        gState.polygons = state.polygons;
+                    }
+
                     // Подсветка полигона победителя
                     highlightPolygonId = state.winner.user_id;
                     drawGameFrame(null, highlightPolygonId);
-                    // Ждём 1.5 секунды, чтобы игрок увидел подсветку
                     await new Promise(r => setTimeout(r, 1500));
 
                     showWinnerModal(state.winner);
-                    // Сбрасываем подсветку после закрытия модалки
                     highlightPolygonId = null;
                     await updateBalance();
                 }
@@ -1175,7 +1184,6 @@
                     }
                 }
 
-                // Обновляем таймер
                 if (newState.status === 'counting') {
                     if (!timerInterval || newState.timer !== gState.timer) {
                         gState.timer = newState.timer;
@@ -1212,7 +1220,6 @@
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
                 renderBetsList();
 
-                // Перерисовываем фон, передавая актуальную подсветку
                 if (!isSpinning) drawGameFrame(null, highlightPolygonId);
 
                 const myId = String(tg.initDataUnsafe?.user?.id);
@@ -1220,7 +1227,6 @@
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
 
-                // Запуск анимации
                 if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
                     isSpinning = true;
                     runSpinAnimation(gState.spin_params);
@@ -1230,7 +1236,6 @@
                     drawGameFrame(null, highlightPolygonId);
                 }
 
-                // Если появился победитель (на случай, если fetchWinnerNow не сработал)
                 if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
                     if (document.getElementById('page-game').classList.contains('page-active')) {
                         lastShownRoundId = gState.round_id;
@@ -1240,7 +1245,6 @@
                     }
                 }
 
-                // Автоматический сброс поля после окончания раунда
                 if (gState.players.length === 0 && gState.status === 'waiting') {
                     drawGameFrame(null, highlightPolygonId);
                 }
