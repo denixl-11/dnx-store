@@ -168,7 +168,7 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-#  ВЗВЕШЕННАЯ ДИАГРАММА ВОРОНОГО (вспомогательные функции)
+#  ЧИСТАЯ ДИАГРАММА ВОРОНОГО (вспомогательные функции)
 # ------------------------------------------------------------
 def clip_polygon_by_halfplane(poly, point_on_line, normal):
     clipped = []
@@ -241,15 +241,9 @@ def polygon_area_and_centroid(poly):
     return abs(area), (cx, cy)
 
 
-def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iterations=300):
-    """
-    Строит взвешенную диаграмму Вороного для списка players в прямоугольнике bounds.
-    players: список словарей с ключами id, username, color, amount.
-    target_areas: список целевых площадей (если None, вычисляются пропорционально amount).
-    """
+def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iterations=500):
     if not players:
         return []
-
     n = len(players)
     if target_areas is None:
         total = sum(p["amount"] for p in players)
@@ -266,10 +260,23 @@ def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iteration
     width = xmax - xmin
     height = ymax - ymin
 
-    # Начальные позиции точек (случайно внутри bounds)
-    points = np.random.rand(n, 2)
-    points[:, 0] = xmin + width * (0.1 + 0.8 * points[:, 0])
-    points[:, 1] = ymin + height * (0.1 + 0.8 * points[:, 1])
+    # Инициализация точек: x-позиция примерно пропорциональна накопленной доле
+    points = np.zeros((n, 2))
+    order = np.argsort(target_areas)[::-1]
+    sorted_targets = [target_areas[i] for i in order]
+    x_positions = []
+    current = 0.0
+    for t in sorted_targets:
+        center = current + t / 2.0
+        x_positions.append(xmin + center * width)
+        current += t
+    for idx, i in enumerate(order):
+        points[i, 0] = x_positions[idx]
+        points[i, 1] = ymin + height * (0.1 + 0.8 * random.random())
+    points[:, 0] += np.random.normal(0, width * 0.02, n)
+    points[:, 1] += np.random.normal(0, height * 0.02, n)
+    points[:, 0] = np.clip(points[:, 0], xmin + width * 0.05, xmax - width * 0.05)
+    points[:, 1] = np.clip(points[:, 1], ymin + height * 0.05, ymax - height * 0.05)
 
     prev_error = float('inf')
     for it in range(iterations):
@@ -286,7 +293,7 @@ def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iteration
                 centroids[i] = None
 
         error = np.mean(np.abs(areas - target_areas))
-        if error < 0.001:
+        if error < 0.0005:
             break
 
         step_scale = 0.5 if error > prev_error else 1.0
@@ -297,13 +304,11 @@ def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iteration
                 continue
             target = target_areas[i]
             if areas[i] < target:
-                # увеличить площадь: точка от центроида
                 direction = np.array(points[i]) - np.array(centroids[i])
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
                     points[i] += step_scale * 0.5 * direction / norm * (1 - areas[i] / target)
             else:
-                # уменьшить площадь: точка к центроиду
                 direction = np.array(centroids[i]) - np.array(points[i])
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
@@ -328,11 +333,6 @@ def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iteration
 
 
 def weighted_voronoi_polygons(players_dict: dict) -> list:
-    """
-    Рекурсивная диаграмма Вороного с гарантией минимальной площади 4%.
-    При дисбалансе >96% группа разделяется на лидера и остальных,
-    для них строится Вороной, затем рекурсия продолжается внутри каждой части.
-    """
     if not players_dict:
         return []
 
@@ -341,9 +341,7 @@ def weighted_voronoi_polygons(players_dict: dict) -> list:
         return []
 
     def recurse(group, bounds):
-        """Рекурсивно строит полигоны для группы игроков в прямоугольнике bounds."""
         if len(group) == 1:
-            # Один игрок – весь bounds
             xmin, ymin, xmax, ymax = bounds
             coords = [
                 {"x": xmin, "y": ymin},
@@ -363,38 +361,28 @@ def weighted_voronoi_polygons(players_dict: dict) -> list:
         max_share = max(shares)
         max_idx = shares.index(max_share)
 
-        # Если лидер занимает >96%, делим группу на лидера и остальных
         if max_share > 0.96:
             leader = group[max_idx]
             others = [p for i, p in enumerate(group) if i != max_idx]
             others_total = sum(p["amount"] for p in others)
 
-            # Строим Вороного для двух "игроков": лидер и "мета-игрок" остальных
-            # Целевые площади: лидер = max_share, остальные = 1 - max_share, но не менее 4%
             target_leader = max_share
             target_others = max(0.04, 1.0 - max_share)
-            # Нормализуем
             total_target = target_leader + target_others
             target_leader /= total_target
             target_others /= total_target
 
-            # Создаём временные сущности для Вороного
             meta_leader = {
-                "id": leader["id"],
-                "username": leader["username"],
-                "color": leader["color"],
-                "amount": leader["amount"]
+                "id": leader["id"], "username": leader["username"],
+                "color": leader["color"], "amount": leader["amount"]
             }
             meta_others = {
-                "id": "__others__",
-                "username": "others",
-                "color": "#000000",  # будет заменён
-                "amount": others_total
+                "id": "__others__", "username": "others",
+                "color": "#000000", "amount": others_total
             }
             two_players = [meta_leader, meta_others]
             two_targets = [target_leader, target_others]
-
-            polygons = build_weighted_voronoi_in_rect(two_players, bounds, target_areas=two_targets, iterations=200)
+            polygons = build_weighted_voronoi_in_rect(two_players, bounds, target_areas=two_targets, iterations=500)
 
             leader_poly = None
             others_poly = None
@@ -405,32 +393,25 @@ def weighted_voronoi_polygons(players_dict: dict) -> list:
                     others_poly = poly["polygon"]
 
             result = []
-            # Добавляем полигон лидера
             if leader_poly:
                 result.append({
-                    "player_id": leader["id"],
-                    "username": leader["username"],
-                    "color": leader["color"],
-                    "polygon": leader_poly
+                    "player_id": leader["id"], "username": leader["username"],
+                    "color": leader["color"], "polygon": leader_poly
                 })
-            # Рекурсивно обрабатываем остальных внутри их полигона
             if others and others_poly:
-                # Преобразуем координаты полигона в bounds (min/max)
                 xs = [p["x"] for p in others_poly]
                 ys = [p["y"] for p in others_poly]
                 new_bounds = (min(xs), min(ys), max(xs), max(ys))
-                # Запускаем рекурсию для остальных
                 result.extend(recurse(others, new_bounds))
             return result
 
-        # Если дисбаланс не экстремальный, строим обычный Вороной для всех
         return build_weighted_voronoi_in_rect(group, bounds)
 
     return recurse(players, (0.0, 0.0, 1.0, 1.0))
 
 
 # ------------------------------------------------------------
-# Генерация траектории
+# Генерация траектории (без изменений)
 # ------------------------------------------------------------
 def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
     x = start_x
@@ -499,7 +480,7 @@ def generate_spin_params(polygons: list) -> dict:
 
 
 # ------------------------------------------------------------
-# Игровая механика (без изменений)
+# Игровая механика
 # ------------------------------------------------------------
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
@@ -617,7 +598,7 @@ async def game_worker():
                     logging.info("Spinning with recursive Voronoi polygons")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(3 + 1 + 10 + 0.5)
+            await asyncio.sleep(3 + 1 + 10 + 2 + 0.5)  # учтена пауза 2 сек после движения
             async with game_lock:
                 if game_state["status"] == "spinning":
                     final_point = game_state["spin_params"]["trajectory"][-1]
@@ -633,7 +614,8 @@ async def game_worker():
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    game_state["polygons"] = None
+                    # Полигоны НЕ обнуляем, чтобы фронтенд успел подсветить
+                    # game_state["polygons"] = None
                     logging.info(f"Round finished, winner: {winner_data}")
 
 
