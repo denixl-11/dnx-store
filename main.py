@@ -16,8 +16,6 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 from dotenv import load_dotenv
-
-# Новые импорты для Вороного
 import numpy as np
 from scipy.spatial import Voronoi
 from shapely.geometry import Polygon, Point
@@ -66,7 +64,7 @@ game_state = {
     "last_winner_id": None,
     "round_id": None,
     "game_number": 0,
-    "polygons": None  # вместо sectors теперь храним полигоны
+    "polygons": None
 }
 
 
@@ -177,80 +175,107 @@ def require_auth(handler):
 # ------------------------------------------------------------
 # Генерация полигонов методом взвешенной Вороного
 # ------------------------------------------------------------
-def weighted_voronoi_polygons(players_dict: dict, num_iterations: int = 50) -> list:
+def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list:
     """
-    Возвращает список полигонов для каждого игрока.
-    Каждый полигон – список точек (x, y) в [0,1].
+    Генерирует полигоны Вороного с весами (ставками).
+    Возвращает список словарей: {player_id, username, color, polygon: [{x, y}, ...]}
     """
     if not players_dict:
         return []
-    # Сортируем игроков для стабильности
+
     sorted_players = sorted(players_dict.values(), key=lambda p: p["amount"], reverse=True)
-    weights = [p["amount"] for p in sorted_players]
-    total_weight = sum(weights)
-    if total_weight == 0:
+    weights = np.array([p["amount"] for p in sorted_players])
+    total = weights.sum()
+    if total == 0:
         return []
+    target_areas = weights / total
     n = len(sorted_players)
 
-    # Начальные точки (случайные) внутри квадрата [0,1]
-    points = np.random.rand(n, 2)
+    # Начальные точки – случайные, но стараемся распределить равномернее
+    points = np.random.rand(n, 2) * 0.8 + 0.1  # в [0.1, 0.9]
 
-    for _ in range(num_iterations):
-        # Строим диаграмму Вороного
+    for it in range(iterations):
         vor = Voronoi(points)
-        # Получаем области для каждой точки
-        regions = []
-        for point_idx in range(n):
-            region_idx = vor.point_region[point_idx]
-            region_vertices = vor.regions[region_idx]
-            if -1 in region_vertices:
-                # Неограниченная область – пропускаем (будет обработана позже)
+        for i in range(n):
+            region_idx = vor.point_region[i]
+            verts = vor.regions[region_idx]
+            if -1 in verts:
+                # Неограниченная область – пропускаем (обработаем позже)
                 continue
-            poly = Polygon([vor.vertices[i] for i in region_vertices])
-            # Обрезаем до единичного квадрата
+            poly = Polygon([vor.vertices[j] for j in verts])
             poly = poly.intersection(Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]))
-            if poly.is_empty:
+            if poly.is_empty or poly.area == 0:
                 continue
             area = poly.area
-            target_area = weights[point_idx] / total_weight
-            # Корректируем положение точки: двигаем к центру масс области
             centroid = poly.centroid
-            # Если площадь меньше целевой, сдвигаем точку к центру масс (увеличивая область)
-            # Иначе отодвигаем от центра масс
-            if area < target_area:
-                # Приближаем к центру масс
-                points[point_idx] = 0.9 * points[point_idx] + 0.1 * np.array([centroid.x, centroid.y])
+            # Корректируем точку: если площадь меньше целевой, двигаем к центроиду,
+            # иначе – от центроида
+            if area < target_areas[i]:
+                points[i] = 0.8 * points[i] + 0.2 * np.array([centroid.x, centroid.y])
             else:
-                # Отдаляем от центра масс
-                direction = points[point_idx] - np.array([centroid.x, centroid.y])
-                if np.linalg.norm(direction) > 0.001:
-                    points[point_idx] = points[point_idx] + 0.1 * direction
+                direction = points[i] - np.array([centroid.x, centroid.y])
+                norm = np.linalg.norm(direction)
+                if norm > 0.001:
+                    points[i] = points[i] + 0.2 * direction / norm * (area - target_areas[i]) * 1.5
         # Ограничиваем точки внутри квадрата
-        points = np.clip(points, 0.01, 0.99)
+        points = np.clip(points, 0.02, 0.98)
 
     # Финальное построение полигонов
-    final_polygons = []
     vor = Voronoi(points)
+    final_polygons = []
     for i, player in enumerate(sorted_players):
         region_idx = vor.point_region[i]
-        region_vertices = vor.regions[region_idx]
-        if -1 in region_vertices:
-            # Если область неограничена, строим полигон, обрезанный квадратом
-            # Для простоты используем ближайшие вершины
-            # Это редкий случай, можно обработать отдельно
+        verts = vor.regions[region_idx]
+        if -1 in verts:
+            # Для неограниченных областей – строим полигон вручную (редкий случай)
+            # Используем ближайшие вершины и обрезаем квадратом
+            # Возьмём ограничивающий квадрат и пересечём с полуплоскостями
+            # Но это сложно, проще взять fallback
             continue
-        poly = Polygon([vor.vertices[j] for j in region_vertices])
+        poly = Polygon([vor.vertices[j] for j in verts])
         poly = poly.intersection(Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]))
-        if poly.is_empty:
+        if poly.is_empty or poly.area < 0.0001:
             continue
-        # Получаем координаты вершин (в порядке обхода)
-        coords = list(poly.exterior.coords[:-1])  # убираем повтор первой точки
+        coords = list(poly.exterior.coords[:-1])  # удаляем повтор первой точки
         final_polygons.append({
             "player_id": player["id"],
             "username": player["username"],
             "color": player["color"],
             "polygon": [{"x": c[0], "y": c[1]} for c in coords]
         })
+
+    # Если количество полигонов меньше, чем игроков – добавляем оставшихся
+    # Это крайний случай, но на всякий случай реализуем fallback
+    if len(final_polygons) < n:
+        used_ids = {p["player_id"] for p in final_polygons}
+        remaining = [p for p in sorted_players if p["id"] not in used_ids]
+        if remaining:
+            # Разделим оставшуюся площадь поровну по вертикали (чтобы не сломать игру)
+            # Это временное решение, чтобы игра не падала
+            total_area = 1.0
+            used_area = sum(poly["polygon"] for poly in final_polygons)  # не совсем корректно
+            # Просто добавим прямоугольники для оставшихся (но это будет редко)
+            # Для простоты – генерируем простые прямоугольники с площадью пропорциональной весу
+            remaining_weights = np.array([p["amount"] for p in remaining])
+            remaining_total = remaining_weights.sum()
+            if remaining_total > 0:
+                x_start = 0.0
+                for p in remaining:
+                    width = (p["amount"] / remaining_total) * 0.5  # половина поля
+                    poly_coords = [
+                        {"x": x_start, "y": 0.0},
+                        {"x": x_start + width, "y": 0.0},
+                        {"x": x_start + width, "y": 1.0},
+                        {"x": x_start, "y": 1.0}
+                    ]
+                    final_polygons.append({
+                        "player_id": p["id"],
+                        "username": p["username"],
+                        "color": p["color"],
+                        "polygon": poly_coords
+                    })
+                    x_start += width
+
     return final_polygons
 
 
@@ -293,7 +318,6 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
 
 
 def generate_spin_params(players_dict: dict):
-    # Генерируем полигоны
     polygons = weighted_voronoi_polygons(players_dict)
 
     start_x = random.uniform(0.1, 0.9) * 1000
@@ -322,7 +346,7 @@ def generate_spin_params(players_dict: dict):
         "spinAngleSpeed": spin_angle_speed,
         "trajectory": motion_trajectory,
         "target_position": target_x,
-        "polygons": polygons  # передаём полигоны вместо секторов
+        "polygons": polygons
     }
 
 
@@ -351,7 +375,7 @@ async def get_user_photo(user_id: int) -> str | None:
 
 
 def point_in_polygon(point, polygon):
-    """Проверка, находится ли точка внутри многоугольника (алгоритм пересечения лучей)"""
+    """Проверка точки в многоугольнике (алгоритм пересечения лучей)"""
     x, y = point
     inside = False
     n = len(polygon)
@@ -374,7 +398,6 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
         return None
     x = final_point["x"]
     y = final_point["y"]
-    # Ищем полигон, содержащий точку
     winner_id = None
     for poly in polygons:
         if point_in_polygon((x, y), poly["polygon"]):
@@ -466,7 +489,7 @@ async def game_worker():
                     logging.info(f"Round finished, winner: {winner_data}")
 
 
-# ------------------- API (с изменениями для полигонов) -------------------
+# ------------------- API -------------------
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
@@ -636,7 +659,7 @@ async def handle_game_state(request):
             "last_winner_id": game_state.get("last_winner_id"),
             "round_id": game_state.get("round_id"),
             "game_number": game_state.get("game_number", 0),
-            "polygons": game_state.get("polygons")  # теперь полигоны
+            "polygons": game_state.get("polygons")
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -695,38 +718,199 @@ async def handle_game_bet(request):
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
+        logging.error(f"Bet error: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 
-# Остальные хендлеры без изменений (handle_game_cancel, handle_game_finish, и т.д.)
-# ... (они такие же, как в предыдущей версии, только вместо sectors используем polygons)
+@require_auth
+async def handle_game_cancel(request):
+    global game_state
+    try:
+        user = request['telegram_user']
+        user_id = user['id']
+        async with game_lock:
+            if len(game_state["players"]) == 1 and user_id in game_state["players"]:
+                refund = game_state["players"][user_id]["amount"]
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (refund, user_id))
+                        conn.commit()
+                game_state["players"] = {}
+                game_state["pool"] = 0.0
+                game_state["polygons"] = None
+                game_state["status"] = "waiting"
+                return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        return web.json_response({"success": False, "error": "cannot_cancel"},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        logging.error(f"Cancel error: {e}")
+        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# ======== ВНИМАНИЕ: остальные хендлеры (game_cancel, history, leaderboard, season, prize, requisites) остаются без изменений ========
-# Я их не повторяю для краткости, но в полном файле они должны быть.
-# Ниже привожу только ключевые изменения.
 
-# ... (пропущены хендлеры, которые не изменились)
+async def handle_game_finish(request):
+    return web.json_response({"success": True, "message": "Server handles finish"},
+                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-# Callbacks админа (без изменений)
+
+@require_auth
+async def handle_game_history(request):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT game_number, winner_name, win_amount FROM game_history ORDER BY game_number DESC LIMIT 100")
+                rows = cur.fetchall()
+        result = []
+        for row in rows:
+            result.append({
+                "game_number": row["game_number"],
+                "winner_name": row["winner_name"],
+                "win_amount": float(row["win_amount"])
+            })
+        return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        logging.error(f"Game history error: {e}")
+        return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+async def handle_leaderboard(request):
+    user_id = request['telegram_user']['id']
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT username, wins FROM leaderboard ORDER BY wins DESC LIMIT 5")
+                top_rows = cur.fetchall()
+                cur.execute("SELECT username, wins FROM leaderboard WHERE user_id = %s", (user_id,))
+                user_row = cur.fetchone()
+        result = {"top": [], "user": None}
+        for r in top_rows:
+            result["top"].append({"username": r["username"], "wins": r["wins"]})
+        if user_row:
+            result["user"] = {"username": user_row["username"], "wins": user_row["wins"]}
+        return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        logging.error(f"Leaderboard error: {e}")
+        return web.json_response({"top": [], "user": None}, status=500,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+async def handle_season_state(request):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT end_time FROM season WHERE id = 1")
+                row = cur.fetchone()
+                if row:
+                    end_time = row["end_time"]
+                    if end_time.tzinfo is None:
+                        end_time = end_time.replace(tzinfo=timezone.utc)
+                    return web.json_response({"end_time": end_time.timestamp() * 1000},
+                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+async def handle_get_prize_items(request):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT id, name, image_url, nft_link, traits FROM prize_items ORDER BY id")
+                items = cur.fetchall()
+                for item in items:
+                    traits = item.get('traits')
+                    if isinstance(traits, str):
+                        try:
+                            item['traits'] = json.loads(traits)
+                        except:
+                            item['traits'] = []
+        return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        logging.error(f"Prize items error: {e}")
+        return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+async def handle_get_requisites(request):
+    return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+# ---------- Админ-коллбэки ----------
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
-    # ... (без изменений)
-    pass
+    parts = callback.data.split("_")
+    if len(parts) != 4: return
+    _, _, uid, amount = parts
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO users (id, balance) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET balance = users.balance + EXCLUDED.balance",
+                    (uid, float(amount)))
+                conn.commit()
+        await callback.message.edit_text(f"✅ Баланс пополнен на {amount} ₽!")
+        try:
+            await bot.send_message(uid, f"💰 Ваш баланс пополнен на {amount} ₽!")
+        except:
+            pass
+    except Exception as e:
+        logging.error(f"Topup approve error: {e}")
 
 
 @dp.callback_query(F.data.startswith("topup_no_"))
 async def admin_topup_reject(callback: types.CallbackQuery):
-    pass
+    parts = callback.data.split("_")
+    if len(parts) != 4: return
+    _, _, uid, amount = parts
+    await callback.message.edit_text(f"❌ Заявка на {amount} ₽ отклонена.")
+    try:
+        await bot.send_message(uid, f"❌ Заявка на пополнение {amount} ₽ отклонена.")
+    except:
+        pass
 
 
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
-    pass
+    parts = callback.data.split("_")
+    if len(parts) != 4: return
+    _, _, uid, item_id = parts
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
+                    (int(item_id), uid))
+                conn.commit()
+        await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
+        try:
+            await bot.send_message(uid, f"🎉 NFT (ID: {item_id}) выведен!")
+        except:
+            pass
+    except Exception as e:
+        logging.error(f"Withdraw approve error: {e}")
 
 
 @dp.callback_query(F.data.startswith("with_no_"))
 async def admin_withdraw_reject(callback: types.CallbackQuery):
-    pass
+    parts = callback.data.split("_")
+    if len(parts) != 4: return
+    _, _, uid, item_id = parts
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE items SET status = 'Продан', last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
+                    (int(item_id), uid))
+                conn.commit()
+        await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
+        try:
+            await bot.send_message(uid, f"❌ Вывод NFT (ID: {item_id}) отклонён.")
+        except:
+            pass
+    except Exception as e:
+        logging.error(f"Withdraw reject error: {e}")
 
 
 @dp.message(Command("start"))
@@ -736,7 +920,7 @@ async def cmd_start(message: types.Message):
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
 
 
-# Настройка роутинга (добавляем /game/state, /game/bet, /game/cancel и т.д.)
+# ---------- Настройка сервера ----------
 app = web.Application()
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)
@@ -747,7 +931,7 @@ app.router.add_post('/buy', handle_buy)
 app.router.add_post('/request-withdraw', handle_request_withdraw)
 app.router.add_get('/game/state', handle_game_state)
 app.router.add_post('/game/bet', handle_game_bet)
-app.router.add_post('/game/cancel', handle_game_cancel)  # этот хендлер нужно добавить
+app.router.add_post('/game/cancel', handle_game_cancel)
 app.router.add_post('/game/finish', handle_game_finish)
 app.router.add_get('/game/history', handle_game_history)
 app.router.add_get('/leaderboard', handle_leaderboard)

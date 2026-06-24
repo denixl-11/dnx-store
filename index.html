@@ -6,7 +6,6 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* ===== ВСЕ СТИЛИ ОСТАЮТСЯ КАК В ИСХОДНОМ ФАЙЛЕ (без изменений) ===== */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -15,8 +14,10 @@
             --text-muted: #7a7a7c;
             --border-color: #222224;
         }
+
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { overflow-x: hidden; width: 100%; }
+
         body {
             background-color: var(--bg-main);
             color: var(--text-main);
@@ -29,51 +30,104 @@
             padding-bottom: 100px;
             -webkit-font-smoothing: antialiased;
         }
-        header { width: 100%; padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); background: rgba(10,10,12,0.95); z-index: 50; }
+
+        header {
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(10, 10, 12, 0.95);
+            z-index: 50;
+        }
+
         .header-left { display: flex; align-items: center; gap: 8px; }
         .avatar { width: 36px; height: 36px; border-radius: 50%; background: #222; object-fit: cover; border: 1px solid var(--border-color); }
         .username { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
-        .header-right { background: rgba(203,161,83,0.1); border: 1px solid var(--accent-gold); padding: 8px 12px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+
+        .header-right {
+            background: rgba(203, 161, 83, 0.1);
+            border: 1px solid var(--accent-gold);
+            padding: 8px 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
         .header-right:active { transform: scale(0.95); }
         .balance-text { color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; }
+
         .catalog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; padding: 20px; box-sizing: border-box; }
         .item-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; }
         .item-image { width: 100%; aspect-ratio: 1/1; border-radius: 12px; object-fit: cover; margin-bottom: 14px; cursor: pointer; }
         .item-name { font-size: 0.95rem; font-weight: 500; margin-bottom: 14px; color: var(--text-main); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
         .card-buttons { display: flex; width: 100%; gap: 8px; }
         .btn-buy-now { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 10px; height: 36px; font-weight: 700; font-size: 0.85rem; text-transform: uppercase; cursor: pointer; }
-        .btn-add-cart { width: 40px; background: rgba(255,255,255,0.02); border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .btn-add-cart { width: 40px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 10px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
         .btn-main-action { width: 100%; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; transition: 0.3s; }
         .btn-main-action:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-secondary { width: 100%; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 12px; height: 52px; font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer; }
+
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .tab-bar { position: fixed; bottom: 0; width: 100%; background: rgba(10,10,12,0.85); backdrop-filter: blur(15px); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 20px 0 25px 0; z-index: 100; }
+
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: rgba(10, 10, 12, 0.85);
+            backdrop-filter: blur(15px);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            padding: 20px 0 25px 0;
+            z-index: 100;
+        }
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
+
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
+
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap { position: relative; width: 90%; height: 25vh; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); background: #131315; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
         #gameCanvas { width: 100%; height: 100%; display: block; }
-        .game-info-row { width: 90%; display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.7rem; color: rgba(255,255,255,0.45); font-weight: 500; letter-spacing: 0.5px; }
-        .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203,161,83,0.2); pointer-events: none; }
+        .game-info-row {
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.45);
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203, 161, 83, 0.2); pointer-events: none; }
+
         .game-controls { display: flex; gap: 12px; width: 90%; margin-top: 16px; }
         .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .game-btn-cancel { width: 90%; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
+
         .bets-list-container { width: 90%; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
         .bets-list-header { padding: 12px 15px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); text-align: center; letter-spacing: 1px; }
         .bets-list { max-height: 200px; overflow-y: auto; padding: 5px 15px; }
         .bet-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; align-items: center; }
         .bet-row:last-child { border-bottom: none; }
+
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; text-align: center; }
         .modal-title { font-weight: 700; font-size: 1.1rem; color: var(--accent-gold); margin-bottom: 16px; text-transform: uppercase; }
         .input-dark { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 14px; border-radius: 10px; font-size: 1rem; margin-bottom: 20px; box-sizing: border-box; text-align: center; }
+
         .topup-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; width: 100%; max-width: 400px; margin-bottom: 20px; }
-        .topup-btn { background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 12px; height: 48px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
+        .topup-btn { background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 12px; height: 48px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
         .topup-btn.custom-btn { grid-column: span 3; border-color: var(--accent-gold); color: var(--accent-gold); }
+
         .nft-modal-sheet { position: fixed; bottom: -100%; left: 0; width: 100%; background: #0a0a0c; border-radius: 24px 24px 0 0; transition: bottom 0.4s; display: flex; flex-direction: column; max-height: 90vh; overflow: hidden; z-index: 1100; }
         .modal-overlay.active .nft-modal-sheet { bottom: 0; }
         .nft-modal-header-rocket { padding-top: 25px; display: flex; flex-direction: column; align-items: center; position: relative; }
@@ -82,44 +136,155 @@
         .trait-row { display: flex; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #2c2c2e; font-size: 14px; }
         .trait-row .trait-name { color: var(--accent-gold); font-weight: 500; }
         .trait-row .trait-value { color: var(--accent-gold); font-weight: 600; }
+
         .cart-list { padding: 20px; }
         .cart-item { display: flex; align-items: center; gap: 15px; background: var(--bg-card); padding: 12px; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border-color); }
         .cart-item img { width: 50px; height: 50px; border-radius: 8px; }
         .cart-item-info { flex: 1; }
         .fixed-footer { position: fixed; bottom: 85px; width: 100%; padding: 0 20px; z-index: 90; box-sizing: border-box; }
-        .modal-tg-btn { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; z-index: 10; }
-        .modal-tg-btn:hover { background: rgba(203,161,83,0.3); }
+
+        .modal-tg-btn {
+            position: absolute; top: 15px; left: 15px;
+            background: rgba(0,0,0,0.4); border-radius: 50%;
+            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.2s; z-index: 10;
+        }
+        .modal-tg-btn:hover { background: rgba(203, 161, 83, 0.3); }
         .modal-tg-btn svg { width: 20px; height: 20px; stroke: white; stroke-width: 1.8; fill: none; }
         .modal-tg-btn:hover svg { stroke: var(--accent-gold); }
+
         .modal-buttons-row { display: flex; gap: 10px; align-items: stretch; }
         .modal-buttons-row .btn-buy-modal { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; }
-        .modal-buttons-row .btn-cart-icon { width: 52px; background: rgba(255,255,255,0.02); border: 1px solid var(--accent-gold); border-radius: 12px; height: 52px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .modal-buttons-row .btn-cart-icon { width: 52px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 12px; height: 52px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .modal-buttons-row .btn-cart-icon svg { stroke: var(--accent-gold); width: 24px; height: 24px; }
+
         .winner-modal .winner-avatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-gold); margin-bottom: 16px; }
         .winner-modal .winner-name { font-size: 1.4rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 8px; }
         .winner-modal .winner-amount { font-size: 1.2rem; font-weight: 700; color: var(--text-main); margin-bottom: 20px; }
         .winner-modal .winner-amount span { color: var(--accent-gold); font-size: 1.5rem; }
-        .history-btn { background: rgba(122,122,124,0.1); border: 1px solid var(--text-muted); color: var(--text-muted); border-radius: 8px; padding: 4px 10px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-        .history-modal-list { width: 100%; max-height: 300px; overflow-y: auto; }
-        .history-modal-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
+
+        .history-btn {
+            background: rgba(122,122,124,0.1);
+            border: 1px solid var(--text-muted);
+            color: var(--text-muted);
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .history-modal-list {
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .history-modal-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.85rem;
+        }
         .history-modal-row:last-child { border-bottom: none; }
-        .confirm-buy-item-preview { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-        .confirm-buy-item-preview img { width: 60px; height: 60px; border-radius: 10px; }
-        .leaderboard-bar { width: 90%; background: linear-gradient(135deg, rgba(203,161,83,0.2), rgba(203,161,83,0.05)); border: 1px solid var(--accent-gold); border-radius: 12px; padding: 10px 16px; margin-bottom: 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; color: var(--accent-gold); font-weight: 700; font-size: 0.9rem; }
+
+        .confirm-buy-item-preview {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .confirm-buy-item-preview img {
+            width: 60px;
+            height: 60px;
+            border-radius: 10px;
+        }
+
+        .leaderboard-bar {
+            width: 90%;
+            background: linear-gradient(135deg, rgba(203,161,83,0.2), rgba(203,161,83,0.05));
+            border: 1px solid var(--accent-gold);
+            border-radius: 12px;
+            padding: 10px 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--accent-gold);
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
         .leaderboard-bar span:last-child { font-size: 0.8rem; opacity: 0.9; }
-        .leaderboard-fullscreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-main); z-index: 2000; padding: 20px; overflow-y: auto; display: none; }
+
+        .leaderboard-fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-main);
+            z-index: 2000;
+            padding: 20px;
+            overflow-y: auto;
+            display: none;
+        }
         .leaderboard-fullscreen.active { display: block; }
-        .leaderboard-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .season-timer { background: rgba(203,161,83,0.1); border: 1px solid var(--accent-gold); border-radius: 8px; padding: 8px 14px; text-align: center; font-size: 0.8rem; color: var(--accent-gold); margin-bottom: 20px; }
+
+        .leaderboard-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .season-timer {
+            background: rgba(203,161,83,0.1);
+            border: 1px solid var(--accent-gold);
+            border-radius: 8px;
+            padding: 8px 14px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--accent-gold);
+            margin-bottom: 20px;
+        }
+
         .leaderboard-list { display: flex; flex-direction: column; gap: 8px; }
-        .leaderboard-row { display: flex; align-items: center; gap: 10px; background: var(--bg-card); border-radius: 10px; padding: 10px 14px; border: 1px solid var(--border-color); }
+        .leaderboard-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+        }
         .leaderboard-rank { font-weight: 700; color: var(--accent-gold); width: 24px; text-align: center; }
         .leaderboard-name { flex: 1; font-weight: 500; }
         .leaderboard-wins { color: var(--text-muted); font-size: 0.8rem; margin-right: 6px; }
         .leaderboard-nft { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid var(--border-color); }
+
         #prize-detail-overlay { z-index: 3000; }
-        .prize-modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; width: 90%; max-width: 400px; text-align: center; position: relative; padding: 20px; }
-        .prize-modal-img { width: 200px; height: 200px; border-radius: 16px; object-fit: cover; margin-bottom: 16px; }
+
+        .prize-modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            position: relative;
+            padding: 20px;
+        }
+        .prize-modal-img {
+            width: 200px;
+            height: 200px;
+            border-radius: 16px;
+            object-fit: cover;
+            margin-bottom: 16px;
+        }
         .prize-modal-traits { margin: 12px 0; }
     </style>
 </head>
@@ -339,19 +504,20 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // =====================================================================
-        // ПОЛНЫЙ СКРИПТ С ПОДДЕРЖКОЙ ПОЛИГОНОВ ВОРОНОГО (вместо секторов)
-        // =====================================================================
+        // ====================================================================
+        //  ПОЛНЫЙ СКРИПТ – ВСЕ ФУНКЦИИ МАГАЗИНА, КОРЗИНЫ, БАЛАНСА И ИГРЫ
+        //  С ПОДДЕРЖКОЙ ПОЛИГОНОВ ВОРОНОГО
+        // ====================================================================
         const tg = window.Telegram.WebApp;
         tg.ready();
-        const API_BASE = 'https://dnx-shop.onrender.com';  // замените на свой бэкенд
+        const API_BASE = 'https://dnx-shop.onrender.com';
         const initData = tg.initData || '';
         const userDisplayName = tg.initDataUnsafe?.user?.username || "Guest";
         const userAvatar = tg.initDataUnsafe?.user?.photo_url || "";
         document.getElementById('username-display').innerText = userDisplayName;
         if(userAvatar) document.getElementById('avatar-img').src = userAvatar;
 
-        // ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+        // ---------- Общие функции ----------
         async function apiFetch(url, options = {}) {
             const headers = {
                 'Content-Type': 'application/json',
@@ -410,7 +576,6 @@
             document.getElementById('big-balance').innerText = userBalance.toFixed(2) + ' ₽';
         }
 
-        // ===== МАГАЗИН И КОРЗИНА (без изменений) =====
         async function loadCatalog() {
             try {
                 const res = await fetch(`${API_BASE}/items`);
@@ -621,7 +786,7 @@
             }
         }
 
-        // ===== ПРИЗЫ =====
+        // --- Призы ---
         let currentPrizeItems = [];
 
         async function loadPrizeItems() {
@@ -668,7 +833,7 @@
             document.getElementById('prize-detail-overlay').classList.remove('active');
         }
 
-        // ===== ЛИДЕРЫ =====
+        // --- Лидеры и сезон ---
         async function loadLeaderboardPreview() {
             try {
                 const data = await apiFetch(`${API_BASE}/leaderboard`);
@@ -758,16 +923,15 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // =====================================================================
+        // ====================================================================
         //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО)
-        // =====================================================================
+        // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         let gState = {
             players: [], pool: 0, status: 'waiting', timer: 15,
             spin_params: null, winner: null, last_winner_id: null,
-            round_id: null, game_number: 0,
-            polygons: null   // теперь храним массив полигонов: [{player_id, username, color, polygon: [[x,y],...]}]
+            round_id: null, game_number: 0, polygons: null
         };
         let isSpinning = false;
         let animationFrameId = null;
@@ -783,68 +947,45 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
-        // Функция проверки точки в полигоне (алгоритм ray casting)
-        function pointInPolygon(px, py, polygon) {
-            let inside = false;
-            const n = polygon.length;
-            for (let i = 0, j = n-1; i < n; j = i++) {
-                const xi = polygon[i][0], yi = polygon[i][1];
-                const xj = polygon[j][0], yj = polygon[j][1];
-                const intersect = ((yi > py) !== (yj > py)) &&
-                    (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
-                if (intersect) inside = !inside;
-            }
-            return inside;
-        }
-
+        // Отрисовка полигонов (без fallback-прямоугольников)
         function drawGameFrame(ballPos = null) {
             if(!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
 
-            // Рисуем полигоны (если есть)
+            // Рисуем полигоны, если они есть
             if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
-                    const pts = poly.polygon; // массив [x,y] в координатах 0..1
-                    if (!pts || pts.length < 3) continue;
+                    const pts = poly.polygon;
+                    if (pts.length < 3) continue;
                     ctx.beginPath();
-                    ctx.moveTo(pts[0][0] * cw, (1 - pts[0][1]) * ch);
+                    ctx.moveTo(pts[0].x * cw, (1 - pts[0].y) * ch);
                     for (let i = 1; i < pts.length; i++) {
-                        ctx.lineTo(pts[i][0] * cw, (1 - pts[i][1]) * ch);
+                        ctx.lineTo(pts[i].x * cw, (1 - pts[i].y) * ch);
                     }
                     ctx.closePath();
-                    ctx.fillStyle = poly.color || '#888';
+                    ctx.fillStyle = poly.color;
                     ctx.fill();
-                    ctx.strokeStyle = "rgba(0,0,0,0.4)";
-                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+                    ctx.lineWidth = 1;
                     ctx.stroke();
                 }
-            } else if (gState.players && gState.players.length > 0) {
-                // fallback – прямоугольники
-                let curX = 0;
-                const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
-                sorted.forEach(p => {
-                    const w = (p.amount / gState.pool) * cw;
-                    ctx.fillStyle = p.color;
-                    ctx.fillRect(curX, 0, w, ch);
-                    curX += w;
-                });
             } else {
+                // Если полигонов нет – показываем надпись
                 ctx.fillStyle = "rgba(255,255,255,0.05)";
                 ctx.fillRect(0, 0, cw, ch);
                 ctx.fillStyle = "#555";
                 ctx.font = "30px Inter";
                 ctx.textAlign = "center";
-                ctx.fillText("Ждем ставки...", cw/2, ch/2);
+                ctx.fillText("Загрузка поля...", cw/2, ch/2);
             }
 
-            // Шарик и стрелка (как раньше)
+            // Шарик и стрелка (без изменений)
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
 
-                // Стрелка – только в фазе вращения
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const angle = ballPos.angle;
                     const arrowLen = 35;
@@ -853,7 +994,7 @@
                     ctx.beginPath();
                     ctx.moveTo(bx, by);
                     ctx.lineTo(endX, endY);
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+                    ctx.strokeStyle = "rgba(255,255,255,0.9)";
                     ctx.lineWidth = 3;
                     ctx.stroke();
                     const headLen = 10;
@@ -867,7 +1008,6 @@
                     ctx.fill();
                 }
 
-                // Шарик
                 ctx.shadowColor = "#fff";
                 ctx.shadowBlur = 20;
                 ctx.beginPath();
@@ -879,7 +1019,7 @@
             }
         }
 
-        // Анимация (без изменений)
+        // Анимация вращения и полёта
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const startTime = performance.now();
@@ -922,7 +1062,6 @@
             animationFrameId = requestAnimationFrame(animate);
         }
 
-        // Запрос победителя (с проверкой вхождения в полигон)
         async function fetchWinnerNow() {
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
@@ -955,7 +1094,6 @@
             if (winnerTimer) { clearTimeout(winnerTimer); winnerTimer = null; }
         }
 
-        // pollGame – обновляем состояние, теперь ожидаем поле "polygons" вместо "sectors"
         async function pollGame() {
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
@@ -999,8 +1137,7 @@
                 gState.last_winner_id = newState.last_winner_id;
                 gState.round_id = newState.round_id;
                 gState.game_number = newState.game_number;
-                // Ожидаем, что сервер присылает поле "polygons" (массив объектов с polygon: [[x,y], ...])
-                gState.polygons = newState.polygons || null;
+                gState.polygons = newState.polygons;  // <- теперь полигоны
 
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
@@ -1062,7 +1199,7 @@
                 </div>`).join('');
         }
 
-        // Ставки (без изменений)
+        // Ставки
         function openBetConfirm(amt) {
             betAmountTemp = amt;
             document.getElementById('confirm-bet-amount').innerText = amt;
@@ -1121,7 +1258,7 @@
                 });
         }
 
-        // ===== ИНИЦИАЛИЗАЦИЯ =====
+        // Инициализация
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
