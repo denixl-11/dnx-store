@@ -504,9 +504,6 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // ====================================================================
-        //  ПОЛНЫЙ СКРИПТ – МАГАЗИН, КОРЗИНА, БАЛАНС И ИГРА
-        // ====================================================================
         const tg = window.Telegram.WebApp;
         tg.ready();
         const API_BASE = 'https://dnx-shop.onrender.com';
@@ -516,7 +513,6 @@
         document.getElementById('username-display').innerText = userDisplayName;
         if(userAvatar) document.getElementById('avatar-img').src = userAvatar;
 
-        // ---------- Общие функции ----------
         async function apiFetch(url, options = {}) {
             const headers = {
                 'Content-Type': 'application/json',
@@ -963,7 +959,7 @@
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
         let initialGameStateLoaded = false;
-        let highlightPolygon = null;   // координаты полигона победителя для подсветки
+        let highlightPolygon = null;
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -973,14 +969,12 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
-        // Отрисовка поля и шарика. Если передан highlightPolygon, применяется золотая подсветка.
         function drawGameFrame(ballPos = null, highlightPts = null) {
             if(!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
 
-            // Фон или полигоны
             if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
@@ -998,7 +992,6 @@
                     ctx.stroke();
                 }
             } else {
-                // Ожидание или один игрок
                 if (gState.players.length === 1) {
                     const singlePlayer = gState.players[0];
                     ctx.fillStyle = singlePlayer.color;
@@ -1013,7 +1006,6 @@
                 }
             }
 
-            // Подсветка полигона победителя (если есть)
             if (highlightPts && highlightPts.length >= 3) {
                 ctx.save();
                 ctx.beginPath();
@@ -1030,7 +1022,6 @@
                 ctx.restore();
             }
 
-            // Шарик и стрелка
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
@@ -1068,7 +1059,6 @@
             }
         }
 
-        // Анимация: вращение (3 сек) → пауза (1 сек) → движение (10 сек)
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const startTime = performance.now();
@@ -1132,7 +1122,6 @@
                     lastShownRoundId = state.round_id;
                     localStorage.setItem('last_round_id', lastShownRoundId);
 
-                    // Подсветка из координат, присланных в winner.polygon
                     if (state.winner.polygon && state.winner.polygon.length >= 3) {
                         highlightPolygon = state.winner.polygon;
                         drawGameFrame(null, highlightPolygon);
@@ -1140,7 +1129,7 @@
                     }
 
                     showWinnerModal(state.winner);
-                    highlightPolygon = null;   // очищаем подсветку
+                    highlightPolygon = null;
                     await updateBalance();
                 }
             } catch(e) { console.error(e); }
@@ -1270,7 +1259,6 @@
                 </div>`).join('');
         }
 
-        // Ставки
         function openBetConfirm(amt) {
             betAmountTemp = amt;
             document.getElementById('confirm-bet-amount').innerText = amt;
@@ -1329,7 +1317,6 @@
                 });
         }
 
-        // Инициализация
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();

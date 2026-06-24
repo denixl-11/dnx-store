@@ -168,7 +168,7 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-#  РУЧНАЯ ДИАГРАММА ВОРОНОГО С ГАРАНТИРОВАННОЙ МИНИМАЛЬНОЙ ПЛОЩАДЬЮ
+#  ДИАГРАММА ВОРОНОГО С ГАРАНТИРОВАННОЙ МИНИМАЛЬНОЙ ПЛОЩАДЬЮ
 # ------------------------------------------------------------
 def clip_polygon_by_halfplane(poly, point_on_line, normal):
     clipped = []
@@ -240,7 +240,7 @@ def polygon_area_and_centroid(poly):
     return abs(area), (cx, cy)
 
 
-def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list:
+def weighted_voronoi_polygons(players_dict: dict, iterations: int = 500) -> list:
     if not players_dict:
         return []
 
@@ -256,16 +256,24 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
     if n * min_area > 1.0:
         min_area = 1.0 / n
 
-    # Выделяем каждому минимум, оставшееся распределяем пропорционально исходным ставкам
+    # Целевые площади: каждому минимум, остальное пропорционально ставкам
     remaining = 1.0 - n * min_area
     target_areas = np.full(n, min_area, dtype=float)
     if remaining > 0:
         extra = (weights / weights.sum()) * remaining
         target_areas += extra
 
-    points = np.random.rand(n, 2) * 0.8 + 0.1
+    # Инициализация точек: большие ставки ближе к центру, маленькие — к краям
+    points = np.zeros((n, 2))
+    for i in range(n):
+        # Чем больше целевая площадь, тем ближе к центру (диапазон 0.2-0.8)
+        r = 0.2 + 0.6 * (1.0 - target_areas[i])
+        angle = random.random() * 2 * math.pi
+        points[i] = [0.5 + r * math.cos(angle), 0.5 + r * math.sin(angle)]
+    np.clip(points, 0.02, 0.98, out=points)
 
-    for _ in range(iterations):
+    prev_error = float('inf')
+    for it in range(iterations):
         areas = np.zeros(n)
         centroids = [None] * n
         for i in range(n):
@@ -278,6 +286,13 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
                 areas[i] = 0.0
                 centroids[i] = None
 
+        error = np.mean(np.abs(areas - target_areas))
+        if error < 0.001:
+            break
+
+        step_scale = 0.5 if error > prev_error else 1.0
+        prev_error = error
+
         for i in range(n):
             if areas[i] <= 0 or centroids[i] is None:
                 continue
@@ -286,12 +301,12 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
                 direction = np.array(centroids[i]) - points[i]
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
-                    points[i] += 0.2 * direction / norm * (1 - areas[i] / target)
+                    points[i] += step_scale * 0.3 * direction / norm * (1 - areas[i] / target)
             else:
                 direction = points[i] - np.array(centroids[i])
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
-                    points[i] += 0.2 * direction / norm * (areas[i] / target - 1)
+                    points[i] += step_scale * 0.3 * direction / norm * (areas[i] / target - 1)
         np.clip(points, 0.02, 0.98, out=points)
 
     final_polygons = []
@@ -379,7 +394,7 @@ def generate_spin_params(polygons: list) -> dict:
 
 
 # ------------------------------------------------------------
-# Игровая механика (определение победителя)
+# Игровая механика
 # ------------------------------------------------------------
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
@@ -471,7 +486,7 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
             "win_amount": profit,
             "photo_url": photo_url,
             "round_id": game_state["round_id"],
-            "polygon": winner_polygon      # <-- координаты сектора победителя
+            "polygon": winner_polygon
         }
     except Exception as e:
         logging.error(f"DB error finish_round: {e}")
@@ -513,7 +528,7 @@ async def game_worker():
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    game_state["polygons"] = None   # поле очищается
+                    game_state["polygons"] = None
                     logging.info(f"Round finished, winner: {winner_data}")
 
 
