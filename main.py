@@ -169,6 +169,7 @@ def require_auth(handler):
 
 # ------------------------------------------------------------
 #  ДИАГРАММА ВОРОНОГО С ГАРАНТИРОВАННОЙ МИНИМАЛЬНОЙ ПЛОЩАДЬЮ
+#  (исправлены направления движения точек)
 # ------------------------------------------------------------
 def clip_polygon_by_halfplane(poly, point_on_line, normal):
     clipped = []
@@ -263,11 +264,11 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 500) -> list
         extra = (weights / weights.sum()) * remaining
         target_areas += extra
 
-    # Инициализация точек: большие ставки ближе к центру, маленькие — к краям
+    # Начальные позиции: большие ставки почти в центре, маленькие — почти на краю
     points = np.zeros((n, 2))
     for i in range(n):
-        # Чем больше целевая площадь, тем ближе к центру (диапазон 0.2-0.8)
-        r = 0.2 + 0.6 * (1.0 - target_areas[i])
+        # r от 0.05 (центр) до 0.95 (край)
+        r = 0.05 + 0.9 * (1.0 - target_areas[i])
         angle = random.random() * 2 * math.pi
         points[i] = [0.5 + r * math.cos(angle), 0.5 + r * math.sin(angle)]
     np.clip(points, 0.02, 0.98, out=points)
@@ -298,15 +299,17 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 500) -> list
                 continue
             target = target_areas[i]
             if areas[i] < target:
-                direction = np.array(centroids[i]) - points[i]
-                norm = np.linalg.norm(direction)
-                if norm > 0.001:
-                    points[i] += step_scale * 0.3 * direction / norm * (1 - areas[i] / target)
-            else:
+                # Двигаем ТОЧКУ ОТ ЦЕНТРОИДА, чтобы увеличить площадь
                 direction = points[i] - np.array(centroids[i])
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
-                    points[i] += step_scale * 0.3 * direction / norm * (areas[i] / target - 1)
+                    points[i] += step_scale * 0.5 * direction / norm * (1 - areas[i] / target)
+            else:
+                # Двигаем ТОЧКУ К ЦЕНТРОИДУ, чтобы уменьшить площадь
+                direction = np.array(centroids[i]) - points[i]
+                norm = np.linalg.norm(direction)
+                if norm > 0.001:
+                    points[i] += step_scale * 0.5 * direction / norm * (areas[i] / target - 1)
         np.clip(points, 0.02, 0.98, out=points)
 
     final_polygons = []
@@ -325,7 +328,7 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 500) -> list
 
 
 # ------------------------------------------------------------
-# Генерация траектории
+# Генерация траектории (без изменений)
 # ------------------------------------------------------------
 def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
     x = start_x
@@ -532,7 +535,7 @@ async def game_worker():
                     logging.info(f"Round finished, winner: {winner_data}")
 
 
-# ------------------- API -------------------
+# ------------------- API (без изменений) -------------------
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
