@@ -4,11 +4,9 @@ import os
 import json
 import random
 import math
-import hashlib
-import hmac
 from urllib.parse import parse_qs
-from decimal import Decimal
 from datetime import datetime, timezone
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from aiogram import Bot, Dispatcher, types, F
@@ -17,9 +15,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 from dotenv import load_dotenv
 import numpy as np
-from scipy.spatial import Voronoi
-from shapely.geometry import Polygon, Point
-from shapely.ops import clip_by_rect
+from shapely.geometry import Point, Polygon, MultiPoint, box
+from shapely.ops import voronoi_diagram
 
 load_dotenv()
 
@@ -173,16 +170,18 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-# Генерация полигонов методом взвешенной Вороного
+# Генерация полигонов методом взвешенной Вороного (shapely)
 # ------------------------------------------------------------
 def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list:
     """
-    Генерирует полигоны Вороного с весами (ставками).
-    Возвращает список словарей: {player_id, username, color, polygon: [{x, y}, ...]}
+    Генерирует полигоны Вороного с весами (ставками) так, чтобы площадь ячейки
+    была пропорциональна доле ставки от банка. Использует shapely.ops.voronoi_diagram
+    для автоматической обрезки по квадрату [0,1]x[0,1].
     """
     if not players_dict:
         return []
 
+    # Сортируем игроков по убыванию ставки, чтобы стабильно работать с весами
     sorted_players = sorted(players_dict.values(), key=lambda p: p["amount"], reverse=True)
     weights = np.array([p["amount"] for p in sorted_players])
     total = weights.sum()
@@ -191,90 +190,64 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
     target_areas = weights / total
     n = len(sorted_players)
 
-    # Начальные точки – случайные, но стараемся распределить равномернее
-    points = np.random.rand(n, 2) * 0.8 + 0.1  # в [0.1, 0.9]
+    # Начальные позиции случайны, но не у самого края
+    points = np.random.rand(n, 2) * 0.8 + 0.1
 
-    for it in range(iterations):
-        vor = Voronoi(points)
+    # Итеративное перемещение точек для достижения целевых площадей
+    for _ in range(iterations):
+        try:
+            # Строим обрезанную диаграмму Вороного для текущих точек
+            diagram = voronoi_diagram(MultiPoint([Point(x, y) for x, y in points]),
+                                      envelope=box(0, 0, 1, 1))
+        except Exception:
+            continue
+
+        areas = np.zeros(n)
+        centroids = [None] * n
+        # Сопоставляем полигоны с игроками
         for i in range(n):
-            region_idx = vor.point_region[i]
-            verts = vor.regions[region_idx]
-            if -1 in verts:
-                # Неограниченная область – пропускаем (обработаем позже)
+            pt = Point(points[i])
+            for geom in diagram.geoms:
+                if geom.contains(pt):
+                    areas[i] = geom.area
+                    centroids[i] = np.array([geom.centroid.x, geom.centroid.y])
+                    break
+
+        # Корректировка точек
+        for i in range(n):
+            if areas[i] <= 0 or centroids[i] is None:
                 continue
-            poly = Polygon([vor.vertices[j] for j in verts])
-            poly = poly.intersection(Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]))
-            if poly.is_empty or poly.area == 0:
-                continue
-            area = poly.area
-            centroid = poly.centroid
-            # Корректируем точку: если площадь меньше целевой, двигаем к центроиду,
-            # иначе – от центроида
-            if area < target_areas[i]:
-                points[i] = 0.8 * points[i] + 0.2 * np.array([centroid.x, centroid.y])
-            else:
-                direction = points[i] - np.array([centroid.x, centroid.y])
+            if areas[i] < target_areas[i]:
+                # двигаемся к центроиду
+                direction = centroids[i] - points[i]
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
-                    points[i] = points[i] + 0.2 * direction / norm * (area - target_areas[i]) * 1.5
+                    points[i] += 0.2 * direction / norm * (1 - areas[i] / target_areas[i])
+            else:
+                direction = points[i] - centroids[i]
+                norm = np.linalg.norm(direction)
+                if norm > 0.001:
+                    points[i] += 0.2 * direction / norm * (areas[i] / target_areas[i] - 1)
         # Ограничиваем точки внутри квадрата
-        points = np.clip(points, 0.02, 0.98)
+        np.clip(points, 0.02, 0.98, out=points)
 
-    # Финальное построение полигонов
-    vor = Voronoi(points)
+    # Финальное построение полигонов для окончательных позиций точек
+    final_diagram = voronoi_diagram(MultiPoint([Point(x, y) for x, y in points]),
+                                    envelope=box(0, 0, 1, 1))
     final_polygons = []
     for i, player in enumerate(sorted_players):
-        region_idx = vor.point_region[i]
-        verts = vor.regions[region_idx]
-        if -1 in verts:
-            # Для неограниченных областей – строим полигон вручную (редкий случай)
-            # Используем ближайшие вершины и обрезаем квадратом
-            # Возьмём ограничивающий квадрат и пересечём с полуплоскостями
-            # Но это сложно, проще взять fallback
-            continue
-        poly = Polygon([vor.vertices[j] for j in verts])
-        poly = poly.intersection(Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]))
-        if poly.is_empty or poly.area < 0.0001:
-            continue
-        coords = list(poly.exterior.coords[:-1])  # удаляем повтор первой точки
-        final_polygons.append({
-            "player_id": player["id"],
-            "username": player["username"],
-            "color": player["color"],
-            "polygon": [{"x": c[0], "y": c[1]} for c in coords]
-        })
-
-    # Если количество полигонов меньше, чем игроков – добавляем оставшихся
-    # Это крайний случай, но на всякий случай реализуем fallback
-    if len(final_polygons) < n:
-        used_ids = {p["player_id"] for p in final_polygons}
-        remaining = [p for p in sorted_players if p["id"] not in used_ids]
-        if remaining:
-            # Разделим оставшуюся площадь поровну по вертикали (чтобы не сломать игру)
-            # Это временное решение, чтобы игра не падала
-            total_area = 1.0
-            used_area = sum(poly["polygon"] for poly in final_polygons)  # не совсем корректно
-            # Просто добавим прямоугольники для оставшихся (но это будет редко)
-            # Для простоты – генерируем простые прямоугольники с площадью пропорциональной весу
-            remaining_weights = np.array([p["amount"] for p in remaining])
-            remaining_total = remaining_weights.sum()
-            if remaining_total > 0:
-                x_start = 0.0
-                for p in remaining:
-                    width = (p["amount"] / remaining_total) * 0.5  # половина поля
-                    poly_coords = [
-                        {"x": x_start, "y": 0.0},
-                        {"x": x_start + width, "y": 0.0},
-                        {"x": x_start + width, "y": 1.0},
-                        {"x": x_start, "y": 1.0}
-                    ]
-                    final_polygons.append({
-                        "player_id": p["id"],
-                        "username": p["username"],
-                        "color": p["color"],
-                        "polygon": poly_coords
-                    })
-                    x_start += width
+        pt = Point(points[i])
+        for geom in final_diagram.geoms:
+            if geom.contains(pt):
+                # Извлекаем координаты внешнего контура (без последней повторяющейся точки)
+                coords = list(geom.exterior.coords[:-1])
+                final_polygons.append({
+                    "player_id": player["id"],
+                    "username": player["username"],
+                    "color": player["color"],
+                    "polygon": [{"x": c[0], "y": c[1]} for c in coords]
+                })
+                break
 
     return final_polygons
 
@@ -399,6 +372,7 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
     x = final_point["x"]
     y = final_point["y"]
     winner_id = None
+    winner_username = None
     for poly in polygons:
         if point_in_polygon((x, y), poly["polygon"]):
             winner_id = poly["player_id"]
@@ -424,9 +398,7 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
                     INSERT INTO leaderboard (user_id, username, wins) VALUES (%s, %s, 1)
                     ON CONFLICT (user_id) DO UPDATE SET wins = leaderboard.wins + 1, username = EXCLUDED.username
                 """, (winner_id, winner_username))
-                conn.commit()
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
+                # Пишем историю и обновляем счётчик в той же транзакции
                 cur.execute(
                     "INSERT INTO game_history (game_number, winner_name, win_amount) VALUES (%s, %s, %s)",
                     (game_state["game_number"], winner_username, profit)
@@ -709,7 +681,7 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            # Генерируем полигоны при каждом изменении ставок (если уже в counting)
+            # Пересчитываем полигоны при каждом изменении ставок
             if game_state["status"] == "counting":
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
