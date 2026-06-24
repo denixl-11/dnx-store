@@ -959,7 +959,7 @@
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
         let initialGameStateLoaded = false;
-        let highlightPolygon = null;   // координаты полигона победителя для подсветки
+        let highlightPolygon = null;
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -975,7 +975,6 @@
             const ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
 
-            // Фон или полигоны
             if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
@@ -993,7 +992,6 @@
                     ctx.stroke();
                 }
             } else {
-                // Ожидание или один игрок (заливка всего экрана)
                 if (gState.players.length === 1) {
                     const singlePlayer = gState.players[0];
                     ctx.fillStyle = singlePlayer.color;
@@ -1008,7 +1006,6 @@
                 }
             }
 
-            // Подсветка полигона победителя
             if (highlightPts && highlightPts.length >= 3) {
                 ctx.save();
                 ctx.beginPath();
@@ -1025,12 +1022,10 @@
                 ctx.restore();
             }
 
-            // Шарик и стрелка
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
 
-                // Стрелка показывается во время вращения и паузы
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const angle = ballPos.angle;
                     const arrowLen = 35;
@@ -1053,7 +1048,6 @@
                     ctx.fill();
                 }
 
-                // Шарик
                 ctx.shadowColor = "#fff";
                 ctx.shadowBlur = 20;
                 ctx.beginPath();
@@ -1070,24 +1064,22 @@
             const startTime = performance.now();
             const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
             let prevPos = null;
-            let pauseAngle = null;   // финальный угол после вращения
+            let pauseAngle = null;
+            let finalPos = null;
 
             function animate(now) {
                 const elapsed = now - startTime;
 
-                // Фаза вращения (0 .. spinDuration)
                 if (elapsed < spinDuration) {
                     const t = elapsed / spinDuration;
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
                     const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
-                    pauseAngle = angle;   // запоминаем последний угол
+                    pauseAngle = angle;
                     const ball = { x: startPos.x, y: startPos.y, angle };
                     drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
-                // Пауза (1 секунда)
                 else if (elapsed < spinDuration + 1000) {
-                    // Используем точный угол по первой точке траектории, если он ещё не установлен
                     if (pauseAngle === null && trajectory.length > 0) {
                         const firstMove = trajectory[0];
                         pauseAngle = Math.atan2(firstMove.y - startPos.y, firstMove.x - startPos.x);
@@ -1096,27 +1088,27 @@
                     drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
-                // Движение (10 секунд)
                 else if (elapsed < spinDuration + 1000 + 10000) {
                     const motionElapsed = elapsed - (spinDuration + 1000);
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
-                        const finalPos = trajectory[trajectory.length-1];
+                        finalPos = trajectory[trajectory.length-1];
                         drawGameFrame(finalPos, highlightPolygon);
-                        animationFrameId = null;
-                        fetchWinnerNow();
-                        return;
+                        animationFrameId = requestAnimationFrame(animate);
+                    } else {
+                        const pos = trajectory[frameIndex];
+                        if (prevPos) pos.prev = prevPos;
+                        else pos.prev = startPos;
+                        drawGameFrame(pos, highlightPolygon);
+                        prevPos = pos;
+                        animationFrameId = requestAnimationFrame(animate);
                     }
-                    const pos = trajectory[frameIndex];
-                    if (prevPos) pos.prev = prevPos;
-                    else pos.prev = startPos;
-                    drawGameFrame(pos, highlightPolygon);
-                    prevPos = pos;
+                }
+                else if (elapsed < spinDuration + 1000 + 10000 + 2000) {
+                    drawGameFrame(finalPos || trajectory[trajectory.length-1], highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else {
-                    const finalPos = trajectory[trajectory.length-1];
-                    drawGameFrame(finalPos, highlightPolygon);
                     animationFrameId = null;
                     fetchWinnerNow();
                 }
@@ -1132,16 +1124,14 @@
                     lastShownRoundId = state.round_id;
                     localStorage.setItem('last_round_id', lastShownRoundId);
 
-                    // Подсветка победителя из winner.polygon
                     if (state.winner.polygon && state.winner.polygon.length >= 3) {
                         highlightPolygon = state.winner.polygon;
                         drawGameFrame(null, highlightPolygon);
-                        // Ждём 1.5 секунды, чтобы игрок увидел подсветку
-                        await new Promise(r => setTimeout(r, 1500));
+                        await new Promise(r => setTimeout(r, 2000));
                     }
 
                     showWinnerModal(state.winner);
-                    highlightPolygon = null;   // сбрасываем подсветку после показа окна
+                    highlightPolygon = null;
                     await updateBalance();
                 }
             } catch(e) { console.error(e); }
@@ -1179,7 +1169,6 @@
                     }
                 }
 
-                // Обновление таймера
                 if (newState.status === 'counting') {
                     if (!timerInterval || newState.timer !== gState.timer) {
                         gState.timer = newState.timer;
@@ -1216,16 +1205,13 @@
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
                 renderBetsList();
 
-                // Отрисовка фона с актуальной подсветкой
                 if (!isSpinning) drawGameFrame(null, highlightPolygon);
 
-                // Кнопка отмены ставки
                 const myId = String(tg.initDataUnsafe?.user?.id);
                 const hasMyBet = gState.players.find(p => p.id === myId);
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
 
-                // Запуск анимации
                 if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
                     isSpinning = true;
                     runSpinAnimation(gState.spin_params);
@@ -1235,7 +1221,6 @@
                     drawGameFrame(null, highlightPolygon);
                 }
 
-                // Обработка победителя (на случай, если fetchWinnerNow не вызвался)
                 if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
                     if (document.getElementById('page-game').classList.contains('page-active')) {
                         lastShownRoundId = gState.round_id;
@@ -1245,12 +1230,10 @@
                     }
                 }
 
-                // Сброс поля при отсутствии игроков
                 if (gState.players.length === 0 && gState.status === 'waiting') {
                     drawGameFrame(null, highlightPolygon);
                 }
 
-                // Периодическое обновление лидеров
                 if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
                     loadLeaderboardPreview();
                     lastLeaderboardUpdate = Date.now();
@@ -1278,7 +1261,6 @@
                 </div>`).join('');
         }
 
-        // Ставки
         function openBetConfirm(amt) {
             betAmountTemp = amt;
             document.getElementById('confirm-bet-amount').innerText = amt;
@@ -1337,7 +1319,6 @@
                 });
         }
 
-        // Инициализация
         document.getElementById('cart-counter').innerText = cart.length;
         updateBalance();
         loadCatalog();
