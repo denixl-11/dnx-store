@@ -15,8 +15,6 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 from dotenv import load_dotenv
 import numpy as np
-from shapely.geometry import Point, MultiPoint, box
-from shapely.ops import voronoi_diagram
 
 load_dotenv()
 
@@ -169,9 +167,98 @@ def require_auth(handler):
     return wrapper
 
 
-# ------------------------------------------------------------
-# Генерация взвешенных полигонов Вороного через shapely (без scipy)
-# ------------------------------------------------------------
+# ============================================================
+#  РУЧНАЯ ДИАГРАММА ВОРОНОГО С ВЕСАМИ (без scipy/shapely)
+# ============================================================
+
+def clip_polygon_by_halfplane(poly, point_on_line, normal):
+    """
+    Обрезает выпуклый полигон (список точек (x,y)) полуплоскостью,
+    заданной прямой и нормалью, направленной ВНУТРЬ.
+    Возвращает новый список точек.
+    """
+    clipped = []
+    n = len(poly)
+    for i in range(n):
+        p1 = poly[i]
+        p2 = poly[(i + 1) % n]
+
+        # Знак относительно прямой
+        d1 = (p1[0] - point_on_line[0]) * normal[0] + (p1[1] - point_on_line[1]) * normal[1]
+        d2 = (p2[0] - point_on_line[0]) * normal[0] + (p2[1] - point_on_line[1]) * normal[1]
+
+        if d1 >= -1e-9:  # точка внутри (или на границе)
+            clipped.append(p1)
+        if (d1 >= -1e-9 and d2 < -1e-9) or (d1 < -1e-9 and d2 >= -1e-9):
+            # Пересечение
+            t = d1 / (d1 - d2)
+            inter_x = p1[0] + t * (p2[0] - p1[0])
+            inter_y = p1[1] + t * (p2[1] - p1[1])
+            clipped.append((inter_x, inter_y))
+    return clipped
+
+
+def build_voronoi_cell(points, i):
+    """
+    Строит ячейку Вороного для i-й точки, обрезанную квадратом [0,1]x[0,1].
+    points: numpy array (N, 2)
+    """
+    # Начальный полигон — большой квадрат, заведомо покрывающий [0,1]
+    margin = 0.2
+    cell = [
+        (-margin, -margin),
+        (1 + margin, -margin),
+        (1 + margin, 1 + margin),
+        (-margin, 1 + margin)
+    ]
+    pi = points[i]
+    for j in range(len(points)):
+        if i == j:
+            continue
+        pj = points[j]
+        mid = ((pi[0] + pj[0]) / 2, (pi[1] + pj[1]) / 2)
+        dx = pj[0] - pi[0]
+        dy = pj[1] - pi[1]
+        length = math.hypot(dx, dy)
+        if length < 1e-12:
+            continue
+        # Нормаль к серединному перпендикуляру, направленная к pi
+        normal = (-dx / length, -dy / length)  # от j к i
+        cell = clip_polygon_by_halfplane(cell, mid, normal)
+        if len(cell) < 3:
+            break
+    # Дополнительно обрезаем по квадрату [0,1]
+    # Границы: x=0 (нормаль вправо), x=1 (нормаль влево), y=0 (нормаль вверх), y=1 (нормаль вниз)
+    cell = clip_polygon_by_halfplane(cell, (0, 0), (1, 0))
+    cell = clip_polygon_by_halfplane(cell, (1, 0), (-1, 0))
+    cell = clip_polygon_by_halfplane(cell, (0, 0), (0, 1))
+    cell = clip_polygon_by_halfplane(cell, (0, 1), (0, -1))
+    return cell
+
+
+def polygon_area_and_centroid(poly):
+    """Вычисляет площадь и центроид многоугольника (формула шнуровки)."""
+    n = len(poly)
+    if n < 3:
+        return 0.0, (0.0, 0.0)
+    area = 0.0
+    cx = 0.0
+    cy = 0.0
+    for i in range(n):
+        x1, y1 = poly[i]
+        x2, y2 = poly[(i + 1) % n]
+        cross = x1 * y2 - x2 * y1
+        area += cross
+        cx += (x1 + x2) * cross
+        cy += (y1 + y2) * cross
+    area *= 0.5
+    if abs(area) < 1e-12:
+        return 0.0, (0.0, 0.0)
+    cx /= (6.0 * area)
+    cy /= (6.0 * area)
+    return abs(area), (cx, cy)
+
+
 def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list:
     if not players_dict:
         return []
@@ -184,61 +271,56 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
     target_areas = weights / total
     n = len(sorted_players)
 
-    # Начальные позиции точек (избегаем границ)
+    # Начальные позиции точек
     points = np.random.rand(n, 2) * 0.8 + 0.1
 
-    # Итеративное перемещение для достижения целевых площадей
+    # Итеративная подгонка площадей
     for _ in range(iterations):
-        try:
-            # Строим диаграмму Вороного внутри квадрата [0,1]x[0,1]
-            diagram = voronoi_diagram(MultiPoint([Point(x, y) for x, y in points]),
-                                      envelope=box(0, 0, 1, 1))
-        except Exception:
-            continue
-
         areas = np.zeros(n)
         centroids = [None] * n
+        # Строим все ячейки
         for i in range(n):
-            pt = Point(points[i])
-            for geom in diagram.geoms:
-                if geom.contains(pt):
-                    areas[i] = geom.area
-                    centroids[i] = np.array([geom.centroid.x, geom.centroid.y])
-                    break
+            cell = build_voronoi_cell(points, i)
+            if len(cell) >= 3:
+                area, cent = polygon_area_and_centroid(cell)
+                areas[i] = area
+                centroids[i] = cent
+            else:
+                areas[i] = 0.0
+                centroids[i] = None
 
+        # Корректируем точки
         for i in range(n):
             if areas[i] <= 0 or centroids[i] is None:
                 continue
-            if areas[i] < target_areas[i]:
-                # двигаем точку к центроиду ячейки
-                direction = centroids[i] - points[i]
+            target = target_areas[i]
+            if areas[i] < target:
+                direction = np.array(centroids[i]) - points[i]
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
-                    points[i] += 0.2 * direction / norm * (1 - areas[i] / target_areas[i])
+                    points[i] += 0.2 * direction / norm * (1 - areas[i] / target)
             else:
-                direction = points[i] - centroids[i]
+                direction = points[i] - np.array(centroids[i])
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
-                    points[i] += 0.2 * direction / norm * (areas[i] / target_areas[i] - 1)
-        # Ограничиваем точки внутри допустимой области
+                    points[i] += 0.2 * direction / norm * (areas[i] / target - 1)
+        # Ограничиваем внутри квадрата
         np.clip(points, 0.02, 0.98, out=points)
 
-    # Финальное построение полигонов
-    final_diagram = voronoi_diagram(MultiPoint([Point(x, y) for x, y in points]),
-                                    envelope=box(0, 0, 1, 1))
+    # Финальные полигоны
     final_polygons = []
     for i, player in enumerate(sorted_players):
-        pt = Point(points[i])
-        for geom in final_diagram.geoms:
-            if geom.contains(pt):
-                coords = list(geom.exterior.coords[:-1])  # удаляем повторяющуюся вершину
-                final_polygons.append({
-                    "player_id": player["id"],
-                    "username": player["username"],
-                    "color": player["color"],
-                    "polygon": [{"x": c[0], "y": c[1]} for c in coords]
-                })
-                break
+        cell = build_voronoi_cell(points, i)
+        if len(cell) < 3:
+            continue  # теоретически не должно случиться
+        # Преобразуем в формат для фронта
+        coords = [{"x": float(p[0]), "y": float(p[1])} for p in cell]
+        final_polygons.append({
+            "player_id": player["id"],
+            "username": player["username"],
+            "color": player["color"],
+            "polygon": coords
+        })
 
     return final_polygons
 
@@ -315,7 +397,7 @@ def generate_spin_params(players_dict: dict):
 
 
 # ------------------------------------------------------------
-# Игровая механика
+# Игровая механика (определение победителя по полигонам)
 # ------------------------------------------------------------
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
@@ -427,7 +509,7 @@ async def game_worker():
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning with Voronoi polygons")
+                    logging.info(f"Spinning with custom Voronoi polygons")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(10.2)
@@ -670,7 +752,6 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            # Пересчитываем полигоны при изменении ставок
             if game_state["status"] == "counting":
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
