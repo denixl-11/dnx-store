@@ -348,7 +348,7 @@ def generate_spin_params(polygons: list) -> dict:
     final_angle = spin_angle_start + angle_total
 
     base_speed = random.uniform(4000, 4500)
-    motion_speed = base_speed * 4.4
+    motion_speed = base_speed * (2.2 / 1.5)   # уменьшена в 1.5 раза
 
     motion_trajectory = generate_motion_trajectory(
         start_x, start_y, final_angle, motion_speed, 10000, dt=16
@@ -483,7 +483,8 @@ async def game_worker():
                     logging.info("Spinning with fixed Voronoi polygons")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(3 + 10 + 0.5)  # spin_duration + motion_duration + small buffer
+            # spin (3) + pause (1) + motion (10) + buffer (0.5)
+            await asyncio.sleep(3 + 1 + 10 + 0.5)
             async with game_lock:
                 if game_state["status"] == "spinning":
                     final_point = game_state["spin_params"]["trajectory"][-1]
@@ -723,16 +724,13 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            # Генерация или обновление полигонов
             if len(game_state["players"]) == 1:
-                # Для одного игрока – весь экран
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
             elif len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
             elif game_state["status"] == "counting":
-                # Обновляем полигоны при каждом новом игроке/ставке во время отсчёта
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
 
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})

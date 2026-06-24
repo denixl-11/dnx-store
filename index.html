@@ -963,7 +963,7 @@
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
         let initialGameStateLoaded = false;
-        let highlightPolygonId = null;
+        let highlightPolygonId = null;   // для подсветки полигона победителя
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -973,12 +973,14 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
+        // Отрисовка поля и шарика. Если передан highlightId, применяется золотая подсветка.
         function drawGameFrame(ballPos = null, highlightId = null) {
             if(!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
 
+            // Фон или полигоны
             if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
@@ -995,7 +997,7 @@
                     ctx.lineWidth = 1;
                     ctx.stroke();
 
-                    // Подсветка полигона победителя
+                    // Подсветка победителя
                     if (highlightId && poly.player_id === highlightId) {
                         ctx.save();
                         ctx.strokeStyle = "#FFD700";
@@ -1007,7 +1009,7 @@
                     }
                 }
             } else {
-                // Один игрок: заливаем весь квадрат его цветом, если он есть
+                // Ожидание или один игрок
                 if (gState.players.length === 1) {
                     const singlePlayer = gState.players[0];
                     ctx.fillStyle = singlePlayer.color;
@@ -1027,6 +1029,7 @@
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
 
+                // Стрелка показывается только во время вращения
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const angle = ballPos.angle;
                     const arrowLen = 35;
@@ -1049,6 +1052,7 @@
                     ctx.fill();
                 }
 
+                // Сам шарик
                 ctx.shadowColor = "#fff";
                 ctx.shadowBlur = 20;
                 ctx.beginPath();
@@ -1060,28 +1064,41 @@
             }
         }
 
+        // Анимация: вращение (3 сек) → пауза (1 сек) → движение (10 сек)
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const startTime = performance.now();
             const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
             let prevPos = null;
+            let finalAngle = null;
 
             function animate(now) {
                 const elapsed = now - startTime;
 
+                // Фаза вращения (0 .. spinDuration)
                 if (elapsed < spinDuration) {
                     const t = elapsed / spinDuration;
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
-                    const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
-                    const ball = { x: startPos.x, y: startPos.y, angle };
-                    drawGameFrame(ball);
+                    finalAngle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
+                    const ball = { x: startPos.x, y: startPos.y, angle: finalAngle };
+                    drawGameFrame(ball, highlightPolygonId);
                     animationFrameId = requestAnimationFrame(animate);
-                } else if (elapsed < spinDuration + 10000) {
-                    const motionElapsed = elapsed - spinDuration;
+                }
+                // Фаза паузы (spinDuration .. spinDuration + 1000)
+                else if (elapsed < spinDuration + 1000) {
+                    // Шарик неподвижен, стрелка показывает последнее направление
+                    const ball = { x: startPos.x, y: startPos.y, angle: finalAngle };
+                    drawGameFrame(ball, highlightPolygonId);
+                    animationFrameId = requestAnimationFrame(animate);
+                }
+                // Фаза движения (spinDuration+1000 .. spinDuration+1000+10000)
+                else if (elapsed < spinDuration + 1000 + 10000) {
+                    const motionElapsed = elapsed - (spinDuration + 1000);
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
+                        // Достигли конца траектории
                         const finalPos = trajectory[trajectory.length-1];
-                        drawGameFrame(finalPos);
+                        drawGameFrame(finalPos, highlightPolygonId);
                         animationFrameId = null;
                         fetchWinnerNow();
                         return;
@@ -1089,12 +1106,14 @@
                     const pos = trajectory[frameIndex];
                     if (prevPos) pos.prev = prevPos;
                     else pos.prev = startPos;
-                    drawGameFrame(pos);
+                    drawGameFrame(pos, highlightPolygonId);
                     prevPos = pos;
                     animationFrameId = requestAnimationFrame(animate);
-                } else {
+                }
+                // Завершение
+                else {
                     const finalPos = trajectory[trajectory.length-1];
-                    drawGameFrame(finalPos);
+                    drawGameFrame(finalPos, highlightPolygonId);
                     animationFrameId = null;
                     fetchWinnerNow();
                 }
@@ -1110,12 +1129,14 @@
                     lastShownRoundId = state.round_id;
                     localStorage.setItem('last_round_id', lastShownRoundId);
 
-                    // Подсветка победителя на 1.5 сек перед показом модалки
+                    // Подсветка полигона победителя
                     highlightPolygonId = state.winner.user_id;
                     drawGameFrame(null, highlightPolygonId);
+                    // Ждём 1.5 секунды, чтобы игрок увидел подсветку
                     await new Promise(r => setTimeout(r, 1500));
 
                     showWinnerModal(state.winner);
+                    // Сбрасываем подсветку после закрытия модалки
                     highlightPolygonId = null;
                     await updateBalance();
                 }
@@ -1154,6 +1175,7 @@
                     }
                 }
 
+                // Обновляем таймер
                 if (newState.status === 'counting') {
                     if (!timerInterval || newState.timer !== gState.timer) {
                         gState.timer = newState.timer;
@@ -1190,22 +1212,25 @@
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
                 renderBetsList();
 
-                if (!isSpinning) drawGameFrame();
+                // Перерисовываем фон, передавая актуальную подсветку
+                if (!isSpinning) drawGameFrame(null, highlightPolygonId);
 
                 const myId = String(tg.initDataUnsafe?.user?.id);
                 const hasMyBet = gState.players.find(p => p.id === myId);
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
 
+                // Запуск анимации
                 if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
                     isSpinning = true;
                     runSpinAnimation(gState.spin_params);
                 } else if (gState.status !== 'spinning' && isSpinning) {
                     isSpinning = false;
                     if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
-                    drawGameFrame();
+                    drawGameFrame(null, highlightPolygonId);
                 }
 
+                // Если появился победитель (на случай, если fetchWinnerNow не сработал)
                 if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
                     if (document.getElementById('page-game').classList.contains('page-active')) {
                         lastShownRoundId = gState.round_id;
@@ -1215,8 +1240,9 @@
                     }
                 }
 
+                // Автоматический сброс поля после окончания раунда
                 if (gState.players.length === 0 && gState.status === 'waiting') {
-                    drawGameFrame();
+                    drawGameFrame(null, highlightPolygonId);
                 }
 
                 if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
