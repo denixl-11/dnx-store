@@ -37,4 +37,4 @@ urllib3==2.6.3
 yarl==1.23.0
 python-dotenv
 numpy==1.26.4
-shapely==2.0.4
+scipy==1.11.4
