@@ -167,30 +167,20 @@ def require_auth(handler):
     return wrapper
 
 
-# ============================================================
+# ------------------------------------------------------------
 #  РУЧНАЯ ДИАГРАММА ВОРОНОГО С ВЕСАМИ (без scipy/shapely)
-# ============================================================
-
+# ------------------------------------------------------------
 def clip_polygon_by_halfplane(poly, point_on_line, normal):
-    """
-    Обрезает выпуклый полигон (список точек (x,y)) полуплоскостью,
-    заданной прямой и нормалью, направленной ВНУТРЬ.
-    Возвращает новый список точек.
-    """
     clipped = []
     n = len(poly)
     for i in range(n):
         p1 = poly[i]
         p2 = poly[(i + 1) % n]
-
-        # Знак относительно прямой
         d1 = (p1[0] - point_on_line[0]) * normal[0] + (p1[1] - point_on_line[1]) * normal[1]
         d2 = (p2[0] - point_on_line[0]) * normal[0] + (p2[1] - point_on_line[1]) * normal[1]
-
-        if d1 >= -1e-9:  # точка внутри (или на границе)
+        if d1 >= -1e-9:
             clipped.append(p1)
         if (d1 >= -1e-9 and d2 < -1e-9) or (d1 < -1e-9 and d2 >= -1e-9):
-            # Пересечение
             t = d1 / (d1 - d2)
             inter_x = p1[0] + t * (p2[0] - p1[0])
             inter_y = p1[1] + t * (p2[1] - p1[1])
@@ -199,11 +189,6 @@ def clip_polygon_by_halfplane(poly, point_on_line, normal):
 
 
 def build_voronoi_cell(points, i):
-    """
-    Строит ячейку Вороного для i-й точки, обрезанную квадратом [0,1]x[0,1].
-    points: numpy array (N, 2)
-    """
-    # Начальный полигон — большой квадрат, заведомо покрывающий [0,1]
     margin = 0.2
     cell = [
         (-margin, -margin),
@@ -222,13 +207,10 @@ def build_voronoi_cell(points, i):
         length = math.hypot(dx, dy)
         if length < 1e-12:
             continue
-        # Нормаль к серединному перпендикуляру, направленная к pi
-        normal = (-dx / length, -dy / length)  # от j к i
+        normal = (-dx / length, -dy / length)
         cell = clip_polygon_by_halfplane(cell, mid, normal)
         if len(cell) < 3:
             break
-    # Дополнительно обрезаем по квадрату [0,1]
-    # Границы: x=0 (нормаль вправо), x=1 (нормаль влево), y=0 (нормаль вверх), y=1 (нормаль вниз)
     cell = clip_polygon_by_halfplane(cell, (0, 0), (1, 0))
     cell = clip_polygon_by_halfplane(cell, (1, 0), (-1, 0))
     cell = clip_polygon_by_halfplane(cell, (0, 0), (0, 1))
@@ -237,7 +219,6 @@ def build_voronoi_cell(points, i):
 
 
 def polygon_area_and_centroid(poly):
-    """Вычисляет площадь и центроид многоугольника (формула шнуровки)."""
     n = len(poly)
     if n < 3:
         return 0.0, (0.0, 0.0)
@@ -271,14 +252,11 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
     target_areas = weights / total
     n = len(sorted_players)
 
-    # Начальные позиции точек
     points = np.random.rand(n, 2) * 0.8 + 0.1
 
-    # Итеративная подгонка площадей
     for _ in range(iterations):
         areas = np.zeros(n)
         centroids = [None] * n
-        # Строим все ячейки
         for i in range(n):
             cell = build_voronoi_cell(points, i)
             if len(cell) >= 3:
@@ -289,7 +267,6 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
                 areas[i] = 0.0
                 centroids[i] = None
 
-        # Корректируем точки
         for i in range(n):
             if areas[i] <= 0 or centroids[i] is None:
                 continue
@@ -304,16 +281,13 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
                     points[i] += 0.2 * direction / norm * (areas[i] / target - 1)
-        # Ограничиваем внутри квадрата
         np.clip(points, 0.02, 0.98, out=points)
 
-    # Финальные полигоны
     final_polygons = []
     for i, player in enumerate(sorted_players):
         cell = build_voronoi_cell(points, i)
         if len(cell) < 3:
-            continue  # теоретически не должно случиться
-        # Преобразуем в формат для фронта
+            continue
         coords = [{"x": float(p[0]), "y": float(p[1])} for p in cell]
         final_polygons.append({
             "player_id": player["id"],
@@ -321,12 +295,11 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
             "color": player["color"],
             "polygon": coords
         })
-
     return final_polygons
 
 
 # ------------------------------------------------------------
-# Генерация траектории (без изменений)
+# Генерация траектории с новыми параметрами
 # ------------------------------------------------------------
 def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
     x = start_x
@@ -363,24 +336,22 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
     return frames
 
 
-def generate_spin_params(players_dict: dict):
-    polygons = weighted_voronoi_polygons(players_dict)
-
+def generate_spin_params(polygons: list) -> dict:
     start_x = random.uniform(0.1, 0.9) * 1000
     start_y = random.uniform(0.1, 0.9) * 1000
 
-    spin_duration = 5000
-    spin_angle_speed = random.uniform(1.5 * math.pi, 4.5 * math.pi)
+    spin_duration = 3000
+    spin_angle_speed = random.uniform(4.5 * math.pi, 13.5 * math.pi)
     spin_angle_start = random.uniform(0, 2 * math.pi)
 
     angle_total = 0.5 * spin_angle_speed * (spin_duration / 1000)
     final_angle = spin_angle_start + angle_total
 
     base_speed = random.uniform(4000, 4500)
-    motion_speed = base_speed * 2.2
+    motion_speed = base_speed * 4.4
 
     motion_trajectory = generate_motion_trajectory(
-        start_x, start_y, final_angle, motion_speed, 5000, dt=16
+        start_x, start_y, final_angle, motion_speed, 10000, dt=16
     )
     final_point = motion_trajectory[-1]
     target_x = final_point["x"]
@@ -501,7 +472,7 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
-                    spin_params = generate_spin_params(game_state["players"])
+                    spin_params = generate_spin_params(game_state["polygons"])
                     game_state["spin_params"] = spin_params
                     game_state["polygons"] = spin_params["polygons"]
                     game_state["target_position"] = spin_params["target_position"]
@@ -509,10 +480,10 @@ async def game_worker():
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info(f"Spinning with custom Voronoi polygons")
+                    logging.info("Spinning with fixed Voronoi polygons")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(10.2)
+            await asyncio.sleep(3 + 10 + 0.5)  # spin_duration + motion_duration + small buffer
             async with game_lock:
                 if game_state["status"] == "spinning":
                     final_point = game_state["spin_params"]["trajectory"][-1]
@@ -752,12 +723,18 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            if game_state["status"] == "counting":
+            # Генерация или обновление полигонов
+            if len(game_state["players"]) == 1:
+                # Для одного игрока – весь экран
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
-            if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
+            elif len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
                 game_state["timer"] = 15
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
+            elif game_state["status"] == "counting":
+                # Обновляем полигоны при каждом новом игроке/ставке во время отсчёта
+                game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
+
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Bet error: {e}")

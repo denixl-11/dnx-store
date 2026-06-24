@@ -509,7 +509,7 @@
         // ====================================================================
         const tg = window.Telegram.WebApp;
         tg.ready();
-        const API_BASE = 'https://dnx-shop.onrender.com'; // ← замените на URL вашего бэкенда при необходимости
+        const API_BASE = 'https://dnx-shop.onrender.com';
         const initData = tg.initData || '';
         const userDisplayName = tg.initDataUnsafe?.user?.username || "Guest";
         const userAvatar = tg.initDataUnsafe?.user?.photo_url || "";
@@ -689,7 +689,6 @@
             pendingBuyItem = null;
         }
 
-        // Функция оплаты всей корзины
         async function buyCart() {
             if (cart.length === 0) return;
             const itemIds = cart.map(item => item.id);
@@ -964,6 +963,7 @@
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
         let initialGameStateLoaded = false;
+        let highlightPolygonId = null;
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -973,14 +973,12 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
-        // Отрисовка полигонов
-        function drawGameFrame(ballPos = null) {
+        function drawGameFrame(ballPos = null, highlightId = null) {
             if(!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
 
-            // Рисуем полигоны, если они есть
             if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
@@ -996,15 +994,32 @@
                     ctx.strokeStyle = "rgba(0,0,0,0.3)";
                     ctx.lineWidth = 1;
                     ctx.stroke();
+
+                    // Подсветка полигона победителя
+                    if (highlightId && poly.player_id === highlightId) {
+                        ctx.save();
+                        ctx.strokeStyle = "#FFD700";
+                        ctx.lineWidth = 4;
+                        ctx.shadowColor = "#FFD700";
+                        ctx.shadowBlur = 12;
+                        ctx.stroke();
+                        ctx.restore();
+                    }
                 }
             } else {
-                // Если полигонов нет – показываем надпись
-                ctx.fillStyle = "rgba(255,255,255,0.05)";
-                ctx.fillRect(0, 0, cw, ch);
-                ctx.fillStyle = "#555";
-                ctx.font = "30px Inter";
-                ctx.textAlign = "center";
-                ctx.fillText("Загрузка поля...", cw/2, ch/2);
+                // Один игрок: заливаем весь квадрат его цветом, если он есть
+                if (gState.players.length === 1) {
+                    const singlePlayer = gState.players[0];
+                    ctx.fillStyle = singlePlayer.color;
+                    ctx.fillRect(0, 0, cw, ch);
+                } else {
+                    ctx.fillStyle = "rgba(255,255,255,0.05)";
+                    ctx.fillRect(0, 0, cw, ch);
+                    ctx.fillStyle = "#555";
+                    ctx.font = "30px Inter";
+                    ctx.textAlign = "center";
+                    ctx.fillText("Ожидание игроков...", cw/2, ch/2);
+                }
             }
 
             // Шарик и стрелка
@@ -1045,7 +1060,6 @@
             }
         }
 
-        // Анимация вращения и полёта
         function runSpinAnimation(params) {
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const startTime = performance.now();
@@ -1062,7 +1076,7 @@
                     const ball = { x: startPos.x, y: startPos.y, angle };
                     drawGameFrame(ball);
                     animationFrameId = requestAnimationFrame(animate);
-                } else if (elapsed < spinDuration + 5000) {
+                } else if (elapsed < spinDuration + 10000) {
                     const motionElapsed = elapsed - spinDuration;
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
@@ -1095,7 +1109,14 @@
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     lastShownRoundId = state.round_id;
                     localStorage.setItem('last_round_id', lastShownRoundId);
+
+                    // Подсветка победителя на 1.5 сек перед показом модалки
+                    highlightPolygonId = state.winner.user_id;
+                    drawGameFrame(null, highlightPolygonId);
+                    await new Promise(r => setTimeout(r, 1500));
+
                     showWinnerModal(state.winner);
+                    highlightPolygonId = null;
                     await updateBalance();
                 }
             } catch(e) { console.error(e); }
