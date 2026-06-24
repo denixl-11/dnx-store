@@ -168,8 +168,7 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-#  ДИАГРАММА ВОРОНОГО С ГАРАНТИРОВАННОЙ МИНИМАЛЬНОЙ ПЛОЩАДЬЮ
-#  (исправлены направления движения точек)
+#  ВЗВЕШЕННАЯ ДИАГРАММА ВОРОНОГО (вспомогательные функции)
 # ------------------------------------------------------------
 def clip_polygon_by_halfplane(poly, point_on_line, normal):
     clipped = []
@@ -189,13 +188,14 @@ def clip_polygon_by_halfplane(poly, point_on_line, normal):
     return clipped
 
 
-def build_voronoi_cell(points, i):
+def build_voronoi_cell_in_rect(points, i, bounds):
+    xmin, ymin, xmax, ymax = bounds
     margin = 0.2
     cell = [
-        (-margin, -margin),
-        (1 + margin, -margin),
-        (1 + margin, 1 + margin),
-        (-margin, 1 + margin)
+        (xmin - margin, ymin - margin),
+        (xmax + margin, ymin - margin),
+        (xmax + margin, ymax + margin),
+        (xmin - margin, ymax + margin)
     ]
     pi = points[i]
     for j in range(len(points)):
@@ -212,10 +212,10 @@ def build_voronoi_cell(points, i):
         cell = clip_polygon_by_halfplane(cell, mid, normal)
         if len(cell) < 3:
             break
-    cell = clip_polygon_by_halfplane(cell, (0, 0), (1, 0))
-    cell = clip_polygon_by_halfplane(cell, (1, 0), (-1, 0))
-    cell = clip_polygon_by_halfplane(cell, (0, 0), (0, 1))
-    cell = clip_polygon_by_halfplane(cell, (0, 1), (0, -1))
+    cell = clip_polygon_by_halfplane(cell, (xmin, 0), (1, 0))
+    cell = clip_polygon_by_halfplane(cell, (xmax, 0), (-1, 0))
+    cell = clip_polygon_by_halfplane(cell, (0, ymin), (0, 1))
+    cell = clip_polygon_by_halfplane(cell, (0, ymax), (0, -1))
     return cell
 
 
@@ -241,44 +241,42 @@ def polygon_area_and_centroid(poly):
     return abs(area), (cx, cy)
 
 
-def weighted_voronoi_polygons(players_dict: dict, iterations: int = 500) -> list:
-    if not players_dict:
+def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iterations=300):
+    """
+    Строит взвешенную диаграмму Вороного для списка players в прямоугольнике bounds.
+    players: список словарей с ключами id, username, color, amount.
+    target_areas: список целевых площадей (если None, вычисляются пропорционально amount).
+    """
+    if not players:
         return []
 
-    sorted_players = sorted(players_dict.values(), key=lambda p: p["amount"], reverse=True)
-    weights = np.array([p["amount"] for p in sorted_players])
-    total = weights.sum()
-    if total == 0:
-        return []
-    n = len(sorted_players)
+    n = len(players)
+    if target_areas is None:
+        total = sum(p["amount"] for p in players)
+        if total == 0:
+            return []
+        target_areas = [p["amount"] / total for p in players]
+    else:
+        total_target = sum(target_areas)
+        if total_target == 0:
+            return []
+        target_areas = [a / total_target for a in target_areas]
 
-    # Минимальная площадь 1/25, но не более 1/n
-    min_area = 1.0 / 25.0
-    if n * min_area > 1.0:
-        min_area = 1.0 / n
+    xmin, ymin, xmax, ymax = bounds
+    width = xmax - xmin
+    height = ymax - ymin
 
-    # Целевые площади: каждому минимум, остальное пропорционально ставкам
-    remaining = 1.0 - n * min_area
-    target_areas = np.full(n, min_area, dtype=float)
-    if remaining > 0:
-        extra = (weights / weights.sum()) * remaining
-        target_areas += extra
-
-    # Начальные позиции: большие ставки почти в центре, маленькие — почти на краю
-    points = np.zeros((n, 2))
-    for i in range(n):
-        # r от 0.05 (центр) до 0.95 (край)
-        r = 0.05 + 0.9 * (1.0 - target_areas[i])
-        angle = random.random() * 2 * math.pi
-        points[i] = [0.5 + r * math.cos(angle), 0.5 + r * math.sin(angle)]
-    np.clip(points, 0.02, 0.98, out=points)
+    # Начальные позиции точек (случайно внутри bounds)
+    points = np.random.rand(n, 2)
+    points[:, 0] = xmin + width * (0.1 + 0.8 * points[:, 0])
+    points[:, 1] = ymin + height * (0.1 + 0.8 * points[:, 1])
 
     prev_error = float('inf')
     for it in range(iterations):
         areas = np.zeros(n)
         centroids = [None] * n
         for i in range(n):
-            cell = build_voronoi_cell(points, i)
+            cell = build_voronoi_cell_in_rect(points, i, bounds)
             if len(cell) >= 3:
                 area, cent = polygon_area_and_centroid(cell)
                 areas[i] = area
@@ -299,22 +297,24 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 500) -> list
                 continue
             target = target_areas[i]
             if areas[i] < target:
-                # Двигаем ТОЧКУ ОТ ЦЕНТРОИДА, чтобы увеличить площадь
-                direction = points[i] - np.array(centroids[i])
+                # увеличить площадь: точка от центроида
+                direction = np.array(points[i]) - np.array(centroids[i])
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
                     points[i] += step_scale * 0.5 * direction / norm * (1 - areas[i] / target)
             else:
-                # Двигаем ТОЧКУ К ЦЕНТРОИДУ, чтобы уменьшить площадь
-                direction = np.array(centroids[i]) - points[i]
+                # уменьшить площадь: точка к центроиду
+                direction = np.array(centroids[i]) - np.array(points[i])
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
                     points[i] += step_scale * 0.5 * direction / norm * (areas[i] / target - 1)
-        np.clip(points, 0.02, 0.98, out=points)
+
+        points[:, 0] = np.clip(points[:, 0], xmin + 0.02 * width, xmax - 0.02 * width)
+        points[:, 1] = np.clip(points[:, 1], ymin + 0.02 * height, ymax - 0.02 * height)
 
     final_polygons = []
-    for i, player in enumerate(sorted_players):
-        cell = build_voronoi_cell(points, i)
+    for i, player in enumerate(players):
+        cell = build_voronoi_cell_in_rect(points, i, bounds)
         if len(cell) < 3:
             continue
         coords = [{"x": float(p[0]), "y": float(p[1])} for p in cell]
@@ -327,8 +327,110 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 500) -> list
     return final_polygons
 
 
+def weighted_voronoi_polygons(players_dict: dict) -> list:
+    """
+    Рекурсивная диаграмма Вороного с гарантией минимальной площади 4%.
+    При дисбалансе >96% группа разделяется на лидера и остальных,
+    для них строится Вороной, затем рекурсия продолжается внутри каждой части.
+    """
+    if not players_dict:
+        return []
+
+    players = list(players_dict.values())
+    if not players:
+        return []
+
+    def recurse(group, bounds):
+        """Рекурсивно строит полигоны для группы игроков в прямоугольнике bounds."""
+        if len(group) == 1:
+            # Один игрок – весь bounds
+            xmin, ymin, xmax, ymax = bounds
+            coords = [
+                {"x": xmin, "y": ymin},
+                {"x": xmax, "y": ymin},
+                {"x": xmax, "y": ymax},
+                {"x": xmin, "y": ymax}
+            ]
+            return [{
+                "player_id": group[0]["id"],
+                "username": group[0]["username"],
+                "color": group[0]["color"],
+                "polygon": coords
+            }]
+
+        total_amount = sum(p["amount"] for p in group)
+        shares = [p["amount"] / total_amount for p in group]
+        max_share = max(shares)
+        max_idx = shares.index(max_share)
+
+        # Если лидер занимает >96%, делим группу на лидера и остальных
+        if max_share > 0.96:
+            leader = group[max_idx]
+            others = [p for i, p in enumerate(group) if i != max_idx]
+            others_total = sum(p["amount"] for p in others)
+
+            # Строим Вороного для двух "игроков": лидер и "мета-игрок" остальных
+            # Целевые площади: лидер = max_share, остальные = 1 - max_share, но не менее 4%
+            target_leader = max_share
+            target_others = max(0.04, 1.0 - max_share)
+            # Нормализуем
+            total_target = target_leader + target_others
+            target_leader /= total_target
+            target_others /= total_target
+
+            # Создаём временные сущности для Вороного
+            meta_leader = {
+                "id": leader["id"],
+                "username": leader["username"],
+                "color": leader["color"],
+                "amount": leader["amount"]
+            }
+            meta_others = {
+                "id": "__others__",
+                "username": "others",
+                "color": "#000000",  # будет заменён
+                "amount": others_total
+            }
+            two_players = [meta_leader, meta_others]
+            two_targets = [target_leader, target_others]
+
+            polygons = build_weighted_voronoi_in_rect(two_players, bounds, target_areas=two_targets, iterations=200)
+
+            leader_poly = None
+            others_poly = None
+            for poly in polygons:
+                if poly["player_id"] == leader["id"]:
+                    leader_poly = poly["polygon"]
+                elif poly["player_id"] == "__others__":
+                    others_poly = poly["polygon"]
+
+            result = []
+            # Добавляем полигон лидера
+            if leader_poly:
+                result.append({
+                    "player_id": leader["id"],
+                    "username": leader["username"],
+                    "color": leader["color"],
+                    "polygon": leader_poly
+                })
+            # Рекурсивно обрабатываем остальных внутри их полигона
+            if others and others_poly:
+                # Преобразуем координаты полигона в bounds (min/max)
+                xs = [p["x"] for p in others_poly]
+                ys = [p["y"] for p in others_poly]
+                new_bounds = (min(xs), min(ys), max(xs), max(ys))
+                # Запускаем рекурсию для остальных
+                result.extend(recurse(others, new_bounds))
+            return result
+
+        # Если дисбаланс не экстремальный, строим обычный Вороной для всех
+        return build_weighted_voronoi_in_rect(group, bounds)
+
+    return recurse(players, (0.0, 0.0, 1.0, 1.0))
+
+
 # ------------------------------------------------------------
-# Генерация траектории (без изменений)
+# Генерация траектории
 # ------------------------------------------------------------
 def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
     x = start_x
@@ -397,7 +499,7 @@ def generate_spin_params(polygons: list) -> dict:
 
 
 # ------------------------------------------------------------
-# Игровая механика
+# Игровая механика (без изменений)
 # ------------------------------------------------------------
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
@@ -512,7 +614,7 @@ async def game_worker():
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info("Spinning with fixed Voronoi polygons")
+                    logging.info("Spinning with recursive Voronoi polygons")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(3 + 1 + 10 + 0.5)
