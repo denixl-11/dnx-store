@@ -59,8 +59,7 @@ game_state = {
     "last_winner_id": None,
     "round_id": None,
     "game_number": 0,
-    "polygons": None,
-    "last_polygons": None          # храним полигоны после конца раунда для подсветки
+    "polygons": None
 }
 
 
@@ -169,7 +168,7 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-#  РУЧНАЯ ДИАГРАММА ВОРОНОГО С ВЕСАМИ И МИНИМАЛЬНОЙ ПЛОЩАДЬЮ
+#  РУЧНАЯ ДИАГРАММА ВОРОНОГО С ГАРАНТИРОВАННОЙ МИНИМАЛЬНОЙ ПЛОЩАДЬЮ
 # ------------------------------------------------------------
 def clip_polygon_by_halfplane(poly, point_on_line, normal):
     clipped = []
@@ -250,18 +249,19 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
     total = weights.sum()
     if total == 0:
         return []
-    target_areas = weights / total
-
-    # Гарантируем минимальную площадь 1/25 (4%)
-    min_target = 1.0 / 25.0
     n = len(sorted_players)
-    # При большом количестве игроков минимальная площадь не может быть больше 1/n
-    min_target = min(min_target, 1.0 / n)
 
-    adjusted = np.maximum(target_areas, min_target)
-    # Нормализуем, чтобы сумма была ровно 1
-    adjusted = adjusted / adjusted.sum()
-    target_areas = adjusted
+    # Минимальная площадь 1/25, но не более 1/n
+    min_area = 1.0 / 25.0
+    if n * min_area > 1.0:
+        min_area = 1.0 / n
+
+    # Выделяем каждому минимум, оставшееся распределяем пропорционально исходным ставкам
+    remaining = 1.0 - n * min_area
+    target_areas = np.full(n, min_area, dtype=float)
+    if remaining > 0:
+        extra = (weights / weights.sum()) * remaining
+        target_areas += extra
 
     points = np.random.rand(n, 2) * 0.8 + 0.1
 
@@ -359,7 +359,7 @@ def generate_spin_params(polygons: list) -> dict:
     final_angle = spin_angle_start + angle_total
 
     base_speed = random.uniform(4000, 4500)
-    motion_speed = base_speed * (2.2 / 1.5)   # уменьшена в 1.5 раза
+    motion_speed = base_speed * (2.2 / 1.5)
 
     motion_trajectory = generate_motion_trajectory(
         start_x, start_y, final_angle, motion_speed, 10000, dt=16
@@ -379,7 +379,7 @@ def generate_spin_params(polygons: list) -> dict:
 
 
 # ------------------------------------------------------------
-# Игровая механика
+# Игровая механика (определение победителя)
 # ------------------------------------------------------------
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
@@ -427,10 +427,12 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
     y = final_point["y"]
     winner_id = None
     winner_username = None
+    winner_polygon = None
     for poly in polygons:
         if point_in_polygon((x, y), poly["polygon"]):
             winner_id = poly["player_id"]
             winner_username = poly["username"]
+            winner_polygon = poly["polygon"]
             break
     if not winner_id:
         return None
@@ -468,7 +470,8 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
             "username": winner_username,
             "win_amount": profit,
             "photo_url": photo_url,
-            "round_id": game_state["round_id"]
+            "round_id": game_state["round_id"],
+            "polygon": winner_polygon      # <-- координаты сектора победителя
         }
     except Exception as e:
         logging.error(f"DB error finish_round: {e}")
@@ -494,7 +497,7 @@ async def game_worker():
                     logging.info("Spinning with fixed Voronoi polygons")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(3 + 1 + 10 + 0.5)   # ожидание завершения анимации
+            await asyncio.sleep(3 + 1 + 10 + 0.5)
             async with game_lock:
                 if game_state["status"] == "spinning":
                     final_point = game_state["spin_params"]["trajectory"][-1]
@@ -506,13 +509,11 @@ async def game_worker():
                     )
                     game_state["winner"] = winner_data
                     game_state["last_winner_id"] = winner_data["user_id"] if winner_data else None
-                    # Сохраняем полигоны для подсветки
-                    game_state["last_polygons"] = game_state["polygons"]
                     game_state["status"] = "waiting"
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    game_state["polygons"] = None
+                    game_state["polygons"] = None   # поле очищается
                     logging.info(f"Round finished, winner: {winner_data}")
 
 
@@ -676,8 +677,6 @@ async def handle_request_withdraw(request):
 async def handle_game_state(request):
     async with game_lock:
         sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
-        # Если активных полигонов нет, но есть сохранённые (после раунда), отдаём их
-        polys = game_state.get("polygons") or game_state.get("last_polygons")
         resp = {
             "status": game_state["status"],
             "players": sorted_players,
@@ -688,7 +687,7 @@ async def handle_game_state(request):
             "last_winner_id": game_state.get("last_winner_id"),
             "round_id": game_state.get("round_id"),
             "game_number": game_state.get("game_number", 0),
-            "polygons": polys
+            "polygons": game_state.get("polygons")
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -738,10 +737,6 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            # При первой ставке сбрасываем last_polygons, чтобы не показывать чужое поле
-            if len(game_state["players"]) == 1:
-                game_state["last_polygons"] = None
-
             if len(game_state["players"]) == 1:
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
             elif len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
@@ -773,7 +768,6 @@ async def handle_game_cancel(request):
                 game_state["players"] = {}
                 game_state["pool"] = 0.0
                 game_state["polygons"] = None
-                game_state["last_polygons"] = None
                 game_state["status"] = "waiting"
                 return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         return web.json_response({"success": False, "error": "cannot_cancel"},

@@ -963,7 +963,7 @@
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
         let initialGameStateLoaded = false;
-        let highlightPolygonId = null;   // для подсветки полигона победителя
+        let highlightPolygon = null;   // координаты полигона победителя для подсветки
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -973,8 +973,8 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
-        // Отрисовка поля и шарика. Если передан highlightId, применяется золотая подсветка.
-        function drawGameFrame(ballPos = null, highlightId = null) {
+        // Отрисовка поля и шарика. Если передан highlightPolygon, применяется золотая подсветка.
+        function drawGameFrame(ballPos = null, highlightPts = null) {
             if(!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
@@ -996,17 +996,6 @@
                     ctx.strokeStyle = "rgba(0,0,0,0.3)";
                     ctx.lineWidth = 1;
                     ctx.stroke();
-
-                    // Подсветка победителя
-                    if (highlightId && poly.player_id === highlightId) {
-                        ctx.save();
-                        ctx.strokeStyle = "#FFD700";
-                        ctx.lineWidth = 4;
-                        ctx.shadowColor = "#FFD700";
-                        ctx.shadowBlur = 12;
-                        ctx.stroke();
-                        ctx.restore();
-                    }
                 }
             } else {
                 // Ожидание или один игрок
@@ -1024,12 +1013,28 @@
                 }
             }
 
+            // Подсветка полигона победителя (если есть)
+            if (highlightPts && highlightPts.length >= 3) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(highlightPts[0].x * cw, (1 - highlightPts[0].y) * ch);
+                for (let i = 1; i < highlightPts.length; i++) {
+                    ctx.lineTo(highlightPts[i].x * cw, (1 - highlightPts[i].y) * ch);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = "#FFD700";
+                ctx.lineWidth = 4;
+                ctx.shadowColor = "#FFD700";
+                ctx.shadowBlur = 12;
+                ctx.stroke();
+                ctx.restore();
+            }
+
             // Шарик и стрелка
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
 
-                // Стрелка показывается только во время вращения и паузы
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const angle = ballPos.angle;
                     const arrowLen = 35;
@@ -1052,7 +1057,6 @@
                     ctx.fill();
                 }
 
-                // Сам шарик
                 ctx.shadowColor = "#fff";
                 ctx.shadowBlur = 20;
                 ctx.beginPath();
@@ -1070,41 +1074,35 @@
             const startTime = performance.now();
             const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
             let prevPos = null;
-            // Угол для стрелки: после вращения вычисляем точный угол по первой точке траектории
             let pauseAngle = null;
 
             function animate(now) {
                 const elapsed = now - startTime;
 
-                // Фаза вращения (0 .. spinDuration)
                 if (elapsed < spinDuration) {
                     const t = elapsed / spinDuration;
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
                     const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
-                    pauseAngle = angle;  // запоминаем последний угол
+                    pauseAngle = angle;
                     const ball = { x: startPos.x, y: startPos.y, angle };
-                    drawGameFrame(ball, highlightPolygonId);
+                    drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
-                // Фаза паузы (spinDuration .. spinDuration + 1000)
                 else if (elapsed < spinDuration + 1000) {
-                    // Если ещё не вычислен точный угол – берём из первой точки траектории
                     if (pauseAngle === null && trajectory.length > 0) {
                         const firstMove = trajectory[0];
                         pauseAngle = Math.atan2(firstMove.y - startPos.y, firstMove.x - startPos.x);
                     }
-                    const angle = pauseAngle || 0;
-                    const ball = { x: startPos.x, y: startPos.y, angle };
-                    drawGameFrame(ball, highlightPolygonId);
+                    const ball = { x: startPos.x, y: startPos.y, angle: pauseAngle };
+                    drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
-                // Фаза движения (spinDuration+1000 .. spinDuration+1000+10000)
                 else if (elapsed < spinDuration + 1000 + 10000) {
                     const motionElapsed = elapsed - (spinDuration + 1000);
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
                         const finalPos = trajectory[trajectory.length-1];
-                        drawGameFrame(finalPos, highlightPolygonId);
+                        drawGameFrame(finalPos, highlightPolygon);
                         animationFrameId = null;
                         fetchWinnerNow();
                         return;
@@ -1112,14 +1110,13 @@
                     const pos = trajectory[frameIndex];
                     if (prevPos) pos.prev = prevPos;
                     else pos.prev = startPos;
-                    drawGameFrame(pos, highlightPolygonId);
+                    drawGameFrame(pos, highlightPolygon);
                     prevPos = pos;
                     animationFrameId = requestAnimationFrame(animate);
                 }
-                // Завершение
                 else {
                     const finalPos = trajectory[trajectory.length-1];
-                    drawGameFrame(finalPos, highlightPolygonId);
+                    drawGameFrame(finalPos, highlightPolygon);
                     animationFrameId = null;
                     fetchWinnerNow();
                 }
@@ -1135,18 +1132,15 @@
                     lastShownRoundId = state.round_id;
                     localStorage.setItem('last_round_id', lastShownRoundId);
 
-                    // Полигоны могут быть ещё доступны через last_polygons на сервере
-                    if (state.polygons) {
-                        gState.polygons = state.polygons;
+                    // Подсветка из координат, присланных в winner.polygon
+                    if (state.winner.polygon && state.winner.polygon.length >= 3) {
+                        highlightPolygon = state.winner.polygon;
+                        drawGameFrame(null, highlightPolygon);
+                        await new Promise(r => setTimeout(r, 1500));
                     }
 
-                    // Подсветка полигона победителя
-                    highlightPolygonId = state.winner.user_id;
-                    drawGameFrame(null, highlightPolygonId);
-                    await new Promise(r => setTimeout(r, 1500));
-
                     showWinnerModal(state.winner);
-                    highlightPolygonId = null;
+                    highlightPolygon = null;   // очищаем подсветку
                     await updateBalance();
                 }
             } catch(e) { console.error(e); }
@@ -1220,7 +1214,7 @@
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
                 renderBetsList();
 
-                if (!isSpinning) drawGameFrame(null, highlightPolygonId);
+                if (!isSpinning) drawGameFrame(null, highlightPolygon);
 
                 const myId = String(tg.initDataUnsafe?.user?.id);
                 const hasMyBet = gState.players.find(p => p.id === myId);
@@ -1233,7 +1227,7 @@
                 } else if (gState.status !== 'spinning' && isSpinning) {
                     isSpinning = false;
                     if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
-                    drawGameFrame(null, highlightPolygonId);
+                    drawGameFrame(null, highlightPolygon);
                 }
 
                 if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
@@ -1246,7 +1240,7 @@
                 }
 
                 if (gState.players.length === 0 && gState.status === 'waiting') {
-                    drawGameFrame(null, highlightPolygonId);
+                    drawGameFrame(null, highlightPolygon);
                 }
 
                 if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
