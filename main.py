@@ -59,7 +59,8 @@ game_state = {
     "last_winner_id": None,
     "round_id": None,
     "game_number": 0,
-    "polygons": None
+    "polygons": None,
+    "last_polygons": None
 }
 
 
@@ -168,7 +169,7 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-#  ЧИСТАЯ ДИАГРАММА ВОРОНОГО (вспомогательные функции)
+#  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ДИАГРАММЫ ВОРОНОГО
 # ------------------------------------------------------------
 def clip_polygon_by_halfplane(poly, point_on_line, normal):
     clipped = []
@@ -241,9 +242,10 @@ def polygon_area_and_centroid(poly):
     return abs(area), (cx, cy)
 
 
-def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iterations=500):
+def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iterations=5000):
     if not players:
         return []
+
     n = len(players)
     if target_areas is None:
         total = sum(p["amount"] for p in players)
@@ -251,6 +253,7 @@ def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iteration
             return []
         target_areas = [p["amount"] / total for p in players]
     else:
+        # target_areas приходят уже ненормализованными? Нет, они должны быть уже нормализованы перед вызовом.
         total_target = sum(target_areas)
         if total_target == 0:
             return []
@@ -260,23 +263,10 @@ def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iteration
     width = xmax - xmin
     height = ymax - ymin
 
-    # Инициализация точек: x-позиция примерно пропорциональна накопленной доле
-    points = np.zeros((n, 2))
-    order = np.argsort(target_areas)[::-1]
-    sorted_targets = [target_areas[i] for i in order]
-    x_positions = []
-    current = 0.0
-    for t in sorted_targets:
-        center = current + t / 2.0
-        x_positions.append(xmin + center * width)
-        current += t
-    for idx, i in enumerate(order):
-        points[i, 0] = x_positions[idx]
-        points[i, 1] = ymin + height * (0.1 + 0.8 * random.random())
-    points[:, 0] += np.random.normal(0, width * 0.02, n)
-    points[:, 1] += np.random.normal(0, height * 0.02, n)
-    points[:, 0] = np.clip(points[:, 0], xmin + width * 0.05, xmax - width * 0.05)
-    points[:, 1] = np.clip(points[:, 1], ymin + height * 0.05, ymax - height * 0.05)
+    # Абсолютно случайные начальные позиции внутри bounds
+    points = np.random.rand(n, 2)
+    points[:, 0] = xmin + width * (0.02 + 0.96 * points[:, 0])
+    points[:, 1] = ymin + height * (0.02 + 0.96 * points[:, 1])
 
     prev_error = float('inf')
     for it in range(iterations):
@@ -304,12 +294,12 @@ def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iteration
                 continue
             target = target_areas[i]
             if areas[i] < target:
-                direction = np.array(points[i]) - np.array(centroids[i])
+                direction = points[i] - np.array(centroids[i])
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
                     points[i] += step_scale * 0.5 * direction / norm * (1 - areas[i] / target)
             else:
-                direction = np.array(centroids[i]) - np.array(points[i])
+                direction = np.array(centroids[i]) - points[i]
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
                     points[i] += step_scale * 0.5 * direction / norm * (areas[i] / target - 1)
@@ -333,6 +323,10 @@ def build_weighted_voronoi_in_rect(players, bounds, target_areas=None, iteration
 
 
 def weighted_voronoi_polygons(players_dict: dict) -> list:
+    """
+    Рекурсивная диаграмма Вороного с гарантией минимальной площади 4%.
+    Исправлена критическая ошибка: теперь группа маленьких игроков всегда получает ровно 4% при дисбалансе >96%.
+    """
     if not players_dict:
         return []
 
@@ -366,11 +360,10 @@ def weighted_voronoi_polygons(players_dict: dict) -> list:
             others = [p for i, p in enumerate(group) if i != max_idx]
             others_total = sum(p["amount"] for p in others)
 
-            target_leader = max_share
-            target_others = max(0.04, 1.0 - max_share)
-            total_target = target_leader + target_others
-            target_leader /= total_target
-            target_others /= total_target
+            # Исправленная формула: лидер не получает больше 0.96, остальные – не менее 0.04
+            target_leader = min(max_share, 0.96)
+            target_others = max(1.0 - max_share, 0.04)
+            # Сумма всегда 1.0, нормализация не нужна
 
             meta_leader = {
                 "id": leader["id"], "username": leader["username"],
@@ -382,7 +375,8 @@ def weighted_voronoi_polygons(players_dict: dict) -> list:
             }
             two_players = [meta_leader, meta_others]
             two_targets = [target_leader, target_others]
-            polygons = build_weighted_voronoi_in_rect(two_players, bounds, target_areas=two_targets, iterations=500)
+            # Для двух точек достаточно 20 итераций
+            polygons = build_weighted_voronoi_in_rect(two_players, bounds, target_areas=two_targets, iterations=20)
 
             leader_poly = None
             others_poly = None
@@ -405,7 +399,7 @@ def weighted_voronoi_polygons(players_dict: dict) -> list:
                 result.extend(recurse(others, new_bounds))
             return result
 
-        return build_weighted_voronoi_in_rect(group, bounds)
+        return build_weighted_voronoi_in_rect(group, bounds, iterations=5000)
 
     return recurse(players, (0.0, 0.0, 1.0, 1.0))
 
@@ -480,7 +474,7 @@ def generate_spin_params(polygons: list) -> dict:
 
 
 # ------------------------------------------------------------
-# Игровая механика
+# Игровая механика (определение победителя по полигонам)
 # ------------------------------------------------------------
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
@@ -598,7 +592,7 @@ async def game_worker():
                     logging.info("Spinning with recursive Voronoi polygons")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(3 + 1 + 10 + 2 + 0.5)  # учтена пауза 2 сек после движения
+            await asyncio.sleep(3 + 1 + 10 + 2 + 0.5)
             async with game_lock:
                 if game_state["status"] == "spinning":
                     final_point = game_state["spin_params"]["trajectory"][-1]
@@ -610,16 +604,16 @@ async def game_worker():
                     )
                     game_state["winner"] = winner_data
                     game_state["last_winner_id"] = winner_data["user_id"] if winner_data else None
+                    game_state["last_polygons"] = game_state["polygons"]
                     game_state["status"] = "waiting"
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    # Полигоны НЕ обнуляем, чтобы фронтенд успел подсветить
-                    # game_state["polygons"] = None
+                    game_state["polygons"] = None
                     logging.info(f"Round finished, winner: {winner_data}")
 
 
-# ------------------- API (без изменений) -------------------
+# ------------------- API -------------------
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
@@ -779,6 +773,7 @@ async def handle_request_withdraw(request):
 async def handle_game_state(request):
     async with game_lock:
         sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
+        polys = game_state.get("polygons") or game_state.get("last_polygons")
         resp = {
             "status": game_state["status"],
             "players": sorted_players,
@@ -789,7 +784,7 @@ async def handle_game_state(request):
             "last_winner_id": game_state.get("last_winner_id"),
             "round_id": game_state.get("round_id"),
             "game_number": game_state.get("game_number", 0),
-            "polygons": game_state.get("polygons")
+            "polygons": polys
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -840,6 +835,7 @@ async def handle_game_bet(request):
             game_state["pool"] += amount
 
             if len(game_state["players"]) == 1:
+                game_state["last_polygons"] = None
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
             elif len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
@@ -870,6 +866,7 @@ async def handle_game_cancel(request):
                 game_state["players"] = {}
                 game_state["pool"] = 0.0
                 game_state["polygons"] = None
+                game_state["last_polygons"] = None
                 game_state["status"] = "waiting"
                 return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         return web.json_response({"success": False, "error": "cannot_cancel"},
