@@ -15,7 +15,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 from dotenv import load_dotenv
 import numpy as np
-from shapely.geometry import Point, Polygon, MultiPoint, box
+from shapely.geometry import Point, MultiPoint, box
 from shapely.ops import voronoi_diagram
 
 load_dotenv()
@@ -170,18 +170,12 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-# Генерация полигонов методом взвешенной Вороного (shapely)
+# Генерация взвешенных полигонов Вороного через shapely (без scipy)
 # ------------------------------------------------------------
 def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list:
-    """
-    Генерирует полигоны Вороного с весами (ставками) так, чтобы площадь ячейки
-    была пропорциональна доле ставки от банка. Использует shapely.ops.voronoi_diagram
-    для автоматической обрезки по квадрату [0,1]x[0,1].
-    """
     if not players_dict:
         return []
 
-    # Сортируем игроков по убыванию ставки, чтобы стабильно работать с весами
     sorted_players = sorted(players_dict.values(), key=lambda p: p["amount"], reverse=True)
     weights = np.array([p["amount"] for p in sorted_players])
     total = weights.sum()
@@ -190,13 +184,13 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
     target_areas = weights / total
     n = len(sorted_players)
 
-    # Начальные позиции случайны, но не у самого края
+    # Начальные позиции точек (избегаем границ)
     points = np.random.rand(n, 2) * 0.8 + 0.1
 
-    # Итеративное перемещение точек для достижения целевых площадей
+    # Итеративное перемещение для достижения целевых площадей
     for _ in range(iterations):
         try:
-            # Строим обрезанную диаграмму Вороного для текущих точек
+            # Строим диаграмму Вороного внутри квадрата [0,1]x[0,1]
             diagram = voronoi_diagram(MultiPoint([Point(x, y) for x, y in points]),
                                       envelope=box(0, 0, 1, 1))
         except Exception:
@@ -204,7 +198,6 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
 
         areas = np.zeros(n)
         centroids = [None] * n
-        # Сопоставляем полигоны с игроками
         for i in range(n):
             pt = Point(points[i])
             for geom in diagram.geoms:
@@ -213,12 +206,11 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
                     centroids[i] = np.array([geom.centroid.x, geom.centroid.y])
                     break
 
-        # Корректировка точек
         for i in range(n):
             if areas[i] <= 0 or centroids[i] is None:
                 continue
             if areas[i] < target_areas[i]:
-                # двигаемся к центроиду
+                # двигаем точку к центроиду ячейки
                 direction = centroids[i] - points[i]
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
@@ -228,10 +220,10 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
                 norm = np.linalg.norm(direction)
                 if norm > 0.001:
                     points[i] += 0.2 * direction / norm * (areas[i] / target_areas[i] - 1)
-        # Ограничиваем точки внутри квадрата
+        # Ограничиваем точки внутри допустимой области
         np.clip(points, 0.02, 0.98, out=points)
 
-    # Финальное построение полигонов для окончательных позиций точек
+    # Финальное построение полигонов
     final_diagram = voronoi_diagram(MultiPoint([Point(x, y) for x, y in points]),
                                     envelope=box(0, 0, 1, 1))
     final_polygons = []
@@ -239,8 +231,7 @@ def weighted_voronoi_polygons(players_dict: dict, iterations: int = 100) -> list
         pt = Point(points[i])
         for geom in final_diagram.geoms:
             if geom.contains(pt):
-                # Извлекаем координаты внешнего контура (без последней повторяющейся точки)
-                coords = list(geom.exterior.coords[:-1])
+                coords = list(geom.exterior.coords[:-1])  # удаляем повторяющуюся вершину
                 final_polygons.append({
                     "player_id": player["id"],
                     "username": player["username"],
@@ -324,7 +315,7 @@ def generate_spin_params(players_dict: dict):
 
 
 # ------------------------------------------------------------
-# Игровая механика (определение победителя по полигонам)
+# Игровая механика
 # ------------------------------------------------------------
 PLAYER_COLORS = [
     "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
@@ -348,7 +339,6 @@ async def get_user_photo(user_id: int) -> str | None:
 
 
 def point_in_polygon(point, polygon):
-    """Проверка точки в многоугольнике (алгоритм пересечения лучей)"""
     x, y = point
     inside = False
     n = len(polygon)
@@ -398,7 +388,6 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
                     INSERT INTO leaderboard (user_id, username, wins) VALUES (%s, %s, 1)
                     ON CONFLICT (user_id) DO UPDATE SET wins = leaderboard.wins + 1, username = EXCLUDED.username
                 """, (winner_id, winner_username))
-                # Пишем историю и обновляем счётчик в той же транзакции
                 cur.execute(
                     "INSERT INTO game_history (game_number, winner_name, win_amount) VALUES (%s, %s, %s)",
                     (game_state["game_number"], winner_username, profit)
@@ -681,7 +670,7 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            # Пересчитываем полигоны при каждом изменении ставок
+            # Пересчитываем полигоны при изменении ставок
             if game_state["status"] == "counting":
                 game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
