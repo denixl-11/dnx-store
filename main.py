@@ -60,7 +60,7 @@ game_state = {
     "round_id": None,
     "game_number": 0,
     "polygons": None,
-    "last_polygons": None          # храним полигоны после конца раунда для подсветки
+    "last_polygons": None          # для подсветки после раунда
 }
 
 
@@ -244,8 +244,8 @@ def polygon_area_and_centroid(poly):
 
 def build_weighted_voronoi(players, bounds, target_areas=None, iterations=5000):
     """
-    Универсальная функция построения взвешенного Вороного для любого числа игроков.
-    Если target_areas не заданы, вычисляются пропорционально ставкам с гарантией минимума 4%.
+    Универсальная функция взвешенного Вороного для любого числа игроков.
+    Если target_areas не заданы, вычисляются пропорционально ставкам с гарантией 4%.
     """
     if not players:
         return []
@@ -255,13 +255,15 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=5000):
         total = sum(p["amount"] for p in players)
         if total == 0:
             return []
-        # Вычисляем доли и применяем гарантию 4%
+        # Вычисляем доли и гарантируем минимум 4% (или 1/n, если игроков > 25)
         raw = np.array([p["amount"] / total for p in players])
-        adjusted = np.maximum(raw, 0.04)
-        adjusted /= adjusted.sum()
-        target_areas = adjusted.tolist()
+        min_area = 1.0 / 25.0
+        if n > 25:
+            min_area = 1.0 / n
+        adjusted = np.maximum(raw, min_area)
+        target_areas = adjusted / adjusted.sum()
+        target_areas = target_areas.tolist()
     else:
-        # Убедимся, что сумма target_areas равна 1
         total = sum(target_areas)
         if total == 0:
             return []
@@ -271,7 +273,7 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=5000):
     width = xmax - xmin
     height = ymax - ymin
 
-    # Абсолютно случайные начальные позиции
+    # Абсолютно случайные начальные позиции внутри bounds
     points = np.random.rand(n, 2)
     points[:, 0] = xmin + width * (0.02 + 0.96 * points[:, 0])
     points[:, 1] = ymin + height * (0.02 + 0.96 * points[:, 1])
@@ -332,17 +334,12 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=5000):
     return final_polygons
 
 
-def weighted_voronoi_polygons(players_dict: dict) -> list:
-    """
-    Точка входа. Всегда использует единый алгоритм взвешенного Вороного с гарантией 4%.
-    Никакой рекурсии – она была источником ошибок.
-    """
-    if not players_dict:
-        return []
+def weighted_voronoi_polygons(players_dict: dict, iterations=300):
+    """Точка входа. Быстрая или точная генерация."""
     players = list(players_dict.values())
     if not players:
         return []
-    return build_weighted_voronoi(players, (0.0, 0.0, 1.0, 1.0))
+    return build_weighted_voronoi(players, (0.0, 0.0, 1.0, 1.0), iterations=iterations)
 
 
 # ------------------------------------------------------------
@@ -522,9 +519,12 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
-                    # Финальная точная генерация полигонов (5000 итераций)
-                    if game_state["polygons"] is None or len(game_state["players"]) != len(game_state["polygons"]):
-                        game_state["polygons"] = weighted_voronoi_polygons(game_state["players"])
+                    # Финальная точная генерация (5000 итераций)
+                    game_state["polygons"] = build_weighted_voronoi(
+                        list(game_state["players"].values()),
+                        (0.0, 0.0, 1.0, 1.0),
+                        iterations=5000
+                    )
                     spin_params = generate_spin_params(game_state["polygons"])
                     game_state["spin_params"] = spin_params
                     game_state["polygons"] = spin_params["polygons"]
@@ -533,9 +533,10 @@ async def game_worker():
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info("Spinning with weighted Voronoi")
+                    logging.info("Spinning with exact Voronoi")
 
         if game_state["status"] == "spinning":
+            # Вращение(3) + пауза(1) + движение(10) + стоянка(2) + запас(0.5)
             await asyncio.sleep(3 + 1 + 10 + 2 + 0.5)
             async with game_lock:
                 if game_state["status"] == "spinning":
@@ -548,16 +549,17 @@ async def game_worker():
                     )
                     game_state["winner"] = winner_data
                     game_state["last_winner_id"] = winner_data["user_id"] if winner_data else None
+                    # Сохраняем полигоны для подсветки
                     game_state["last_polygons"] = game_state["polygons"]
                     game_state["status"] = "waiting"
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    game_state["polygons"] = None
+                    game_state["polygons"] = None   # очищаем активные, но last_polygons остаётся
                     logging.info(f"Round finished, winner: {winner_data}")
 
 
-# ------------------- API (без изменений) -------------------
+# ------------------- API -------------------
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
@@ -779,15 +781,15 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            # При первой ставке сбрасываем прошлые полигоны
+            # При первой ставке сбрасываем last_polygons
             if len(game_state["players"]) == 1:
                 game_state["last_polygons"] = None
 
-            # Пересчитываем полигоны с небольшим числом итераций для быстроты
+            # Быстрая генерация полигонов для отображения (300 итераций)
             game_state["polygons"] = build_weighted_voronoi(
                 list(game_state["players"].values()),
                 (0.0, 0.0, 1.0, 1.0),
-                iterations=300   # быстрая предварительная генерация
+                iterations=300
             )
 
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
