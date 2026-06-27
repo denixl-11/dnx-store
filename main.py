@@ -60,7 +60,7 @@ game_state = {
     "round_id": None,
     "game_number": 0,
     "polygons": None,
-    "last_polygons": None          # для подсветки после раунда
+    "last_polygons": None
 }
 
 
@@ -169,162 +169,152 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-#  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ДИАГРАММЫ ВОРОНОГО
+#  НОВАЯ ГЕОМЕТРИЯ: BSP RECURSIVE POLYGON CLIPPING (SAFE 4%)
 # ------------------------------------------------------------
-def clip_polygon_by_halfplane(poly, point_on_line, normal):
-    clipped = []
-    n = len(poly)
-    for i in range(n):
-        p1 = poly[i]
-        p2 = poly[(i + 1) % n]
-        d1 = (p1[0] - point_on_line[0]) * normal[0] + (p1[1] - point_on_line[1]) * normal[1]
-        d2 = (p2[0] - point_on_line[0]) * normal[0] + (p2[1] - point_on_line[1]) * normal[1]
-        if d1 >= -1e-9:
-            clipped.append(p1)
-        if (d1 >= -1e-9 and d2 < -1e-9) or (d1 < -1e-9 and d2 >= -1e-9):
-            t = d1 / (d1 - d2)
-            inter_x = p1[0] + t * (p2[0] - p1[0])
-            inter_y = p1[1] + t * (p2[1] - p1[1])
-            clipped.append((inter_x, inter_y))
-    return clipped
+def adjust_weights_to_minimum(players, min_pct=0.04):
+    N = len(players)
+    if N == 0: return []
+    if N == 1: return [1.0]
+
+    if N * min_pct > 1.0:
+        min_pct = 1.0 / N
+
+    weights = np.array([float(p["amount"]) for p in players])
+    total = np.sum(weights)
+    shares = weights / total if total > 0 else np.ones(N) / N
+
+    locked = np.zeros(N, dtype=bool)
+    adjusted = np.zeros(N)
+
+    for _ in range(N):
+        unlocked_sum = np.sum(shares[~locked])
+        if unlocked_sum <= 0: break
+
+        needs_boost = (~locked) & (shares < min_pct)
+        if not np.any(needs_boost): break
+
+        adjusted[needs_boost] = min_pct
+        locked[needs_boost] = True
+
+        allocated = np.sum(adjusted[locked])
+        rem = 1.0 - allocated
+        if rem <= 0: break
+
+        old_w = weights[~locked]
+        w_sum = np.sum(old_w)
+        if w_sum > 0:
+            shares[~locked] = (old_w / w_sum) * rem
+        else:
+            shares[~locked] = rem / np.sum(~locked)
+
+    adjusted[~locked] = shares[~locked]
+    return (adjusted / np.sum(adjusted)).tolist()
 
 
-def build_voronoi_cell_in_rect(points, i, bounds):
-    xmin, ymin, xmax, ymax = bounds
-    margin = 0.2
-    cell = [
-        (xmin - margin, ymin - margin),
-        (xmax + margin, ymin - margin),
-        (xmax + margin, ymax + margin),
-        (xmin - margin, ymax + margin)
-    ]
-    pi = points[i]
-    for j in range(len(points)):
-        if i == j:
-            continue
-        pj = points[j]
-        mid = ((pi[0] + pj[0]) / 2, (pi[1] + pj[1]) / 2)
-        dx = pj[0] - pi[0]
-        dy = pj[1] - pi[1]
-        length = math.hypot(dx, dy)
-        if length < 1e-12:
-            continue
-        normal = (-dx / length, -dy / length)
-        cell = clip_polygon_by_halfplane(cell, mid, normal)
-        if len(cell) < 3:
-            break
-    cell = clip_polygon_by_halfplane(cell, (xmin, 0), (1, 0))
-    cell = clip_polygon_by_halfplane(cell, (xmax, 0), (-1, 0))
-    cell = clip_polygon_by_halfplane(cell, (0, ymin), (0, 1))
-    cell = clip_polygon_by_halfplane(cell, (0, ymax), (0, -1))
-    return cell
-
-
-def polygon_area_and_centroid(poly):
-    n = len(poly)
-    if n < 3:
-        return 0.0, (0.0, 0.0)
+def get_polygon_area(poly):
     area = 0.0
-    cx = 0.0
-    cy = 0.0
+    n = len(poly)
+    if n < 3: return 0.0
     for i in range(n):
-        x1, y1 = poly[i]
-        x2, y2 = poly[(i + 1) % n]
-        cross = x1 * y2 - x2 * y1
-        area += cross
-        cx += (x1 + x2) * cross
-        cy += (y1 + y2) * cross
-    area *= 0.5
-    if abs(area) < 1e-12:
-        return 0.0, (0.0, 0.0)
-    cx /= (6.0 * area)
-    cy /= (6.0 * area)
-    return abs(area), (cx, cy)
+        area += (poly[i][0] * poly[(i+1)%n][1] - poly[(i+1)%n][0] * poly[i][1])
+    return abs(area) * 0.5
 
 
-def build_weighted_voronoi(players, bounds, target_areas=None, iterations=5000):
-    """
-    Универсальная функция взвешенного Вороного для любого числа игроков.
-    Если target_areas не заданы, вычисляются пропорционально ставкам с гарантией 4%.
-    """
-    if not players:
-        return []
+def split_polygon_by_line(poly, pt, normal):
+    poly1, poly2 = [], []
+    n = len(poly)
+    dists = [(p[0]-pt[0])*normal[0] + (p[1]-pt[1])*normal[1] for p in poly]
 
-    n = len(players)
-    if target_areas is None:
-        total = sum(p["amount"] for p in players)
-        if total == 0:
-            return []
-        # Вычисляем доли и гарантируем минимум 4% (или 1/n, если игроков > 25)
-        raw = np.array([p["amount"] / total for p in players])
-        min_area = 1.0 / 25.0
-        if n > 25:
-            min_area = 1.0 / n
-        adjusted = np.maximum(raw, min_area)
-        target_areas = adjusted / adjusted.sum()
-        target_areas = target_areas.tolist()
-    else:
-        total = sum(target_areas)
-        if total == 0:
-            return []
-        target_areas = [a / total for a in target_areas]
+    for i in range(n):
+        p1, p2 = poly[i], poly[(i+1)%n]
+        d1, d2 = dists[i], dists[(i+1)%n]
+
+        if d1 >= -1e-9: poly1.append(p1)
+        if d1 <= 1e-9: poly2.append(p1)
+
+        if (d1 > 1e-9 and d2 < -1e-9) or (d1 < -1e-9 and d2 > 1e-9):
+            t = d1 / (d1 - d2)
+            inter = (p1[0] + t*(p2[0]-p1[0]), p1[1] + t*(p2[1]-p1[1]))
+            poly1.append(inter)
+            poly2.append(inter)
+
+    def clean_poly(p_list):
+        if not p_list: return []
+        res = [p_list[0]]
+        for p in p_list[1:]:
+            if math.hypot(p[0]-res[-1][0], p[1]-res[-1][1]) > 1e-9:
+                res.append(p)
+        if len(res) > 1 and math.hypot(res[0][0]-res[-1][0], res[0][1]-res[-1][1]) <= 1e-9:
+            res.pop()
+        return res
+
+    return clean_poly(poly1), clean_poly(poly2)
+
+
+def clip_polygon_exact_area(poly, target_ratio, angle):
+    total_area = get_polygon_area(poly)
+    if total_area < 1e-12: return poly, poly
+
+    target = total_area * target_ratio
+    nx, ny = math.cos(angle), math.sin(angle)
+    projs = [p[0]*nx + p[1]*ny for p in poly]
+    low, high = min(projs), max(projs)
+
+    for _ in range(50):
+        mid = (low + high) / 2.0
+        p1, p2 = split_polygon_by_line(poly, (mid*nx, mid*ny), (nx, ny))
+        if get_polygon_area(p1) < target:
+            low = mid
+        else:
+            high = mid
+
+    mid = (low + high) / 2.0
+    return split_polygon_by_line(poly, (mid*nx, mid*ny), (nx, ny))
+
+
+def recursive_bsp_split(poly, players, weights, depth=0):
+    if len(players) == 1:
+        return [{"player": players[0], "polygon": poly}]
+
+    half = len(players) // 2
+    w_left = sum(weights[:half])
+    w_total = sum(weights)
+    ratio = w_left / w_total if w_total > 0 else 0.5
+
+    xs, ys = [p[0] for p in poly], [p[1] for p in poly]
+    dx, dy = max(xs) - min(xs), max(ys) - min(ys)
+
+    base_angle = 0.0 if dx > dy else math.pi / 2
+    twist = (depth % 3 - 1) * 0.15
+    angle = base_angle + twist
+
+    poly_left, poly_right = clip_polygon_exact_area(poly, ratio, angle)
+
+    res = []
+    if get_polygon_area(poly_left) > 1e-9:
+        res.extend(recursive_bsp_split(poly_left, players[:half], weights[:half], depth+1))
+    if get_polygon_area(poly_right) > 1e-9:
+        res.extend(recursive_bsp_split(poly_right, players[half:], weights[half:], depth+1))
+
+    return res
+
+
+def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
+    if not players: return []
+
+    sorted_players = sorted(players, key=lambda p: float(p["amount"]), reverse=True)
+    weights = adjust_weights_to_minimum(sorted_players, min_pct=0.04)
 
     xmin, ymin, xmax, ymax = bounds
-    width = xmax - xmin
-    height = ymax - ymin
+    root_poly = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
 
-    # Абсолютно случайные начальные позиции внутри bounds
-    points = np.random.rand(n, 2)
-    points[:, 0] = xmin + width * (0.02 + 0.96 * points[:, 0])
-    points[:, 1] = ymin + height * (0.02 + 0.96 * points[:, 1])
-
-    prev_error = float('inf')
-    for it in range(iterations):
-        areas = np.zeros(n)
-        centroids = [None] * n
-        for i in range(n):
-            cell = build_voronoi_cell_in_rect(points, i, bounds)
-            if len(cell) >= 3:
-                area, cent = polygon_area_and_centroid(cell)
-                areas[i] = area
-                centroids[i] = cent
-            else:
-                areas[i] = 0.0
-                centroids[i] = None
-
-        error = np.mean(np.abs(areas - target_areas))
-        if error < 0.0005:
-            break
-
-        step_scale = 0.5 if error > prev_error else 1.0
-        prev_error = error
-
-        for i in range(n):
-            if areas[i] <= 0 or centroids[i] is None:
-                continue
-            target = target_areas[i]
-            if areas[i] < target:
-                # увеличить площадь: точку от центроида
-                direction = points[i] - np.array(centroids[i])
-                norm = np.linalg.norm(direction)
-                if norm > 0.001:
-                    points[i] += step_scale * 0.5 * direction / norm * (1 - areas[i] / target)
-            else:
-                # уменьшить площадь: точку к центроиду
-                direction = np.array(centroids[i]) - points[i]
-                norm = np.linalg.norm(direction)
-                if norm > 0.001:
-                    points[i] += step_scale * 0.5 * direction / norm * (areas[i] / target - 1)
-
-        points[:, 0] = np.clip(points[:, 0], xmin + 0.02 * width, xmax - 0.02 * width)
-        points[:, 1] = np.clip(points[:, 1], ymin + 0.02 * height, ymax - 0.02 * height)
+    polygons_data = recursive_bsp_split(root_poly, sorted_players, weights, depth=0)
 
     final_polygons = []
-    for i, player in enumerate(players):
-        cell = build_voronoi_cell_in_rect(points, i, bounds)
-        if len(cell) < 3:
-            continue
-        coords = [{"x": float(p[0]), "y": float(p[1])} for p in cell]
+    for item in polygons_data:
+        player = item["player"]
+        poly = item["polygon"]
+        coords = [{"x": float(p[0]), "y": float(p[1])} for p in poly]
         final_polygons.append({
             "player_id": player["id"],
             "username": player["username"],
@@ -334,16 +324,8 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=5000):
     return final_polygons
 
 
-def weighted_voronoi_polygons(players_dict: dict, iterations=300):
-    """Точка входа. Быстрая или точная генерация."""
-    players = list(players_dict.values())
-    if not players:
-        return []
-    return build_weighted_voronoi(players, (0.0, 0.0, 1.0, 1.0), iterations=iterations)
-
-
 # ------------------------------------------------------------
-# Генерация траектории
+# Генерация траектории (без изменений)
 # ------------------------------------------------------------
 def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
     x = start_x
@@ -392,7 +374,7 @@ def generate_spin_params(polygons: list) -> dict:
     final_angle = spin_angle_start + angle_total
 
     base_speed = random.uniform(4000, 4500)
-    motion_speed = base_speed * (2.2 / 1.5)   # уменьшена в 1.5 раза
+    motion_speed = base_speed * (2.2 / 1.5)
 
     motion_trajectory = generate_motion_trajectory(
         start_x, start_y, final_angle, motion_speed, 10000, dt=16
@@ -519,11 +501,10 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
-                    # Финальная точная генерация (5000 итераций)
+                    # Финальная точная генерация полигонов (BSP не требует итераций)
                     game_state["polygons"] = build_weighted_voronoi(
                         list(game_state["players"].values()),
-                        (0.0, 0.0, 1.0, 1.0),
-                        iterations=5000
+                        (0.0, 0.0, 1.0, 1.0)
                     )
                     spin_params = generate_spin_params(game_state["polygons"])
                     game_state["spin_params"] = spin_params
@@ -533,10 +514,10 @@ async def game_worker():
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info("Spinning with exact Voronoi")
+                    logging.info("Spinning with BSP polygons")
 
         if game_state["status"] == "spinning":
-            # Вращение(3) + пауза(1) + движение(10) + стоянка(2) + запас(0.5)
+            # Ожидаем завершения анимации (вращение 3, пауза 1, движение 10, стоянка 2)
             await asyncio.sleep(3 + 1 + 10 + 2 + 0.5)
             async with game_lock:
                 if game_state["status"] == "spinning":
@@ -555,7 +536,7 @@ async def game_worker():
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    game_state["polygons"] = None   # очищаем активные, но last_polygons остаётся
+                    game_state["polygons"] = None   # активные сброшены, last_polygons остаётся для фронта
                     logging.info(f"Round finished, winner: {winner_data}")
 
 
@@ -719,7 +700,6 @@ async def handle_request_withdraw(request):
 async def handle_game_state(request):
     async with game_lock:
         sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
-        # Отдаём last_polygons, если активных полигонов нет
         polys = game_state.get("polygons") or game_state.get("last_polygons")
         resp = {
             "status": game_state["status"],
@@ -781,15 +761,14 @@ async def handle_game_bet(request):
                 }
             game_state["pool"] += amount
 
-            # При первой ставке сбрасываем last_polygons
+            # При первой ставке сбрасываем прошлые полигоны
             if len(game_state["players"]) == 1:
                 game_state["last_polygons"] = None
 
-            # Быстрая генерация полигонов для отображения (300 итераций)
+            # Пересчитываем полигоны (быстрый BSP, итерации не требуются)
             game_state["polygons"] = build_weighted_voronoi(
                 list(game_state["players"].values()),
-                (0.0, 0.0, 1.0, 1.0),
-                iterations=300
+                (0.0, 0.0, 1.0, 1.0)
             )
 
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
