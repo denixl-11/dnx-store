@@ -252,8 +252,10 @@ def split_polygon_by_line(poly, pt, normal):
 
 
 def clip_polygon_exact_area(poly, target_ratio, angle):
+    """Отсекает ровно target_ratio площади с помощью бинарного поиска полуплоскости."""
     total_area = get_polygon_area(poly)
-    if total_area < 1e-12: return poly, poly
+    if total_area < 1e-12:
+        return poly, []
 
     target = total_area * target_ratio
     nx, ny = math.cos(angle), math.sin(angle)
@@ -264,9 +266,9 @@ def clip_polygon_exact_area(poly, target_ratio, angle):
         mid = (low + high) / 2.0
         p1, p2 = split_polygon_by_line(poly, (mid*nx, mid*ny), (nx, ny))
         if get_polygon_area(p1) < target:
-            low = mid
-        else:
             high = mid
+        else:
+            low = mid
 
     mid = (low + high) / 2.0
     return split_polygon_by_line(poly, (mid*nx, mid*ny), (nx, ny))
@@ -281,6 +283,12 @@ def recursive_bsp_split(poly, players, weights, depth=0):
     w_total = sum(weights)
     ratio = w_left / w_total if w_total > 0 else 0.5
 
+    if not poly or len(poly) < 3:
+        res = []
+        res.extend(recursive_bsp_split([], players[:half], weights[:half], depth+1))
+        res.extend(recursive_bsp_split([], players[half:], weights[half:], depth+1))
+        return res
+
     xs, ys = [p[0] for p in poly], [p[1] for p in poly]
     dx, dy = max(xs) - min(xs), max(ys) - min(ys)
 
@@ -291,10 +299,8 @@ def recursive_bsp_split(poly, players, weights, depth=0):
     poly_left, poly_right = clip_polygon_exact_area(poly, ratio, angle)
 
     res = []
-    if get_polygon_area(poly_left) > 1e-9:
-        res.extend(recursive_bsp_split(poly_left, players[:half], weights[:half], depth+1))
-    if get_polygon_area(poly_right) > 1e-9:
-        res.extend(recursive_bsp_split(poly_right, players[half:], weights[half:], depth+1))
+    res.extend(recursive_bsp_split(poly_left, players[:half], weights[:half], depth+1))
+    res.extend(recursive_bsp_split(poly_right, players[half:], weights[half:], depth+1))
 
     return res
 
