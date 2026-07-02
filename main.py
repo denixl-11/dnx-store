@@ -169,46 +169,45 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-#  НОВАЯ ГЕОМЕТРИЯ: BSP RECURSIVE POLYGON CLIPPING (SAFE 4%)
+#  НОВАЯ ГЕОМЕТРИЯ: BSP RECURSIVE POLYGON CLIPPING (SAFE 1%)
 # ------------------------------------------------------------
-def adjust_weights_to_minimum(players, min_pct=0.04):
-    N = len(players)
+def adjust_weights_to_minimum(weights, min_ratio=0.01):
+    N = len(weights)
     if N == 0: return []
     if N == 1: return [1.0]
 
-    if N * min_pct > 1.0:
-        min_pct = 1.0 / N
+    # Защита: если вдруг игроков больше 100, и 1% на всех не хватает, делим поровну
+    if N * min_ratio > 1.0:
+        min_ratio = 1.0 / N
 
-    weights = np.array([float(p["amount"]) for p in players])
-    total = np.sum(weights)
-    shares = weights / total if total > 0 else np.ones(N) / N
+    total = sum(weights)
+    if total == 0: return [1.0 / N] * N
 
-    locked = np.zeros(N, dtype=bool)
-    adjusted = np.zeros(N)
+    ratios = [w / total for w in weights]
 
-    for _ in range(N):
-        unlocked_sum = np.sum(shares[~locked])
-        if unlocked_sum <= 0: break
+    while True:
+        deficient = [i for i, r in enumerate(ratios) if r < min_ratio]
+        if not deficient:
+            break
 
-        needs_boost = (~locked) & (shares < min_pct)
-        if not np.any(needs_boost): break
+        for i in deficient:
+            ratios[i] = min_ratio
 
-        adjusted[needs_boost] = min_pct
-        locked[needs_boost] = True
+        surplus_indices = [i for i, r in enumerate(ratios) if r > min_ratio]
+        if not surplus_indices:
+            break
 
-        allocated = np.sum(adjusted[locked])
-        rem = 1.0 - allocated
-        if rem <= 0: break
+        total_surplus_weight = sum(weights[i] for i in surplus_indices)
+        remaining_ratio = 1.0 - len(deficient) * min_ratio
 
-        old_w = weights[~locked]
-        w_sum = np.sum(old_w)
-        if w_sum > 0:
-            shares[~locked] = (old_w / w_sum) * rem
+        if total_surplus_weight > 0:
+            for i in surplus_indices:
+                ratios[i] = (weights[i] / total_surplus_weight) * remaining_ratio
         else:
-            shares[~locked] = rem / np.sum(~locked)
+            for i in surplus_indices:
+                ratios[i] = remaining_ratio / len(surplus_indices)
 
-    adjusted[~locked] = shares[~locked]
-    return (adjusted / np.sum(adjusted)).tolist()
+    return ratios
 
 
 def get_polygon_area(poly):
@@ -216,25 +215,25 @@ def get_polygon_area(poly):
     n = len(poly)
     if n < 3: return 0.0
     for i in range(n):
-        area += (poly[i][0] * poly[(i+1)%n][1] - poly[(i+1)%n][0] * poly[i][1])
+        area += (poly[i][0] * poly[(i + 1) % n][1] - poly[(i + 1) % n][0] * poly[i][1])
     return abs(area) * 0.5
 
 
 def split_polygon_by_line(poly, pt, normal):
     poly1, poly2 = [], []
     n = len(poly)
-    dists = [(p[0]-pt[0])*normal[0] + (p[1]-pt[1])*normal[1] for p in poly]
+    dists = [(p[0] - pt[0]) * normal[0] + (p[1] - pt[1]) * normal[1] for p in poly]
 
     for i in range(n):
-        p1, p2 = poly[i], poly[(i+1)%n]
-        d1, d2 = dists[i], dists[(i+1)%n]
+        p1, p2 = poly[i], poly[(i + 1) % n]
+        d1, d2 = dists[i], dists[(i + 1) % n]
 
         if d1 >= -1e-9: poly1.append(p1)
         if d1 <= 1e-9: poly2.append(p1)
 
         if (d1 > 1e-9 and d2 < -1e-9) or (d1 < -1e-9 and d2 > 1e-9):
             t = d1 / (d1 - d2)
-            inter = (p1[0] + t*(p2[0]-p1[0]), p1[1] + t*(p2[1]-p1[1]))
+            inter = (p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1]))
             poly1.append(inter)
             poly2.append(inter)
 
@@ -242,9 +241,9 @@ def split_polygon_by_line(poly, pt, normal):
         if not p_list: return []
         res = [p_list[0]]
         for p in p_list[1:]:
-            if math.hypot(p[0]-res[-1][0], p[1]-res[-1][1]) > 1e-9:
+            if math.hypot(p[0] - res[-1][0], p[1] - res[-1][1]) > 1e-9:
                 res.append(p)
-        if len(res) > 1 and math.hypot(res[0][0]-res[-1][0], res[0][1]-res[-1][1]) <= 1e-9:
+        if len(res) > 1 and math.hypot(res[0][0] - res[-1][0], res[0][1] - res[-1][1]) <= 1e-9:
             res.pop()
         return res
 
@@ -259,19 +258,19 @@ def clip_polygon_exact_area(poly, target_ratio, angle):
 
     target = total_area * target_ratio
     nx, ny = math.cos(angle), math.sin(angle)
-    projs = [p[0]*nx + p[1]*ny for p in poly]
+    projs = [p[0] * nx + p[1] * ny for p in poly]
     low, high = min(projs), max(projs)
 
     for _ in range(50):
         mid = (low + high) / 2.0
-        p1, p2 = split_polygon_by_line(poly, (mid*nx, mid*ny), (nx, ny))
+        p1, p2 = split_polygon_by_line(poly, (mid * nx, mid * ny), (nx, ny))
         if get_polygon_area(p1) < target:
             high = mid
         else:
             low = mid
 
     mid = (low + high) / 2.0
-    return split_polygon_by_line(poly, (mid*nx, mid*ny), (nx, ny))
+    return split_polygon_by_line(poly, (mid * nx, mid * ny), (nx, ny))
 
 
 def recursive_bsp_split(poly, players, weights, depth=0):
@@ -285,8 +284,8 @@ def recursive_bsp_split(poly, players, weights, depth=0):
 
     if not poly or len(poly) < 3:
         res = []
-        res.extend(recursive_bsp_split([], players[:half], weights[:half], depth+1))
-        res.extend(recursive_bsp_split([], players[half:], weights[half:], depth+1))
+        res.extend(recursive_bsp_split([], players[:half], weights[:half], depth + 1))
+        res.extend(recursive_bsp_split([], players[half:], weights[half:], depth + 1))
         return res
 
     xs, ys = [p[0] for p in poly], [p[1] for p in poly]
@@ -299,8 +298,8 @@ def recursive_bsp_split(poly, players, weights, depth=0):
     poly_left, poly_right = clip_polygon_exact_area(poly, ratio, angle)
 
     res = []
-    res.extend(recursive_bsp_split(poly_left, players[:half], weights[:half], depth+1))
-    res.extend(recursive_bsp_split(poly_right, players[half:], weights[half:], depth+1))
+    res.extend(recursive_bsp_split(poly_left, players[:half], weights[:half], depth + 1))
+    res.extend(recursive_bsp_split(poly_right, players[half:], weights[half:], depth + 1))
 
     return res
 
@@ -309,7 +308,8 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
     if not players: return []
 
     sorted_players = sorted(players, key=lambda p: float(p["amount"]), reverse=True)
-    weights = adjust_weights_to_minimum(sorted_players, min_pct=0.04)
+    amounts = [float(p["amount"]) for p in sorted_players]
+    weights = adjust_weights_to_minimum(amounts, min_ratio=0.01)
 
     xmin, ymin, xmax, ymax = bounds
     root_poly = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
@@ -542,7 +542,7 @@ async def game_worker():
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    game_state["polygons"] = None   # активные сброшены, last_polygons остаётся для фронта
+                    game_state["polygons"] = None  # активные сброшены, last_polygons остаётся для фронта
                     logging.info(f"Round finished, winner: {winner_data}")
 
 

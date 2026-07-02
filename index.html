@@ -532,10 +532,8 @@
         let currentCatalog = [];
         let inventoryData = [];
         let pendingTopupAmount = 0;
-        let betAmountTemp = 0;
         let pendingBuyItem = null;
         let currentPrizeItem = null;
-        let cancelInProgress = false;
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
@@ -945,7 +943,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО)
+        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – НОВАЯ ВЕРСИЯ
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -954,6 +952,7 @@
             spin_params: null, winner: null, last_winner_id: null,
             round_id: null, game_number: 0, polygons: null
         };
+
         let isSpinning = false;
         let animationFrameId = null;
         let timerInterval = null;
@@ -961,16 +960,26 @@
         let initialGameStateLoaded = false;
         let highlightPolygon = null;   // координаты полигона победителя для подсветки
 
+        // ИСПРАВЛЕНИЕ: Добавлены потерянные переменные
+        let cancelInProgress = false;
+        let betAmountTemp = null;
+        let winnerTimer = null;
+        let lastLeaderboardUpdate = 0;
+
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
             canvas.width = rect.width * 2;
             canvas.height = rect.height * 2;
+            // ИСПРАВЛЕНИЕ: Обязательно задаем CSS-размеры для корректного DPI-масштабирования
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
         }
+
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
         function drawGameFrame(ballPos = null, highlightPts = null) {
-            if(!ctx) return;
+            if (!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
@@ -993,7 +1002,7 @@
                     ctx.stroke();
                 }
             } else {
-                // Ожидание или один игрок (заливка всего экрана)
+                // Ожидание или один игрок
                 if (gState.players.length === 1) {
                     const singlePlayer = gState.players[0];
                     ctx.fillStyle = singlePlayer.color;
@@ -1004,7 +1013,7 @@
                     ctx.fillStyle = "#555";
                     ctx.font = "30px Inter";
                     ctx.textAlign = "center";
-                    ctx.fillText("Ожидание игроков...", cw/2, ch/2);
+                    ctx.fillText("Ожидание игроков...", cw / 2, ch / 2);
                 }
             }
 
@@ -1032,22 +1041,25 @@
 
                 // Стрелка показывается во время вращения и паузы
                 if (ballPos.angle !== undefined && !ballPos.prev) {
-                    const angle = ballPos.angle;
+                    // ИСПРАВЛЕНИЕ: Инвертируем угол для Canvas, так как ось Y перевернута
+                    const drawAngle = -ballPos.angle;
                     const arrowLen = 35;
-                    const endX = bx + Math.cos(angle) * arrowLen;
-                    const endY = by + Math.sin(angle) * arrowLen;
+                    const endX = bx + Math.cos(drawAngle) * arrowLen;
+                    const endY = by + Math.sin(drawAngle) * arrowLen;
+
                     ctx.beginPath();
                     ctx.moveTo(bx, by);
                     ctx.lineTo(endX, endY);
                     ctx.strokeStyle = "rgba(255,255,255,0.9)";
                     ctx.lineWidth = 3;
                     ctx.stroke();
+
                     const headLen = 10;
                     const headAngle = 0.4;
                     ctx.beginPath();
                     ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - headLen * Math.cos(angle - headAngle), endY - headLen * Math.sin(angle - headAngle));
-                    ctx.lineTo(endX - headLen * Math.cos(angle + headAngle), endY - headLen * Math.sin(angle + headAngle));
+                    ctx.lineTo(endX - headLen * Math.cos(drawAngle - headAngle), endY - headLen * Math.sin(drawAngle - headAngle));
+                    ctx.lineTo(endX - headLen * Math.cos(drawAngle + headAngle), endY - headLen * Math.sin(drawAngle + headAngle));
                     ctx.closePath();
                     ctx.fillStyle = "#fff";
                     ctx.fill();
@@ -1057,7 +1069,7 @@
                 ctx.shadowColor = "#fff";
                 ctx.shadowBlur = 20;
                 ctx.beginPath();
-                ctx.arc(bx, by, 20, 0, Math.PI*2);
+                ctx.arc(bx, by, 20, 0, Math.PI * 2);
                 ctx.fillStyle = "#fff";
                 ctx.fill();
                 ctx.shadowBlur = 0;
@@ -1070,24 +1082,21 @@
             const startTime = performance.now();
             const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
             let prevPos = null;
-            let pauseAngle = null;   // финальный угол после вращения
+            let pauseAngle = null;
 
             function animate(now) {
                 const elapsed = now - startTime;
 
-                // Фаза вращения (0 .. spinDuration)
                 if (elapsed < spinDuration) {
                     const t = elapsed / spinDuration;
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
-                    const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration/1000);
-                    pauseAngle = angle;   // запоминаем последний угол
+                    const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration / 1000);
+                    pauseAngle = angle;
                     const ball = { x: startPos.x, y: startPos.y, angle };
                     drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
-                // Пауза (1 секунда)
                 else if (elapsed < spinDuration + 1000) {
-                    // Используем точный угол по первой точке траектории, если он ещё не установлен
                     if (pauseAngle === null && trajectory.length > 0) {
                         const firstMove = trajectory[0];
                         pauseAngle = Math.atan2(firstMove.y - startPos.y, firstMove.x - startPos.x);
@@ -1096,12 +1105,11 @@
                     drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
-                // Движение (10 секунд)
                 else if (elapsed < spinDuration + 1000 + 10000) {
                     const motionElapsed = elapsed - (spinDuration + 1000);
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
-                        const finalPos = trajectory[trajectory.length-1];
+                        const finalPos = trajectory[trajectory.length - 1];
                         drawGameFrame(finalPos, highlightPolygon);
                         animationFrameId = null;
                         fetchWinnerNow();
@@ -1110,12 +1118,13 @@
                     const pos = trajectory[frameIndex];
                     if (prevPos) pos.prev = prevPos;
                     else pos.prev = startPos;
+
                     drawGameFrame(pos, highlightPolygon);
                     prevPos = pos;
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else {
-                    const finalPos = trajectory[trajectory.length-1];
+                    const finalPos = trajectory[trajectory.length - 1];
                     drawGameFrame(finalPos, highlightPolygon);
                     animationFrameId = null;
                     fetchWinnerNow();
@@ -1128,26 +1137,24 @@
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
+
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     lastShownRoundId = state.round_id;
                     localStorage.setItem('last_round_id', lastShownRoundId);
 
-                    // Подсветка победителя из winner.polygon
                     if (state.winner.polygon && state.winner.polygon.length >= 3) {
                         highlightPolygon = state.winner.polygon;
                         drawGameFrame(null, highlightPolygon);
-                        // Ждём 2 секунды, чтобы игрок увидел подсветку
                         await new Promise(r => setTimeout(r, 2000));
                     }
 
                     showWinnerModal(state.winner);
-                    highlightPolygon = null;   // сбрасываем подсветку после показа окна
                     await updateBalance();
+                    // ИСПРАВЛЕНИЕ: Мы не обнуляем highlightPolygon здесь. Он сам очистится в pollGame, когда статус сменится на 'waiting'.
                 }
             } catch(e) { console.error(e); }
         }
 
-        let winnerTimer = null;
         function showWinnerModal(winner) {
             if(!winner) return;
             document.getElementById('winner-name').innerText = winner.username;
@@ -1155,12 +1162,13 @@
             const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,...';
             document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,...'">`;
             document.getElementById('winner-modal').classList.add('active');
+
             if (winnerTimer) clearTimeout(winnerTimer);
             winnerTimer = setTimeout(() => {
                 closeWinnerModal();
-                winnerTimer = null;
             }, 2500);
         }
+
         function closeWinnerModal() {
             document.getElementById('winner-modal').classList.remove('active');
             if (winnerTimer) { clearTimeout(winnerTimer); winnerTimer = null; }
@@ -1179,12 +1187,21 @@
                     }
                 }
 
-                // Обновление таймера
+                // ИСПРАВЛЕНИЕ: Очищаем подсветку при начале нового раунда
+                if (newState.status === 'waiting') {
+                    highlightPolygon = null;
+                }
+
+                // ИСПРАВЛЕНИЕ: Логика таймера переписана для устранения лагов и дерганья
                 if (newState.status === 'counting') {
-                    if (!timerInterval || newState.timer !== gState.timer) {
+                    // Синхронизируем локальный таймер с сервером только если рассинхрон больше 1 секунды
+                    if (Math.abs(gState.timer - newState.timer) > 1 || !timerInterval) {
                         gState.timer = newState.timer;
-                        document.getElementById('game-timer-bg').innerText = newState.timer;
-                        if (timerInterval) clearInterval(timerInterval);
+                        document.getElementById('game-timer-bg').innerText = gState.timer;
+                    }
+
+                    // Запускаем локальный интервал один раз для плавной анимации
+                    if (!timerInterval) {
                         timerInterval = setInterval(() => {
                             if (gState.timer > 0) {
                                 gState.timer--;
@@ -1196,7 +1213,7 @@
                         }, 1000);
                     }
                 } else {
-                    if(timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+                    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
                     document.getElementById('game-timer-bg').innerText = '';
                 }
 
@@ -1204,6 +1221,7 @@
                     gState.players = newState.players;
                     gState.pool = newState.pool;
                 }
+
                 gState.status = newState.status;
                 gState.spin_params = newState.spin_params;
                 gState.winner = newState.winner;
@@ -1216,14 +1234,15 @@
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
                 renderBetsList();
 
-                // Отрисовка фона с актуальной подсветкой
                 if (!isSpinning) drawGameFrame(null, highlightPolygon);
 
                 // Кнопка отмены ставки
                 const myId = String(tg.initDataUnsafe?.user?.id);
-                const hasMyBet = gState.players.find(p => p.id === myId);
+                const hasMyBet = gState.players.find(p => String(p.id) === myId); // ИСПРАВЛЕНИЕ: Приводим ID к строке для надежности
                 const cancelBtn = document.getElementById('btn-cancel-bet');
-                if(cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
+                if (cancelBtn) {
+                    cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
+                }
 
                 // Запуск анимации
                 if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
@@ -1235,9 +1254,10 @@
                     drawGameFrame(null, highlightPolygon);
                 }
 
-                // Обработка победителя (на случай, если fetchWinnerNow не вызвался)
+                // Обработка победителя (fallback)
                 if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
-                    if (document.getElementById('page-game').classList.contains('page-active')) {
+                    const pageGame = document.getElementById('page-game');
+                    if (pageGame && pageGame.classList.contains('page-active')) {
                         lastShownRoundId = gState.round_id;
                         localStorage.setItem('last_round_id', lastShownRoundId);
                         showWinnerModal(gState.winner);
@@ -1245,20 +1265,13 @@
                     }
                 }
 
-                // Сброс поля при отсутствии игроков
-                if (gState.players.length === 0 && gState.status === 'waiting') {
-                    drawGameFrame(null, highlightPolygon);
-                }
-
-                // Периодическое обновление лидеров
                 if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
-                    loadLeaderboardPreview();
+                    if (typeof loadLeaderboardPreview === 'function') loadLeaderboardPreview();
                     lastLeaderboardUpdate = Date.now();
                 }
             } catch(e) { console.error("Game poll error", e); }
         }
         setInterval(pollGame, 1000);
-        let lastLeaderboardUpdate = 0;
 
         function renderBetsList() {
             const container = document.getElementById('bets-list-container');
@@ -1266,8 +1279,9 @@
             const hasPlayers = gState.players && gState.players.length > 0;
             container.style.display = hasPlayers ? 'flex' : 'none';
             if (!hasPlayers) return;
+
             document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
-            const sorted = [...gState.players].sort((a,b) => a.id.localeCompare(b.id));
+            const sorted = [...gState.players].sort((a,b) => String(a.id).localeCompare(String(b.id)));
             list.innerHTML = sorted.map(p => `
                 <div class="bet-row">
                     <span style="display:flex; gap:8px;">
@@ -1278,43 +1292,52 @@
                 </div>`).join('');
         }
 
-        // Ставки
         function openBetConfirm(amt) {
             betAmountTemp = amt;
             document.getElementById('confirm-bet-amount').innerText = amt;
             document.getElementById('confirm-bet-modal').classList.add('active');
         }
+
         function openCustomBet() {
             document.getElementById('custom-bet-input').value = '';
             document.getElementById('custom-bet-modal').classList.add('active');
         }
+
         function submitCustomBet() {
-            const v = parseInt(document.getElementById('custom-bet-input').value, 10);
-            if (!v || isNaN(v) || v < 10 || v !== Number(document.getElementById('custom-bet-input').value)) {
-                showAlert("Введите целое число от 10 ₽");
+            const inputVal = document.getElementById('custom-bet-input').value;
+            const v = parseInt(inputVal, 10);
+            if (!v || isNaN(v) || v < 10 || v !== Number(inputVal)) {
+                if (typeof showAlert === 'function') showAlert("Введите целое число от 10 ₽");
                 return;
             }
-            closeModal('custom-bet-modal');
+            if (typeof closeModal === 'function') closeModal('custom-bet-modal');
             openBetConfirm(v);
         }
+
         async function executeBet() {
             const btn = document.getElementById('btn-confirm-bet');
-            if(btn) { btn.disabled = true; btn.innerText = 'Загрузка...'; }
+            if (btn) { btn.disabled = true; btn.innerText = 'Загрузка...'; }
             try {
                 const data = await apiFetch(`${API_BASE}/game/bet`, { method: 'POST', body: JSON.stringify({amount: betAmountTemp}) });
-                closeModal('confirm-bet-modal');
-                if(data.success) { await updateBalance(); pollGame(); }
-                else {
+                if (typeof closeModal === 'function') closeModal('confirm-bet-modal');
+
+                if (data.success) {
+                    await updateBalance();
+                    pollGame();
+                } else {
                     let msg = "Ставка не принята";
-                    if(data.error === 'insufficient_funds') msg = "Недостаточно средств!";
-                    else if(data.error === 'game_started') msg = "Игра уже началась!";
-                    else if(data.error === 'room_full') msg = "Слишком много игроков!";
-                    else if(data.error === 'min_bet') msg = "Минимальная ставка 10 ₽";
-                    else if(data.error === 'invalid_amount') msg = "Ставка должна быть целым числом";
-                    showAlert(msg);
+                    if (data.error === 'insufficient_funds') msg = "Недостаточно средств!";
+                    else if (data.error === 'game_started') msg = "Игра уже началась!";
+                    else if (data.error === 'room_full') msg = "Слишком много игроков!";
+                    else if (data.error === 'min_bet') msg = "Минимальная ставка 10 ₽";
+                    else if (data.error === 'invalid_amount') msg = "Ставка должна быть целым числом";
+                    if (typeof showAlert === 'function') showAlert(msg);
                 }
-            } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети"); }
-            if(btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
+            } catch(e) {
+                if (typeof closeModal === 'function') closeModal('confirm-bet-modal');
+                if (typeof showAlert === 'function') showAlert("Ошибка сети");
+            }
+            if (btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
 
         function cancelGameBet() {
@@ -1324,6 +1347,7 @@
             gState.pool = 0;
             drawGameFrame();
             renderBetsList();
+
             apiFetch(`${API_BASE}/game/cancel`, { method: 'POST', body: JSON.stringify({}) })
                 .then(() => {
                     cancelInProgress = false;
