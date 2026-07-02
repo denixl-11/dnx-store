@@ -169,14 +169,14 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-#  НОВАЯ ГЕОМЕТРИЯ: BSP RECURSIVE POLYGON CLIPPING (SAFE 1%)
+#  НОВАЯ ГЕОМЕТРИЯ: BSP RECURSIVE POLYGON CLIPPING (SAFE 2%)
 # ------------------------------------------------------------
-def adjust_weights_to_minimum(weights, min_ratio=0.01):
+def adjust_weights_to_minimum(weights, min_ratio=0.02):
     N = len(weights)
     if N == 0: return []
     if N == 1: return [1.0]
 
-    # Защита: если вдруг игроков больше 100, и 1% на всех не хватает, делим поровну
+    # Защита: если вдруг игроков больше 50, и 2% на всех не хватает, делим поровну
     if N * min_ratio > 1.0:
         min_ratio = 1.0 / N
 
@@ -309,7 +309,7 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
 
     sorted_players = sorted(players, key=lambda p: float(p["amount"]), reverse=True)
     amounts = [float(p["amount"]) for p in sorted_players]
-    weights = adjust_weights_to_minimum(amounts, min_ratio=0.01)
+    weights = adjust_weights_to_minimum(amounts, min_ratio=0.02)
 
     xmin, ymin, xmax, ymax = bounds
     root_poly = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
@@ -403,10 +403,26 @@ def generate_spin_params(polygons: list) -> dict:
 # Игровая механика
 # ------------------------------------------------------------
 PLAYER_COLORS = [
-    "#FFADAD", "#FFD6A5", "#FDFFB6", "#CAFFBF", "#9BF6FF",
-    "#A0C4FF", "#BDB2FF", "#FFC6FF", "#FFC09F", "#F3FFB6",
-    "#B5EAD7", "#C7CEEA", "#FFDAC1", "#E2F0CB", "#B5D8FF",
-    "#D0BFFF", "#FFB3C6", "#AFCBFF", "#FFC8A2", "#C1E1C1"
+    "#FF6B6B",  # коралловый
+    "#4ECDC4",  # бирюзовый
+    "#FFD166",  # золотой
+    "#1A535C",  # тёмно-бирюзовый
+    "#FF8C42",  # оранжевый
+    "#6C5CE7",  # фиолетовый
+    "#A8E6CF",  # мятный
+    "#E17055",  # терракотовый
+    "#0984E3",  # синий
+    "#FDCB6E",  # жёлтый
+    "#E84393",  # розовый
+    "#00B894",  # зелёный
+    "#636E72",  # графитовый
+    "#D63031",  # красный
+    "#81ECEC",  # циан
+    "#B794F4",  # лавандовый
+    "#F39C12",  # оранжево-жёлтый
+    "#27AE60",  # изумрудный
+    "#8E44AD",  # пурпурный
+    "#16A085",  # морская волна
 ]
 
 
@@ -499,6 +515,15 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
         return None
 
 
+async def clear_last_polygons_after_delay(delay=5):
+    """Очищает last_polygons через delay секунд, если не начался новый раунд."""
+    await asyncio.sleep(delay)
+    async with game_lock:
+        # Только если игра в режиме ожидания и полигоны всё ещё старые
+        if game_state["status"] == "waiting" and not game_state["players"]:
+            game_state["last_polygons"] = None
+
+
 async def game_worker():
     global game_state
     while True:
@@ -544,6 +569,9 @@ async def game_worker():
                     game_state["timer"] = 15
                     game_state["polygons"] = None  # активные сброшены, last_polygons остаётся для фронта
                     logging.info(f"Round finished, winner: {winner_data}")
+
+                    # Запускаем отложенную очистку last_polygons, чтобы поле исчезло через 5 секунд
+                    asyncio.create_task(clear_last_polygons_after_delay(5))
 
 
 # ------------------- API -------------------
