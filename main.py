@@ -176,7 +176,6 @@ def adjust_weights_to_minimum(weights, min_ratio=0.02):
     if N == 0: return []
     if N == 1: return [1.0]
 
-    # Защита: если вдруг игроков больше 50, и 2% на всех не хватает, делим поровну
     if N * min_ratio > 1.0:
         min_ratio = 1.0 / N
 
@@ -251,7 +250,6 @@ def split_polygon_by_line(poly, pt, normal):
 
 
 def clip_polygon_exact_area(poly, target_ratio, angle):
-    """Отсекает ровно target_ratio площади с помощью бинарного поиска полуплоскости."""
     total_area = get_polygon_area(poly)
     if total_area < 1e-12:
         return poly, []
@@ -308,8 +306,13 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
     if not players: return []
 
     sorted_players = sorted(players, key=lambda p: float(p["amount"]), reverse=True)
-    amounts = [float(p["amount"]) for p in sorted_players]
-    weights = adjust_weights_to_minimum(amounts, min_ratio=0.02)
+    # Визуальные веса: реальная сумма + бонус за докидывания (0.01% за каждое)
+    total_real = sum(float(p["amount"]) for p in players)
+    visual_amounts = [
+        float(p["amount"]) + p.get("bets_count", 0) * 0.0001 * total_real
+        for p in sorted_players
+    ]
+    weights = adjust_weights_to_minimum(visual_amounts, min_ratio=0.02)
 
     xmin, ymin, xmax, ymax = bounds
     root_poly = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
@@ -400,29 +403,13 @@ def generate_spin_params(polygons: list) -> dict:
 
 
 # ------------------------------------------------------------
-# Игровая механика
+# Игровая механика (классический выигрыш 70%)
 # ------------------------------------------------------------
 PLAYER_COLORS = [
-    "#FF6B6B",  # коралловый
-    "#4ECDC4",  # бирюзовый
-    "#FFD166",  # золотой
-    "#1A535C",  # тёмно-бирюзовый
-    "#FF8C42",  # оранжевый
-    "#6C5CE7",  # фиолетовый
-    "#A8E6CF",  # мятный
-    "#E17055",  # терракотовый
-    "#0984E3",  # синий
-    "#FDCB6E",  # жёлтый
-    "#E84393",  # розовый
-    "#00B894",  # зелёный
-    "#636E72",  # графитовый
-    "#D63031",  # красный
-    "#81ECEC",  # циан
-    "#B794F4",  # лавандовый
-    "#F39C12",  # оранжево-жёлтый
-    "#27AE60",  # изумрудный
-    "#8E44AD",  # пурпурный
-    "#16A085",  # морская волна
+    "#FF6B6B", "#4ECDC4", "#FFD166", "#1A535C", "#FF8C42",
+    "#6C5CE7", "#A8E6CF", "#E17055", "#0984E3", "#FDCB6E",
+    "#E84393", "#00B894", "#636E72", "#D63031", "#81ECEC",
+    "#B794F4", "#F39C12", "#27AE60", "#8E44AD", "#16A085"
 ]
 
 
@@ -516,10 +503,8 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
 
 
 async def clear_last_polygons_after_delay(delay=5):
-    """Очищает last_polygons через delay секунд, если не начался новый раунд."""
     await asyncio.sleep(delay)
     async with game_lock:
-        # Только если игра в режиме ожидания и полигоны всё ещё старые
         if game_state["status"] == "waiting" and not game_state["players"]:
             game_state["last_polygons"] = None
 
@@ -532,7 +517,6 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
-                    # Финальная точная генерация полигонов (BSP не требует итераций)
                     game_state["polygons"] = build_weighted_voronoi(
                         list(game_state["players"].values()),
                         (0.0, 0.0, 1.0, 1.0)
@@ -548,7 +532,6 @@ async def game_worker():
                     logging.info("Spinning with BSP polygons")
 
         if game_state["status"] == "spinning":
-            # Ожидаем завершения анимации (вращение 3, пауза 1, движение 10, стоянка 2)
             await asyncio.sleep(3 + 1 + 10 + 2 + 0.5)
             async with game_lock:
                 if game_state["status"] == "spinning":
@@ -561,16 +544,14 @@ async def game_worker():
                     )
                     game_state["winner"] = winner_data
                     game_state["last_winner_id"] = winner_data["user_id"] if winner_data else None
-                    # Сохраняем полигоны для подсветки
                     game_state["last_polygons"] = game_state["polygons"]
                     game_state["status"] = "waiting"
                     game_state["players"] = {}
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
-                    game_state["polygons"] = None  # активные сброшены, last_polygons остаётся для фронта
+                    game_state["polygons"] = None
                     logging.info(f"Round finished, winner: {winner_data}")
 
-                    # Запускаем отложенную очистку last_polygons, чтобы поле исчезло через 5 секунд
                     asyncio.create_task(clear_last_polygons_after_delay(5))
 
 
@@ -783,6 +764,7 @@ async def handle_game_bet(request):
                     conn.commit()
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
+                game_state["players"][user_id]["bets_count"] += 1
             else:
                 occupied_colors = {p["color"] for p in game_state["players"].values()}
                 available = [c for c in PLAYER_COLORS if c not in occupied_colors]
@@ -791,15 +773,14 @@ async def handle_game_bet(request):
                 color = random.choice(available)
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
-                    "amount": amount, "color": color
+                    "amount": amount, "color": color,
+                    "bets_count": 1
                 }
             game_state["pool"] += amount
 
-            # При первой ставке сбрасываем прошлые полигоны
             if len(game_state["players"]) == 1:
                 game_state["last_polygons"] = None
 
-            # Пересчитываем полигоны (быстрый BSP, итерации не требуются)
             game_state["polygons"] = build_weighted_voronoi(
                 list(game_state["players"].values()),
                 (0.0, 0.0, 1.0, 1.0)

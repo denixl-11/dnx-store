@@ -943,7 +943,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – НОВАЯ ВЕРСИЯ
+        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – УЛУЧШЕННАЯ ВЕРСИЯ
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -958,9 +958,9 @@
         let timerInterval = null;
         let lastShownRoundId = localStorage.getItem('last_round_id');
         let initialGameStateLoaded = false;
-        let highlightPolygon = null;   // координаты полигона победителя для подсветки
+        let highlightPolygon = null;
+        let isShowingWinner = false;   // НОВАЯ ПЕРЕМЕННАЯ
 
-        // ИСПРАВЛЕНИЕ: Добавлены потерянные переменные
         let cancelInProgress = false;
         let betAmountTemp = null;
         let winnerTimer = null;
@@ -970,7 +970,6 @@
             const rect = canvas.parentElement.getBoundingClientRect();
             canvas.width = rect.width * 2;
             canvas.height = rect.height * 2;
-            // ИСПРАВЛЕНИЕ: Обязательно задаем CSS-размеры для корректного DPI-масштабирования
             canvas.style.width = rect.width + 'px';
             canvas.style.height = rect.height + 'px';
         }
@@ -1002,7 +1001,6 @@
                     ctx.stroke();
                 }
             } else {
-                // Ожидание или один игрок
                 if (gState.players.length === 1) {
                     const singlePlayer = gState.players[0];
                     ctx.fillStyle = singlePlayer.color;
@@ -1017,7 +1015,7 @@
                 }
             }
 
-            // Подсветка полигона победителя
+            // Подсветка полигона победителя (УЛУЧШЕННАЯ)
             if (highlightPts && highlightPts.length >= 3) {
                 ctx.save();
                 ctx.beginPath();
@@ -1026,10 +1024,14 @@
                     ctx.lineTo(highlightPts[i].x * cw, (1 - highlightPts[i].y) * ch);
                 }
                 ctx.closePath();
+                // Золотая заливка
+                ctx.fillStyle = "rgba(255, 215, 0, 0.25)";
+                ctx.fill();
+                // Золотая обводка
                 ctx.strokeStyle = "#FFD700";
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 6;
                 ctx.shadowColor = "#FFD700";
-                ctx.shadowBlur = 12;
+                ctx.shadowBlur = 25;
                 ctx.stroke();
                 ctx.restore();
             }
@@ -1038,22 +1040,17 @@
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
-
-                // Стрелка показывается во время вращения и паузы
                 if (ballPos.angle !== undefined && !ballPos.prev) {
-                    // ИСПРАВЛЕНИЕ: Инвертируем угол для Canvas, так как ось Y перевернута
                     const drawAngle = -ballPos.angle;
                     const arrowLen = 35;
                     const endX = bx + Math.cos(drawAngle) * arrowLen;
                     const endY = by + Math.sin(drawAngle) * arrowLen;
-
                     ctx.beginPath();
                     ctx.moveTo(bx, by);
                     ctx.lineTo(endX, endY);
                     ctx.strokeStyle = "rgba(255,255,255,0.9)";
                     ctx.lineWidth = 3;
                     ctx.stroke();
-
                     const headLen = 10;
                     const headAngle = 0.4;
                     ctx.beginPath();
@@ -1064,8 +1061,6 @@
                     ctx.fillStyle = "#fff";
                     ctx.fill();
                 }
-
-                // Шарик
                 ctx.shadowColor = "#fff";
                 ctx.shadowBlur = 20;
                 ctx.beginPath();
@@ -1086,7 +1081,6 @@
 
             function animate(now) {
                 const elapsed = now - startTime;
-
                 if (elapsed < spinDuration) {
                     const t = elapsed / spinDuration;
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
@@ -1118,7 +1112,6 @@
                     const pos = trajectory[frameIndex];
                     if (prevPos) pos.prev = prevPos;
                     else pos.prev = startPos;
-
                     drawGameFrame(pos, highlightPolygon);
                     prevPos = pos;
                     animationFrameId = requestAnimationFrame(animate);
@@ -1133,24 +1126,24 @@
             animationFrameId = requestAnimationFrame(animate);
         }
 
+        // НОВАЯ ФУНКЦИЯ ПОЛУЧЕНИЯ ПОБЕДИТЕЛЯ
         async function fetchWinnerNow() {
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
-
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     lastShownRoundId = state.round_id;
                     localStorage.setItem('last_round_id', lastShownRoundId);
+                    isShowingWinner = true;
 
                     if (state.winner.polygon && state.winner.polygon.length >= 3) {
                         highlightPolygon = state.winner.polygon;
                         drawGameFrame(null, highlightPolygon);
-                        await new Promise(r => setTimeout(r, 2000));
+                        await new Promise(r => setTimeout(r, 1500));
                     }
-
                     showWinnerModal(state.winner);
                     await updateBalance();
-                    // ИСПРАВЛЕНИЕ: Мы не обнуляем highlightPolygon здесь. Он сам очистится в pollGame, когда статус сменится на 'waiting'.
+                    setTimeout(() => { isShowingWinner = false; highlightPolygon = null; }, 3000);
                 }
             } catch(e) { console.error(e); }
         }
@@ -1162,11 +1155,8 @@
             const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,...';
             document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar" onerror="this.src='data:image/svg+xml;base64,...'">`;
             document.getElementById('winner-modal').classList.add('active');
-
             if (winnerTimer) clearTimeout(winnerTimer);
-            winnerTimer = setTimeout(() => {
-                closeWinnerModal();
-            }, 2500);
+            winnerTimer = setTimeout(() => { closeWinnerModal(); }, 2500);
         }
 
         function closeWinnerModal() {
@@ -1187,20 +1177,15 @@
                     }
                 }
 
-                // ИСПРАВЛЕНИЕ: Очищаем подсветку при начале нового раунда
                 if (newState.status === 'waiting') {
                     highlightPolygon = null;
                 }
 
-                // ИСПРАВЛЕНИЕ: Логика таймера переписана для устранения лагов и дерганья
                 if (newState.status === 'counting') {
-                    // Синхронизируем локальный таймер с сервером только если рассинхрон больше 1 секунды
                     if (Math.abs(gState.timer - newState.timer) > 1 || !timerInterval) {
                         gState.timer = newState.timer;
                         document.getElementById('game-timer-bg').innerText = gState.timer;
                     }
-
-                    // Запускаем локальный интервал один раз для плавной анимации
                     if (!timerInterval) {
                         timerInterval = setInterval(() => {
                             if (gState.timer > 0) {
@@ -1221,7 +1206,6 @@
                     gState.players = newState.players;
                     gState.pool = newState.pool;
                 }
-
                 gState.status = newState.status;
                 gState.spin_params = newState.spin_params;
                 gState.winner = newState.winner;
@@ -1234,17 +1218,16 @@
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
                 renderBetsList();
 
-                if (!isSpinning) drawGameFrame(null, highlightPolygon);
+                // ИЗМЕНЕННАЯ ПРОВЕРКА ПЕРЕД ОТРИСОВКОЙ
+                if (!isSpinning && !isShowingWinner) drawGameFrame(null, highlightPolygon);
 
-                // Кнопка отмены ставки
                 const myId = String(tg.initDataUnsafe?.user?.id);
-                const hasMyBet = gState.players.find(p => String(p.id) === myId); // ИСПРАВЛЕНИЕ: Приводим ID к строке для надежности
+                const hasMyBet = gState.players.find(p => String(p.id) === myId);
                 const cancelBtn = document.getElementById('btn-cancel-bet');
                 if (cancelBtn) {
                     cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
                 }
 
-                // Запуск анимации
                 if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
                     isSpinning = true;
                     runSpinAnimation(gState.spin_params);
@@ -1254,7 +1237,6 @@
                     drawGameFrame(null, highlightPolygon);
                 }
 
-                // Обработка победителя (fallback)
                 if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
                     const pageGame = document.getElementById('page-game');
                     if (pageGame && pageGame.classList.contains('page-active')) {
@@ -1273,6 +1255,7 @@
         }
         setInterval(pollGame, 1000);
 
+        // НОВАЯ ФУНКЦИЯ renderBetsList
         function renderBetsList() {
             const container = document.getElementById('bets-list-container');
             const list = document.getElementById('game-bets-list');
@@ -1282,14 +1265,21 @@
 
             document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
             const sorted = [...gState.players].sort((a,b) => String(a.id).localeCompare(String(b.id)));
-            list.innerHTML = sorted.map(p => `
-                <div class="bet-row">
-                    <span style="display:flex; gap:8px;">
-                        <span style="width:12px; height:12px; border-radius:50%; background:${p.color};"></span>
-                        <span>${escapeHtml(p.username)}</span>
+
+            list.innerHTML = sorted.map(p => {
+                const winPercent = ((p.amount / gState.pool) * 100).toFixed(1);
+                return `
+                <div class="bet-row" style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="display:flex; align-items: center; gap: 12px;">
+                        <span style="width:16px; height:16px; border-radius:50%; background:${p.color}; box-shadow: 0 0 6px ${p.color};"></span>
+                        <span style="font-weight: 500; font-size: 15px;">${escapeHtml(p.username)}</span>
                     </span>
-                    <span style="color:var(--accent-gold);">${p.amount} ₽</span>
-                </div>`).join('');
+                    <span style="display:flex; gap: 15px; align-items: center;">
+                        <span style="color: rgba(255,255,255,0.6); font-size: 14px;">${winPercent}%</span>
+                        <span style="color:var(--accent-gold); font-weight: 600; font-size: 15px; min-width: 50px; text-align: right;">${p.amount} ₽</span>
+                    </span>
+                </div>`;
+            }).join('');
         }
 
         function openBetConfirm(amt) {
@@ -1320,7 +1310,6 @@
             try {
                 const data = await apiFetch(`${API_BASE}/game/bet`, { method: 'POST', body: JSON.stringify({amount: betAmountTemp}) });
                 if (typeof closeModal === 'function') closeModal('confirm-bet-modal');
-
                 if (data.success) {
                     await updateBalance();
                     pollGame();
@@ -1347,7 +1336,6 @@
             gState.pool = 0;
             drawGameFrame();
             renderBetsList();
-
             apiFetch(`${API_BASE}/game/cancel`, { method: 'POST', body: JSON.stringify({}) })
                 .then(() => {
                     cancelInProgress = false;
