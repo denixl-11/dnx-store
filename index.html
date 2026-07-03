@@ -93,7 +93,18 @@
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
 
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
-        .game-canvas-wrap { position: relative; width: 90%; height: 25vh; border-radius: 16px; overflow: hidden; border: 2px solid var(--border-color); background: #131315; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
+        .game-canvas-wrap {
+            position: relative;
+            width: 90vw;
+            height: 90vw;
+            max-width: 400px;
+            max-height: 400px;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid #444;
+            background: #131315;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
         #gameCanvas { width: 100%; height: 100%; display: block; }
         .game-info-row {
             width: 90%;
@@ -943,10 +954,11 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – ФИНАЛЬНАЯ ВЕРСИЯ
+        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – ФИНАЛЬНАЯ ВЕРСИЯ С АВАТАРАМИ
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const imageCache = {};
         let gState = {
             players: [], pool: 0, status: 'waiting', timer: 15,
             spin_params: null, winner: null, last_winner_id: null,
@@ -968,23 +980,36 @@
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width * 2;
-            canvas.height = rect.height * 2;
-            canvas.style.width = rect.width + 'px';
-            canvas.style.height = rect.height + 'px';
+            const size = Math.min(rect.width, rect.height);
+            canvas.width = size * 2;
+            canvas.height = size * 2;
+            canvas.style.width = size + 'px';
+            canvas.style.height = size + 'px';
         }
 
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
+        function getPolygonCentroid(pts) {
+            let x = 0, y = 0, twicearea = 0;
+            let nPts = pts.length;
+            for (let i = 0, j = nPts - 1; i < nPts; j = i++) {
+                let p1 = pts[i];
+                let p2 = pts[j];
+                let f = (p1.x * p2.y - p2.x * p1.y);
+                twicearea += f;
+                x += (p1.x + p2.x) * f;
+                y += (p1.y + p2.y) * f;
+            }
+            let f = twicearea * 3;
+            let area = Math.abs(twicearea / 2);
+            return { x: x / f, y: y / f, area: area };
+        }
+
         function drawGameFrame(ballPos = null, highlightPts = null) {
             if (!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
-            const PADDING = 5;
-            const drawWidth = cw - PADDING * 2;
-            const drawHeight = ch - PADDING * 2;
-
             ctx.clearRect(0, 0, cw, ch);
 
             // Фон или полигоны
@@ -993,16 +1018,52 @@
                     const pts = poly.polygon;
                     if (pts.length < 3) continue;
                     ctx.beginPath();
-                    ctx.moveTo(PADDING + pts[0].x * drawWidth, PADDING + (1 - pts[0].y) * drawHeight);
+                    ctx.moveTo(pts[0].x * cw, (1 - pts[0].y) * ch);
                     for (let i = 1; i < pts.length; i++) {
-                        ctx.lineTo(PADDING + pts[i].x * drawWidth, PADDING + (1 - pts[i].y) * drawHeight);
+                        ctx.lineTo(pts[i].x * cw, (1 - pts[i].y) * ch);
                     }
                     ctx.closePath();
                     ctx.fillStyle = poly.color;
                     ctx.fill();
                     ctx.strokeStyle = "rgba(0,0,0,0.3)";
-                    ctx.lineWidth = 1;
+                    ctx.lineWidth = 2;
                     ctx.stroke();
+                }
+
+                // Отрисовка аватарок
+                for (const poly of gState.polygons) {
+                    if (!poly.photo_url) continue;
+                    const scaledPoints = poly.polygon.map(p => ({
+                        x: p.x * cw,
+                        y: (1 - p.y) * ch
+                    }));
+                    const centroid = getPolygonCentroid(scaledPoints);
+                    const maxRadius = 45;
+                    const minRadius = 15;
+                    let radius = Math.sqrt(centroid.area) * 0.20;
+                    if (radius > maxRadius) radius = maxRadius;
+                    if (radius < minRadius) radius = minRadius;
+
+                    const img = imageCache[poly.photo_url];
+                    if (img && img.complete) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+                        ctx.clip();
+                        ctx.drawImage(img, centroid.x - radius, centroid.y - radius, radius * 2, radius * 2);
+                        ctx.restore();
+
+                        ctx.beginPath();
+                        ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+                        ctx.stroke();
+                    } else if (!img) {
+                        const newImg = new Image();
+                        newImg.crossOrigin = "anonymous";
+                        newImg.src = poly.photo_url;
+                        imageCache[poly.photo_url] = newImg;
+                    }
                 }
             } else {
                 if (gState.players.length === 1) {
@@ -1023,9 +1084,9 @@
             if (highlightPts && highlightPts.length >= 3) {
                 ctx.save();
                 ctx.beginPath();
-                ctx.moveTo(PADDING + highlightPts[0].x * drawWidth, PADDING + (1 - highlightPts[0].y) * drawHeight);
+                ctx.moveTo(highlightPts[0].x * cw, (1 - highlightPts[0].y) * ch);
                 for (let i = 1; i < highlightPts.length; i++) {
-                    ctx.lineTo(PADDING + highlightPts[i].x * drawWidth, PADDING + (1 - highlightPts[i].y) * drawHeight);
+                    ctx.lineTo(highlightPts[i].x * cw, (1 - highlightPts[i].y) * ch);
                 }
                 ctx.closePath();
                 ctx.fillStyle = "rgba(255, 215, 0, 0.25)";
@@ -1040,8 +1101,8 @@
 
             // Шарик и стрелка
             if (ballPos) {
-                const bx = PADDING + ballPos.x * drawWidth;
-                const by = PADDING + (1 - ballPos.y) * drawHeight;
+                const bx = ballPos.x * cw;
+                const by = (1 - ballPos.y) * ch;
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const drawAngle = -ballPos.angle;
                     const arrowLen = 35;

@@ -169,7 +169,7 @@ def require_auth(handler):
 
 
 # ------------------------------------------------------------
-#  НОВАЯ ГЕОМЕТРИЯ: BSP RECURSIVE POLYGON CLIPPING (SAFE 2%)
+#  ГЕОМЕТРИЯ: BSP RECURSIVE POLYGON CLIPPING (TRIANGLES)
 # ------------------------------------------------------------
 def adjust_weights_to_minimum(weights, min_ratio=0.02):
     N = len(weights)
@@ -289,9 +289,12 @@ def recursive_bsp_split(poly, players, weights, depth=0):
     xs, ys = [p[0] for p in poly], [p[1] for p in poly]
     dx, dy = max(xs) - min(xs), max(ys) - min(ys)
 
-    base_angle = 0.0 if dx > dy else math.pi / 2
-    twist = (depth % 3 - 1) * 0.15
-    angle = base_angle + twist
+    # TRIANGLE ANGLES
+    if depth == 0:
+        base_angle = random.choice([math.pi / 4, 3 * math.pi / 4])
+        angle = base_angle + random.uniform(-0.2, 0.2)
+    else:
+        angle = random.uniform(0, math.pi)
 
     poly_left, poly_right = clip_polygon_exact_area(poly, ratio, angle)
 
@@ -306,7 +309,6 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
     if not players: return []
 
     sorted_players = sorted(players, key=lambda p: float(p["amount"]), reverse=True)
-    # Визуальные веса: реальная сумма + бонус за докидывания (0.01% за каждое)
     total_real = sum(float(p["amount"]) for p in players)
     visual_amounts = [
         float(p["amount"]) + p.get("bets_count", 0) * 0.0001 * total_real
@@ -328,6 +330,7 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
             "player_id": player["id"],
             "username": player["username"],
             "color": player["color"],
+            "photo_url": player.get("photo_url"),
             "polygon": coords
         })
     return final_polygons
@@ -529,7 +532,7 @@ async def game_worker():
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info("Spinning with BSP polygons")
+                    logging.info("Spinning with triangle BSP polygons")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(3 + 1 + 10 + 1 + 0.5)
@@ -771,10 +774,12 @@ async def handle_game_bet(request):
                 if not available:
                     available = ["#" + ''.join(random.choices('0123456789ABCDEF', k=6))]
                 color = random.choice(available)
+                photo_url = data.get('photo_url', '')
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
                     "amount": amount, "color": color,
-                    "bets_count": 1
+                    "bets_count": 1,
+                    "photo_url": photo_url
                 }
             game_state["pool"] += amount
 
