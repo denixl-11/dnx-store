@@ -1126,24 +1126,45 @@
             animationFrameId = requestAnimationFrame(animate);
         }
 
-        // НОВАЯ ФУНКЦИЯ ПОЛУЧЕНИЯ ПОБЕДИТЕЛЯ
+        // Единая логика показа победителя с задержкой и обводкой
+        async function showWinnerSequence(winnerData, roundId) {
+            if (isShowingWinner) return; // Защита от двойного запуска
+            isShowingWinner = true;
+
+            lastShownRoundId = roundId;
+            localStorage.setItem('last_round_id', lastShownRoundId);
+
+            // Временный console.log для проверки данных с бэкенда (см. Причину 2)
+            console.log("Данные победителя для обводки:", winnerData);
+
+            if (winnerData.polygon && winnerData.polygon.length >= 3) {
+                highlightPolygon = winnerData.polygon;
+                // Принудительно рисуем кадр с обводкой
+                drawGameFrame(null, highlightPolygon);
+                // Ждем 1.5 секунды, пока горит золото
+                await new Promise(r => setTimeout(r, 1500));
+            } else {
+                console.warn("Внимание: Бэкенд не передал winner.polygon!");
+            }
+
+            // Только теперь показываем модалку
+            showWinnerModal(winnerData);
+            if (typeof updateBalance === 'function') await updateBalance();
+
+            // Через 3 секунды снимаем блокировки
+            setTimeout(() => {
+                isShowingWinner = false;
+                highlightPolygon = null;
+            }, 3000);
+        }
+
         async function fetchWinnerNow() {
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
-                if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
-                    lastShownRoundId = state.round_id;
-                    localStorage.setItem('last_round_id', lastShownRoundId);
-                    isShowingWinner = true;
 
-                    if (state.winner.polygon && state.winner.polygon.length >= 3) {
-                        highlightPolygon = state.winner.polygon;
-                        drawGameFrame(null, highlightPolygon);
-                        await new Promise(r => setTimeout(r, 1500));
-                    }
-                    showWinnerModal(state.winner);
-                    await updateBalance();
-                    setTimeout(() => { isShowingWinner = false; highlightPolygon = null; }, 3000);
+                if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
+                    await showWinnerSequence(state.winner, state.round_id);
                 }
             } catch(e) { console.error(e); }
         }
@@ -1237,13 +1258,12 @@
                     drawGameFrame(null, highlightPolygon);
                 }
 
+                // Обработка победителя (fallback)
                 if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
                     const pageGame = document.getElementById('page-game');
                     if (pageGame && pageGame.classList.contains('page-active')) {
-                        lastShownRoundId = gState.round_id;
-                        localStorage.setItem('last_round_id', lastShownRoundId);
-                        showWinnerModal(gState.winner);
-                        await updateBalance();
+                        // ИСПОЛЬЗУЕМ НАШУ НОВУЮ ФУНКЦИЮ
+                        showWinnerSequence(gState.winner, gState.round_id);
                     }
                 }
 
