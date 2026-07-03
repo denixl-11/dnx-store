@@ -334,7 +334,7 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
 
 
 # ------------------------------------------------------------
-# Генерация траектории (без изменений)
+# Генерация траектории
 # ------------------------------------------------------------
 def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
     x = start_x
@@ -403,7 +403,7 @@ def generate_spin_params(polygons: list) -> dict:
 
 
 # ------------------------------------------------------------
-# Игровая механика (классический выигрыш 70%)
+# Игровая механика
 # ------------------------------------------------------------
 PLAYER_COLORS = [
     "#FF6B6B", "#4ECDC4", "#FFD166", "#1A535C", "#FF8C42",
@@ -532,7 +532,7 @@ async def game_worker():
                     logging.info("Spinning with BSP polygons")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(3 + 1 + 10 + 1 + 0.5)  # стоянка сокращена до 1 секунды
+            await asyncio.sleep(3 + 1 + 10 + 1 + 0.5)
             async with game_lock:
                 if game_state["status"] == "spinning":
                     final_point = game_state["spin_params"]["trajectory"][-1]
@@ -552,7 +552,7 @@ async def game_worker():
                     game_state["polygons"] = None
                     logging.info(f"Round finished, winner: {winner_data}")
 
-                    asyncio.create_task(clear_last_polygons_after_delay(0.3))  # очистка через 0.3 секунды
+                    asyncio.create_task(clear_last_polygons_after_delay(0.3))
 
 
 # ------------------- API -------------------
