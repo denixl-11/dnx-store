@@ -956,7 +956,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – ФИНАЛЬНАЯ ВЕРСИЯ С АВАТАРАМИ
+        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – ФИНАЛЬНАЯ ВЕРСИЯ
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -980,7 +980,7 @@
         let winnerTimer = null;
         let lastLeaderboardUpdate = 0;
 
-        const PADDING = 12; // безопасный отступ, чтобы обводка и шарик не обрезались
+        const PADDING = 6; // минимальный отступ, чтобы обводка не уходила за край canvas
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -1086,7 +1086,7 @@
                 }
             }
 
-            // Подсветка полигона победителя
+            // Подсветка полигона победителя (без тени, чтобы не обрезалась)
             if (highlightPts && highlightPts.length >= 3) {
                 ctx.save();
                 ctx.beginPath();
@@ -1095,12 +1095,10 @@
                     ctx.lineTo(PADDING + highlightPts[i].x * drawWidth, PADDING + (1 - highlightPts[i].y) * drawHeight);
                 }
                 ctx.closePath();
-                ctx.fillStyle = "rgba(255, 215, 0, 0.25)";
+                ctx.fillStyle = "rgba(255, 215, 0, 0.2)";
                 ctx.fill();
                 ctx.strokeStyle = "#FFD700";
-                ctx.lineWidth = 6;
-                ctx.shadowColor = "#FFD700";
-                ctx.shadowBlur = 25;
+                ctx.lineWidth = 4;
                 ctx.stroke();
                 ctx.restore();
             }
