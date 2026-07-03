@@ -95,9 +95,10 @@
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;
-            width: 90%;
-            aspect-ratio: 1/1;
-            max-width: 300px;
+            width: 85vw;
+            height: 85vw;
+            max-width: 380px;
+            max-height: 380px;
             border-radius: 16px;
             overflow: hidden;
             border: 2px solid #444;
@@ -106,7 +107,8 @@
         }
         #gameCanvas { width: 100%; height: 100%; display: block; }
         .game-info-row {
-            width: 90%;
+            width: 85vw;
+            max-width: 380px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -118,11 +120,11 @@
         }
         .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203, 161, 83, 0.5); pointer-events: none; }
 
-        .game-controls { display: flex; gap: 12px; width: 90%; margin-top: 16px; }
+        .game-controls { display: flex; gap: 12px; width: 85vw; max-width: 380px; margin-top: 16px; }
         .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
-        .game-btn-cancel { width: 90%; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
+        .game-btn-cancel { width: 85vw; max-width: 380px; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
 
-        .bets-list-container { width: 90%; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
+        .bets-list-container { width: 85vw; max-width: 380px; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
         .bets-list-header { padding: 12px 15px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); text-align: center; letter-spacing: 1px; }
         .bets-list { max-height: 200px; overflow-y: auto; padding: 5px 15px; }
         .bet-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; align-items: center; }
@@ -213,7 +215,8 @@
         }
 
         .leaderboard-bar {
-            width: 90%;
+            width: 85vw;
+            max-width: 380px;
             background: linear-gradient(135deg, rgba(203,161,83,0.2), rgba(203,161,83,0.05));
             border: 1px solid var(--accent-gold);
             border-radius: 12px;
@@ -317,7 +320,7 @@
                 <span id="leaderboard-preview">...</span>
             </div>
 
-            <div style="width:90%; display:flex; justify-content: flex-end; margin-bottom: 4px;">
+            <div style="width:85vw; max-width:380px; display:flex; justify-content: flex-end; margin-bottom: 4px;">
                 <div class="history-btn" onclick="openHistoryModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     История
@@ -977,6 +980,8 @@
         let winnerTimer = null;
         let lastLeaderboardUpdate = 0;
 
+        const PADDING = 12; // безопасный отступ, чтобы обводка и шарик не обрезались
+
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
             const size = Math.min(rect.width, rect.height);
@@ -1009,6 +1014,8 @@
             if (!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
+            const drawWidth = cw - PADDING * 2;
+            const drawHeight = ch - PADDING * 2;
             ctx.clearRect(0, 0, cw, ch);
 
             // Фон или полигоны
@@ -1017,9 +1024,9 @@
                     const pts = poly.polygon;
                     if (pts.length < 3) continue;
                     ctx.beginPath();
-                    ctx.moveTo(pts[0].x * cw, (1 - pts[0].y) * ch);
+                    ctx.moveTo(PADDING + pts[0].x * drawWidth, PADDING + (1 - pts[0].y) * drawHeight);
                     for (let i = 1; i < pts.length; i++) {
-                        ctx.lineTo(pts[i].x * cw, (1 - pts[i].y) * ch);
+                        ctx.lineTo(PADDING + pts[i].x * drawWidth, PADDING + (1 - pts[i].y) * drawHeight);
                     }
                     ctx.closePath();
                     ctx.fillStyle = poly.color;
@@ -1033,8 +1040,8 @@
                 for (const poly of gState.polygons) {
                     if (!poly.photo_url) continue;
                     const scaledPoints = poly.polygon.map(p => ({
-                        x: p.x * cw,
-                        y: (1 - p.y) * ch
+                        x: PADDING + p.x * drawWidth,
+                        y: PADDING + (1 - p.y) * drawHeight
                     }));
                     const centroid = getPolygonCentroid(scaledPoints);
                     const maxRadius = 45;
@@ -1083,9 +1090,9 @@
             if (highlightPts && highlightPts.length >= 3) {
                 ctx.save();
                 ctx.beginPath();
-                ctx.moveTo(highlightPts[0].x * cw, (1 - highlightPts[0].y) * ch);
+                ctx.moveTo(PADDING + highlightPts[0].x * drawWidth, PADDING + (1 - highlightPts[0].y) * drawHeight);
                 for (let i = 1; i < highlightPts.length; i++) {
-                    ctx.lineTo(highlightPts[i].x * cw, (1 - highlightPts[i].y) * ch);
+                    ctx.lineTo(PADDING + highlightPts[i].x * drawWidth, PADDING + (1 - highlightPts[i].y) * drawHeight);
                 }
                 ctx.closePath();
                 ctx.fillStyle = "rgba(255, 215, 0, 0.25)";
@@ -1100,8 +1107,8 @@
 
             // Шарик и стрелка
             if (ballPos) {
-                const bx = ballPos.x * cw;
-                const by = (1 - ballPos.y) * ch;
+                const bx = PADDING + ballPos.x * drawWidth;
+                const by = PADDING + (1 - ballPos.y) * drawHeight;
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const drawAngle = -ballPos.angle;
                     const arrowLen = 35;
