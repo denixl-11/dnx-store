@@ -502,7 +502,7 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
         return None
 
 
-async def clear_last_polygons_after_delay(delay=5):
+async def clear_last_polygons_after_delay(delay=0.3):
     await asyncio.sleep(delay)
     async with game_lock:
         if game_state["status"] == "waiting" and not game_state["players"]:
@@ -532,7 +532,7 @@ async def game_worker():
                     logging.info("Spinning with BSP polygons")
 
         if game_state["status"] == "spinning":
-            await asyncio.sleep(3 + 1 + 10 + 2 + 0.5)
+            await asyncio.sleep(3 + 1 + 10 + 1 + 0.5)  # стоянка сокращена до 1 секунды
             async with game_lock:
                 if game_state["status"] == "spinning":
                     final_point = game_state["spin_params"]["trajectory"][-1]
@@ -552,7 +552,7 @@ async def game_worker():
                     game_state["polygons"] = None
                     logging.info(f"Round finished, winner: {winner_data}")
 
-                    asyncio.create_task(clear_last_polygons_after_delay(5))
+                    asyncio.create_task(clear_last_polygons_after_delay(0.3))  # очистка через 0.3 секунды
 
 
 # ------------------- API -------------------
