@@ -963,7 +963,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – С ПРЕМИАЛЬНЫМ ЭКРАНОМ ОЖИДАНИЯ
+        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – ФИНАЛЬНАЯ ВЕРСИЯ
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -999,6 +999,20 @@
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
 
+        // Универсальный парсер цветов (защита от строк/кортежей из БД)
+        function parseColors(colorData) {
+            if (Array.isArray(colorData)) {
+                if (colorData.length >= 2) return colorData;
+                if (colorData.length === 1) return [colorData[0], colorData[0]];
+            }
+            if (typeof colorData === 'string') {
+                const hexes = colorData.match(/#[0-9a-fA-F]{6}/g);
+                if (hexes && hexes.length >= 2) return [hexes[0], hexes[1]];
+                if (hexes && hexes.length === 1) return [hexes[0], hexes[0]];
+            }
+            return ["#D4AF37", "#AA8000"]; // fallback
+        }
+
         function getPolygonCentroid(pts) {
             let x = 0, y = 0, twicearea = 0;
             let nPts = pts.length;
@@ -1019,7 +1033,6 @@
             const time = Date.now() * 0.001;
             const width = canvas.width;
             const height = canvas.height;
-
             const bgGradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width);
             bgGradient.addColorStop(0, '#1E1E1E');
             bgGradient.addColorStop(1, '#0A0A0A');
@@ -1029,28 +1042,18 @@
             ctx.save();
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-
             const tileSize = 80;
             const offset = (time * 15) % tileSize;
-
             for (let x = -tileSize; x < width + tileSize; x += tileSize) {
                 for (let y = -tileSize; y < height + tileSize; y += tileSize) {
                     const shapeType = (Math.floor(x / tileSize) + Math.floor(y / tileSize)) % 3;
                     const cx = x + offset;
                     const cy = y + offset;
                     const size = 18;
-
                     ctx.beginPath();
-                    if (shapeType === 0) {
-                        ctx.arc(cx, cy, size, 0, Math.PI * 2);
-                    } else if (shapeType === 1) {
-                        ctx.moveTo(cx, cy - size);
-                        ctx.lineTo(cx + size + 4, cy + size);
-                        ctx.lineTo(cx - size - 4, cy + size);
-                        ctx.closePath();
-                    } else {
-                        ctx.rect(cx - size, cy - size, size * 2, size * 2);
-                    }
+                    if (shapeType === 0) ctx.arc(cx, cy, size, 0, Math.PI * 2);
+                    else if (shapeType === 1) { ctx.moveTo(cx, cy - size); ctx.lineTo(cx + size + 4, cy + size); ctx.lineTo(cx - size - 4, cy + size); ctx.closePath(); }
+                    else ctx.rect(cx - size, cy - size, size * 2, size * 2);
                     ctx.stroke();
                 }
             }
@@ -1059,11 +1062,9 @@
             ctx.save();
             const pulse = (Math.sin(time * 3) + 1) / 2;
             const alpha = 0.4 + (pulse * 0.6);
-
             ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`;
             ctx.shadowColor = `rgba(224, 179, 102, ${pulse * 0.8})`;
             ctx.shadowBlur = 15 + (pulse * 10);
-
             ctx.font = "bold 24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
@@ -1071,7 +1072,6 @@
             ctx.restore();
         }
 
-        // НОВАЯ ФУНКЦИЯ drawGameFrame (замена)
         function drawGameFrame(ballPos = null, highlightPts = null) {
             if (!ctx) return;
             const cw = canvas.width;
@@ -1082,156 +1082,112 @@
                 cancelAnimationFrame(animationFrameId);
             }
 
-            // ЛОГИКА: Экран ожидания показывается СТРОГО если 0 игроков
             const isWaitingMode = gState.players.length === 0 && gState.status !== 'spinning';
 
             if (isWaitingMode) {
-                // Отрисовка премиального экрана ожидания
                 drawWaitingState(ctx, canvas);
             }
             else if (gState.polygons && gState.polygons.length > 0) {
-                // Отрисовка полигонов (если 2 и более игроков)
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
                     if (pts.length < 3) continue;
+                    const colors = parseColors(poly.color);
+                    const grad = ctx.createLinearGradient(0, 0, cw, ch);
+                    grad.addColorStop(0, colors[0]);
+                    grad.addColorStop(1, colors[1]);
+                    ctx.fillStyle = grad;
                     ctx.beginPath();
                     ctx.moveTo(pts[0].x * cw, (1 - pts[0].y) * ch);
                     for (let i = 1; i < pts.length; i++) {
                         ctx.lineTo(pts[i].x * cw, (1 - pts[i].y) * ch);
                     }
                     ctx.closePath();
-                    ctx.fillStyle = poly.color;
                     ctx.fill();
                     ctx.strokeStyle = "rgba(0,0,0,0.3)";
                     ctx.lineWidth = 2;
                     ctx.stroke();
                 }
 
-                // Отрисовка аватарок для полигонов
+                // Аватарки
                 for (const poly of gState.polygons) {
                     if (!poly.photo_url) continue;
-                    const scaledPoints = poly.polygon.map(p => ({
-                        x: p.x * cw,
-                        y: (1 - p.y) * ch
-                    }));
+                    const scaledPoints = poly.polygon.map(p => ({ x: p.x * cw, y: (1 - p.y) * ch }));
                     const centroid = getPolygonCentroid(scaledPoints);
-                    const maxRadius = 45;
-                    const minRadius = 15;
+                    const maxRadius = 45, minRadius = 15;
                     let radius = Math.sqrt(centroid.area) * 0.20;
                     if (radius > maxRadius) radius = maxRadius;
                     if (radius < minRadius) radius = minRadius;
-
                     const img = imageCache[poly.photo_url];
                     if (img && img.complete) {
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
-                        ctx.clip();
+                        ctx.save(); ctx.beginPath(); ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2); ctx.clip();
                         ctx.drawImage(img, centroid.x - radius, centroid.y - radius, radius * 2, radius * 2);
                         ctx.restore();
-
-                        ctx.beginPath();
-                        ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-                        ctx.stroke();
+                        ctx.beginPath(); ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+                        ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"; ctx.stroke();
                     } else if (!img) {
-                        const newImg = new Image();
-                        newImg.crossOrigin = "anonymous";
-                        newImg.src = poly.photo_url;
-                        imageCache[poly.photo_url] = newImg;
+                        const newImg = new Image(); newImg.crossOrigin = "anonymous";
+                        newImg.src = poly.photo_url; imageCache[poly.photo_url] = newImg;
                     }
                 }
             }
             else if (gState.players.length === 1) {
-                // ЕСЛИ РОВНО 1 ИГРОК - полностью заливаем поле его цветом
                 const singlePlayer = gState.players[0];
-                ctx.fillStyle = singlePlayer.color;
+                const colors = parseColors(singlePlayer.color);
+                const grad = ctx.createLinearGradient(0, 0, cw, ch);
+                grad.addColorStop(0, colors[0]); grad.addColorStop(1, colors[1]);
+                ctx.fillStyle = grad;
                 ctx.fillRect(0, 0, cw, ch);
-
-                // Бонус: Рисуем аватарку единственного игрока ровно по центру
                 if (singlePlayer.photo_url) {
-                    const radius = 45; // Максимальный размер
+                    const radius = 45;
                     const img = imageCache[singlePlayer.photo_url];
-
                     if (img && img.complete) {
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
-                        ctx.clip();
-                        ctx.drawImage(img, cw / 2 - radius, ch / 2 - radius, radius * 2, radius * 2);
+                        ctx.save(); ctx.beginPath(); ctx.arc(cw/2, ch/2, radius, 0, Math.PI*2); ctx.clip();
+                        ctx.drawImage(img, cw/2 - radius, ch/2 - radius, radius*2, radius*2);
                         ctx.restore();
-
-                        ctx.beginPath();
-                        ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-                        ctx.stroke();
+                        ctx.beginPath(); ctx.arc(cw/2, ch/2, radius, 0, Math.PI*2);
+                        ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255, 255, 255, 0.2)"; ctx.stroke();
                     } else if (!img) {
-                        const newImg = new Image();
-                        newImg.crossOrigin = "anonymous";
-                        newImg.src = singlePlayer.photo_url;
-                        imageCache[singlePlayer.photo_url] = newImg;
+                        const newImg = new Image(); newImg.crossOrigin = "anonymous";
+                        newImg.src = singlePlayer.photo_url; imageCache[singlePlayer.photo_url] = newImg;
                     }
                 }
             }
 
-            // Подсветка полигона победителя
+            // Подсветка победителя
             if (highlightPts && highlightPts.length >= 3) {
-                const INSET = 2;
-                const dw = cw - INSET * 2;
-                const dh = ch - INSET * 2;
+                const INSET = 2, dw = cw - INSET*2, dh = ch - INSET*2;
                 ctx.save();
                 ctx.beginPath();
-                ctx.moveTo(INSET + highlightPts[0].x * dw, INSET + (1 - highlightPts[0].y) * dh);
+                ctx.moveTo(INSET + highlightPts[0].x*dw, INSET + (1 - highlightPts[0].y)*dh);
                 for (let i = 1; i < highlightPts.length; i++) {
-                    ctx.lineTo(INSET + highlightPts[i].x * dw, INSET + (1 - highlightPts[i].y) * dh);
+                    ctx.lineTo(INSET + highlightPts[i].x*dw, INSET + (1 - highlightPts[i].y)*dh);
                 }
                 ctx.closePath();
-                ctx.fillStyle = "rgba(255, 215, 0, 0.2)";
-                ctx.fill();
-                ctx.strokeStyle = "#FFD700";
-                ctx.lineWidth = 4;
-                ctx.stroke();
+                ctx.fillStyle = "rgba(255, 215, 0, 0.2)"; ctx.fill();
+                ctx.strokeStyle = "#FFD700"; ctx.lineWidth = 4; ctx.stroke();
                 ctx.restore();
             }
 
-            // Отрисовка шарика и стрелки
+            // Шарик и стрелка
             if (ballPos) {
-                const bx = ballPos.x * cw;
-                const by = (1 - ballPos.y) * ch;
+                const bx = ballPos.x * cw, by = (1 - ballPos.y) * ch;
                 if (ballPos.angle !== undefined && !ballPos.prev) {
-                    const drawAngle = -ballPos.angle;
-                    const arrowLen = 35;
-                    const endX = bx + Math.cos(drawAngle) * arrowLen;
-                    const endY = by + Math.sin(drawAngle) * arrowLen;
-                    ctx.beginPath();
-                    ctx.moveTo(bx, by);
-                    ctx.lineTo(endX, endY);
-                    ctx.strokeStyle = "rgba(255,255,255,0.9)";
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-                    const headLen = 10;
-                    const headAngle = 0.4;
-                    ctx.beginPath();
-                    ctx.moveTo(endX, endY);
-                    ctx.lineTo(endX - headLen * Math.cos(drawAngle - headAngle), endY - headLen * Math.sin(drawAngle - headAngle));
-                    ctx.lineTo(endX - headLen * Math.cos(drawAngle + headAngle), endY - headLen * Math.sin(drawAngle + headAngle));
-                    ctx.closePath();
-                    ctx.fillStyle = "#fff";
-                    ctx.fill();
+                    const drawAngle = -ballPos.angle, arrowLen = 35;
+                    const endX = bx + Math.cos(drawAngle)*arrowLen, endY = by + Math.sin(drawAngle)*arrowLen;
+                    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(endX, endY);
+                    ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 3; ctx.stroke();
+                    const headLen = 10, headAngle = 0.4;
+                    ctx.beginPath(); ctx.moveTo(endX, endY);
+                    ctx.lineTo(endX - headLen*Math.cos(drawAngle - headAngle), endY - headLen*Math.sin(drawAngle - headAngle));
+                    ctx.lineTo(endX - headLen*Math.cos(drawAngle + headAngle), endY - headLen*Math.sin(drawAngle + headAngle));
+                    ctx.closePath(); ctx.fillStyle = "#fff"; ctx.fill();
                 }
-                ctx.shadowColor = "#fff";
-                ctx.shadowBlur = 20;
-                ctx.beginPath();
-                ctx.arc(bx, by, 20, 0, Math.PI * 2);
-                ctx.fillStyle = "#fff";
-                ctx.fill();
-                ctx.shadowBlur = 0;
-                ctx.closePath();
+                ctx.shadowColor = "#fff"; ctx.shadowBlur = 20;
+                ctx.beginPath(); ctx.arc(bx, by, 20, 0, Math.PI*2);
+                ctx.fillStyle = "#fff"; ctx.fill();
+                ctx.shadowBlur = 0; ctx.closePath();
             }
 
-            // Запускаем бесконечный цикл анимации ТОЛЬКО для экрана ожидания
             if (isWaitingMode && !isSpinning) {
                 animationFrameId = requestAnimationFrame(() => drawGameFrame(ballPos, highlightPts));
             }
@@ -1241,21 +1197,17 @@
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const startTime = performance.now();
             const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
-            let prevPos = null;
-            let pauseAngle = null;
-
+            let prevPos = null, pauseAngle = null;
             function animate(now) {
                 const elapsed = now - startTime;
                 if (elapsed < spinDuration) {
-                    const t = elapsed / spinDuration;
-                    const currentAngleSpeed = spinAngleSpeed * (1 - t);
+                    const t = elapsed / spinDuration, currentAngleSpeed = spinAngleSpeed * (1 - t);
                     const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration / 1000);
                     pauseAngle = angle;
                     const ball = { x: startPos.x, y: startPos.y, angle };
                     drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
-                }
-                else if (elapsed < spinDuration + 1000) {
+                } else if (elapsed < spinDuration + 1000) {
                     if (pauseAngle === null && trajectory.length > 0) {
                         const firstMove = trajectory[0];
                         pauseAngle = Math.atan2(firstMove.y - startPos.y, firstMove.x - startPos.x);
@@ -1263,8 +1215,7 @@
                     const ball = { x: startPos.x, y: startPos.y, angle: pauseAngle };
                     drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
-                }
-                else if (elapsed < spinDuration + 1000 + 10000) {
+                } else if (elapsed < spinDuration + 1000 + 10000) {
                     const motionElapsed = elapsed - (spinDuration + 1000);
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
@@ -1275,13 +1226,11 @@
                         return;
                     }
                     const pos = trajectory[frameIndex];
-                    if (prevPos) pos.prev = prevPos;
-                    else pos.prev = startPos;
+                    if (prevPos) pos.prev = prevPos; else pos.prev = startPos;
                     drawGameFrame(pos, highlightPolygon);
                     prevPos = pos;
                     animationFrameId = requestAnimationFrame(animate);
-                }
-                else {
+                } else {
                     const finalPos = trajectory[trajectory.length - 1];
                     drawGameFrame(finalPos, highlightPolygon);
                     animationFrameId = null;
@@ -1294,28 +1243,22 @@
         function formatWinChance(betAmount, totalPool) {
             if (totalPool === 0) return "0";
             let percent = (betAmount / totalPool) * 100;
-            if (percent > 0 && percent < 0.001) {
-                return "0.001";
-            }
+            if (percent > 0 && percent < 0.001) return "0.001";
             return parseFloat(percent.toFixed(3)).toString();
         }
 
         async function showWinnerSequence(winnerData, roundId) {
             if (isShowingWinner) return;
             isShowingWinner = true;
-
             lastShownRoundId = roundId;
             localStorage.setItem('last_round_id', lastShownRoundId);
-
             if (winnerData.polygon && winnerData.polygon.length >= 3) {
                 highlightPolygon = winnerData.polygon;
                 drawGameFrame(null, highlightPolygon);
                 await new Promise(r => setTimeout(r, 1000));
             }
-
             showWinnerModal(winnerData);
             if (typeof updateBalance === 'function') await updateBalance();
-
             isShowingWinner = false;
             highlightPolygon = null;
         }
@@ -1324,7 +1267,6 @@
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
-
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     await showWinnerSequence(state.winner, state.round_id);
                 }
@@ -1341,7 +1283,6 @@
             if (winnerTimer) clearTimeout(winnerTimer);
             winnerTimer = setTimeout(() => { closeWinnerModal(); }, 2500);
         }
-
         function closeWinnerModal() {
             document.getElementById('winner-modal').classList.remove('active');
             if (winnerTimer) { clearTimeout(winnerTimer); winnerTimer = null; }
@@ -1351,7 +1292,6 @@
             try {
                 const r = await fetch(`${API_BASE}/game/state`);
                 const newState = await r.json();
-
                 if (!initialGameStateLoaded) {
                     initialGameStateLoaded = true;
                     if (newState.round_id) {
@@ -1359,11 +1299,7 @@
                         localStorage.setItem('last_round_id', lastShownRoundId);
                     }
                 }
-
-                if (newState.status === 'waiting') {
-                    highlightPolygon = null;
-                }
-
+                if (newState.status === 'waiting') highlightPolygon = null;
                 if (newState.status === 'counting') {
                     if (Math.abs(gState.timer - newState.timer) > 1 || !timerInterval) {
                         gState.timer = newState.timer;
@@ -1371,30 +1307,18 @@
                     }
                     if (!timerInterval) {
                         timerInterval = setInterval(() => {
-                            if (gState.timer > 0) {
-                                gState.timer--;
-                                document.getElementById('game-timer-bg').innerText = gState.timer;
-                            } else {
-                                clearInterval(timerInterval);
-                                timerInterval = null;
-                            }
+                            if (gState.timer > 0) { gState.timer--; document.getElementById('game-timer-bg').innerText = gState.timer; }
+                            else { clearInterval(timerInterval); timerInterval = null; }
                         }, 1000);
                     }
                 } else {
                     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
                     document.getElementById('game-timer-bg').innerText = '';
                 }
-
-                if (!cancelInProgress) {
-                    gState.players = newState.players;
-                    gState.pool = newState.pool;
-                }
-                gState.status = newState.status;
-                gState.spin_params = newState.spin_params;
-                gState.winner = newState.winner;
-                gState.last_winner_id = newState.last_winner_id;
-                gState.round_id = newState.round_id;
-                gState.game_number = newState.game_number;
+                if (!cancelInProgress) { gState.players = newState.players; gState.pool = newState.pool; }
+                gState.status = newState.status; gState.spin_params = newState.spin_params;
+                gState.winner = newState.winner; gState.last_winner_id = newState.last_winner_id;
+                gState.round_id = newState.round_id; gState.game_number = newState.game_number;
                 gState.polygons = newState.polygons;
 
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
@@ -1406,13 +1330,10 @@
                 const myId = String(tg.initDataUnsafe?.user?.id);
                 const hasMyBet = gState.players.find(p => String(p.id) === myId);
                 const cancelBtn = document.getElementById('btn-cancel-bet');
-                if (cancelBtn) {
-                    cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
-                }
+                if (cancelBtn) cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
 
                 if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
-                    isSpinning = true;
-                    runSpinAnimation(gState.spin_params);
+                    isSpinning = true; runSpinAnimation(gState.spin_params);
                 } else if (gState.status !== 'spinning' && isSpinning) {
                     isSpinning = false;
                     if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
@@ -1440,16 +1361,15 @@
             const hasPlayers = gState.players && gState.players.length > 0;
             container.style.display = hasPlayers ? 'flex' : 'none';
             if (!hasPlayers) return;
-
             document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
             const sorted = [...gState.players].sort((a,b) => String(a.id).localeCompare(String(b.id)));
-
             list.innerHTML = sorted.map(p => {
                 const winPercent = formatWinChance(p.amount, gState.pool);
+                const colors = parseColors(p.color);
                 return `
                 <div class="bet-row" style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="display:flex; align-items: center; gap: 12px;">
-                        <span style="width:16px; height:16px; border-radius:50%; background:${p.color}; box-shadow: 0 0 6px ${p.color};"></span>
+                        <span style="width:16px; height:16px; border-radius:50%; background:${colors[0]}; box-shadow: 0 0 6px ${colors[0]};"></span>
                         <span style="font-weight: 500; font-size: 15px;">${escapeHtml(p.username)}</span>
                     </span>
                     <span style="display:flex; gap: 15px; align-items: center;">
@@ -1460,17 +1380,8 @@
             }).join('');
         }
 
-        function openBetConfirm(amt) {
-            betAmountTemp = amt;
-            document.getElementById('confirm-bet-amount').innerText = amt;
-            document.getElementById('confirm-bet-modal').classList.add('active');
-        }
-
-        function openCustomBet() {
-            document.getElementById('custom-bet-input').value = '';
-            document.getElementById('custom-bet-modal').classList.add('active');
-        }
-
+        function openBetConfirm(amt) { betAmountTemp = amt; document.getElementById('confirm-bet-amount').innerText = amt; document.getElementById('confirm-bet-modal').classList.add('active'); }
+        function openCustomBet() { document.getElementById('custom-bet-input').value = ''; document.getElementById('custom-bet-modal').classList.add('active'); }
         function submitCustomBet() {
             const inputVal = document.getElementById('custom-bet-input').value;
             const v = parseInt(inputVal, 10);
@@ -1481,17 +1392,14 @@
             if (typeof closeModal === 'function') closeModal('custom-bet-modal');
             openBetConfirm(v);
         }
-
         async function executeBet() {
             const btn = document.getElementById('btn-confirm-bet');
             if (btn) { btn.disabled = true; btn.innerText = 'Загрузка...'; }
             try {
                 const data = await apiFetch(`${API_BASE}/game/bet`, { method: 'POST', body: JSON.stringify({amount: betAmountTemp}) });
                 if (typeof closeModal === 'function') closeModal('confirm-bet-modal');
-                if (data.success) {
-                    await updateBalance();
-                    pollGame();
-                } else {
+                if (data.success) { await updateBalance(); pollGame(); }
+                else {
                     let msg = "Ставка не принята";
                     if (data.error === 'insufficient_funds') msg = "Недостаточно средств!";
                     else if (data.error === 'game_started') msg = "Игра уже началась!";
@@ -1500,40 +1408,20 @@
                     else if (data.error === 'invalid_amount') msg = "Ставка должна быть целым числом";
                     if (typeof showAlert === 'function') showAlert(msg);
                 }
-            } catch(e) {
-                if (typeof closeModal === 'function') closeModal('confirm-bet-modal');
-                if (typeof showAlert === 'function') showAlert("Ошибка сети");
-            }
+            } catch(e) { if (typeof closeModal === 'function') closeModal('confirm-bet-modal'); if (typeof showAlert === 'function') showAlert("Ошибка сети"); }
             if (btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
 
         function cancelGameBet() {
-            cancelInProgress = true;
-            document.getElementById('btn-cancel-bet').style.display = 'none';
-            gState.players = [];
-            gState.pool = 0;
-            drawGameFrame();
-            renderBetsList();
+            cancelInProgress = true; document.getElementById('btn-cancel-bet').style.display = 'none';
+            gState.players = []; gState.pool = 0; drawGameFrame(); renderBetsList();
             apiFetch(`${API_BASE}/game/cancel`, { method: 'POST', body: JSON.stringify({}) })
-                .then(() => {
-                    cancelInProgress = false;
-                    updateBalance();
-                    pollGame();
-                })
-                .catch(() => {
-                    cancelInProgress = false;
-                    updateBalance();
-                    pollGame();
-                });
+                .then(() => { cancelInProgress = false; updateBalance(); pollGame(); })
+                .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // Инициализация
         document.getElementById('cart-counter').innerText = cart.length;
-        updateBalance();
-        loadCatalog();
-        loadPrizeItems();
-        loadLeaderboardPreview();
-        pollGame();
+        updateBalance(); loadCatalog(); loadPrizeItems(); loadLeaderboardPreview(); pollGame();
         try { tg.expand(); } catch(e) {}
     </script>
 </body>
