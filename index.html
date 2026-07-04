@@ -1545,7 +1545,8 @@
                     drawGameFrame(null, highlightPolygon);
                 }
 
-                if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
+                // 👇 ВОТ ГЛАВНОЕ ИСПРАВЛЕНИЕ – показываем победителя сразу, как только он появился
+                if (willShowWinner && !isShowingWinner) {
                     const pageGame = document.getElementById('page-game');
                     if (pageGame && pageGame.classList.contains('page-active')) {
                         showWinnerSequence(gState.winner, gState.round_id);
