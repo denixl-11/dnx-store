@@ -326,6 +326,7 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
         player = item["player"]
         poly = item["polygon"]
         coords = [{"x": float(p[0]), "y": float(p[1])} for p in poly]
+        # Передаём photo_url в полигон, чтобы finish_round мог взять его оттуда
         final_polygons.append({
             "player_id": player["id"],
             "username": player["username"],
@@ -406,17 +407,25 @@ def generate_spin_params(polygons: list) -> dict:
 
 
 # ------------------------------------------------------------
-# Игровая механика
+# Игровая механика (тёмные градиенты, кортежи цветов)
 # ------------------------------------------------------------
 PLAYER_COLORS = [
-    "#FF6B6B", "#4ECDC4", "#FFD166", "#1A535C", "#FF8C42",
-    "#6C5CE7", "#A8E6CF", "#E17055", "#0984E3", "#FDCB6E",
-    "#E84393", "#00B894", "#636E72", "#D63031", "#81ECEC",
-    "#B794F4", "#F39C12", "#27AE60", "#8E44AD", "#16A085"
+    ("#0F2027", "#203A43"),  # Глубокий океан
+    ("#4A0E2E", "#2A081A"),  # Темный рубин
+    ("#0B3024", "#051A13"),  # Полуночный лес
+    ("#29134A", "#150A26"),  # Глубокий фиолетовый
+    ("#5C2C06", "#331803"),  # Жженый дуб
+    ("#0B1B3D", "#050D21"),  # Темный сапфир
+    ("#3A2F1D", "#1C160C"),  # Угольное золото
+    ("#3D1036", "#1E081A"),  # Сливовая ночь
+    ("#1A2A6C", "#112240"),  # Сумеречный горизонт
+    ("#3E1F00", "#1A0B00")  # Горький шоколад
 ]
 
 
 async def get_user_photo(user_id: int) -> str | None:
+    # Оставлен на случай, если понадобится в будущем.
+    # Сейчас photo_url берётся из полигона.
     try:
         photos = await bot.get_user_profile_photos(user_id, limit=1)
         if photos.total_count == 0:
@@ -455,20 +464,22 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
     winner_id = None
     winner_username = None
     winner_polygon = None
+    photo_url = None
+
     for poly in polygons:
         if point_in_polygon((x, y), poly["polygon"]):
             winner_id = poly["player_id"]
             winner_username = poly["username"]
             winner_polygon = poly["polygon"]
+            photo_url = poly.get("photo_url")  # берём готовое фото из полигона
             break
+
     if not winner_id:
         return None
 
     winner_bet = players[winner_id]["amount"]
     others_bets = pool - winner_bet
     profit = winner_bet + (others_bets * 0.7)
-
-    photo_url = await get_user_photo(int(winner_id))
 
     try:
         with get_db_connection() as conn:
@@ -772,7 +783,10 @@ async def handle_game_bet(request):
                 occupied_colors = {p["color"] for p in game_state["players"].values()}
                 available = [c for c in PLAYER_COLORS if c not in occupied_colors]
                 if not available:
-                    available = ["#" + ''.join(random.choices('0123456789ABCDEF', k=6))]
+                    available = [(
+                        "#" + ''.join(random.choices('0123456789ABCDEF', k=6)),
+                        "#" + ''.join(random.choices('0123456789ABCDEF', k=6))
+                    )]
                 color = random.choice(available)
                 photo_url = data.get('photo_url', '')
                 game_state["players"][user_id] = {

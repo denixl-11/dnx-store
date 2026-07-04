@@ -104,8 +104,15 @@
             border: 2px solid #444;
             background: #131315;
             box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            transform: translateZ(0);
+            isolation: isolate;
         }
-        #gameCanvas { width: 100%; height: 100%; display: block; }
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: inherit;
+        }
         .game-info-row {
             width: 85vw;
             max-width: 380px;
@@ -1008,7 +1015,6 @@
             return { x: x / f, y: y / f, area: area };
         }
 
-        // ПРЕМИАЛЬНЫЙ ЭКРАН ОЖИДАНИЯ
         function drawWaitingState(ctx, canvas) {
             const time = Date.now() * 0.001;
             const width = canvas.width;
@@ -1065,24 +1071,26 @@
             ctx.restore();
         }
 
+        // НОВАЯ ФУНКЦИЯ drawGameFrame (замена)
         function drawGameFrame(ballPos = null, highlightPts = null) {
             if (!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
 
-            // Если нет полигонов и статус ожидания — премиальный экран
-            if (!gState.polygons || gState.polygons.length === 0 || gState.status === 'waiting') {
-                if (gState.players.length === 0 || gState.status === 'waiting') {
-                    drawWaitingState(ctx, canvas);
-                    // Зацикливаем анимацию
-                    animationFrameId = requestAnimationFrame(() => drawGameFrame(ballPos, highlightPts));
-                    return;
-                }
+            if (animationFrameId && !isSpinning) {
+                cancelAnimationFrame(animationFrameId);
             }
 
-            // Фон или полигоны
-            if (gState.polygons && gState.polygons.length > 0) {
+            // ЛОГИКА: Экран ожидания показывается СТРОГО если 0 игроков
+            const isWaitingMode = gState.players.length === 0 && gState.status !== 'spinning';
+
+            if (isWaitingMode) {
+                // Отрисовка премиального экрана ожидания
+                drawWaitingState(ctx, canvas);
+            }
+            else if (gState.polygons && gState.polygons.length > 0) {
+                // Отрисовка полигонов (если 2 и более игроков)
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
                     if (pts.length < 3) continue;
@@ -1099,7 +1107,7 @@
                     ctx.stroke();
                 }
 
-                // Отрисовка аватарок
+                // Отрисовка аватарок для полигонов
                 for (const poly of gState.polygons) {
                     if (!poly.photo_url) continue;
                     const scaledPoints = poly.polygon.map(p => ({
@@ -1134,11 +1142,37 @@
                         imageCache[poly.photo_url] = newImg;
                     }
                 }
-            } else {
-                if (gState.players.length === 1) {
-                    const singlePlayer = gState.players[0];
-                    ctx.fillStyle = singlePlayer.color;
-                    ctx.fillRect(0, 0, cw, ch);
+            }
+            else if (gState.players.length === 1) {
+                // ЕСЛИ РОВНО 1 ИГРОК - полностью заливаем поле его цветом
+                const singlePlayer = gState.players[0];
+                ctx.fillStyle = singlePlayer.color;
+                ctx.fillRect(0, 0, cw, ch);
+
+                // Бонус: Рисуем аватарку единственного игрока ровно по центру
+                if (singlePlayer.photo_url) {
+                    const radius = 45; // Максимальный размер
+                    const img = imageCache[singlePlayer.photo_url];
+
+                    if (img && img.complete) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
+                        ctx.clip();
+                        ctx.drawImage(img, cw / 2 - radius, ch / 2 - radius, radius * 2, radius * 2);
+                        ctx.restore();
+
+                        ctx.beginPath();
+                        ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+                        ctx.stroke();
+                    } else if (!img) {
+                        const newImg = new Image();
+                        newImg.crossOrigin = "anonymous";
+                        newImg.src = singlePlayer.photo_url;
+                        imageCache[singlePlayer.photo_url] = newImg;
+                    }
                 }
             }
 
@@ -1162,7 +1196,7 @@
                 ctx.restore();
             }
 
-            // Шарик и стрелка
+            // Отрисовка шарика и стрелки
             if (ballPos) {
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
@@ -1197,8 +1231,8 @@
                 ctx.closePath();
             }
 
-            // Зацикливаем анимацию, если не активна спин-анимация
-            if (!isSpinning && !gState.polygons) {
+            // Запускаем бесконечный цикл анимации ТОЛЬКО для экрана ожидания
+            if (isWaitingMode && !isSpinning) {
                 animationFrameId = requestAnimationFrame(() => drawGameFrame(ballPos, highlightPts));
             }
         }
