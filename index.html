@@ -981,6 +981,7 @@
         let initialGameStateLoaded = false;
         let highlightPolygon = null;
         let isShowingWinner = false;
+        let finalBallPos = null; // финальная позиция шарика для подсветки
 
         let cancelInProgress = false;
         let betAmountTemp = null;
@@ -1029,7 +1030,7 @@
         }
 
         function drawWaitingState(ctx, canvas) {
-            const time = Date.now() * 0.001; 
+            const time = Date.now() * 0.001;
             const width = canvas.width;
             const height = canvas.height;
 
@@ -1042,9 +1043,9 @@
             ctx.save();
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-            
+
             const tileSize = 80;
-            const offset = (time * 15) % tileSize; 
+            const offset = (time * 15) % tileSize;
 
             for (let x = -tileSize; x < width + tileSize; x += tileSize) {
                 for (let y = -tileSize; y < height + tileSize; y += tileSize) {
@@ -1054,14 +1055,14 @@
                     const size = 18;
 
                     ctx.beginPath();
-                    if (shapeType === 0) { 
+                    if (shapeType === 0) {
                         ctx.arc(cx, cy, size, 0, Math.PI * 2);
-                    } else if (shapeType === 1) { 
+                    } else if (shapeType === 1) {
                         ctx.moveTo(cx, cy - size);
                         ctx.lineTo(cx + size + 4, cy + size);
                         ctx.lineTo(cx - size - 4, cy + size);
                         ctx.closePath();
-                    } else { 
+                    } else {
                         ctx.rect(cx - size, cy - size, size * 2, size * 2);
                     }
                     ctx.stroke();
@@ -1070,10 +1071,10 @@
             ctx.restore();
 
             ctx.save();
-            const pulse = (Math.sin(time * 3) + 1) / 2; 
-            const alpha = 0.4 + (pulse * 0.6); 
+            const pulse = (Math.sin(time * 3) + 1) / 2;
+            const alpha = 0.4 + (pulse * 0.6);
 
-            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`; 
+            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`;
             ctx.shadowColor = `rgba(224, 179, 102, ${pulse * 0.8})`;
             ctx.shadowBlur = 15 + (pulse * 10);
 
@@ -1098,7 +1099,7 @@
 
             if (isWaitingMode) {
                 drawWaitingState(ctx, canvas);
-            } 
+            }
             else if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
@@ -1261,15 +1262,6 @@
             }
 
             if (ballPos) {
-                const BALL_RADIUS = 20;
-                const normRadiusX = BALL_RADIUS / cw;
-                const normRadiusY = BALL_RADIUS / ch;
-
-                if (ballPos.x < normRadiusX) ballPos.x = normRadiusX;
-                if (ballPos.x > 1 - normRadiusX) ballPos.x = 1 - normRadiusX;
-                if (ballPos.y < normRadiusY) ballPos.y = normRadiusY;
-                if (ballPos.y > 1 - normRadiusY) ballPos.y = 1 - normRadiusY;
-
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
                 if (ballPos.angle !== undefined && !ballPos.prev) {
@@ -1339,8 +1331,9 @@
                     const motionElapsed = elapsed - (spinDuration + 1000);
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
-                        const finalPos = trajectory[trajectory.length - 1];
-                        drawGameFrame(finalPos, highlightPolygon);
+                        // движение завершено, запоминаем финальную точку и запускаем получение победителя
+                        finalBallPos = trajectory[trajectory.length - 1];
+                        drawGameFrame(finalBallPos, highlightPolygon);
                         animationFrameId = null;
                         fetchWinnerNow();
                         return;
@@ -1353,8 +1346,9 @@
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else {
-                    const finalPos = trajectory[trajectory.length - 1];
-                    drawGameFrame(finalPos, highlightPolygon);
+                    // если время вышло за пределы ожидаемого, завершаем
+                    finalBallPos = trajectory[trajectory.length - 1];
+                    drawGameFrame(finalBallPos, highlightPolygon);
                     animationFrameId = null;
                     fetchWinnerNow();
                 }
@@ -1378,20 +1372,25 @@
 
             if (winnerData.polygon) {
                 highlightPolygon = winnerData.polygon;
-                drawGameFrame(null, highlightPolygon);
+                // отрисовываем шарик (если есть) и подсветку
+                drawGameFrame(finalBallPos, highlightPolygon);
 
+                // ждём 1.5 секунды
                 await new Promise(r => setTimeout(r, 1500));
             }
 
+            // показываем модальное окно
             showWinnerModal(winnerData);
             updateBalance();
 
+            // сбрасываем состояние
             gState.polygons = [];
             gState.players = [];
             highlightPolygon = null;
+            finalBallPos = null;
             isShowingWinner = false;
 
-            drawGameFrame();
+            drawGameFrame(); // waiting mode
         }
 
         async function fetchWinnerNow() {

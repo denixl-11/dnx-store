@@ -76,7 +76,7 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                # Предметы (минимальная структура, чтобы бэкенд не падал)
+                # Предметы
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS items (
                         id SERIAL PRIMARY KEY,
@@ -91,7 +91,6 @@ def init_db():
                         last_event VARCHAR(50)
                     )
                 """)
-                # Игровая история
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -101,7 +100,6 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
-                # Счётчик игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_counter (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -113,7 +111,6 @@ def init_db():
                 last_num = cur.fetchone()[0]
                 game_state["game_number"] = last_num
 
-                # Лидерборд
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS leaderboard (
                         user_id VARCHAR(255) PRIMARY KEY,
@@ -121,7 +118,6 @@ def init_db():
                         wins INT DEFAULT 0
                     )
                 """)
-                # Сезон
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS season (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -130,7 +126,6 @@ def init_db():
                 """)
                 cur.execute(
                     "INSERT INTO season (id, end_time) VALUES (1, '2026-06-30 15:00:00+00') ON CONFLICT (id) DO NOTHING")
-                # Призовые предметы
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS prize_items (
                         id SERIAL PRIMARY KEY,
@@ -305,9 +300,6 @@ def recursive_bsp_split(poly, players, weights, depth=0):
         res.extend(recursive_bsp_split([], players[half:], weights[half:], depth + 1))
         return res
 
-    xs, ys = [p[0] for p in poly], [p[1] for p in poly]
-    dx, dy = max(xs) - min(xs), max(ys) - min(ys)
-
     if depth == 0:
         base_angle = random.choice([math.pi / 4, 3 * math.pi / 4])
         angle = base_angle + random.uniform(-0.2, 0.2)
@@ -357,7 +349,7 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
 # ------------------------------------------------------------
 # Генерация траектории
 # ------------------------------------------------------------
-def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
+def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16, ball_radius_px=20):
     x = start_x
     y = start_y
     vx = math.cos(angle) * speed
@@ -374,17 +366,18 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
         step_y = vy * speed_factor * (dt / 1000)
         x += step_x
         y += step_y
-        if x <= 0:
-            x = 0
+        # Отскок с учётом радиуса
+        if x <= ball_radius_px:
+            x = ball_radius_px
             vx = abs(vx) * 0.9
-        elif x >= 1000:
-            x = 1000
+        elif x >= 1000 - ball_radius_px:
+            x = 1000 - ball_radius_px
             vx = -abs(vx) * 0.9
-        if y <= 0:
-            y = 0
+        if y <= ball_radius_px:
+            y = ball_radius_px
             vy = abs(vy) * 0.9
-        elif y >= 1000:
-            y = 1000
+        elif y >= 1000 - ball_radius_px:
+            y = 1000 - ball_radius_px
             vy = -abs(vy) * 0.9
         frames.append({"x": x / 1000, "y": y / 1000})
         elapsed += dt
@@ -393,8 +386,8 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
 
 
 def generate_spin_params(polygons: list) -> dict:
-    start_x = random.uniform(0.1, 0.9) * 1000
-    start_y = random.uniform(0.1, 0.9) * 1000
+    start_x = random.uniform(0.2, 0.8) * 1000
+    start_y = random.uniform(0.2, 0.8) * 1000
 
     spin_duration = 3000
     spin_angle_speed = random.uniform(4.5 * math.pi, 13.5 * math.pi)
@@ -407,10 +400,9 @@ def generate_spin_params(polygons: list) -> dict:
     motion_speed = base_speed * (2.2 / 1.5)
 
     motion_trajectory = generate_motion_trajectory(
-        start_x, start_y, final_angle, motion_speed, 10000, dt=16
+        start_x, start_y, final_angle, motion_speed, 10000, dt=16, ball_radius_px=20
     )
     final_point = motion_trajectory[-1]
-    target_x = final_point["x"]
 
     return {
         "startPos": {"x": start_x / 1000, "y": start_y / 1000},
@@ -418,13 +410,13 @@ def generate_spin_params(polygons: list) -> dict:
         "spinAngleStart": spin_angle_start,
         "spinAngleSpeed": spin_angle_speed,
         "trajectory": motion_trajectory,
-        "target_position": target_x,
+        "target_position": final_point["x"],
         "polygons": polygons
     }
 
 
 # ------------------------------------------------------------
-# Игровая механика (тёмные градиенты, кортежи цветов)
+# Игровая механика
 # ------------------------------------------------------------
 PLAYER_COLORS = [
     ("#7F00FF", "#E100FF"),
@@ -438,19 +430,6 @@ PLAYER_COLORS = [
     ("#00FF87", "#60EFFF"),
     ("#A8BFFF", "#884AF6")
 ]
-
-
-async def get_user_photo(user_id: int) -> str | None:
-    try:
-        photos = await bot.get_user_profile_photos(user_id, limit=1)
-        if photos.total_count == 0:
-            return None
-        file_id = photos.photos[0][-1].file_id
-        file = await bot.get_file(file_id)
-        return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
-    except Exception as e:
-        logging.error(f"Failed to get photo for user {user_id}: {e}")
-        return None
 
 
 def point_in_polygon(point, polygon):
@@ -546,16 +525,11 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
-
-                    # ❗️ Больше никакого перестроения полигонов!
-                    # Берём строго те области, которые зафиксировались во время приёма ставок.
                     if not game_state.get("polygons"):
-                        # Защитный фолбэк (на случай непредвиденных багов)
                         game_state["polygons"] = build_weighted_voronoi(
                             list(game_state["players"].values()),
                             (0.0, 0.0, 1.0, 1.0)
                         )
-
                     spin_params = generate_spin_params(game_state["polygons"])
                     game_state["spin_params"] = spin_params
                     game_state["target_position"] = spin_params["target_position"]
