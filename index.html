@@ -956,7 +956,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – ФИНАЛЬНАЯ ВЕРСИЯ
+        //  ИГРОВАЯ ЛОГИКА (ПОЛИГОНЫ ВОРОНОГО) – С ПРЕМИАЛЬНЫМ ЭКРАНОМ ОЖИДАНИЯ
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -979,8 +979,6 @@
         let betAmountTemp = null;
         let winnerTimer = null;
         let lastLeaderboardUpdate = 0;
-
-        const PADDING = 6; // минимальный отступ, чтобы обводка не уходила за край canvas
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -1010,13 +1008,78 @@
             return { x: x / f, y: y / f, area: area };
         }
 
+        // ПРЕМИАЛЬНЫЙ ЭКРАН ОЖИДАНИЯ
+        function drawWaitingState(ctx, canvas) {
+            const time = Date.now() * 0.001;
+            const width = canvas.width;
+            const height = canvas.height;
+
+            const bgGradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width);
+            bgGradient.addColorStop(0, '#1E1E1E');
+            bgGradient.addColorStop(1, '#0A0A0A');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.save();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+
+            const tileSize = 80;
+            const offset = (time * 15) % tileSize;
+
+            for (let x = -tileSize; x < width + tileSize; x += tileSize) {
+                for (let y = -tileSize; y < height + tileSize; y += tileSize) {
+                    const shapeType = (Math.floor(x / tileSize) + Math.floor(y / tileSize)) % 3;
+                    const cx = x + offset;
+                    const cy = y + offset;
+                    const size = 18;
+
+                    ctx.beginPath();
+                    if (shapeType === 0) {
+                        ctx.arc(cx, cy, size, 0, Math.PI * 2);
+                    } else if (shapeType === 1) {
+                        ctx.moveTo(cx, cy - size);
+                        ctx.lineTo(cx + size + 4, cy + size);
+                        ctx.lineTo(cx - size - 4, cy + size);
+                        ctx.closePath();
+                    } else {
+                        ctx.rect(cx - size, cy - size, size * 2, size * 2);
+                    }
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+
+            ctx.save();
+            const pulse = (Math.sin(time * 3) + 1) / 2;
+            const alpha = 0.4 + (pulse * 0.6);
+
+            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`;
+            ctx.shadowColor = `rgba(224, 179, 102, ${pulse * 0.8})`;
+            ctx.shadowBlur = 15 + (pulse * 10);
+
+            ctx.font = "bold 24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("Ожидание игроков...", width / 2, height / 2);
+            ctx.restore();
+        }
+
         function drawGameFrame(ballPos = null, highlightPts = null) {
             if (!ctx) return;
             const cw = canvas.width;
             const ch = canvas.height;
-            const drawWidth = cw - PADDING * 2;
-            const drawHeight = ch - PADDING * 2;
             ctx.clearRect(0, 0, cw, ch);
+
+            // Если нет полигонов и статус ожидания — премиальный экран
+            if (!gState.polygons || gState.polygons.length === 0 || gState.status === 'waiting') {
+                if (gState.players.length === 0 || gState.status === 'waiting') {
+                    drawWaitingState(ctx, canvas);
+                    // Зацикливаем анимацию
+                    animationFrameId = requestAnimationFrame(() => drawGameFrame(ballPos, highlightPts));
+                    return;
+                }
+            }
 
             // Фон или полигоны
             if (gState.polygons && gState.polygons.length > 0) {
@@ -1024,9 +1087,9 @@
                     const pts = poly.polygon;
                     if (pts.length < 3) continue;
                     ctx.beginPath();
-                    ctx.moveTo(PADDING + pts[0].x * drawWidth, PADDING + (1 - pts[0].y) * drawHeight);
+                    ctx.moveTo(pts[0].x * cw, (1 - pts[0].y) * ch);
                     for (let i = 1; i < pts.length; i++) {
-                        ctx.lineTo(PADDING + pts[i].x * drawWidth, PADDING + (1 - pts[i].y) * drawHeight);
+                        ctx.lineTo(pts[i].x * cw, (1 - pts[i].y) * ch);
                     }
                     ctx.closePath();
                     ctx.fillStyle = poly.color;
@@ -1040,8 +1103,8 @@
                 for (const poly of gState.polygons) {
                     if (!poly.photo_url) continue;
                     const scaledPoints = poly.polygon.map(p => ({
-                        x: PADDING + p.x * drawWidth,
-                        y: PADDING + (1 - p.y) * drawHeight
+                        x: p.x * cw,
+                        y: (1 - p.y) * ch
                     }));
                     const centroid = getPolygonCentroid(scaledPoints);
                     const maxRadius = 45;
@@ -1076,23 +1139,19 @@
                     const singlePlayer = gState.players[0];
                     ctx.fillStyle = singlePlayer.color;
                     ctx.fillRect(0, 0, cw, ch);
-                } else {
-                    ctx.fillStyle = "rgba(255,255,255,0.05)";
-                    ctx.fillRect(0, 0, cw, ch);
-                    ctx.fillStyle = "#555";
-                    ctx.font = "30px Inter";
-                    ctx.textAlign = "center";
-                    ctx.fillText("Ожидание игроков...", cw / 2, ch / 2);
                 }
             }
 
-            // Подсветка полигона победителя (без тени, чтобы не обрезалась)
+            // Подсветка полигона победителя
             if (highlightPts && highlightPts.length >= 3) {
+                const INSET = 2;
+                const dw = cw - INSET * 2;
+                const dh = ch - INSET * 2;
                 ctx.save();
                 ctx.beginPath();
-                ctx.moveTo(PADDING + highlightPts[0].x * drawWidth, PADDING + (1 - highlightPts[0].y) * drawHeight);
+                ctx.moveTo(INSET + highlightPts[0].x * dw, INSET + (1 - highlightPts[0].y) * dh);
                 for (let i = 1; i < highlightPts.length; i++) {
-                    ctx.lineTo(PADDING + highlightPts[i].x * drawWidth, PADDING + (1 - highlightPts[i].y) * drawHeight);
+                    ctx.lineTo(INSET + highlightPts[i].x * dw, INSET + (1 - highlightPts[i].y) * dh);
                 }
                 ctx.closePath();
                 ctx.fillStyle = "rgba(255, 215, 0, 0.2)";
@@ -1105,8 +1164,8 @@
 
             // Шарик и стрелка
             if (ballPos) {
-                const bx = PADDING + ballPos.x * drawWidth;
-                const by = PADDING + (1 - ballPos.y) * drawHeight;
+                const bx = ballPos.x * cw;
+                const by = (1 - ballPos.y) * ch;
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const drawAngle = -ballPos.angle;
                     const arrowLen = 35;
@@ -1136,6 +1195,11 @@
                 ctx.fill();
                 ctx.shadowBlur = 0;
                 ctx.closePath();
+            }
+
+            // Зацикливаем анимацию, если не активна спин-анимация
+            if (!isSpinning && !gState.polygons) {
+                animationFrameId = requestAnimationFrame(() => drawGameFrame(ballPos, highlightPts));
             }
         }
 
