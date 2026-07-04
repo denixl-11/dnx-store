@@ -1151,7 +1151,6 @@
                     if (radius < minRadius) radius = minRadius;
 
                     if (!poly.photo_url) {
-                        // Fallback: буква, если нет аватарки
                         ctx.save();
                         ctx.beginPath();
                         ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
@@ -1192,7 +1191,7 @@
                         imageCache[poly.photo_url] = newImg;
                     }
                 }
-            } 
+            }
             else if (gState.players.length === 1) {
                 const singlePlayer = gState.players[0];
                 const colors = parseColors(singlePlayer.color);
@@ -1201,7 +1200,7 @@
                 grad.addColorStop(1, colors[1]);
                 ctx.fillStyle = grad;
                 ctx.fillRect(0, 0, cw, ch);
-                
+
                 const radius = 45;
                 if (!singlePlayer.photo_url) {
                     ctx.save();
@@ -1266,7 +1265,6 @@
                 const normRadiusX = BALL_RADIUS / cw;
                 const normRadiusY = BALL_RADIUS / ch;
 
-                // Ограничиваем шарик внутри поля
                 if (ballPos.x < normRadiusX) ballPos.x = normRadiusX;
                 if (ballPos.x > 1 - normRadiusX) ballPos.x = 1 - normRadiusX;
                 if (ballPos.y < normRadiusY) ballPos.y = normRadiusY;
@@ -1373,39 +1371,34 @@
             return parseFloat(percent.toFixed(3)).toString();
         }
 
-        // НОВОЕ: задержка перед показом окна победителя, подсветка держится 1.5 секунды
         async function showWinnerSequence(winnerData, roundId) {
             if (isShowingWinner) return;
             isShowingWinner = true;
-            
             lastShownRoundId = roundId;
-            localStorage.setItem('last_round_id', lastShownRoundId);
 
-            // Включаем золотую подсветку (highlightPolygon уже должен быть установлен в winnerData.polygon)
-            if (winnerData.polygon && winnerData.polygon.length >= 3) {
+            if (winnerData.polygon) {
                 highlightPolygon = winnerData.polygon;
                 drawGameFrame(null, highlightPolygon);
 
-                // Ждём 1.5 секунды, чтобы игрок увидел подсветку
                 await new Promise(r => setTimeout(r, 1500));
             }
 
-            // Теперь показываем модальное окно
             showWinnerModal(winnerData);
-            if (typeof updateBalance === 'function') await updateBalance();
-            
-            // После показа окна очищаем поле и подсветку
+            updateBalance();
+
             gState.polygons = [];
             gState.players = [];
             highlightPolygon = null;
             isShowingWinner = false;
+
+            drawGameFrame();
         }
 
         async function fetchWinnerNow() {
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
-                
+
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     await showWinnerSequence(state.winner, state.round_id);
                 }
@@ -1429,89 +1422,83 @@
         }
 
         async function pollGame() {
-            try {
-                const r = await fetch(`${API_BASE}/game/state`);
-                const newState = await r.json();
+            const r = await fetch(`${API_BASE}/game/state`);
+            const newState = await r.json();
 
-                if (!initialGameStateLoaded) {
-                    initialGameStateLoaded = true;
-                    if (newState.round_id) {
-                        lastShownRoundId = newState.round_id;
-                        localStorage.setItem('last_round_id', lastShownRoundId);
-                    }
+            if (!initialGameStateLoaded) {
+                initialGameStateLoaded = true;
+                if (newState.round_id) lastShownRoundId = newState.round_id;
+            }
+
+            // ЗАМОРОЗКА обновлений, пока показывается победитель
+            if (isShowingWinner) return;
+
+            if (newState.status === 'counting') {
+                if (Math.abs(gState.timer - newState.timer) > 1 || !timerInterval) {
+                    gState.timer = newState.timer;
+                    document.getElementById('game-timer-bg').innerText = gState.timer;
                 }
-
-                if (newState.status === 'waiting') {
-                    highlightPolygon = null;
+                if (!timerInterval) {
+                    timerInterval = setInterval(() => {
+                        if (gState.timer > 0) {
+                            gState.timer--;
+                            document.getElementById('game-timer-bg').innerText = gState.timer;
+                        } else {
+                            clearInterval(timerInterval);
+                            timerInterval = null;
+                        }
+                    }, 1000);
                 }
+            } else {
+                if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+                document.getElementById('game-timer-bg').innerText = '';
+            }
 
-                if (newState.status === 'counting') {
-                    if (Math.abs(gState.timer - newState.timer) > 1 || !timerInterval) {
-                        gState.timer = newState.timer;
-                        document.getElementById('game-timer-bg').innerText = gState.timer;
-                    }
-                    if (!timerInterval) {
-                        timerInterval = setInterval(() => {
-                            if (gState.timer > 0) {
-                                gState.timer--;
-                                document.getElementById('game-timer-bg').innerText = gState.timer;
-                            } else {
-                                clearInterval(timerInterval);
-                                timerInterval = null;
-                            }
-                        }, 1000);
-                    }
-                } else {
-                    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-                    document.getElementById('game-timer-bg').innerText = '';
+            if (!cancelInProgress) {
+                gState.players = newState.players;
+                gState.pool = newState.pool;
+            }
+            gState.status = newState.status;
+            gState.spin_params = newState.spin_params;
+            gState.winner = newState.winner;
+            gState.last_winner_id = newState.last_winner_id;
+            gState.round_id = newState.round_id;
+            gState.game_number = newState.game_number;
+            gState.polygons = newState.polygons;
+
+            document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
+            document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
+            renderBetsList();
+
+            if (!isSpinning && !isShowingWinner) drawGameFrame(null, highlightPolygon);
+
+            const myId = String(tg.initDataUnsafe?.user?.id);
+            const hasMyBet = gState.players.find(p => String(p.id) === myId);
+            const cancelBtn = document.getElementById('btn-cancel-bet');
+            if (cancelBtn) {
+                cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
+            }
+
+            if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
+                isSpinning = true;
+                runSpinAnimation(gState.spin_params);
+            } else if (gState.status !== 'spinning' && isSpinning) {
+                isSpinning = false;
+                if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+                drawGameFrame(null, highlightPolygon);
+            }
+
+            if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
+                const pageGame = document.getElementById('page-game');
+                if (pageGame && pageGame.classList.contains('page-active')) {
+                    showWinnerSequence(gState.winner, gState.round_id);
                 }
+            }
 
-                if (!cancelInProgress) {
-                    gState.players = newState.players;
-                    gState.pool = newState.pool;
-                }
-                gState.status = newState.status;
-                gState.spin_params = newState.spin_params;
-                gState.winner = newState.winner;
-                gState.last_winner_id = newState.last_winner_id;
-                gState.round_id = newState.round_id;
-                gState.game_number = newState.game_number;
-                gState.polygons = newState.polygons;
-
-                document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
-                document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
-                renderBetsList();
-
-                if (!isSpinning && !isShowingWinner) drawGameFrame(null, highlightPolygon);
-
-                const myId = String(tg.initDataUnsafe?.user?.id);
-                const hasMyBet = gState.players.find(p => String(p.id) === myId);
-                const cancelBtn = document.getElementById('btn-cancel-bet');
-                if (cancelBtn) {
-                    cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
-                }
-
-                if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
-                    isSpinning = true;
-                    runSpinAnimation(gState.spin_params);
-                } else if (gState.status !== 'spinning' && isSpinning) {
-                    isSpinning = false;
-                    if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
-                    drawGameFrame(null, highlightPolygon);
-                }
-
-                if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
-                    const pageGame = document.getElementById('page-game');
-                    if (pageGame && pageGame.classList.contains('page-active')) {
-                        showWinnerSequence(gState.winner, gState.round_id);
-                    }
-                }
-
-                if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
-                    if (typeof loadLeaderboardPreview === 'function') loadLeaderboardPreview();
-                    lastLeaderboardUpdate = Date.now();
-                }
-            } catch(e) { console.error("Game poll error", e); }
+            if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
+                if (typeof loadLeaderboardPreview === 'function') loadLeaderboardPreview();
+                lastLeaderboardUpdate = Date.now();
+            }
         }
         setInterval(pollGame, 1000);
 

@@ -68,6 +68,7 @@ def init_db():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # Пользователи
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
@@ -75,8 +76,22 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
-                cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
+                # Предметы (минимальная структура, чтобы бэкенд не падал)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS items (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(255),
+                        price NUMERIC DEFAULT 0.0,
+                        status VARCHAR(50) DEFAULT 'Доступен',
+                        image_url TEXT,
+                        nft_link TEXT DEFAULT '',
+                        traits JSONB DEFAULT '[]'::jsonb,
+                        buyer_id VARCHAR(255),
+                        number VARCHAR(20),
+                        last_event VARCHAR(50)
+                    )
+                """)
+                # Игровая история
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -86,6 +101,7 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
+                # Счётчик игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_counter (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -97,6 +113,7 @@ def init_db():
                 last_num = cur.fetchone()[0]
                 game_state["game_number"] = last_num
 
+                # Лидерборд
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS leaderboard (
                         user_id VARCHAR(255) PRIMARY KEY,
@@ -104,6 +121,7 @@ def init_db():
                         wins INT DEFAULT 0
                     )
                 """)
+                # Сезон
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS season (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -112,6 +130,7 @@ def init_db():
                 """)
                 cur.execute(
                     "INSERT INTO season (id, end_time) VALUES (1, '2026-06-30 15:00:00+00') ON CONFLICT (id) DO NOTHING")
+                # Призовые предметы
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS prize_items (
                         id SERIAL PRIMARY KEY,
@@ -289,7 +308,6 @@ def recursive_bsp_split(poly, players, weights, depth=0):
     xs, ys = [p[0] for p in poly], [p[1] for p in poly]
     dx, dy = max(xs) - min(xs), max(ys) - min(ys)
 
-    # TRIANGLE ANGLES
     if depth == 0:
         base_angle = random.choice([math.pi / 4, 3 * math.pi / 4])
         angle = base_angle + random.uniform(-0.2, 0.2)
@@ -326,7 +344,6 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
         player = item["player"]
         poly = item["polygon"]
         coords = [{"x": float(p[0]), "y": float(p[1])} for p in poly]
-        # Передаём photo_url в полигон, чтобы finish_round мог взять его оттуда
         final_polygons.append({
             "player_id": player["id"],
             "username": player["username"],
@@ -424,8 +441,6 @@ PLAYER_COLORS = [
 
 
 async def get_user_photo(user_id: int) -> str | None:
-    # Оставлен на случай, если понадобится в будущем.
-    # Сейчас photo_url берётся из полигона.
     try:
         photos = await bot.get_user_profile_photos(user_id, limit=1)
         if photos.total_count == 0:
@@ -471,7 +486,7 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
             winner_id = poly["player_id"]
             winner_username = poly["username"]
             winner_polygon = poly["polygon"]
-            photo_url = poly.get("photo_url")  # берём готовое фото из полигона
+            photo_url = poly.get("photo_url")
             break
 
     if not winner_id:
@@ -531,19 +546,23 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
-                    game_state["polygons"] = build_weighted_voronoi(
-                        list(game_state["players"].values()),
-                        (0.0, 0.0, 1.0, 1.0)
-                    )
+
+                    # ❗️ Больше никакого перестроения полигонов!
+                    # Берём строго те области, которые зафиксировались во время приёма ставок.
+                    if not game_state.get("polygons"):
+                        # Защитный фолбэк (на случай непредвиденных багов)
+                        game_state["polygons"] = build_weighted_voronoi(
+                            list(game_state["players"].values()),
+                            (0.0, 0.0, 1.0, 1.0)
+                        )
+
                     spin_params = generate_spin_params(game_state["polygons"])
                     game_state["spin_params"] = spin_params
-                    game_state["polygons"] = spin_params["polygons"]
                     game_state["target_position"] = spin_params["target_position"]
                     game_state["round_id"] = random.randint(1, 10 ** 9)
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
-                    logging.info("Spinning with triangle BSP polygons")
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(3 + 1 + 10 + 1 + 0.5)
@@ -564,8 +583,6 @@ async def game_worker():
                     game_state["pool"] = 0.0
                     game_state["timer"] = 15
                     game_state["polygons"] = None
-                    logging.info(f"Round finished, winner: {winner_data}")
-
                     asyncio.create_task(clear_last_polygons_after_delay(0.3))
 
 
