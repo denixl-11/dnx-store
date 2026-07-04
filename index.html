@@ -981,7 +981,7 @@
         let initialGameStateLoaded = false;
         let highlightPolygon = null;
         let isShowingWinner = false;
-        let finalBallPos = null; // финальная позиция шарика для подсветки
+        let finalBallPos = null;
 
         let cancelInProgress = false;
         let betAmountTemp = null;
@@ -1030,7 +1030,7 @@
         }
 
         function drawWaitingState(ctx, canvas) {
-            const time = Date.now() * 0.001;
+            const time = Date.now() * 0.001; 
             const width = canvas.width;
             const height = canvas.height;
 
@@ -1043,9 +1043,9 @@
             ctx.save();
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-
+            
             const tileSize = 80;
-            const offset = (time * 15) % tileSize;
+            const offset = (time * 15) % tileSize; 
 
             for (let x = -tileSize; x < width + tileSize; x += tileSize) {
                 for (let y = -tileSize; y < height + tileSize; y += tileSize) {
@@ -1055,14 +1055,14 @@
                     const size = 18;
 
                     ctx.beginPath();
-                    if (shapeType === 0) {
+                    if (shapeType === 0) { 
                         ctx.arc(cx, cy, size, 0, Math.PI * 2);
-                    } else if (shapeType === 1) {
+                    } else if (shapeType === 1) { 
                         ctx.moveTo(cx, cy - size);
                         ctx.lineTo(cx + size + 4, cy + size);
                         ctx.lineTo(cx - size - 4, cy + size);
                         ctx.closePath();
-                    } else {
+                    } else { 
                         ctx.rect(cx - size, cy - size, size * 2, size * 2);
                     }
                     ctx.stroke();
@@ -1071,10 +1071,10 @@
             ctx.restore();
 
             ctx.save();
-            const pulse = (Math.sin(time * 3) + 1) / 2;
-            const alpha = 0.4 + (pulse * 0.6);
+            const pulse = (Math.sin(time * 3) + 1) / 2; 
+            const alpha = 0.4 + (pulse * 0.6); 
 
-            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`;
+            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`; 
             ctx.shadowColor = `rgba(224, 179, 102, ${pulse * 0.8})`;
             ctx.shadowBlur = 15 + (pulse * 10);
 
@@ -1099,7 +1099,7 @@
 
             if (isWaitingMode) {
                 drawWaitingState(ctx, canvas);
-            }
+            } 
             else if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
@@ -1192,7 +1192,7 @@
                         imageCache[poly.photo_url] = newImg;
                     }
                 }
-            }
+            } 
             else if (gState.players.length === 1) {
                 const singlePlayer = gState.players[0];
                 const colors = parseColors(singlePlayer.color);
@@ -1201,7 +1201,7 @@
                 grad.addColorStop(1, colors[1]);
                 ctx.fillStyle = grad;
                 ctx.fillRect(0, 0, cw, ch);
-
+                
                 const radius = 45;
                 if (!singlePlayer.photo_url) {
                     ctx.save();
@@ -1314,24 +1314,20 @@
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
                     const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration / 1000);
                     pauseAngle = angle;
-                    const ball = { x: startPos.x, y: startPos.y, angle };
-                    drawGameFrame(ball, highlightPolygon);
+                    drawGameFrame({ x: startPos.x, y: startPos.y, angle }, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else if (elapsed < spinDuration + 1000) {
                     if (pauseAngle === null && trajectory.length > 0) {
-                        const firstMove = trajectory[0];
-                        pauseAngle = Math.atan2(firstMove.y - startPos.y, firstMove.x - startPos.x);
+                        pauseAngle = Math.atan2(trajectory[0].y - startPos.y, trajectory[0].x - startPos.x);
                     }
-                    const ball = { x: startPos.x, y: startPos.y, angle: pauseAngle };
-                    drawGameFrame(ball, highlightPolygon);
+                    drawGameFrame({ x: startPos.x, y: startPos.y, angle: pauseAngle }, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else if (elapsed < spinDuration + 1000 + 10000) {
                     const motionElapsed = elapsed - (spinDuration + 1000);
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
-                        // движение завершено, запоминаем финальную точку и запускаем получение победителя
                         finalBallPos = trajectory[trajectory.length - 1];
                         drawGameFrame(finalBallPos, highlightPolygon);
                         animationFrameId = null;
@@ -1346,7 +1342,6 @@
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else {
-                    // если время вышло за пределы ожидаемого, завершаем
                     finalBallPos = trajectory[trajectory.length - 1];
                     drawGameFrame(finalBallPos, highlightPolygon);
                     animationFrameId = null;
@@ -1372,32 +1367,24 @@
 
             if (winnerData.polygon) {
                 highlightPolygon = winnerData.polygon;
-                // отрисовываем шарик (если есть) и подсветку
                 drawGameFrame(finalBallPos, highlightPolygon);
-
-                // ждём 1.5 секунды
                 await new Promise(r => setTimeout(r, 1500));
             }
-
-            // показываем модальное окно
+            
             showWinnerModal(winnerData);
-            updateBalance();
-
-            // сбрасываем состояние
-            gState.polygons = [];
-            gState.players = [];
+            if (typeof updateBalance === 'function') await updateBalance();
+            
+            // Сбрасываем только подсветку и флаг, полигоны останутся до прихода нового состояния
             highlightPolygon = null;
             finalBallPos = null;
             isShowingWinner = false;
-
-            drawGameFrame(); // waiting mode
         }
 
         async function fetchWinnerNow() {
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
-
+                
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     await showWinnerSequence(state.winner, state.round_id);
                 }
