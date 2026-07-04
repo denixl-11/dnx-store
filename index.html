@@ -1029,7 +1029,7 @@
         }
 
         function drawWaitingState(ctx, canvas) {
-            const time = Date.now() * 0.001;
+            const time = Date.now() * 0.001; 
             const width = canvas.width;
             const height = canvas.height;
 
@@ -1042,9 +1042,9 @@
             ctx.save();
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-
+            
             const tileSize = 80;
-            const offset = (time * 15) % tileSize;
+            const offset = (time * 15) % tileSize; 
 
             for (let x = -tileSize; x < width + tileSize; x += tileSize) {
                 for (let y = -tileSize; y < height + tileSize; y += tileSize) {
@@ -1054,14 +1054,14 @@
                     const size = 18;
 
                     ctx.beginPath();
-                    if (shapeType === 0) {
+                    if (shapeType === 0) { 
                         ctx.arc(cx, cy, size, 0, Math.PI * 2);
-                    } else if (shapeType === 1) {
+                    } else if (shapeType === 1) { 
                         ctx.moveTo(cx, cy - size);
                         ctx.lineTo(cx + size + 4, cy + size);
                         ctx.lineTo(cx - size - 4, cy + size);
                         ctx.closePath();
-                    } else {
+                    } else { 
                         ctx.rect(cx - size, cy - size, size * 2, size * 2);
                     }
                     ctx.stroke();
@@ -1070,10 +1070,10 @@
             ctx.restore();
 
             ctx.save();
-            const pulse = (Math.sin(time * 3) + 1) / 2;
-            const alpha = 0.4 + (pulse * 0.6);
+            const pulse = (Math.sin(time * 3) + 1) / 2; 
+            const alpha = 0.4 + (pulse * 0.6); 
 
-            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`;
+            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`; 
             ctx.shadowColor = `rgba(224, 179, 102, ${pulse * 0.8})`;
             ctx.shadowBlur = 15 + (pulse * 10);
 
@@ -1098,7 +1098,7 @@
 
             if (isWaitingMode) {
                 drawWaitingState(ctx, canvas);
-            }
+            } 
             else if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
@@ -1191,7 +1191,7 @@
                         imageCache[poly.photo_url] = newImg;
                     }
                 }
-            }
+            } 
             else if (gState.players.length === 1) {
                 const singlePlayer = gState.players[0];
                 const colors = parseColors(singlePlayer.color);
@@ -1200,7 +1200,7 @@
                 grad.addColorStop(1, colors[1]);
                 ctx.fillStyle = grad;
                 ctx.fillRect(0, 0, cw, ch);
-
+                
                 const radius = 45;
                 if (!singlePlayer.photo_url) {
                     ctx.save();
@@ -1256,25 +1256,23 @@
                 }
                 ctx.closePath();
 
-                // Премиальная золотистая заливка
-                ctx.fillStyle = "rgba(212, 175, 55, 0.15)";
+                // Увеличенная в 2 раза заливка
+                ctx.fillStyle = "rgba(212, 175, 55, 0.3)";
                 ctx.fill();
 
-                // Создаем градиент для обводки
                 const goldGrad = ctx.createLinearGradient(0, 0, cw, ch);
                 goldGrad.addColorStop(0, "#F9F295");
                 goldGrad.addColorStop(0.5, "#D4AF37");
                 goldGrad.addColorStop(1, "#997A00");
 
-                ctx.lineJoin = "round"; // Мягкие закругленные углы
+                ctx.lineJoin = "round";
                 ctx.lineCap = "round";
                 ctx.strokeStyle = goldGrad;
-                ctx.lineWidth = 4;
-
-                // Эффект свечения
-                ctx.shadowColor = "rgba(212, 175, 55, 0.6)";
-                ctx.shadowBlur = 15;
-
+                ctx.lineWidth = 8;   // было 4, стало 8 – в 2 раза жирнее
+                
+                ctx.shadowColor = "rgba(212, 175, 55, 0.9)";
+                ctx.shadowBlur = 30; // было 15, стало 30 – ярче свечение
+                
                 ctx.stroke();
                 ctx.restore();
             }
@@ -1283,12 +1281,10 @@
             // ОТРИСОВКА ШАРИКА (ballPos)
             // ==========================================
             if (ballPos) {
-                // Синхронизация радиуса с бэкендом (25 из 1000 = 2.5% от ширины)
-                const BALL_RADIUS = cw * 0.025;
+                const BALL_RADIUS = cw * 0.025; 
                 const normRadiusX = BALL_RADIUS / cw;
                 const normRadiusY = BALL_RADIUS / ch;
 
-                // Ограничиваем шарик строго внутри поля
                 if (ballPos.x < normRadiusX) ballPos.x = normRadiusX;
                 if (ballPos.x > 1 - normRadiusX) ballPos.x = 1 - normRadiusX;
                 if (ballPos.y < normRadiusY) ballPos.y = normRadiusY;
@@ -1296,8 +1292,7 @@
 
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
-
-                // Отрисовка вектора направления
+                
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const drawAngle = -ballPos.angle;
                     const arrowLen = 35;
@@ -1320,20 +1315,18 @@
                     ctx.fill();
                 }
 
-                // Отрисовка самого шарика
                 ctx.save();
                 ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
                 ctx.shadowBlur = 15;
-
+                
                 ctx.beginPath();
                 ctx.arc(bx, by, BALL_RADIUS, 0, Math.PI * 2);
                 ctx.fillStyle = "#ffffff";
                 ctx.fill();
-
-                // Убираем размытие для четкой обводки
-                ctx.shadowBlur = 0;
+                
+                ctx.shadowBlur = 0; 
                 ctx.lineWidth = 2;
-                ctx.strokeStyle = "rgba(212, 175, 55, 0.7)"; // Тонкая золотая каемка
+                ctx.strokeStyle = "rgba(212, 175, 55, 0.7)";
                 ctx.stroke();
                 ctx.closePath();
                 ctx.restore();
@@ -1410,23 +1403,25 @@
         async function showWinnerSequence(winnerData, roundId) {
             if (isShowingWinner) return;
             isShowingWinner = true;
-
+            
             lastShownRoundId = roundId;
             localStorage.setItem('last_round_id', lastShownRoundId);
 
             if (winnerData.polygon && winnerData.polygon.length >= 3) {
                 highlightPolygon = winnerData.polygon;
-                drawGameFrame(null, highlightPolygon);
-
+                drawGameFrame(null, highlightPolygon); 
                 await new Promise(r => setTimeout(r, 1500));
             }
 
-            showWinnerModal(winnerData);
-            if (typeof updateBalance === 'function') await updateBalance();
-
+            // Очищаем игровое поле перед показом модального окна
             gState.polygons = [];
             gState.players = [];
             highlightPolygon = null;
+            drawGameFrame(); // waiting mode
+
+            showWinnerModal(winnerData);
+            if (typeof updateBalance === 'function') await updateBalance();
+            
             isShowingWinner = false;
         }
 
@@ -1434,7 +1429,7 @@
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
-
+                
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     await showWinnerSequence(state.winner, state.round_id);
                 }
@@ -1470,18 +1465,13 @@
                     }
                 }
 
-                // --- 🛑 НАЧАЛО ИСПРАВЛЕНИЯ ---
-                // Проверяем, готовится ли показ победителя
                 const willShowWinner = initialGameStateLoaded && newState.winner && newState.round_id && newState.round_id !== lastShownRoundId;
-
-                // Замораживаем визуал, если крутится рулетка, показывается рамка победителя ИЛИ мы вот-вот её покажем
+                
                 const protectVisuals = isShowingWinner || willShowWinner || isSpinning;
 
-                // 1. Не удаляем рамку победителя, пока она нужна на экране
                 if (newState.status === 'waiting' && !protectVisuals) {
                     highlightPolygon = null;
                 }
-                // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
                 if (newState.status === 'counting') {
                     if (Math.abs(gState.timer - newState.timer) > 1 || !timerInterval) {
@@ -1504,8 +1494,6 @@
                     document.getElementById('game-timer-bg').innerText = '';
                 }
 
-                // --- 🛑 НАЧАЛО ИСПРАВЛЕНИЯ 2 ---
-                // 2. Блокируем затирание поля пустыми данными (waiting), пока висит золотая рамка!
                 if (!protectVisuals) {
                     if (!cancelInProgress) {
                         gState.players = newState.players;
@@ -1515,13 +1503,11 @@
                     gState.polygons = newState.polygons;
                 }
 
-                // Эти служебные параметры безопасны для обновления всегда
                 gState.spin_params = newState.spin_params;
                 gState.winner = newState.winner;
                 gState.last_winner_id = newState.last_winner_id;
                 gState.round_id = newState.round_id;
                 gState.game_number = newState.game_number;
-                // --- КОНЕЦ ИСПРАВЛЕНИЯ 2 ---
 
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
@@ -1545,7 +1531,6 @@
                     drawGameFrame(null, highlightPolygon);
                 }
 
-                // 👇 ВОТ ГЛАВНОЕ ИСПРАВЛЕНИЕ – показываем победителя сразу, как только он появился
                 if (willShowWinner && !isShowingWinner) {
                     const pageGame = document.getElementById('page-game');
                     if (pageGame && pageGame.classList.contains('page-active')) {
