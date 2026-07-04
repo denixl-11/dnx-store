@@ -981,7 +981,6 @@
         let initialGameStateLoaded = false;
         let highlightPolygon = null;
         let isShowingWinner = false;
-        let finalBallPos = null;
 
         let cancelInProgress = false;
         let betAmountTemp = null;
@@ -1030,7 +1029,7 @@
         }
 
         function drawWaitingState(ctx, canvas) {
-            const time = Date.now() * 0.001; 
+            const time = Date.now() * 0.001;
             const width = canvas.width;
             const height = canvas.height;
 
@@ -1043,9 +1042,9 @@
             ctx.save();
             ctx.lineWidth = 2;
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-            
+
             const tileSize = 80;
-            const offset = (time * 15) % tileSize; 
+            const offset = (time * 15) % tileSize;
 
             for (let x = -tileSize; x < width + tileSize; x += tileSize) {
                 for (let y = -tileSize; y < height + tileSize; y += tileSize) {
@@ -1055,14 +1054,14 @@
                     const size = 18;
 
                     ctx.beginPath();
-                    if (shapeType === 0) { 
+                    if (shapeType === 0) {
                         ctx.arc(cx, cy, size, 0, Math.PI * 2);
-                    } else if (shapeType === 1) { 
+                    } else if (shapeType === 1) {
                         ctx.moveTo(cx, cy - size);
                         ctx.lineTo(cx + size + 4, cy + size);
                         ctx.lineTo(cx - size - 4, cy + size);
                         ctx.closePath();
-                    } else { 
+                    } else {
                         ctx.rect(cx - size, cy - size, size * 2, size * 2);
                     }
                     ctx.stroke();
@@ -1071,10 +1070,10 @@
             ctx.restore();
 
             ctx.save();
-            const pulse = (Math.sin(time * 3) + 1) / 2; 
-            const alpha = 0.4 + (pulse * 0.6); 
+            const pulse = (Math.sin(time * 3) + 1) / 2;
+            const alpha = 0.4 + (pulse * 0.6);
 
-            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`; 
+            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`;
             ctx.shadowColor = `rgba(224, 179, 102, ${pulse * 0.8})`;
             ctx.shadowBlur = 15 + (pulse * 10);
 
@@ -1099,7 +1098,7 @@
 
             if (isWaitingMode) {
                 drawWaitingState(ctx, canvas);
-            } 
+            }
             else if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
@@ -1192,7 +1191,7 @@
                         imageCache[poly.photo_url] = newImg;
                     }
                 }
-            } 
+            }
             else if (gState.players.length === 1) {
                 const singlePlayer = gState.players[0];
                 const colors = parseColors(singlePlayer.color);
@@ -1201,7 +1200,7 @@
                 grad.addColorStop(1, colors[1]);
                 ctx.fillStyle = grad;
                 ctx.fillRect(0, 0, cw, ch);
-                
+
                 const radius = 45;
                 if (!singlePlayer.photo_url) {
                     ctx.save();
@@ -1242,6 +1241,9 @@
                 }
             }
 
+            // ==========================================
+            // ОТРИСОВКА СЕКТОРА ПОБЕДИТЕЛЯ (highlightPts)
+            // ==========================================
             if (!isWaitingMode && highlightPts && highlightPts.length >= 3) {
                 const INSET = 2;
                 const dw = cw - INSET * 2;
@@ -1253,17 +1255,49 @@
                     ctx.lineTo(INSET + highlightPts[i].x * dw, INSET + (1 - highlightPts[i].y) * dh);
                 }
                 ctx.closePath();
-                ctx.fillStyle = "rgba(255, 215, 0, 0.15)";
+
+                // Премиальная золотистая заливка
+                ctx.fillStyle = "rgba(212, 175, 55, 0.15)";
                 ctx.fill();
-                ctx.strokeStyle = "#FFD700";
+
+                // Создаем градиент для обводки
+                const goldGrad = ctx.createLinearGradient(0, 0, cw, ch);
+                goldGrad.addColorStop(0, "#F9F295");
+                goldGrad.addColorStop(0.5, "#D4AF37");
+                goldGrad.addColorStop(1, "#997A00");
+
+                ctx.lineJoin = "round"; // Мягкие закругленные углы
+                ctx.lineCap = "round";
+                ctx.strokeStyle = goldGrad;
                 ctx.lineWidth = 4;
+
+                // Эффект свечения
+                ctx.shadowColor = "rgba(212, 175, 55, 0.6)";
+                ctx.shadowBlur = 15;
+
                 ctx.stroke();
                 ctx.restore();
             }
 
+            // ==========================================
+            // ОТРИСОВКА ШАРИКА (ballPos)
+            // ==========================================
             if (ballPos) {
+                // Синхронизация радиуса с бэкендом (25 из 1000 = 2.5% от ширины)
+                const BALL_RADIUS = cw * 0.025;
+                const normRadiusX = BALL_RADIUS / cw;
+                const normRadiusY = BALL_RADIUS / ch;
+
+                // Ограничиваем шарик строго внутри поля
+                if (ballPos.x < normRadiusX) ballPos.x = normRadiusX;
+                if (ballPos.x > 1 - normRadiusX) ballPos.x = 1 - normRadiusX;
+                if (ballPos.y < normRadiusY) ballPos.y = normRadiusY;
+                if (ballPos.y > 1 - normRadiusY) ballPos.y = 1 - normRadiusY;
+
                 const bx = ballPos.x * cw;
                 const by = (1 - ballPos.y) * ch;
+
+                // Отрисовка вектора направления
                 if (ballPos.angle !== undefined && !ballPos.prev) {
                     const drawAngle = -ballPos.angle;
                     const arrowLen = 35;
@@ -1285,14 +1319,24 @@
                     ctx.fillStyle = "#fff";
                     ctx.fill();
                 }
-                ctx.shadowColor = "#fff";
-                ctx.shadowBlur = 20;
+
+                // Отрисовка самого шарика
+                ctx.save();
+                ctx.shadowColor = "rgba(255, 255, 255, 0.8)";
+                ctx.shadowBlur = 15;
+
                 ctx.beginPath();
-                ctx.arc(bx, by, 20, 0, Math.PI * 2);
-                ctx.fillStyle = "#fff";
+                ctx.arc(bx, by, BALL_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
                 ctx.fill();
+
+                // Убираем размытие для четкой обводки
                 ctx.shadowBlur = 0;
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "rgba(212, 175, 55, 0.7)"; // Тонкая золотая каемка
+                ctx.stroke();
                 ctx.closePath();
+                ctx.restore();
             }
 
             if (isWaitingMode && !isSpinning) {
@@ -1314,22 +1358,25 @@
                     const currentAngleSpeed = spinAngleSpeed * (1 - t);
                     const angle = spinAngleStart + 0.5 * (spinAngleSpeed + currentAngleSpeed) * t * (spinDuration / 1000);
                     pauseAngle = angle;
-                    drawGameFrame({ x: startPos.x, y: startPos.y, angle }, highlightPolygon);
+                    const ball = { x: startPos.x, y: startPos.y, angle };
+                    drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else if (elapsed < spinDuration + 1000) {
                     if (pauseAngle === null && trajectory.length > 0) {
-                        pauseAngle = Math.atan2(trajectory[0].y - startPos.y, trajectory[0].x - startPos.x);
+                        const firstMove = trajectory[0];
+                        pauseAngle = Math.atan2(firstMove.y - startPos.y, firstMove.x - startPos.x);
                     }
-                    drawGameFrame({ x: startPos.x, y: startPos.y, angle: pauseAngle }, highlightPolygon);
+                    const ball = { x: startPos.x, y: startPos.y, angle: pauseAngle };
+                    drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else if (elapsed < spinDuration + 1000 + 10000) {
                     const motionElapsed = elapsed - (spinDuration + 1000);
                     const frameIndex = Math.floor(motionElapsed / 16);
                     if (frameIndex >= trajectory.length) {
-                        finalBallPos = trajectory[trajectory.length - 1];
-                        drawGameFrame(finalBallPos, highlightPolygon);
+                        const finalPos = trajectory[trajectory.length - 1];
+                        drawGameFrame(finalPos, highlightPolygon);
                         animationFrameId = null;
                         fetchWinnerNow();
                         return;
@@ -1342,8 +1389,8 @@
                     animationFrameId = requestAnimationFrame(animate);
                 }
                 else {
-                    finalBallPos = trajectory[trajectory.length - 1];
-                    drawGameFrame(finalBallPos, highlightPolygon);
+                    const finalPos = trajectory[trajectory.length - 1];
+                    drawGameFrame(finalPos, highlightPolygon);
                     animationFrameId = null;
                     fetchWinnerNow();
                 }
@@ -1363,20 +1410,23 @@
         async function showWinnerSequence(winnerData, roundId) {
             if (isShowingWinner) return;
             isShowingWinner = true;
-            lastShownRoundId = roundId;
 
-            if (winnerData.polygon) {
+            lastShownRoundId = roundId;
+            localStorage.setItem('last_round_id', lastShownRoundId);
+
+            if (winnerData.polygon && winnerData.polygon.length >= 3) {
                 highlightPolygon = winnerData.polygon;
-                drawGameFrame(finalBallPos, highlightPolygon);
+                drawGameFrame(null, highlightPolygon);
+
                 await new Promise(r => setTimeout(r, 1500));
             }
-            
+
             showWinnerModal(winnerData);
             if (typeof updateBalance === 'function') await updateBalance();
-            
-            // Сбрасываем только подсветку и флаг, полигоны останутся до прихода нового состояния
+
+            gState.polygons = [];
+            gState.players = [];
             highlightPolygon = null;
-            finalBallPos = null;
             isShowingWinner = false;
         }
 
@@ -1384,7 +1434,7 @@
             try {
                 const res = await fetch(`${API_BASE}/game/state`);
                 const state = await res.json();
-                
+
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     await showWinnerSequence(state.winner, state.round_id);
                 }
@@ -1408,83 +1458,89 @@
         }
 
         async function pollGame() {
-            const r = await fetch(`${API_BASE}/game/state`);
-            const newState = await r.json();
+            try {
+                const r = await fetch(`${API_BASE}/game/state`);
+                const newState = await r.json();
 
-            if (!initialGameStateLoaded) {
-                initialGameStateLoaded = true;
-                if (newState.round_id) lastShownRoundId = newState.round_id;
-            }
-
-            // ЗАМОРОЗКА обновлений, пока показывается победитель
-            if (isShowingWinner) return;
-
-            if (newState.status === 'counting') {
-                if (Math.abs(gState.timer - newState.timer) > 1 || !timerInterval) {
-                    gState.timer = newState.timer;
-                    document.getElementById('game-timer-bg').innerText = gState.timer;
+                if (!initialGameStateLoaded) {
+                    initialGameStateLoaded = true;
+                    if (newState.round_id) {
+                        lastShownRoundId = newState.round_id;
+                        localStorage.setItem('last_round_id', lastShownRoundId);
+                    }
                 }
-                if (!timerInterval) {
-                    timerInterval = setInterval(() => {
-                        if (gState.timer > 0) {
-                            gState.timer--;
-                            document.getElementById('game-timer-bg').innerText = gState.timer;
-                        } else {
-                            clearInterval(timerInterval);
-                            timerInterval = null;
-                        }
-                    }, 1000);
+
+                if (newState.status === 'waiting') {
+                    highlightPolygon = null;
                 }
-            } else {
-                if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-                document.getElementById('game-timer-bg').innerText = '';
-            }
 
-            if (!cancelInProgress) {
-                gState.players = newState.players;
-                gState.pool = newState.pool;
-            }
-            gState.status = newState.status;
-            gState.spin_params = newState.spin_params;
-            gState.winner = newState.winner;
-            gState.last_winner_id = newState.last_winner_id;
-            gState.round_id = newState.round_id;
-            gState.game_number = newState.game_number;
-            gState.polygons = newState.polygons;
-
-            document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
-            document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
-            renderBetsList();
-
-            if (!isSpinning && !isShowingWinner) drawGameFrame(null, highlightPolygon);
-
-            const myId = String(tg.initDataUnsafe?.user?.id);
-            const hasMyBet = gState.players.find(p => String(p.id) === myId);
-            const cancelBtn = document.getElementById('btn-cancel-bet');
-            if (cancelBtn) {
-                cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
-            }
-
-            if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
-                isSpinning = true;
-                runSpinAnimation(gState.spin_params);
-            } else if (gState.status !== 'spinning' && isSpinning) {
-                isSpinning = false;
-                if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
-                drawGameFrame(null, highlightPolygon);
-            }
-
-            if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
-                const pageGame = document.getElementById('page-game');
-                if (pageGame && pageGame.classList.contains('page-active')) {
-                    showWinnerSequence(gState.winner, gState.round_id);
+                if (newState.status === 'counting') {
+                    if (Math.abs(gState.timer - newState.timer) > 1 || !timerInterval) {
+                        gState.timer = newState.timer;
+                        document.getElementById('game-timer-bg').innerText = gState.timer;
+                    }
+                    if (!timerInterval) {
+                        timerInterval = setInterval(() => {
+                            if (gState.timer > 0) {
+                                gState.timer--;
+                                document.getElementById('game-timer-bg').innerText = gState.timer;
+                            } else {
+                                clearInterval(timerInterval);
+                                timerInterval = null;
+                            }
+                        }, 1000);
+                    }
+                } else {
+                    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+                    document.getElementById('game-timer-bg').innerText = '';
                 }
-            }
 
-            if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
-                if (typeof loadLeaderboardPreview === 'function') loadLeaderboardPreview();
-                lastLeaderboardUpdate = Date.now();
-            }
+                if (!cancelInProgress) {
+                    gState.players = newState.players;
+                    gState.pool = newState.pool;
+                }
+                gState.status = newState.status;
+                gState.spin_params = newState.spin_params;
+                gState.winner = newState.winner;
+                gState.last_winner_id = newState.last_winner_id;
+                gState.round_id = newState.round_id;
+                gState.game_number = newState.game_number;
+                gState.polygons = newState.polygons;
+
+                document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
+                document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
+                renderBetsList();
+
+                if (!isSpinning && !isShowingWinner) drawGameFrame(null, highlightPolygon);
+
+                const myId = String(tg.initDataUnsafe?.user?.id);
+                const hasMyBet = gState.players.find(p => String(p.id) === myId);
+                const cancelBtn = document.getElementById('btn-cancel-bet');
+                if (cancelBtn) {
+                    cancelBtn.style.display = (gState.players.length === 1 && hasMyBet && gState.status === 'waiting' && !cancelInProgress) ? 'block' : 'none';
+                }
+
+                if (gState.status === 'spinning' && !isSpinning && gState.spin_params) {
+                    isSpinning = true;
+                    runSpinAnimation(gState.spin_params);
+                } else if (gState.status !== 'spinning' && isSpinning) {
+                    isSpinning = false;
+                    if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+                    drawGameFrame(null, highlightPolygon);
+                }
+
+                if (initialGameStateLoaded && gState.winner && gState.round_id && gState.round_id !== lastShownRoundId && gState.status !== 'spinning') {
+                    const pageGame = document.getElementById('page-game');
+                    if (pageGame && pageGame.classList.contains('page-active')) {
+                        showWinnerSequence(gState.winner, gState.round_id);
+                    }
+                }
+
+                if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
+                    if (typeof loadLeaderboardPreview === 'function') loadLeaderboardPreview();
+                    lastLeaderboardUpdate = Date.now();
+                }
+            } catch(e) { console.error("Game poll error", e); }
         }
         setInterval(pollGame, 1000);
 

@@ -76,7 +76,7 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                # Предметы
+                # Предметы (минимальная структура, чтобы бэкенд не падал)
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS items (
                         id SERIAL PRIMARY KEY,
@@ -91,6 +91,7 @@ def init_db():
                         last_event VARCHAR(50)
                     )
                 """)
+                # Игровая история
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -100,6 +101,7 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
+                # Счётчик игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_counter (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -111,6 +113,7 @@ def init_db():
                 last_num = cur.fetchone()[0]
                 game_state["game_number"] = last_num
 
+                # Лидерборд
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS leaderboard (
                         user_id VARCHAR(255) PRIMARY KEY,
@@ -118,6 +121,7 @@ def init_db():
                         wins INT DEFAULT 0
                     )
                 """)
+                # Сезон
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS season (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -126,6 +130,7 @@ def init_db():
                 """)
                 cur.execute(
                     "INSERT INTO season (id, end_time) VALUES (1, '2026-06-30 15:00:00+00') ON CONFLICT (id) DO NOTHING")
+                # Призовые предметы
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS prize_items (
                         id SERIAL PRIMARY KEY,
@@ -347,47 +352,59 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
 
 
 # ------------------------------------------------------------
-# Генерация траектории
+# Генерация траектории (ОБНОВЛЁННАЯ)
 # ------------------------------------------------------------
-def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16, ball_radius_px=20):
+def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
     x = start_x
     y = start_y
     vx = math.cos(angle) * speed
     vy = math.sin(angle) * speed
     frames = []
     elapsed = 0
+
+    # Радиус мяча в масштабе 1000x1000.
+    # Значение 25-30 обычно идеально подходит, чтобы мяч визуально не врезался в стену.
+    BALL_RADIUS = 25
+
     while elapsed < duration_ms:
         progress = elapsed / duration_ms
         if progress <= 0.5:
             speed_factor = 1 - 0.8 * (progress / 0.5)
         else:
             speed_factor = 0.2 * (1 - (progress - 0.5) / 0.5)
+
         step_x = vx * speed_factor * (dt / 1000)
         step_y = vy * speed_factor * (dt / 1000)
+
         x += step_x
         y += step_y
-        # Отскок с учётом радиуса
-        if x <= ball_radius_px:
-            x = ball_radius_px
+
+        # Отскок по X с учетом радиуса
+        if x <= BALL_RADIUS:
+            x = BALL_RADIUS
             vx = abs(vx) * 0.9
-        elif x >= 1000 - ball_radius_px:
-            x = 1000 - ball_radius_px
+        elif x >= 1000 - BALL_RADIUS:
+            x = 1000 - BALL_RADIUS
             vx = -abs(vx) * 0.9
-        if y <= ball_radius_px:
-            y = ball_radius_px
+
+        # Отскок по Y с учетом радиуса
+        if y <= BALL_RADIUS:
+            y = BALL_RADIUS
             vy = abs(vy) * 0.9
-        elif y >= 1000 - ball_radius_px:
-            y = 1000 - ball_radius_px
+        elif y >= 1000 - BALL_RADIUS:
+            y = 1000 - BALL_RADIUS
             vy = -abs(vy) * 0.9
+
         frames.append({"x": x / 1000, "y": y / 1000})
         elapsed += dt
+
     frames.append({"x": x / 1000, "y": y / 1000})
     return frames
 
 
 def generate_spin_params(polygons: list) -> dict:
-    start_x = random.uniform(0.2, 0.8) * 1000
-    start_y = random.uniform(0.2, 0.8) * 1000
+    start_x = random.uniform(0.1, 0.9) * 1000
+    start_y = random.uniform(0.1, 0.9) * 1000
 
     spin_duration = 3000
     spin_angle_speed = random.uniform(4.5 * math.pi, 13.5 * math.pi)
@@ -400,9 +417,10 @@ def generate_spin_params(polygons: list) -> dict:
     motion_speed = base_speed * (2.2 / 1.5)
 
     motion_trajectory = generate_motion_trajectory(
-        start_x, start_y, final_angle, motion_speed, 10000, dt=16, ball_radius_px=20
+        start_x, start_y, final_angle, motion_speed, 10000, dt=16
     )
     final_point = motion_trajectory[-1]
+    target_x = final_point["x"]
 
     return {
         "startPos": {"x": start_x / 1000, "y": start_y / 1000},
@@ -410,7 +428,7 @@ def generate_spin_params(polygons: list) -> dict:
         "spinAngleStart": spin_angle_start,
         "spinAngleSpeed": spin_angle_speed,
         "trajectory": motion_trajectory,
-        "target_position": final_point["x"],
+        "target_position": target_x,
         "polygons": polygons
     }
 
@@ -525,11 +543,16 @@ async def game_worker():
             if game_state["status"] == "counting":
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
+
+                    # ❗️ Больше никакого перестроения полигонов!
+                    # Берём строго те области, которые зафиксировались во время приёма ставок.
                     if not game_state.get("polygons"):
+                        # Защитный фолбэк (на случай непредвиденных багов)
                         game_state["polygons"] = build_weighted_voronoi(
                             list(game_state["players"].values()),
                             (0.0, 0.0, 1.0, 1.0)
                         )
+
                     spin_params = generate_spin_params(game_state["polygons"])
                     game_state["spin_params"] = spin_params
                     game_state["target_position"] = spin_params["target_position"]
