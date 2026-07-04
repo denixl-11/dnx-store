@@ -1412,7 +1412,8 @@
                 await new Promise(r => setTimeout(r, 1500));
             }
 
-            // Очищаем игровое поле перед показом модального окна
+            // Сброс состояния для waiting mode
+            gState.status = 'waiting';
             gState.polygons = [];
             gState.players = [];
             highlightPolygon = null;
@@ -1420,8 +1421,6 @@
 
             showWinnerModal(winnerData);
             if (typeof updateBalance === 'function') await updateBalance();
-
-            // isShowingWinner будет сброшен в closeWinnerModal
         }
 
         async function fetchWinnerNow() {
@@ -1449,7 +1448,7 @@
         function closeWinnerModal() {
             document.getElementById('winner-modal').classList.remove('active');
             if (winnerTimer) { clearTimeout(winnerTimer); winnerTimer = null; }
-            // Вот здесь снимаем блокировку, чтобы pollGame снова начал обновлять состояние
+            // Снимаем блокировку, чтобы pollGame снова начал обновлять состояние
             isShowingWinner = false;
         }
 
