@@ -1470,9 +1470,18 @@
                     }
                 }
 
-                if (newState.status === 'waiting') {
+                // --- 🛑 НАЧАЛО ИСПРАВЛЕНИЯ ---
+                // Проверяем, готовится ли показ победителя
+                const willShowWinner = initialGameStateLoaded && newState.winner && newState.round_id && newState.round_id !== lastShownRoundId;
+
+                // Замораживаем визуал, если крутится рулетка, показывается рамка победителя ИЛИ мы вот-вот её покажем
+                const protectVisuals = isShowingWinner || willShowWinner || isSpinning;
+
+                // 1. Не удаляем рамку победителя, пока она нужна на экране
+                if (newState.status === 'waiting' && !protectVisuals) {
                     highlightPolygon = null;
                 }
+                // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
                 if (newState.status === 'counting') {
                     if (Math.abs(gState.timer - newState.timer) > 1 || !timerInterval) {
@@ -1495,17 +1504,24 @@
                     document.getElementById('game-timer-bg').innerText = '';
                 }
 
-                if (!cancelInProgress) {
-                    gState.players = newState.players;
-                    gState.pool = newState.pool;
+                // --- 🛑 НАЧАЛО ИСПРАВЛЕНИЯ 2 ---
+                // 2. Блокируем затирание поля пустыми данными (waiting), пока висит золотая рамка!
+                if (!protectVisuals) {
+                    if (!cancelInProgress) {
+                        gState.players = newState.players;
+                        gState.pool = newState.pool;
+                    }
+                    gState.status = newState.status;
+                    gState.polygons = newState.polygons;
                 }
-                gState.status = newState.status;
+
+                // Эти служебные параметры безопасны для обновления всегда
                 gState.spin_params = newState.spin_params;
                 gState.winner = newState.winner;
                 gState.last_winner_id = newState.last_winner_id;
                 gState.round_id = newState.round_id;
                 gState.game_number = newState.game_number;
-                gState.polygons = newState.polygons;
+                // --- КОНЕЦ ИСПРАВЛЕНИЯ 2 ---
 
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
