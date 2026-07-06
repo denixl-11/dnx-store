@@ -14,6 +14,7 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 from dotenv import load_dotenv
+import numpy as np
 
 load_dotenv()
 
@@ -72,8 +73,7 @@ def init_db():
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
                         username VARCHAR(255),
-                        balance NUMERIC DEFAULT 0.0,
-                        photo_url TEXT
+                        balance NUMERIC DEFAULT 0.0
                     )
                 """)
                 # Предметы
@@ -782,10 +782,6 @@ async def handle_game_bet(request):
                         return web.json_response({"success": False, "error": "insufficient_funds"},
                                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
-                    # сохраняем аватарку при ставке
-                    photo_url = data.get('photo_url', '')
-                    if photo_url:
-                        cur.execute("UPDATE users SET photo_url = %s WHERE id = %s", (photo_url, user_id))
                     conn.commit()
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
