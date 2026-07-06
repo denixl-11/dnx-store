@@ -1068,7 +1068,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (с прелоадером, без блокировки)
+        //  ИГРОВАЯ ЛОГИКА (с прелоадером)
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1429,28 +1429,53 @@
             }
         }
 
-        // Прелоадер аватарок (просто загружает в фоне, не блокирует)
-        async function preloadAvatars(polygons) {
+        // Прелоадер аватарок с резервным прокси
+        function preloadAvatars(polygons) {
             if (!polygons || polygons.length === 0) return;
-            const promises = polygons.map(poly => {
-                return new Promise((resolve) => {
-                    if (!poly.photo_url) { resolve(); return; }
-                    if (imageCache[poly.photo_url] && imageCache[poly.photo_url].complete) {
-                        resolve(); return;
+
+            polygons.forEach(poly => {
+                if (!poly.photo_url) return;
+
+                // Если картинка уже загружена или сейчас находится в процессе скачивания — пропускаем
+                if (imageCache[poly.photo_url]) return;
+
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+
+                // ФИКС 1: Как только аватарка скачалась — принудительно и моментально обновляем поле!
+                img.onload = () => {
+                    if (typeof isSpinning !== 'undefined' && !isSpinning) {
+                        if (typeof drawGameFrame === 'function') drawGameFrame(null, null);
                     }
-                    const img = new Image();
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => resolve();
-                    img.onerror = () => {
-                        console.warn("Не удалось прогрузить:", poly.photo_url);
-                        resolve(); // не прерываем
+                };
+
+                // ФИКС 2: Бесплатные прокси часто падают. Если первый сдох — грузим через второй!
+                img.onerror = () => {
+                    console.warn("Основной прокси отвалился, пробуем резервный для:", poly.photo_url);
+
+                    const fallbackImg = new Image();
+                    fallbackImg.crossOrigin = "anonymous";
+
+                    fallbackImg.onload = () => {
+                        // Перезаписываем битую картинку в кэше на рабочую
+                        imageCache[poly.photo_url] = fallbackImg;
+                        if (typeof isSpinning !== 'undefined' && !isSpinning) {
+                            if (typeof drawGameFrame === 'function') drawGameFrame(null, null);
+                        }
                     };
-                    img.src = `https://corsproxy.io/?${encodeURIComponent(poly.photo_url)}`;
-                    imageCache[poly.photo_url] = img;
-                });
+
+                    fallbackImg.onerror = () => console.error("Не удалось загрузить аватарку вообще никак:", poly.photo_url);
+
+                    // Используем запасной мощный прокси
+                    fallbackImg.src = `https://api.allorigins.win/raw?url=${encodeURIComponent(poly.photo_url)}`;
+                };
+
+                // Сразу резервируем место в кэше, чтобы pollGame не спамил миллион запросов в секунду
+                imageCache[poly.photo_url] = img;
+
+                // Пробуем качать через основной прокси
+                img.src = `https://corsproxy.io/?${encodeURIComponent(poly.photo_url)}`;
             });
-            // Запускаем загрузку, но не ждём её окончания – просто даём старт
-            Promise.all(promises).catch(() => {});
         }
 
         function runSpinAnimation(params) {
