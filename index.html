@@ -963,7 +963,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (ФИНАЛЬНАЯ ВЕРСИЯ + ЗОЛОТАЯ ОБВОДКА ПОВЕРХ РАМКИ)
+        //  ИГРОВАЯ ЛОГИКА (ФИНАЛЬНАЯ ВЕРСИЯ + ОБВОДКА ПОВЕРХ СЕРОЙ РАМКИ)
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1301,15 +1301,10 @@
             // ==========================================
             if (!isWaitingMode && highlightPts && highlightPts.length >= 3) {
                 ctx.save();
-                // ❗️ Рисуем с небольшим расширением за границы canvas, чтобы перекрыть серую рамку
-                const scale = 1.02;  // 2% наружу
-                const offsetX = (scale - 1) * cw / 2;
-                const offsetY = (scale - 1) * ch / 2;
-
                 ctx.beginPath();
-                ctx.moveTo(highlightPts[0].x * cw * scale - offsetX, (1 - highlightPts[0].y) * ch * scale - offsetY);
+                ctx.moveTo(highlightPts[0].x * cw, (1 - highlightPts[0].y) * ch);
                 for (let i = 1; i < highlightPts.length; i++) {
-                    ctx.lineTo(highlightPts[i].x * cw * scale - offsetX, (1 - highlightPts[i].y) * ch * scale - offsetY);
+                    ctx.lineTo(highlightPts[i].x * cw, (1 - highlightPts[i].y) * ch);
                 }
                 ctx.closePath();
 
@@ -1412,11 +1407,12 @@
 
             if (winnerData.polygon && winnerData.polygon.length >= 3) {
                 highlightPolygon = winnerData.polygon;
-                // ❗️ Убираем overflow: hidden, чтобы обводка полигона могла выйти за границы
-                if (wrap) wrap.style.overflow = 'visible';
+                // Временно убираем серую рамку, чтобы золотая обводка была поверх
+                if (wrap) wrap.style.border = 'none';
                 drawGameFrame(null, highlightPolygon);
                 await new Promise(r => setTimeout(r, 1500));
-                if (wrap) wrap.style.overflow = 'hidden';
+                // Возвращаем рамку
+                if (wrap) wrap.style.border = '2px solid #444';
             }
 
             // Сброс состояния для waiting mode
