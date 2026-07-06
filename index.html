@@ -1287,12 +1287,21 @@
                     } else if (!img) {
                         const newImg = new Image();
                         newImg.crossOrigin = "anonymous";
+                        
                         newImg.onload = () => {
                             if (!isSpinning) {
                                 drawGameFrame(null, highlightPolygon);
                             }
                         };
-                        newImg.src = poly.photo_url;
+
+                        newImg.onerror = () => {
+                            console.error("Ошибка загрузки аватарки для канваса:", poly.photo_url);
+                            poly.photo_url = ""; 
+                        };
+
+                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(poly.photo_url)}`;
+                        newImg.src = proxyUrl;
+                        
                         imageCache[poly.photo_url] = newImg;
                     }
                 }
@@ -1335,12 +1344,21 @@
                     } else if (!img) {
                         const newImg = new Image();
                         newImg.crossOrigin = "anonymous";
+                        
                         newImg.onload = () => {
                             if (!isSpinning) {
                                 drawGameFrame(null, highlightPolygon);
                             }
                         };
-                        newImg.src = singlePlayer.photo_url;
+
+                        newImg.onerror = () => {
+                            console.error("Ошибка загрузки аватарки для одиночного игрока:", singlePlayer.photo_url);
+                            singlePlayer.photo_url = "";
+                        };
+
+                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(singlePlayer.photo_url)}`;
+                        newImg.src = proxyUrl;
+                        
                         imageCache[singlePlayer.photo_url] = newImg;
                     }
                 }
