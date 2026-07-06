@@ -106,12 +106,6 @@
             box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
             transform: translateZ(0);
             isolation: isolate;
-            transition: border 0.2s, box-shadow 0.2s;
-        }
-        /* 🟡 Золотая обводка победителя (поверх серой рамки) */
-        .game-canvas-wrap.winner-glow {
-            border: 6px solid #FFD700;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 0 30px rgba(255, 215, 0, 0.9);
         }
         #gameCanvas {
             display: block;
@@ -969,7 +963,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА
+        //  ИГРОВАЯ ЛОГИКА (ФИНАЛЬНАЯ ВЕРСИЯ + ЗОЛОТАЯ ОБВОДКА ПОВЕРХ РАМКИ)
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1303,14 +1297,19 @@
             }
 
             // ==========================================
-            // ОТРИСОВКА СЕКТОРА ПОБЕДИТЕЛЯ (highlightPts) – внутри canvas
+            // ОТРИСОВКА СЕКТОРА ПОБЕДИТЕЛЯ (highlightPts)
             // ==========================================
             if (!isWaitingMode && highlightPts && highlightPts.length >= 3) {
                 ctx.save();
+                // ❗️ Рисуем с небольшим расширением за границы canvas, чтобы перекрыть серую рамку
+                const scale = 1.02;  // 2% наружу
+                const offsetX = (scale - 1) * cw / 2;
+                const offsetY = (scale - 1) * ch / 2;
+
                 ctx.beginPath();
-                ctx.moveTo(highlightPts[0].x * cw, (1 - highlightPts[0].y) * ch);
+                ctx.moveTo(highlightPts[0].x * cw * scale - offsetX, (1 - highlightPts[0].y) * ch * scale - offsetY);
                 for (let i = 1; i < highlightPts.length; i++) {
-                    ctx.lineTo(highlightPts[i].x * cw, (1 - highlightPts[i].y) * ch);
+                    ctx.lineTo(highlightPts[i].x * cw * scale - offsetX, (1 - highlightPts[i].y) * ch * scale - offsetY);
                 }
                 ctx.closePath();
 
@@ -1413,11 +1412,11 @@
 
             if (winnerData.polygon && winnerData.polygon.length >= 3) {
                 highlightPolygon = winnerData.polygon;
+                // ❗️ Убираем overflow: hidden, чтобы обводка полигона могла выйти за границы
+                if (wrap) wrap.style.overflow = 'visible';
                 drawGameFrame(null, highlightPolygon);
-                // Добавляем золотую обводку поверх серой рамки
-                if (wrap) wrap.classList.add('winner-glow');
                 await new Promise(r => setTimeout(r, 1500));
-                if (wrap) wrap.classList.remove('winner-glow');
+                if (wrap) wrap.style.overflow = 'hidden';
             }
 
             // Сброс состояния для waiting mode
