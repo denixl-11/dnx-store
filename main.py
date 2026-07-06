@@ -14,7 +14,6 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 from dotenv import load_dotenv
-import numpy as np
 
 load_dotenv()
 
@@ -73,10 +72,11 @@ def init_db():
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
                         username VARCHAR(255),
-                        balance NUMERIC DEFAULT 0.0
+                        balance NUMERIC DEFAULT 0.0,
+                        photo_url TEXT
                     )
                 """)
-                # Предметы (минимальная структура, чтобы бэкенд не падал)
+                # Предметы
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS items (
                         id SERIAL PRIMARY KEY,
@@ -352,7 +352,7 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
 
 
 # ------------------------------------------------------------
-# Генерация траектории (ОБНОВЛЁННАЯ)
+# Генерация траектории
 # ------------------------------------------------------------
 def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=16):
     x = start_x
@@ -362,8 +362,6 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
     frames = []
     elapsed = 0
 
-    # Радиус мяча в масштабе 1000x1000.
-    # Значение 25-30 обычно идеально подходит, чтобы мяч визуально не врезался в стену.
     BALL_RADIUS = 25
 
     while elapsed < duration_ms:
@@ -379,7 +377,6 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
         x += step_x
         y += step_y
 
-        # Отскок по X с учетом радиуса
         if x <= BALL_RADIUS:
             x = BALL_RADIUS
             vx = abs(vx) * 0.9
@@ -387,7 +384,6 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
             x = 1000 - BALL_RADIUS
             vx = -abs(vx) * 0.9
 
-        # Отскок по Y с учетом радиуса
         if y <= BALL_RADIUS:
             y = BALL_RADIUS
             vy = abs(vy) * 0.9
@@ -545,9 +541,7 @@ async def game_worker():
                 if game_state["timer"] <= 0:
 
                     # ❗️ Больше никакого перестроения полигонов!
-                    # Берём строго те области, которые зафиксировались во время приёма ставок.
                     if not game_state.get("polygons"):
-                        # Защитный фолбэк (на случай непредвиденных багов)
                         game_state["polygons"] = build_weighted_voronoi(
                             list(game_state["players"].values()),
                             (0.0, 0.0, 1.0, 1.0)
@@ -597,20 +591,37 @@ async def handle_get_user(request):
     user = request['telegram_user']
     user_id = user['id']
     username = user['username']
+    photo_url = None
+    if request.method == 'POST':
+        try:
+            data = await request.json()
+            photo_url = data.get('photo_url', None)
+        except:
+            pass
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    "INSERT INTO users (id, username) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
-                    (user_id, username))
-                cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
+                if photo_url:
+                    cur.execute("""
+                        INSERT INTO users (id, username, photo_url) VALUES (%s, %s, %s)
+                        ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username, photo_url = COALESCE(EXCLUDED.photo_url, users.photo_url)
+                    """, (user_id, username, photo_url))
+                else:
+                    cur.execute("""
+                        INSERT INTO users (id, username) VALUES (%s, %s)
+                        ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
+                    """, (user_id, username))
+                cur.execute("SELECT balance, photo_url FROM users WHERE id = %s", (user_id,))
                 db_user = cur.fetchone()
                 conn.commit()
                 balance = float(db_user['balance']) if db_user else 0.0
+                saved_photo = db_user.get('photo_url') if db_user else None
+        return web.json_response({"balance": balance, "photo_url": saved_photo},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get user error: {e}")
-        balance = 0.0
-    return web.json_response({"balance": balance}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        return web.json_response({"balance": 0.0, "photo_url": None},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 
 @require_auth
@@ -789,6 +800,9 @@ async def handle_game_bet(request):
                         return web.json_response({"success": False, "error": "insufficient_funds"},
                                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
+                    photo_url = data.get('photo_url', '')
+                    if photo_url:
+                        cur.execute("UPDATE users SET photo_url = %s WHERE id = %s", (photo_url, user_id))
                     conn.commit()
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
@@ -1031,6 +1045,7 @@ async def cmd_start(message: types.Message):
 # ---------- Настройка сервера ----------
 app = web.Application()
 app.router.add_get('/user', handle_get_user)
+app.router.add_post('/user', handle_get_user)  # для сохранения аватарки
 app.router.add_get('/items', handle_get_items)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_get('/req', handle_get_requisites)
@@ -1059,3 +1074,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
