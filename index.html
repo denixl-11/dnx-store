@@ -1068,7 +1068,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (с прелоадером и жёстким обрывом)
+        //  ИГРОВАЯ ЛОГИКА (с прелоадером, без блокировки)
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1243,7 +1243,7 @@
                     ctx.stroke();
                 }
 
-                // Отрисовка аватарок — строго синхронная (без new Image)
+                // Отрисовка аватарок — синхронная, если картинка уже в кэше, иначе заглушка
                 for (const poly of gState.polygons) {
                     const scaledPoints = poly.polygon.map(p => ({
                         x: p.x * cw,
@@ -1256,22 +1256,28 @@
                     if (radius > maxRadius) radius = maxRadius;
                     if (radius < minRadius) radius = minRadius;
 
+                    let isAvatarDrawn = false;
                     if (poly.photo_url) {
                         const img = imageCache[poly.photo_url];
-                        // картинка гарантированно загружена, прелоадер уже отработал
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
-                        ctx.clip();
-                        ctx.drawImage(img, centroid.x - radius, centroid.y - radius, radius * 2, radius * 2);
-                        ctx.restore();
+                        if (img && img.complete && img.naturalWidth > 0) {
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+                            ctx.clip();
+                            ctx.drawImage(img, centroid.x - radius, centroid.y - radius, radius * 2, radius * 2);
+                            ctx.restore();
 
-                        ctx.beginPath();
-                        ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-                        ctx.stroke();
-                    } else {
+                            ctx.beginPath();
+                            ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+                            ctx.lineWidth = 2;
+                            ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+                            ctx.stroke();
+
+                            isAvatarDrawn = true;
+                        }
+                    }
+
+                    if (!isAvatarDrawn) {
                         ctx.save();
                         ctx.beginPath();
                         ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
@@ -1294,21 +1300,28 @@
                 ctx.fillRect(0, 0, cw, ch);
 
                 const radius = 45;
+                let isAvatarDrawn = false;
                 if (singlePlayer.photo_url) {
                     const img = imageCache[singlePlayer.photo_url];
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
-                    ctx.clip();
-                    ctx.drawImage(img, cw / 2 - radius, ch / 2 - radius, radius * 2, radius * 2);
-                    ctx.restore();
+                    if (img && img.complete && img.naturalWidth > 0) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
+                        ctx.clip();
+                        ctx.drawImage(img, cw / 2 - radius, ch / 2 - radius, radius * 2, radius * 2);
+                        ctx.restore();
 
-                    ctx.beginPath();
-                    ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-                    ctx.stroke();
-                } else {
+                        ctx.beginPath();
+                        ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+                        ctx.stroke();
+
+                        isAvatarDrawn = true;
+                    }
+                }
+
+                if (!isAvatarDrawn) {
                     ctx.save();
                     ctx.beginPath();
                     ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
@@ -1416,46 +1429,28 @@
             }
         }
 
-        // Прелоадер аватарок с жёстким таймаутом 500 мс
+        // Прелоадер аватарок (просто загружает в фоне, не блокирует)
         async function preloadAvatars(polygons) {
-            if (!polygons || polygons.length === 0) return true;
-
+            if (!polygons || polygons.length === 0) return;
             const promises = polygons.map(poly => {
-                return new Promise((resolve, reject) => {
-                    if (!poly.photo_url) {
-                        resolve();
-                        return;
-                    }
-
+                return new Promise((resolve) => {
+                    if (!poly.photo_url) { resolve(); return; }
                     if (imageCache[poly.photo_url] && imageCache[poly.photo_url].complete) {
-                        if (imageCache[poly.photo_url].naturalWidth > 0) {
-                            resolve();
-                        } else {
-                            reject(new Error("Битая картинка"));
-                        }
-                        return;
+                        resolve(); return;
                     }
-
                     const img = new Image();
                     img.crossOrigin = "anonymous";
                     img.onload = () => resolve();
-                    img.onerror = () => reject(new Error("Ошибка сети"));
+                    img.onerror = () => {
+                        console.warn("Не удалось прогрузить:", poly.photo_url);
+                        resolve(); // не прерываем
+                    };
                     img.src = `https://corsproxy.io/?${encodeURIComponent(poly.photo_url)}`;
                     imageCache[poly.photo_url] = img;
                 });
             });
-
-            const timeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Таймаут: превышено время ожидания 500мс")), 500)
-            );
-
-            try {
-                await Promise.race([Promise.all(promises), timeout]);
-                return true;
-            } catch (err) {
-                console.warn("Обрыв отрисовки:", err.message);
-                return false;
-            }
+            // Запускаем загрузку, но не ждём её окончания – просто даём старт
+            Promise.all(promises).catch(() => {});
         }
 
         function runSpinAnimation(params) {
@@ -1615,19 +1610,9 @@
                     document.getElementById('game-timer-bg').innerText = '';
                 }
 
-                // Прелоадер + обновление визуала только если не крутится
+                // Фоновая загрузка аватарок и обновление визуала
                 if (!isSpinning) {
-                    const isNetworkOk = await preloadAvatars(newState.polygons);
-
-                    if (!isNetworkOk) {
-                        if (typeof tg !== 'undefined' && tg.showAlert) {
-                            tg.showAlert("Медленное интернет-соединение. Не удалось синхронизировать поле.");
-                        } else {
-                            alert("Медленное интернет-соединение. Не удалось синхронизировать поле.");
-                        }
-                        return; // обрыв обновления
-                    }
-
+                    preloadAvatars(newState.polygons);  // не ждём
                     if (!cancelInProgress) {
                         gState.players = newState.players;
                         gState.pool = newState.pool;
