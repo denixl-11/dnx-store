@@ -106,6 +106,12 @@
             box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
             transform: translateZ(0);
             isolation: isolate;
+            transition: border 0.2s, box-shadow 0.2s;
+        }
+        /* 🟡 Золотая обводка победителя (поверх серой рамки) */
+        .game-canvas-wrap.winner-glow {
+            border: 6px solid #FFD700;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 0 30px rgba(255, 215, 0, 0.9);
         }
         #gameCanvas {
             display: block;
@@ -333,7 +339,7 @@
                     История
                 </div>
             </div>
-            <div class="game-canvas-wrap">
+            <div class="game-canvas-wrap" id="game-canvas-wrap">
                 <canvas id="gameCanvas"></canvas>
                 <div class="game-timer-overlay" id="game-timer-bg"></div>
             </div>
@@ -1242,41 +1248,6 @@
             }
 
             // ==========================================
-            // ОТРИСОВКА СЕКТОРА ПОБЕДИТЕЛЯ (highlightPts)
-            // ==========================================
-            if (!isWaitingMode && highlightPts && highlightPts.length >= 3) {
-                const INSET = 2;
-                const dw = cw - INSET * 2;
-                const dh = ch - INSET * 2;
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(INSET + highlightPts[0].x * dw, INSET + (1 - highlightPts[0].y) * dh);
-                for (let i = 1; i < highlightPts.length; i++) {
-                    ctx.lineTo(INSET + highlightPts[i].x * dw, INSET + (1 - highlightPts[i].y) * dh);
-                }
-                ctx.closePath();
-
-                ctx.fillStyle = "rgba(212, 175, 55, 0.3)";
-                ctx.fill();
-
-                const goldGrad = ctx.createLinearGradient(0, 0, cw, ch);
-                goldGrad.addColorStop(0, "#F9F295");
-                goldGrad.addColorStop(0.5, "#D4AF37");
-                goldGrad.addColorStop(1, "#997A00");
-
-                ctx.lineJoin = "round";
-                ctx.lineCap = "round";
-                ctx.strokeStyle = goldGrad;
-                ctx.lineWidth = 8;
-
-                ctx.shadowColor = "rgba(212, 175, 55, 0.9)";
-                ctx.shadowBlur = 30;
-
-                ctx.stroke();
-                ctx.restore();
-            }
-
-            // ==========================================
             // ОТРИСОВКА ШАРИКА (ballPos)
             // ==========================================
             if (ballPos) {
@@ -1328,6 +1299,38 @@
                 ctx.strokeStyle = "rgba(212, 175, 55, 0.7)";
                 ctx.stroke();
                 ctx.closePath();
+                ctx.restore();
+            }
+
+            // ==========================================
+            // ОТРИСОВКА СЕКТОРА ПОБЕДИТЕЛЯ (highlightPts) – внутри canvas
+            // ==========================================
+            if (!isWaitingMode && highlightPts && highlightPts.length >= 3) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(highlightPts[0].x * cw, (1 - highlightPts[0].y) * ch);
+                for (let i = 1; i < highlightPts.length; i++) {
+                    ctx.lineTo(highlightPts[i].x * cw, (1 - highlightPts[i].y) * ch);
+                }
+                ctx.closePath();
+
+                ctx.fillStyle = "rgba(212, 175, 55, 0.3)";
+                ctx.fill();
+
+                const goldGrad = ctx.createLinearGradient(0, 0, cw, ch);
+                goldGrad.addColorStop(0, "#F9F295");
+                goldGrad.addColorStop(0.5, "#D4AF37");
+                goldGrad.addColorStop(1, "#997A00");
+
+                ctx.lineJoin = "round";
+                ctx.lineCap = "round";
+                ctx.strokeStyle = goldGrad;
+                ctx.lineWidth = 8;
+
+                ctx.shadowColor = "rgba(212, 175, 55, 0.9)";
+                ctx.shadowBlur = 30;
+
+                ctx.stroke();
                 ctx.restore();
             }
 
@@ -1406,10 +1409,15 @@
             lastShownRoundId = roundId;
             localStorage.setItem('last_round_id', lastShownRoundId);
 
+            const wrap = document.getElementById('game-canvas-wrap');
+
             if (winnerData.polygon && winnerData.polygon.length >= 3) {
                 highlightPolygon = winnerData.polygon;
                 drawGameFrame(null, highlightPolygon);
+                // Добавляем золотую обводку поверх серой рамки
+                if (wrap) wrap.classList.add('winner-glow');
                 await new Promise(r => setTimeout(r, 1500));
+                if (wrap) wrap.classList.remove('winner-glow');
             }
 
             // Сброс состояния для waiting mode
@@ -1448,7 +1456,6 @@
         function closeWinnerModal() {
             document.getElementById('winner-modal').classList.remove('active');
             if (winnerTimer) { clearTimeout(winnerTimer); winnerTimer = null; }
-            // Снимаем блокировку, чтобы pollGame снова начал обновлять состояние
             isShowingWinner = false;
         }
 
