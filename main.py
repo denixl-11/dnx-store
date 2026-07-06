@@ -540,7 +540,6 @@ async def game_worker():
                 game_state["timer"] -= 1
                 if game_state["timer"] <= 0:
 
-                    # ❗️ Больше никакого перестроения полигонов!
                     if not game_state.get("polygons"):
                         game_state["polygons"] = build_weighted_voronoi(
                             list(game_state["players"].values()),
@@ -591,37 +590,20 @@ async def handle_get_user(request):
     user = request['telegram_user']
     user_id = user['id']
     username = user['username']
-    photo_url = None
-    if request.method == 'POST':
-        try:
-            data = await request.json()
-            photo_url = data.get('photo_url', None)
-        except:
-            pass
     try:
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                if photo_url:
-                    cur.execute("""
-                        INSERT INTO users (id, username, photo_url) VALUES (%s, %s, %s)
-                        ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username, photo_url = COALESCE(EXCLUDED.photo_url, users.photo_url)
-                    """, (user_id, username, photo_url))
-                else:
-                    cur.execute("""
-                        INSERT INTO users (id, username) VALUES (%s, %s)
-                        ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
-                    """, (user_id, username))
-                cur.execute("SELECT balance, photo_url FROM users WHERE id = %s", (user_id,))
+                cur.execute(
+                    "INSERT INTO users (id, username) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
+                    (user_id, username))
+                cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
                 db_user = cur.fetchone()
                 conn.commit()
                 balance = float(db_user['balance']) if db_user else 0.0
-                saved_photo = db_user.get('photo_url') if db_user else None
-        return web.json_response({"balance": balance, "photo_url": saved_photo},
-                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get user error: {e}")
-        return web.json_response({"balance": 0.0, "photo_url": None},
-                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        balance = 0.0
+    return web.json_response({"balance": balance}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 
 @require_auth
@@ -800,6 +782,7 @@ async def handle_game_bet(request):
                         return web.json_response({"success": False, "error": "insufficient_funds"},
                                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
                     cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
+                    # сохраняем аватарку при ставке
                     photo_url = data.get('photo_url', '')
                     if photo_url:
                         cur.execute("UPDATE users SET photo_url = %s WHERE id = %s", (photo_url, user_id))
@@ -1045,7 +1028,6 @@ async def cmd_start(message: types.Message):
 # ---------- Настройка сервера ----------
 app = web.Application()
 app.router.add_get('/user', handle_get_user)
-app.router.add_post('/user', handle_get_user)  # для сохранения аватарки
 app.router.add_get('/items', handle_get_items)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_get('/req', handle_get_requisites)
@@ -1074,4 +1056,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-    
