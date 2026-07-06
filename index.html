@@ -687,12 +687,7 @@
 
         async function updateBalance() {
             try {
-                const data = await apiFetch(`${API_BASE}/user`, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        photo_url: tg.initDataUnsafe?.user?.photo_url || ''
-                    })
-                });
+                const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
             } catch(e) { console.error(e); userBalance = 0; }
             document.getElementById('header-balance').innerText = userBalance.toFixed(2) + ' ₽';
@@ -1073,7 +1068,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (с сохранением аватарок в БД)
+        //  ИГРОВАЯ ЛОГИКА
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1261,7 +1256,6 @@
                     if (radius < minRadius) radius = minRadius;
 
                     if (!poly.photo_url) {
-                        // рисуем букву
                         ctx.save();
                         ctx.beginPath();
                         ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
@@ -1290,39 +1284,25 @@
                         ctx.clip();
                         ctx.drawImage(img, centroid.x - radius, centroid.y - radius, radius * 2, radius * 2);
                         ctx.restore();
-                    } else {
-                        // fallback — буква
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
-                        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
-                        ctx.fill();
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-                        ctx.stroke();
+                    } else if (!img) {
+                        const newImg = new Image();
+                        newImg.crossOrigin = "anonymous";
+                        
+                        newImg.onload = () => {
+                            if (!isSpinning) {
+                                drawGameFrame(null, highlightPolygon);
+                            }
+                        };
 
-                        ctx.fillStyle = "#FFFFFF";
-                        ctx.font = `bold ${radius}px Arial`;
-                        ctx.textAlign = "center";
-                        ctx.textBaseline = "middle";
-                        const initial = poly.username ? poly.username.charAt(0).toUpperCase() : "?";
-                        ctx.fillText(initial, centroid.x, centroid.y);
-                        ctx.restore();
+                        newImg.onerror = () => {
+                            console.error("Ошибка загрузки аватарки для канваса:", poly.photo_url);
+                            poly.photo_url = ""; 
+                        };
 
-                        if (!img) {
-                            const newImg = new Image();
-                            newImg.crossOrigin = "anonymous";
-                            newImg.onload = () => {
-                                if (!isSpinning) {
-                                    drawGameFrame(null, highlightPolygon);
-                                }
-                            };
-                            newImg.onerror = () => {
-                                poly.photo_url = "";
-                            };
-                            newImg.src = poly.photo_url;
-                            imageCache[poly.photo_url] = newImg;
-                        }
+                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(poly.photo_url)}`;
+                        newImg.src = proxyUrl;
+                        
+                        imageCache[poly.photo_url] = newImg;
                     }
                 }
             } 
@@ -1354,7 +1334,6 @@
                     ctx.restore();
                 } else {
                     const img = imageCache[singlePlayer.photo_url];
-
                     if (img && img.complete && img.naturalWidth !== 0) {
                         ctx.save();
                         ctx.beginPath();
@@ -1362,36 +1341,25 @@
                         ctx.clip();
                         ctx.drawImage(img, cw / 2 - radius, ch / 2 - radius, radius * 2, radius * 2);
                         ctx.restore();
-                    } else {
-                        // fallback — буква
-                        ctx.save();
-                        ctx.beginPath();
-                        ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
-                        ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
-                        ctx.fill();
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-                        ctx.lineWidth = 2;
-                        ctx.stroke();
-                        ctx.fillStyle = "#FFFFFF";
-                        ctx.font = `bold ${radius}px Arial`;
-                        ctx.textAlign = "center";
-                        ctx.textBaseline = "middle";
-                        const initial = singlePlayer.username ? singlePlayer.username.charAt(0).toUpperCase() : "?";
-                        ctx.fillText(initial, cw / 2, ch / 2);
-                        ctx.restore();
+                    } else if (!img) {
+                        const newImg = new Image();
+                        newImg.crossOrigin = "anonymous";
+                        
+                        newImg.onload = () => {
+                            if (!isSpinning) {
+                                drawGameFrame(null, highlightPolygon);
+                            }
+                        };
 
-                        if (!img) {
-                            const newImg = new Image();
-                            newImg.crossOrigin = "anonymous";
-                            newImg.onload = () => {
-                                if (!isSpinning) drawGameFrame(null, highlightPolygon);
-                            };
-                            newImg.onerror = () => {
-                                singlePlayer.photo_url = "";
-                            };
-                            newImg.src = singlePlayer.photo_url;
-                            imageCache[singlePlayer.photo_url] = newImg;
-                        }
+                        newImg.onerror = () => {
+                            console.error("Ошибка загрузки аватарки для одиночного игрока:", singlePlayer.photo_url);
+                            singlePlayer.photo_url = "";
+                        };
+
+                        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(singlePlayer.photo_url)}`;
+                        newImg.src = proxyUrl;
+                        
+                        imageCache[singlePlayer.photo_url] = newImg;
                     }
                 }
             }
