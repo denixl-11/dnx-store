@@ -1068,7 +1068,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (с прелоадером)
+        //  ИГРОВАЯ ЛОГИКА (ПЛАН Б – без CORS, без прокси)
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1243,7 +1243,7 @@
                     ctx.stroke();
                 }
 
-                // Отрисовка аватарок — синхронная, если картинка уже в кэше, иначе заглушка
+                // Отрисовка аватарок – чистая загрузка, без crossOrigin
                 for (const poly of gState.polygons) {
                     const scaledPoints = poly.polygon.map(p => ({
                         x: p.x * cw,
@@ -1257,9 +1257,10 @@
                     if (radius < minRadius) radius = minRadius;
 
                     let isAvatarDrawn = false;
-                    if (poly.photo_url) {
+
+                    if (poly.photo_url && imageCache[poly.photo_url]) {
                         const img = imageCache[poly.photo_url];
-                        if (img && img.complete && img.naturalWidth > 0) {
+                        if (img.complete && img.naturalWidth > 0) {
                             ctx.save();
                             ctx.beginPath();
                             ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
@@ -1301,9 +1302,9 @@
 
                 const radius = 45;
                 let isAvatarDrawn = false;
-                if (singlePlayer.photo_url) {
+                if (singlePlayer.photo_url && imageCache[singlePlayer.photo_url]) {
                     const img = imageCache[singlePlayer.photo_url];
-                    if (img && img.complete && img.naturalWidth > 0) {
+                    if (img.complete && img.naturalWidth > 0) {
                         ctx.save();
                         ctx.beginPath();
                         ctx.arc(cw / 2, ch / 2, radius, 0, Math.PI * 2);
@@ -1429,52 +1430,24 @@
             }
         }
 
-        // Прелоадер аватарок с резервным прокси
+        // Прелоадер без CORS и прокси – прямые ссылки Telegram
         function preloadAvatars(polygons) {
-            if (!polygons || polygons.length === 0) return;
+            if (!polygons) return;
 
             polygons.forEach(poly => {
-                if (!poly.photo_url) return;
-
-                // Если картинка уже загружена или сейчас находится в процессе скачивания — пропускаем
-                if (imageCache[poly.photo_url]) return;
+                if (!poly.photo_url || imageCache[poly.photo_url]) return;
 
                 const img = new Image();
-                img.crossOrigin = "anonymous";
+                // crossOrigin убран намеренно – так Canvas видит картинки Telegram
 
-                // ФИКС 1: Как только аватарка скачалась — принудительно и моментально обновляем поле!
                 img.onload = () => {
                     if (typeof isSpinning !== 'undefined' && !isSpinning) {
                         if (typeof drawGameFrame === 'function') drawGameFrame(null, null);
                     }
                 };
 
-                // ФИКС 2: Бесплатные прокси часто падают. Если первый сдох — грузим через второй!
-                img.onerror = () => {
-                    console.warn("Основной прокси отвалился, пробуем резервный для:", poly.photo_url);
-
-                    const fallbackImg = new Image();
-                    fallbackImg.crossOrigin = "anonymous";
-
-                    fallbackImg.onload = () => {
-                        // Перезаписываем битую картинку в кэше на рабочую
-                        imageCache[poly.photo_url] = fallbackImg;
-                        if (typeof isSpinning !== 'undefined' && !isSpinning) {
-                            if (typeof drawGameFrame === 'function') drawGameFrame(null, null);
-                        }
-                    };
-
-                    fallbackImg.onerror = () => console.error("Не удалось загрузить аватарку вообще никак:", poly.photo_url);
-
-                    // Используем запасной мощный прокси
-                    fallbackImg.src = `https://api.allorigins.win/raw?url=${encodeURIComponent(poly.photo_url)}`;
-                };
-
-                // Сразу резервируем место в кэше, чтобы pollGame не спамил миллион запросов в секунду
+                img.src = poly.photo_url;
                 imageCache[poly.photo_url] = img;
-
-                // Пробуем качать через основной прокси
-                img.src = `https://corsproxy.io/?${encodeURIComponent(poly.photo_url)}`;
             });
         }
 
@@ -1635,9 +1608,9 @@
                     document.getElementById('game-timer-bg').innerText = '';
                 }
 
-                // Фоновая загрузка аватарок и обновление визуала
+                // Обновление и фоновая загрузка аватарок
                 if (!isSpinning) {
-                    preloadAvatars(newState.polygons);  // не ждём
+                    preloadAvatars(newState.polygons);
                     if (!cancelInProgress) {
                         gState.players = newState.players;
                         gState.pool = newState.pool;
