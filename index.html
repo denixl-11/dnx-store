@@ -6,6 +6,7 @@
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* ... (styles unchanged) ... */
         :root {
             --bg-main: #0a0a0c;
             --bg-card: linear-gradient(145deg, #131315 0%, #0d0d0f 100%);
@@ -221,9 +222,6 @@
             border-radius: 10px;
         }
 
-        /* =========================================
-           ВИДЖЕТ "LEADERBOARD" (СТРОГИЙ ДИЗАЙН)
-           ========================================= */
         .elite-leaderboard-bar {
             width: 85vw;
             max-width: 380px;
@@ -415,7 +413,6 @@
 
     <div id="page-game" class="page">
         <div class="game-container">
-            <!-- ПРЕМИАЛЬНЫЙ ВИДЖЕТ: LEADERBOARD -->
             <div class="elite-leaderboard-bar" onclick="openLeaderboardModal()">
                 <div class="elite-left">
                     <div class="elite-icon-container">
@@ -1279,7 +1276,9 @@
                     }));
                     const centroid = getPolygonCentroid(scaledPoints);
 
-                    const MAX_RADIUS = 20;                     // стандартный желаемый радиус
+                    // МЕНЯЕМ ЭТУ СТРОКУ: оригинальный крупный размер
+                    const MAX_RADIUS = 45;
+
                     const radius = getDynamicRadius(centroid, poly.polygon, MAX_RADIUS);
 
                     let isAvatarDrawn = false;
@@ -1326,8 +1325,9 @@
                 ctx.fillStyle = grad;
                 ctx.fillRect(0, 0, cw, ch);
 
-                const MAX_RADIUS = 20;
-                const radius = MAX_RADIUS;   // для одиночного игрока можно не динамить
+                // Для одиночного игрока тоже ставим 45
+                const MAX_RADIUS = 45;
+                const radius = MAX_RADIUS;
                 let isAvatarDrawn = false;
                 if (singlePlayer.photo_url && imageCache[singlePlayer.photo_url]) {
                     const img = imageCache[singlePlayer.photo_url];
