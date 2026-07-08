@@ -14,7 +14,6 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiohttp import web
 from dotenv import load_dotenv
-import numpy as np
 
 load_dotenv()
 
@@ -101,6 +100,7 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
+                cur.execute("ALTER TABLE game_history ADD COLUMN IF NOT EXISTS win_percent NUMERIC DEFAULT 0")
                 # Счётчик игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_counter (
@@ -489,6 +489,12 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
     others_bets = pool - winner_bet
     profit = winner_bet + (others_bets * 0.7)
 
+    # Вычисляем процент выигрыша
+    if pool > 0:
+        win_percent = round((winner_bet / pool) * 100, 1)
+    else:
+        win_percent = 100.0
+
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -501,8 +507,8 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
                     ON CONFLICT (user_id) DO UPDATE SET wins = leaderboard.wins + 1, username = EXCLUDED.username
                 """, (winner_id, winner_username))
                 cur.execute(
-                    "INSERT INTO game_history (game_number, winner_name, win_amount) VALUES (%s, %s, %s)",
-                    (game_state["game_number"], winner_username, profit)
+                    "INSERT INTO game_history (game_number, winner_name, win_amount, win_percent) VALUES (%s, %s, %s, %s)",
+                    (game_state["game_number"], winner_username, profit, win_percent)
                 )
                 cur.execute(
                     "DELETE FROM game_history WHERE id NOT IN (SELECT id FROM game_history ORDER BY game_number DESC LIMIT 100)")
@@ -859,14 +865,15 @@ async def handle_game_history(request):
         with get_db_connection() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    "SELECT game_number, winner_name, win_amount FROM game_history ORDER BY game_number DESC LIMIT 100")
+                    "SELECT game_number, winner_name, win_amount, win_percent FROM game_history ORDER BY game_number DESC LIMIT 100")
                 rows = cur.fetchall()
         result = []
         for row in rows:
             result.append({
                 "game_number": row["game_number"],
                 "winner_name": row["winner_name"],
-                "win_amount": float(row["win_amount"])
+                "win_amount": float(row["win_amount"]),
+                "win_percent": float(row.get("win_percent", 0))
             })
         return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:

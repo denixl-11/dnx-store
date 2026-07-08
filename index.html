@@ -923,7 +923,7 @@
                     <div class="history-modal-row">
                         <span>#${h.game_number}</span>
                         <span>${escapeHtml(h.winner_name)}</span>
-                        <span style="color:var(--accent-gold)">${h.win_amount.toFixed(2)} ₽</span>
+                        <span style="color:var(--accent-gold)">${h.win_amount.toFixed(2)} ₽ (${h.win_percent}%)</span>
                     </div>`).join('');
             } catch(e) {
                 list.innerHTML = 'Ошибка загрузки';
@@ -1189,6 +1189,34 @@
             ctx.restore();
         }
 
+        // ------------------------------------------------------------------
+        //  ДИНАМИЧЕСКИЙ РАДИУС (чтобы аватарки не обрезались)
+        // ------------------------------------------------------------------
+        function getDistanceToEdge(px, py, p1x, p1y, p2x, p2y) {
+            const dx = p2x - p1x;
+            const dy = p2y - p1y;
+            const lengthSq = dx * dx + dy * dy;
+            if (lengthSq === 0) return Math.hypot(px - p1x, py - p1y);
+            let t = ((px - p1x) * dx + (py - p1y) * dy) / lengthSq;
+            t = Math.max(0, Math.min(1, t));
+            const closestX = p1x + t * dx;
+            const closestY = p1y + t * dy;
+            return Math.hypot(px - closestX, py - closestY);
+        }
+
+        function getDynamicRadius(centroid, polygon, defaultRadius) {
+            if (!polygon || polygon.length < 3) return defaultRadius;
+            let minDistance = Infinity;
+            for (let i = 0; i < polygon.length; i++) {
+                const p1 = polygon[i];
+                const p2 = polygon[(i + 1) % polygon.length];
+                const dist = getDistanceToEdge(centroid.x, centroid.y, p1.x, p1.y, p2.x, p2.y);
+                if (dist < minDistance) minDistance = dist;
+            }
+            const safeRadius = minDistance - 2;
+            return Math.max(5, Math.min(defaultRadius, safeRadius));
+        }
+
         function drawGameFrame(ballPos = null, highlightPts = null) {
             if (!ctx) return;
             const cw = canvas.width;
@@ -1243,18 +1271,16 @@
                     ctx.stroke();
                 }
 
-                // Отрисовка аватарок – чистая загрузка, без crossOrigin
+                // Отрисовка аватарок – динамический радиус
                 for (const poly of gState.polygons) {
                     const scaledPoints = poly.polygon.map(p => ({
                         x: p.x * cw,
                         y: (1 - p.y) * ch
                     }));
                     const centroid = getPolygonCentroid(scaledPoints);
-                    const maxRadius = 45;
-                    const minRadius = 15;
-                    let radius = Math.sqrt(centroid.area) * 0.20;
-                    if (radius > maxRadius) radius = maxRadius;
-                    if (radius < minRadius) radius = minRadius;
+
+                    const MAX_RADIUS = 20;                     // стандартный желаемый радиус
+                    const radius = getDynamicRadius(centroid, poly.polygon, MAX_RADIUS);
 
                     let isAvatarDrawn = false;
 
@@ -1300,7 +1326,8 @@
                 ctx.fillStyle = grad;
                 ctx.fillRect(0, 0, cw, ch);
 
-                const radius = 45;
+                const MAX_RADIUS = 20;
+                const radius = MAX_RADIUS;   // для одиночного игрока можно не динамить
                 let isAvatarDrawn = false;
                 if (singlePlayer.photo_url && imageCache[singlePlayer.photo_url]) {
                     const img = imageCache[singlePlayer.photo_url];
