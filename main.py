@@ -140,6 +140,26 @@ def init_db():
                         traits JSONB DEFAULT '[]'::jsonb
                     )
                 """)
+                # Кейсы
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS cases (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(255),
+                        price NUMERIC DEFAULT 0.0,
+                        image_url TEXT
+                    )
+                """)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS case_drops (
+                        id SERIAL PRIMARY KEY,
+                        case_id INTEGER REFERENCES cases(id),
+                        name VARCHAR(255),
+                        image_url TEXT,
+                        nft_link TEXT DEFAULT '',
+                        chance NUMERIC,
+                        value NUMERIC DEFAULT 0.0
+                    )
+                """)
                 conn.commit()
                 logging.info(f"DB initialized. Game number: {last_num}")
     except Exception as e:
@@ -489,7 +509,6 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
     others_bets = pool - winner_bet
     profit = winner_bet + (others_bets * 0.7)
 
-    # Вычисляем процент выигрыша
     if pool > 0:
         win_percent = round((winner_bet / pool) * 100, 1)
     else:
@@ -945,36 +964,113 @@ async def handle_get_requisites(request):
     return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 
+# ------------------------------------------------------------
+#  КЕЙСЫ – новые эндпоинты
+# ------------------------------------------------------------
+async def handle_get_cases(request):
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, name, price, image_url FROM cases")
+            cases = cur.fetchall()
+    return web.json_response(cases, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+async def handle_get_case_details(request):
+    case_id = request.query.get('id')
+    if not case_id:
+        return web.json_response({"error": "missing_id"}, status=400,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT id, name, price, image_url FROM cases WHERE id = %s", (case_id,))
+            case = cur.fetchone()
+            if not case:
+                return web.json_response({"error": "case_not_found"}, status=404,
+                                         headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+            cur.execute("SELECT id, name, image_url, chance, value FROM case_drops WHERE case_id = %s", (case_id,))
+            drops = cur.fetchall()
+            case['drops'] = drops
+    return web.json_response(case, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+async def handle_open_case(request):
+    try:
+        data = await request.json()
+        user = request['telegram_user']
+        user_id = user['id']
+        case_id = data.get('caseId')
+
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT price FROM cases WHERE id = %s", (case_id,))
+                case = cur.fetchone()
+                if not case:
+                    return web.json_response({"success": False, "error": "case_not_found"},
+                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+                cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
+                db_user = cur.fetchone()
+                if not db_user or float(db_user['balance']) < float(case['price']):
+                    return web.json_response({"success": False, "error": "insufficient_funds"},
+                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+                cur.execute("SELECT * FROM case_drops WHERE case_id = %s", (case_id,))
+                drops = cur.fetchall()
+                if not drops:
+                    return web.json_response({"success": False, "error": "empty_case"},
+                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+                total_chance = sum(float(drop['chance']) for drop in drops)
+                rand_val = random.uniform(0, total_chance)
+                current_sum = 0
+                won_drop = drops[-1]
+                for drop in drops:
+                    current_sum += float(drop['chance'])
+                    if rand_val <= current_sum:
+                        won_drop = drop
+                        break
+
+                cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (case['price'], user_id))
+                cur.execute(
+                    "INSERT INTO items (name, price, status, image_url, nft_link, buyer_id, last_event) VALUES (%s, %s, 'Продан', %s, %s, %s, 'case_drop') RETURNING id",
+                    (won_drop['name'], won_drop['value'], won_drop['image_url'], won_drop['nft_link'], user_id))
+                new_item_id = cur.fetchone()['id']
+                won_drop['generated_item_id'] = new_item_id
+                conn.commit()
+
+        return web.json_response({"success": True, "won_item": won_drop},
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as e:
+        logging.error(f"Case open error: {e}")
+        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
 # ---------- Админ-коллбэки ----------
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
-    if len(parts) != 4: return
     _, _, uid, amount = parts
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO users (id, balance) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET balance = users.balance + EXCLUDED.balance",
+                (uid, float(amount)))
+            conn.commit()
+    await callback.message.edit_text(f"✅ Баланс пополнен на {amount} ₽!")
     try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO users (id, balance) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET balance = users.balance + EXCLUDED.balance",
-                    (uid, float(amount)))
-                conn.commit()
-        await callback.message.edit_text(f"✅ Баланс пополнен на {amount} ₽!")
-        try:
-            await bot.send_message(uid, f"💰 Ваш баланс пополнен на {amount} ₽!")
-        except:
-            pass
-    except Exception as e:
-        logging.error(f"Topup approve error: {e}")
+        await bot.send_message(int(uid), f"💰 Ваш баланс пополнен на {amount} ₽!")
+    except:
+        pass
 
 
 @dp.callback_query(F.data.startswith("topup_no_"))
 async def admin_topup_reject(callback: types.CallbackQuery):
     parts = callback.data.split("_")
-    if len(parts) != 4: return
     _, _, uid, amount = parts
     await callback.message.edit_text(f"❌ Заявка на {amount} ₽ отклонена.")
     try:
-        await bot.send_message(uid, f"❌ Заявка на пополнение {amount} ₽ отклонена.")
+        await bot.send_message(int(uid), f"❌ Заявка на пополнение {amount} ₽ отклонена.")
     except:
         pass
 
@@ -982,43 +1078,35 @@ async def admin_topup_reject(callback: types.CallbackQuery):
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
     parts = callback.data.split("_")
-    if len(parts) != 4: return
     _, _, uid, item_id = parts
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
+                (int(item_id), uid))
+            conn.commit()
+    await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
     try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
-                    (int(item_id), uid))
-                conn.commit()
-        await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
-        try:
-            await bot.send_message(uid, f"🎉 NFT (ID: {item_id}) выведен!")
-        except:
-            pass
-    except Exception as e:
-        logging.error(f"Withdraw approve error: {e}")
+        await bot.send_message(int(uid), f"🎉 NFT (ID: {item_id}) выведен!")
+    except:
+        pass
 
 
 @dp.callback_query(F.data.startswith("with_no_"))
 async def admin_withdraw_reject(callback: types.CallbackQuery):
     parts = callback.data.split("_")
-    if len(parts) != 4: return
     _, _, uid, item_id = parts
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE items SET status = 'Продан', last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
+                (int(item_id), uid))
+            conn.commit()
+    await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
     try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE items SET status = 'Продан', last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
-                    (int(item_id), uid))
-                conn.commit()
-        await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
-        try:
-            await bot.send_message(uid, f"❌ Вывод NFT (ID: {item_id}) отклонён.")
-        except:
-            pass
-    except Exception as e:
-        logging.error(f"Withdraw reject error: {e}")
+        await bot.send_message(int(uid), f"❌ Вывод NFT (ID: {item_id}) отклонён.")
+    except:
+        pass
 
 
 @dp.message(Command("start"))
@@ -1045,6 +1133,9 @@ app.router.add_get('/game/history', handle_game_history)
 app.router.add_get('/leaderboard', handle_leaderboard)
 app.router.add_get('/season/state', handle_season_state)
 app.router.add_get('/prize/items', handle_get_prize_items)
+app.router.add_get('/cases', handle_get_cases)
+app.router.add_get('/case-details', handle_get_case_details)
+app.router.add_post('/open-case', handle_open_case)
 app.router.add_options('/{tail:.*}', handle_options)
 
 
