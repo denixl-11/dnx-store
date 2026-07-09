@@ -90,6 +90,35 @@
 
         .btn-secondary { width: 100%; background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 12px; height: 52px; font-weight: 500; font-size: 0.95rem; margin-top: 12px; cursor: pointer; }
 
+        /* Новая кнопка из IMG_0677.jpg */
+        .btn-gold-outline {
+            background-color: #0d0d0d;
+            border: 1px solid rgba(212, 175, 55, 0.6);
+            color: #d4af37;
+            border-radius: 12px;
+            padding: 14px 20px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 0 10px rgba(212, 175, 55, 0.02);
+        }
+        .btn-gold-outline:active {
+            background-color: rgba(212, 175, 55, 0.1);
+            transform: scale(0.97);
+        }
+        .buttons-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
         .page { display: none; width: 100%; animation: fadeIn 0.3s ease; }
         .page-active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -111,7 +140,7 @@
 
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
 
-        /* ========== НОВЫЕ СТИЛИ ВКЛАДОК МАГАЗИНА ========== */
+        /* Стили вкладок магазина */
         .store-tabs {
             display: flex;
             gap: 12px;
@@ -289,7 +318,7 @@
             50% { opacity: 0.5; }
         }
 
-        /* Далее идут все остальные стили игры, модалок и т.д. без изменений */
+        /* Игра */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;
@@ -326,7 +355,6 @@
         .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203, 161, 83, 0.5); pointer-events: none; }
 
         .game-controls { display: flex; gap: 12px; width: 85vw; max-width: 380px; margin-top: 16px; }
-        .game-btn { flex: 1; background: var(--bg-card); border: 1px solid var(--accent-gold); color: var(--accent-gold); border-radius: 12px; height: 48px; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
         .game-btn-cancel { width: 85vw; max-width: 380px; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
 
         .bets-list-container { width: 85vw; max-width: 380px; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
@@ -437,7 +465,7 @@
         .prize-modal-img { width:200px; height:200px; border-radius:16px; object-fit:cover; margin-bottom:16px; }
         .prize-modal-traits { margin:12px 0; }
 
-        /* ---------- СТИЛИ ДЛЯ ОБЪЕДИНЁННОЙ МОДАЛКИ КЕЙСА / РУЛЕТКИ ---------- */
+        /* Переходы для модалки кейса */
         .transition-container {
             transition: opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1), transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
         }
@@ -452,34 +480,30 @@
             transform: scale(1) !important;
         }
 
-        .roulette-wrapper {
-            position: relative;
+        /* Рулетка – строгие стили */
+        #roulette-inline-container {
             width: 100%;
-            margin: 30px 0;
-        }
-        .roulette-pointer {
-            position: absolute;
-            top: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 4px;
-            height: calc(100% + 20px);
-            background: linear-gradient(to bottom, transparent, #d4af37, #f3e5ab, #d4af37, transparent);
-            z-index: 10;
-            box-shadow: 0 0 15px rgba(212, 175, 55, 0.9);
-            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+            margin-top: 15px;
         }
         .roulette-container {
+            width: 100%;
+            height: 120px;
             overflow: hidden;
-            border-radius: 16px;
+            border-radius: 12px;
             background: #0a0908;
-            border: 1px solid rgba(212, 175, 55, 0.2);
-            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9), 0 5px 15px rgba(0, 0, 0, 0.5);
-            padding: 10px 0;
-            margin: 0; /* убираем старые отступы */
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            position: relative;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
         }
         .roulette-track {
-            display: flex;
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            width: max-content;
+            height: 100%;
+            align-items: center;
             gap: 8px;
             will-change: transform;
             transition: transform 6.5s cubic-bezier(0.15, 0.9, 0.1, 1);
@@ -489,19 +513,28 @@
             width: 100px;
             height: 100px;
             background: linear-gradient(145deg, #1f1c16, #0d0c0a);
-            border: 1px solid rgba(255, 255, 255, 0.03);
-            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            padding: 10px;
         }
         .roulette-item img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
-            border-radius: 8px;
+        }
+        .roulette-pointer {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3px;
+            height: 100%;
+            background: #d4af37;
+            z-index: 10;
+            box-shadow: 0 0 10px #d4af37;
         }
 
         .win-pulse {
@@ -557,8 +590,8 @@
                 <span id="game-number-display">#...</span>
             </div>
             <div class="game-controls">
-                <button class="game-btn" onclick="openBetConfirm(10)">+10 ₽</button>
-                <button class="game-btn" onclick="openCustomBet()">Своя сумма</button>
+                <button class="btn-gold-outline" onclick="openBetConfirm(10)">+10 ₽</button>
+                <button class="btn-gold-outline" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
             <div class="bets-list-container" id="bets-list-container">
@@ -755,24 +788,20 @@
     <!-- Единая модалка для кейса и рулетки -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <!-- Блок информации о кейсе -->
             <div id="case-info-container" class="transition-container">
                 <img id="case-detail-img" class="case-detail-img" src="">
                 <h3 class="modal-title" id="case-detail-title" style="font-size: 1.4rem;"></h3>
                 <div class="drop-list" id="case-drop-list"></div>
-                <button class="btn-main-action" id="case-open-btn" onclick="openCase()">
-                    Открыть за <span id="case-price"></span> ₽
+                <button class="btn-gold-outline" id="case-open-btn" onclick="openCase()">
+                    ОТКРЫТЬ ЗА <span id="case-price"></span> ₽
                 </button>
                 <button class="btn-secondary" onclick="closeCaseDetail(event)">Закрыть</button>
             </div>
-            <!-- Блок рулетки и выигрыша -->
             <div id="roulette-inline-container" class="transition-container" style="display: none; opacity: 0;">
                 <h3 class="modal-title" id="roulette-title">Открытие...</h3>
-                <div class="roulette-wrapper" id="roulette-wrapper">
+                <div class="roulette-container" id="roulette-container">
                     <div class="roulette-pointer"></div>
-                    <div class="roulette-container" id="roulette-container">
-                        <div class="roulette-track" id="roulette-track"></div>
-                    </div>
+                    <div class="roulette-track" id="roulette-track"></div>
                 </div>
                 <div id="win-display" style="display: none; text-align: center; margin-top: 20px;">
                     <img id="win-image" src="" style="width: 140px; height: 140px; border-radius: 16px; object-fit: cover;">
@@ -1112,7 +1141,7 @@
             } catch(e) { list.innerHTML = 'Ошибка загрузки'; }
         }
 
-        // --- Призы ---
+        // Призы
         let currentPrizeItems = [];
         async function loadPrizeItems() {
             try {
@@ -1143,7 +1172,7 @@
             document.getElementById('prize-detail-overlay').classList.remove('active');
         }
 
-        // --- Лидеры и сезон ---
+        // Лидеры и сезон
         async function loadLeaderboardPreview() {
             try {
                 const data = await apiFetch(`${API_BASE}/leaderboard`);
@@ -1813,7 +1842,7 @@
                         <span class="drop-name">${escapeHtml(d.name)}</span>
                         <span class="drop-chance">${d.chance}%</span>
                     </div>`).join('');
-                // Показываем информационный блок и скрываем блок рулетки
+                // Сброс состояний
                 document.getElementById('case-info-container').classList.remove('fade-out');
                 document.getElementById('case-info-container').style.display = 'block';
                 document.getElementById('roulette-inline-container').classList.remove('fade-in');
@@ -1822,7 +1851,6 @@
             } catch(e) { showAlert('Ошибка загрузки кейса'); }
         }
 
-        // Новая функция открытия кейса
         async function openCase() {
             if (!currentCase) return;
             if (userBalance < currentCase.price) { showAlert('Недостаточно средств'); return; }
@@ -1837,7 +1865,9 @@
                         infoContainer.style.display = 'none';
                         const rouletteContainer = document.getElementById('roulette-inline-container');
                         document.getElementById('win-display').style.display = 'none';
-                        document.getElementById('roulette-wrapper').style.display = 'block';
+                        // Показываем рулетку
+                        const rouletteBox = document.getElementById('roulette-container');
+                        rouletteBox.style.display = 'block';
                         document.getElementById('roulette-title').innerText = 'Открытие...';
                         rouletteContainer.style.display = 'block';
                         requestAnimationFrame(() => {
@@ -1874,7 +1904,7 @@
                 div.appendChild(img);
                 track.appendChild(div);
             });
-            const itemWidth = 108;
+            const itemWidth = 108; // 100px + gap 8px
             const containerWidth = document.getElementById('roulette-container').clientWidth;
             const offset = (winIndex * itemWidth) - (containerWidth / 2) + (itemWidth / 2);
             const randomizeStop = Math.floor(Math.random() * 80) - 40;
@@ -1892,7 +1922,7 @@
         }
 
         function showWinItem(wonItem) {
-            document.getElementById('roulette-wrapper').style.display = 'none';
+            document.getElementById('roulette-container').style.display = 'none';
             document.getElementById('roulette-title').innerText = 'Кейс открыт!';
             const winDisplay = document.getElementById('win-display');
             const winImg = document.getElementById('win-image');
