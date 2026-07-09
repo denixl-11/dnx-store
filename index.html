@@ -111,7 +111,7 @@
 
         .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
 
-        /* Обновлённые кнопки-вкладки магазина (в стиле кнопок из игры) */
+        /* ========== НОВЫЕ СТИЛИ ВКЛАДОК МАГАЗИНА ========== */
         .store-tabs {
             display: flex;
             gap: 12px;
@@ -151,7 +151,7 @@
             background: rgba(212, 175, 55, 0.1);
         }
 
-        /* Премиальные карточки кейсов */
+        /* Карточки кейсов */
         .case-card {
             background: linear-gradient(160deg, #1f1c16 0%, #0d0c0a 100%);
             border: 1px solid rgba(212, 175, 55, 0.2);
@@ -289,6 +289,7 @@
             50% { opacity: 0.5; }
         }
 
+        /* Далее идут все остальные стили игры, модалок и т.д. без изменений */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;
@@ -436,16 +437,81 @@
         .prize-modal-img { width:200px; height:200px; border-radius:16px; object-fit:cover; margin-bottom:16px; }
         .prize-modal-traits { margin:12px 0; }
 
-        .case-detail-img { width: 90%; max-width: 300px; border-radius: 16px; margin-bottom: 20px; }
-        .drop-list { margin: 20px 0; }
-        .drop-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
-        .drop-row img { width: 40px; height: 40px; border-radius: 8px; }
-        .drop-name { flex: 1; margin-left: 12px; }
-        .drop-chance { color: var(--accent-gold); font-weight: 600; }
-        .roulette-container { overflow: hidden; border-radius: 16px; border: 2px solid var(--accent-gold); margin: 20px 0; }
-        .roulette-track { display: flex; transition: transform 4s cubic-bezier(0.25, 0.1, 0.1, 1); }
-        .roulette-item { flex: 0 0 auto; width: 100px; height: 100px; padding: 8px; }
-        .roulette-item img { width: 100%; height: 100%; border-radius: 12px; object-fit: cover; }
+        /* ---------- СТИЛИ ДЛЯ ОБЪЕДИНЁННОЙ МОДАЛКИ КЕЙСА / РУЛЕТКИ ---------- */
+        .transition-container {
+            transition: opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1), transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .fade-out {
+            opacity: 0 !important;
+            transform: scale(0.95) !important;
+            pointer-events: none;
+        }
+        .fade-in {
+            display: block !important;
+            opacity: 1 !important;
+            transform: scale(1) !important;
+        }
+
+        .roulette-wrapper {
+            position: relative;
+            width: 100%;
+            margin: 30px 0;
+        }
+        .roulette-pointer {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: calc(100% + 20px);
+            background: linear-gradient(to bottom, transparent, #d4af37, #f3e5ab, #d4af37, transparent);
+            z-index: 10;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.9);
+            border-radius: 2px;
+        }
+        .roulette-container {
+            overflow: hidden;
+            border-radius: 16px;
+            background: #0a0908;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9), 0 5px 15px rgba(0, 0, 0, 0.5);
+            padding: 10px 0;
+            margin: 0; /* убираем старые отступы */
+        }
+        .roulette-track {
+            display: flex;
+            gap: 8px;
+            will-change: transform;
+            transition: transform 6.5s cubic-bezier(0.15, 0.9, 0.1, 1);
+        }
+        .roulette-item {
+            flex: 0 0 auto;
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(145deg, #1f1c16, #0d0c0a);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .roulette-item img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .win-pulse {
+            animation: winPulseAnim 2s infinite ease-in-out;
+        }
+        @keyframes winPulseAnim {
+            0% { box-shadow: 0 0 15px rgba(212, 175, 55, 0.2); }
+            50% { box-shadow: 0 0 40px rgba(212, 175, 55, 0.8); transform: scale(1.05); }
+            100% { box-shadow: 0 0 15px rgba(212, 175, 55, 0.2); }
+        }
     </style>
 </head>
 <body>
@@ -686,25 +752,34 @@
         </div>
     </div>
 
-    <!-- Case Detail Modal -->
+    <!-- Единая модалка для кейса и рулетки -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <img id="case-detail-img" class="case-detail-img" src="">
-            <h3 class="modal-title" id="case-detail-title" style="font-size: 1.4rem;"></h3>
-            <div class="drop-list" id="case-drop-list"></div>
-            <button class="btn-main-action" id="case-open-btn" onclick="openCase()">Открыть за <span id="case-price"></span> ₽</button>
-            <button class="btn-secondary" onclick="closeModal('case-detail-overlay')">Закрыть</button>
-        </div>
-    </div>
-
-    <!-- Roulette Overlay -->
-    <div id="roulette-overlay" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 420px;">
-            <h3 class="modal-title">Открытие кейса</h3>
-            <div class="roulette-container" id="roulette-container">
-                <div class="roulette-track" id="roulette-track"></div>
+            <!-- Блок информации о кейсе -->
+            <div id="case-info-container" class="transition-container">
+                <img id="case-detail-img" class="case-detail-img" src="">
+                <h3 class="modal-title" id="case-detail-title" style="font-size: 1.4rem;"></h3>
+                <div class="drop-list" id="case-drop-list"></div>
+                <button class="btn-main-action" id="case-open-btn" onclick="openCase()">
+                    Открыть за <span id="case-price"></span> ₽
+                </button>
+                <button class="btn-secondary" onclick="closeCaseDetail(event)">Закрыть</button>
             </div>
-            <button class="btn-main-action" id="roulette-close-btn" onclick="closeRoulette()">Забрать</button>
+            <!-- Блок рулетки и выигрыша -->
+            <div id="roulette-inline-container" class="transition-container" style="display: none; opacity: 0;">
+                <h3 class="modal-title" id="roulette-title">Открытие...</h3>
+                <div class="roulette-wrapper" id="roulette-wrapper">
+                    <div class="roulette-pointer"></div>
+                    <div class="roulette-container" id="roulette-container">
+                        <div class="roulette-track" id="roulette-track"></div>
+                    </div>
+                </div>
+                <div id="win-display" style="display: none; text-align: center; margin-top: 20px;">
+                    <img id="win-image" src="" style="width: 140px; height: 140px; border-radius: 16px; object-fit: cover;">
+                    <div id="win-name" style="color: var(--accent-gold); font-size: 1.4rem; font-weight: 800; margin-top: 15px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.4);"></div>
+                    <button class="btn-main-action" style="margin-top: 25px;" onclick="claimItem()">Забрать в инвентарь</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1133,7 +1208,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА (полностью без изменений)
+        //  ИГРОВАЯ ЛОГИКА (без изменений)
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1738,16 +1813,16 @@
                         <span class="drop-name">${escapeHtml(d.name)}</span>
                         <span class="drop-chance">${d.chance}%</span>
                     </div>`).join('');
+                // Показываем информационный блок и скрываем блок рулетки
+                document.getElementById('case-info-container').classList.remove('fade-out');
+                document.getElementById('case-info-container').style.display = 'block';
+                document.getElementById('roulette-inline-container').classList.remove('fade-in');
+                document.getElementById('roulette-inline-container').style.display = 'none';
                 document.getElementById('case-detail-overlay').classList.add('active');
             } catch(e) { showAlert('Ошибка загрузки кейса'); }
         }
 
-        function closeCaseDetail(event) {
-            if (event && event.target.id !== 'case-detail-overlay') return;
-            document.getElementById('case-detail-overlay').classList.remove('active');
-            currentCase = null;
-        }
-
+        // Новая функция открытия кейса
         async function openCase() {
             if (!currentCase) return;
             if (userBalance < currentCase.price) { showAlert('Недостаточно средств'); return; }
@@ -1755,12 +1830,29 @@
             try {
                 const result = await apiFetch(`${API_BASE}/open-case`, { method: 'POST', body: JSON.stringify({ caseId: currentCase.id }) });
                 if (result.success) {
-                    closeModal('case-detail-overlay');
                     await updateBalance();
-                    startRoulette(currentCase.drops, result.won_item);
-                } else showAlert(result.error || 'Ошибка открытия');
-            } catch(e) { showAlert('Ошибка сети'); }
-            document.getElementById('case-open-btn').disabled = false;
+                    const infoContainer = document.getElementById('case-info-container');
+                    infoContainer.classList.add('fade-out');
+                    setTimeout(() => {
+                        infoContainer.style.display = 'none';
+                        const rouletteContainer = document.getElementById('roulette-inline-container');
+                        document.getElementById('win-display').style.display = 'none';
+                        document.getElementById('roulette-wrapper').style.display = 'block';
+                        document.getElementById('roulette-title').innerText = 'Открытие...';
+                        rouletteContainer.style.display = 'block';
+                        requestAnimationFrame(() => {
+                            rouletteContainer.classList.add('fade-in');
+                            startRoulette(currentCase.drops, result.won_item);
+                        });
+                    }, 400);
+                } else {
+                    showAlert(result.error || 'Ошибка открытия');
+                    document.getElementById('case-open-btn').disabled = false;
+                }
+            } catch(e) {
+                showAlert('Ошибка сети');
+                document.getElementById('case-open-btn').disabled = false;
+            }
         }
 
         function startRoulette(drops, wonItem) {
@@ -1768,10 +1860,12 @@
             rouletteActive = true;
             const track = document.getElementById('roulette-track');
             track.innerHTML = '';
-            const repeatCount = 20;
             let items = [];
-            for (let i = 0; i < repeatCount; i++) items = items.concat(drops);
-            items.push(wonItem);
+            for (let i = 0; i < 60; i++) {
+                items.push(drops[Math.floor(Math.random() * drops.length)]);
+            }
+            const winIndex = 50;
+            items[winIndex] = wonItem;
             items.forEach(drop => {
                 const div = document.createElement('div');
                 div.className = 'roulette-item';
@@ -1780,27 +1874,69 @@
                 div.appendChild(img);
                 track.appendChild(div);
             });
-            const itemWidth = 100;
+            const itemWidth = 108;
             const containerWidth = document.getElementById('roulette-container').clientWidth;
-            const totalWidth = items.length * itemWidth;
-            const offset = totalWidth - containerWidth + itemWidth / 2;
+            const offset = (winIndex * itemWidth) - (containerWidth / 2) + (itemWidth / 2);
+            const randomizeStop = Math.floor(Math.random() * 80) - 40;
+            const finalOffset = offset + randomizeStop;
             track.style.transition = 'none';
             track.style.transform = 'translateX(0)';
             void track.offsetWidth;
             requestAnimationFrame(() => {
-                track.style.transition = 'transform 4s cubic-bezier(0.25, 0.1, 0.1, 1)';
-                track.style.transform = `translateX(-${offset}px)`;
+                track.style.transition = 'transform 6.5s cubic-bezier(0.15, 0.9, 0.1, 1)';
+                track.style.transform = `translateX(-${finalOffset}px)`;
             });
-            document.getElementById('roulette-overlay').style.display = 'flex';
+            setTimeout(() => {
+                showWinItem(wonItem);
+            }, 7000);
         }
 
-        function closeRoulette() {
-            document.getElementById('roulette-overlay').style.display = 'none';
+        function showWinItem(wonItem) {
+            document.getElementById('roulette-wrapper').style.display = 'none';
+            document.getElementById('roulette-title').innerText = 'Кейс открыт!';
+            const winDisplay = document.getElementById('win-display');
+            const winImg = document.getElementById('win-image');
+            winImg.src = wonItem.image_url;
+            document.getElementById('win-name').innerText = wonItem.name;
+            winDisplay.style.display = 'block';
+            winImg.classList.remove('win-pulse');
+            void winImg.offsetWidth;
+            winImg.classList.add('win-pulse');
+        }
+
+        function claimItem() {
+            const infoContainer = document.getElementById('case-info-container');
+            const rouletteContainer = document.getElementById('roulette-inline-container');
+            infoContainer.classList.remove('fade-out');
+            infoContainer.style.display = 'block';
+            rouletteContainer.classList.remove('fade-in');
+            rouletteContainer.style.display = 'none';
+            document.getElementById('case-detail-overlay').classList.remove('active');
+            document.getElementById('case-open-btn').disabled = false;
             rouletteActive = false;
-            loadInventory();
+            if(typeof loadInventory === 'function') loadInventory();
         }
 
-        // Инициализация
+        function closeCaseDetail(event) {
+            if (event && event.target.id !== 'case-detail-overlay' && event.target.tagName !== 'BUTTON') return;
+            if (rouletteActive) return;
+            document.getElementById('case-detail-overlay').classList.remove('active');
+            currentCase = null;
+            setTimeout(() => {
+                const info = document.getElementById('case-info-container');
+                const roulette = document.getElementById('roulette-inline-container');
+                if (info) {
+                    info.classList.remove('fade-out');
+                    info.style.display = 'block';
+                }
+                if (roulette) {
+                    roulette.classList.remove('fade-in');
+                    roulette.style.display = 'none';
+                }
+                document.getElementById('case-open-btn').disabled = false;
+            }, 300);
+        }
+
         updateCartFab();
         updateBalance();
         loadCatalog();
