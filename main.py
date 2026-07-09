@@ -67,7 +67,6 @@ def init_db():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Пользователи
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
@@ -75,7 +74,6 @@ def init_db():
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                # Предметы
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS items (
                         id SERIAL PRIMARY KEY,
@@ -90,7 +88,6 @@ def init_db():
                         last_event VARCHAR(50)
                     )
                 """)
-                # Игровая история
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -101,7 +98,6 @@ def init_db():
                     )
                 """)
                 cur.execute("ALTER TABLE game_history ADD COLUMN IF NOT EXISTS win_percent NUMERIC DEFAULT 0")
-                # Счётчик игр
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_counter (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -113,7 +109,6 @@ def init_db():
                 last_num = cur.fetchone()[0]
                 game_state["game_number"] = last_num
 
-                # Лидерборд
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS leaderboard (
                         user_id VARCHAR(255) PRIMARY KEY,
@@ -121,7 +116,6 @@ def init_db():
                         wins INT DEFAULT 0
                     )
                 """)
-                # Сезон
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS season (
                         id INT PRIMARY KEY DEFAULT 1,
@@ -130,7 +124,6 @@ def init_db():
                 """)
                 cur.execute(
                     "INSERT INTO season (id, end_time) VALUES (1, '2026-06-30 15:00:00+00') ON CONFLICT (id) DO NOTHING")
-                # Призовые предметы
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS prize_items (
                         id SERIAL PRIMARY KEY,
@@ -970,7 +963,7 @@ async def handle_get_requisites(request):
 async def handle_get_cases(request):
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT id, name, price, image_url FROM cases")
+            cur.execute("SELECT id, name, price::FLOAT, image_url FROM cases")
             cases = cur.fetchall()
     return web.json_response(cases, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -982,12 +975,12 @@ async def handle_get_case_details(request):
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT id, name, price, image_url FROM cases WHERE id = %s", (case_id,))
+            cur.execute("SELECT id, name, price::FLOAT, image_url FROM cases WHERE id = %s", (case_id,))
             case = cur.fetchone()
             if not case:
                 return web.json_response({"error": "case_not_found"}, status=404,
                                          headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-            cur.execute("SELECT id, name, image_url, chance, value FROM case_drops WHERE case_id = %s", (case_id,))
+            cur.execute("SELECT id, name, image_url, chance::FLOAT, value::FLOAT FROM case_drops WHERE case_id = %s", (case_id,))
             drops = cur.fetchall()
             case['drops'] = drops
     return web.json_response(case, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -1015,7 +1008,7 @@ async def handle_open_case(request):
                     return web.json_response({"success": False, "error": "insufficient_funds"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                cur.execute("SELECT * FROM case_drops WHERE case_id = %s", (case_id,))
+                cur.execute("SELECT id, case_id, name, image_url, nft_link, chance::FLOAT, value::FLOAT FROM case_drops WHERE case_id = %s", (case_id,))
                 drops = cur.fetchall()
                 if not drops:
                     return web.json_response({"success": False, "error": "empty_case"},

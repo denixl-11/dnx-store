@@ -1716,6 +1716,7 @@
             const offset = totalWidth - containerWidth + itemWidth / 2;
             track.style.transition = 'none';
             track.style.transform = 'translateX(0)';
+            void track.offsetWidth;
             requestAnimationFrame(() => {
                 track.style.transition = 'transform 4s cubic-bezier(0.25, 0.1, 0.1, 1)';
                 track.style.transform = `translateX(-${offset}px)`;
