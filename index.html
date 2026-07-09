@@ -90,7 +90,41 @@
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
 
-        .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
+        /* Плавающая корзина */
+        .cart-fab {
+            position: fixed;
+            bottom: 120px;
+            right: 20px;
+            width: 64px;
+            height: 64px;
+            background: rgba(10, 10, 12, 0.25);
+            backdrop-filter: blur(10px);
+            border: 2px solid var(--accent-gold);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 95;
+            transition: 0.2s;
+        }
+        .cart-fab.visible { display: flex; }
+        .cart-fab svg { width: 32px; height: 32px; stroke: var(--accent-gold); }
+        .cart-fab .cart-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--accent-gold);
+            color: #000;
+            font-size: 0.7rem;
+            font-weight: 700;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
@@ -176,6 +210,7 @@
         .modal-buttons-row .btn-buy-modal { flex: 1; background: linear-gradient(135deg, #cba153 0%, #a47d33 100%); color: #050505; border: none; border-radius: 12px; height: 52px; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; cursor: pointer; }
         .modal-buttons-row .btn-cart-icon { width: 52px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--accent-gold); border-radius: 12px; height: 52px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
         .modal-buttons-row .btn-cart-icon svg { stroke: var(--accent-gold); width: 24px; height: 24px; }
+        .btn-withdraw { display: none; }
 
         .winner-modal .winner-avatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--accent-gold); margin-bottom: 16px; }
         .winner-modal .winner-name { font-size: 1.4rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 8px; }
@@ -195,213 +230,74 @@
             align-items: center;
             gap: 4px;
         }
-        .history-modal-list {
-            width: 100%;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .history-modal-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            font-size: 0.85rem;
-        }
+        .history-modal-list { width: 100%; max-height: 300px; overflow-y: auto; }
+        .history-modal-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
         .history-modal-row:last-child { border-bottom: none; }
 
-        .confirm-buy-item-preview {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .confirm-buy-item-preview img {
-            width: 60px;
-            height: 60px;
-            border-radius: 10px;
-        }
+        .confirm-buy-item-preview { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .confirm-buy-item-preview img { width: 60px; height: 60px; border-radius: 10px; }
 
         .elite-leaderboard-bar {
-            width: 85vw;
-            max-width: 380px;
-            margin: 0 auto 16px auto;
-            padding: 14px 18px;
+            width: 85vw; max-width: 380px; margin: 0 auto 16px auto; padding: 14px 18px;
             background: linear-gradient(180deg, #1a1814 0%, #0a0908 100%);
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            border-radius: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 16px;
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s;
+        }
+        .elite-leaderboard-bar:active { transform: scale(0.96) translateY(2px); box-shadow: 0 2px 8px rgba(0,0,0,0.8), inset 0 2px 10px rgba(0,0,0,0.6); }
+        .elite-left { display: flex; align-items: center; gap: 14px; }
+        .elite-icon-container { position: relative; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: rgba(212,175,55,0.1); border-radius: 50%; border: 1px solid rgba(212,175,55,0.3); }
+        .elite-icon { font-size: 1.1rem; z-index: 2; }
+        .elite-pulse { position: absolute; width: 100%; height: 100%; background: rgba(212,175,55,0.15); border-radius: 50%; animation: softGoldPulse 4s infinite ease-in-out; }
+        @keyframes softGoldPulse { 0% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.3); opacity: 0; } 100% { transform: scale(1); opacity: 0; } }
+        .elite-text-group { display: flex; flex-direction: column; }
+        .elite-title { font-size: 1.05rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; background: linear-gradient(to right, #FFF5C0, #D4AF37, #AA8222); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .elite-subtitle { font-size: 0.65rem; font-weight: 600; color: rgba(212,175,55,0.6); text-transform: uppercase; letter-spacing: 2px; margin-top: 2px; }
+        .elite-right { background: rgba(20,18,14,0.8); border: 1px solid rgba(212,175,55,0.25); padding: 6px 14px; border-radius: 20px; }
+        .elite-score { color: #F9F295; font-weight: 700; font-size: 0.85rem; }
+
+        .leaderboard-fullscreen { position: fixed; top:0; left:0; width:100%; height:100%; background: var(--bg-main); z-index:2000; padding:20px; overflow-y:auto; display:none; }
+        .leaderboard-fullscreen.active { display:block; }
+        .leaderboard-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+        .season-timer { background: rgba(203,161,83,0.1); border:1px solid var(--accent-gold); border-radius:8px; padding:8px 14px; text-align:center; font-size:0.8rem; color:var(--accent-gold); margin-bottom:20px; }
+        .leaderboard-list { display:flex; flex-direction:column; gap:8px; }
+        .leaderboard-row { display:flex; align-items:center; gap:10px; background:var(--bg-card); border-radius:10px; padding:10px 14px; border:1px solid var(--border-color); }
+        .leaderboard-rank { font-weight:700; color:var(--accent-gold); width:24px; }
+        .leaderboard-name { flex:1; }
+        .leaderboard-wins { color:var(--text-muted); font-size:0.8rem; margin-right:6px; }
+        .leaderboard-nft { width:40px; height:40px; border-radius:8px; object-fit:cover; cursor:pointer; border:1px solid var(--border-color); }
+
+        #prize-detail-overlay { z-index:3000; }
+        .prize-modal-content { background:var(--bg-card); border:1px solid var(--border-color); border-radius:16px; width:90%; max-width:400px; text-align:center; position:relative; padding:20px; }
+        .prize-modal-img { width:200px; height:200px; border-radius:16px; object-fit:cover; margin-bottom:16px; }
+        .prize-modal-traits { margin:12px 0; }
+
+        /* Кнопки-вкладки магазина (Catalog / Cases) */
+        .store-tabs { display: flex; gap: 12px; padding: 0 20px; margin-bottom: 10px; }
+        .store-tab {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--accent-gold);
+            color: var(--accent-gold);
+            border-radius: 12px;
+            height: 48px;
+            font-weight: 700;
+            font-size: 1rem;
+            text-transform: uppercase;
             cursor: pointer;
-            position: relative;
-            box-shadow:
-                0 8px 20px rgba(0, 0, 0, 0.6),
-                inset 0 1px 1px rgba(255, 255, 255, 0.05);
-            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
-                        box-shadow 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-
-        .elite-leaderboard-bar:active {
-            transform: scale(0.96) translateY(2px);
-            box-shadow:
-                0 2px 8px rgba(0, 0, 0, 0.8),
-                inset 0 2px 10px rgba(0, 0, 0, 0.6);
-            border-color: rgba(212, 175, 55, 0.15);
-        }
-
-        .elite-left {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .elite-icon-container {
-            position: relative;
-            width: 36px;
-            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(212, 175, 55, 0.1);
-            border-radius: 50%;
-            border: 1px solid rgba(212, 175, 55, 0.3);
+            transition: 0.3s;
+        }
+        .store-tab.active {
+            background: linear-gradient(135deg, #cba153 0%, #a47d33 100%);
+            color: #050505;
+            border-color: transparent;
         }
 
-        .elite-icon {
-            font-size: 1.1rem;
-            z-index: 2;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-        }
-
-        .elite-pulse {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background: rgba(212, 175, 55, 0.15);
-            border-radius: 50%;
-            animation: softGoldPulse 4s infinite ease-in-out;
-        }
-
-        @keyframes softGoldPulse {
-            0% { transform: scale(1); opacity: 0.7; }
-            50% { transform: scale(1.3); opacity: 0; }
-            100% { transform: scale(1); opacity: 0; }
-        }
-
-        .elite-text-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .elite-title {
-            font-size: 1.05rem;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            background: linear-gradient(to right, #FFF5C0, #D4AF37, #AA8222);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-        }
-
-        .elite-subtitle {
-            font-size: 0.65rem;
-            font-weight: 600;
-            color: rgba(212, 175, 55, 0.6);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-top: 2px;
-        }
-
-        .elite-right {
-            background: rgba(20, 18, 14, 0.8);
-            border: 1px solid rgba(212, 175, 55, 0.25);
-            padding: 6px 14px;
-            border-radius: 20px;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5), 0 0 10px rgba(212, 175, 55, 0.05);
-        }
-
-        .elite-score {
-            color: #F9F295;
-            font-weight: 700;
-            font-size: 0.85rem;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-
-        .leaderboard-fullscreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--bg-main);
-            z-index: 2000;
-            padding: 20px;
-            overflow-y: auto;
-            display: none;
-        }
-        .leaderboard-fullscreen.active { display: block; }
-
-        .leaderboard-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-
-        .season-timer {
-            background: rgba(203,161,83,0.1);
-            border: 1px solid var(--accent-gold);
-            border-radius: 8px;
-            padding: 8px 14px;
-            text-align: center;
-            font-size: 0.8rem;
-            color: var(--accent-gold);
-            margin-bottom: 20px;
-        }
-
-        .leaderboard-list { display: flex; flex-direction: column; gap: 8px; }
-        .leaderboard-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: var(--bg-card);
-            border-radius: 10px;
-            padding: 10px 14px;
-            border: 1px solid var(--border-color);
-        }
-        .leaderboard-rank { font-weight: 700; color: var(--accent-gold); width: 24px; text-align: center; }
-        .leaderboard-name { flex: 1; font-weight: 500; }
-        .leaderboard-wins { color: var(--text-muted); font-size: 0.8rem; margin-right: 6px; }
-        .leaderboard-nft { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; cursor: pointer; border: 1px solid var(--border-color); }
-
-        #prize-detail-overlay { z-index: 3000; }
-
-        .prize-modal-content {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
-            position: relative;
-            padding: 20px;
-        }
-        .prize-modal-img {
-            width: 200px;
-            height: 200px;
-            border-radius: 16px;
-            object-fit: cover;
-            margin-bottom: 16px;
-        }
-        .prize-modal-traits { margin: 12px 0; }
-
-        /* Кейсы и рулетка */
-        .store-tabs { display: flex; padding: 0 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 10px; }
-        .store-tab { padding: 14px 0; margin-right: 24px; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); cursor: pointer; }
-        .store-tab.active { color: var(--accent-gold); border-bottom: 2px solid var(--accent-gold); }
-        .case-detail-img { width: 100%; max-width: 200px; border-radius: 16px; margin-bottom: 20px; }
+        .case-detail-img { width: 90%; max-width: 300px; border-radius: 16px; margin-bottom: 20px; }
         .drop-list { margin: 20px 0; }
         .drop-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color); }
         .drop-row img { width: 40px; height: 40px; border-radius: 8px; }
@@ -425,25 +321,24 @@
         </div>
     </header>
 
+    <!-- Плавающая корзина -->
+    <div class="cart-fab" id="cart-fab" onclick="showPage('cart')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
+        </svg>
+        <span class="cart-badge" id="cart-badge">0</span>
+    </div>
+
     <div id="page-game" class="page">
         <div class="game-container">
             <div class="elite-leaderboard-bar" onclick="openLeaderboardModal()">
                 <div class="elite-left">
-                    <div class="elite-icon-container">
-                        <div class="elite-pulse"></div>
-                        <span class="elite-icon">🏆</span>
-                    </div>
-                    <div class="elite-text-group">
-                        <span class="elite-title">Leaderboard</span>
-                        <span class="elite-subtitle">Season Ranking</span>
-                    </div>
+                    <div class="elite-icon-container"><div class="elite-pulse"></div><span class="elite-icon">🏆</span></div>
+                    <div class="elite-text-group"><span class="elite-title">Leaderboard</span><span class="elite-subtitle">Season Ranking</span></div>
                 </div>
-                <div class="elite-right">
-                    <span id="leaderboard-preview" class="elite-score">...</span>
-                </div>
+                <div class="elite-right"><span id="leaderboard-preview" class="elite-score">...</span></div>
             </div>
-
-            <div style="width:85vw; max-width:380px; display:flex; justify-content: flex-end; margin-bottom: 4px;">
+            <div style="width:85vw; max-width:380px; display:flex; justify-content:flex-end; margin-bottom:4px;">
                 <div class="history-btn" onclick="openHistoryModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     История
@@ -463,24 +358,17 @@
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
             <div class="bets-list-container" id="bets-list-container">
-                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color: var(--accent-gold);">0 ₽</span>)</div>
+                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 ₽</span>)</div>
                 <div class="bets-list" id="game-bets-list"></div>
             </div>
         </div>
     </div>
 
     <div id="page-store" class="page page-active">
-        <div style="padding: 15px 20px; display: flex; justify-content: flex-end;">
-            <div class="cart-btn-header" onclick="showPage('cart')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
-                </svg>
-                <span id="cart-counter">0</span>
-            </div>
-        </div>
+        <!-- Вкладки магазина -->
         <div class="store-tabs">
-            <div class="store-tab active" onclick="switchStoreTab('catalog')">Каталог</div>
-            <div class="store-tab" onclick="switchStoreTab('cases')">Кейсы</div>
+            <div class="store-tab active" onclick="switchStoreTab('catalog')">Catalog</div>
+            <div class="store-tab" onclick="switchStoreTab('cases')">Cases</div>
         </div>
         <div id="catalog-container" class="catalog-grid"></div>
         <div id="cases-container" style="display: none; padding: 20px;">
@@ -541,9 +429,7 @@
                     <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
                         <div style="font-size: 24px; font-weight: 800;" id="nft-modal-title">Name</div>
                         <div id="nft-telegram-link" style="display: none; cursor: pointer; color: #2AABEE;" title="Открыть в Telegram">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.888-.666 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                            </svg>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.888-.666 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
                         </div>
                     </div>
                     <div style="color: var(--text-muted);" id="nft-modal-number">#0000</div>
@@ -551,13 +437,14 @@
             </div>
             <div style="padding: 0 20px; overflow-y: auto; flex: 1;" id="nft-modal-traits-container"></div>
             <div style="padding: 20px;">
-                <div class="modal-buttons-row">
+                <div class="modal-buttons-row" id="nft-modal-actions">
                     <button class="btn-buy-modal" id="nft-modal-btn-buy">КУПИТЬ</button>
                     <div class="btn-cart-icon" id="nft-modal-btn-cart">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                         </svg>
                     </div>
+                    <button class="btn-main-action btn-withdraw" id="nft-modal-btn-withdraw" onclick="if(currentNftItem) withdraw(currentNftItem.id)">ВЫВЕСТИ</button>
                 </div>
             </div>
         </div>
@@ -656,7 +543,7 @@
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <img id="case-detail-img" class="case-detail-img" src="">
-            <h3 class="modal-title" id="case-detail-title"></h3>
+            <h3 class="modal-title" id="case-detail-title" style="font-size: 1.4rem;"></h3>
             <div class="drop-list" id="case-drop-list"></div>
             <button class="btn-main-action" id="case-open-btn" onclick="openCase()">Открыть за <span id="case-price"></span> ₽</button>
             <button class="btn-secondary" onclick="closeModal('case-detail-overlay')">Закрыть</button>
@@ -707,6 +594,7 @@
         let pendingBuyItem = null;
         let currentCase = null;
         let rouletteActive = false;
+        let currentNftItem = null;
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
@@ -728,9 +616,22 @@
                 pollGame();
                 loadLeaderboardPreview();
             }
-            if(id === 'store') loadCatalog();
+            if(id === 'store') {
+                loadCatalog();
+                updateCartFab();
+            }
             if(id === 'inventory') loadInventory();
             if(id === 'cart') renderCart();
+            updateCartFab();
+        }
+
+        function updateCartFab() {
+            const fab = document.getElementById('cart-fab');
+            const storePage = document.getElementById('page-store');
+            const catalogActive = storePage && storePage.classList.contains('page-active') && document.getElementById('catalog-container').style.display !== 'none';
+            if (fab) fab.classList.toggle('visible', catalogActive);
+            const badge = document.getElementById('cart-badge');
+            if (badge) badge.innerText = cart.length;
         }
 
         async function updateBalance() {
@@ -757,6 +658,7 @@
                             </button>
                         </div>
                     </div>`).join('');
+                updateCartFab();
             } catch(e) { console.error(e); }
         }
 
@@ -765,6 +667,7 @@
         function openNftModal(id) {
             const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
             if(!item) return;
+            currentNftItem = item;
             document.getElementById('nft-modal-img').src = item.image_url;
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
@@ -781,11 +684,28 @@
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
                 `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
                 '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
+
+            const isShopItem = currentCatalog.some(i => String(i.id) === String(id));
             const buyBtn = document.getElementById('nft-modal-btn-buy');
-            buyBtn.innerHTML = `КУПИТЬ ЗА ${item.price || 0} ₽`;
-            buyBtn.onclick = () => { closeNftModal(true); confirmBuyItem(item.id, item.price, item.name, item.image_url); };
             const cartBtn = document.getElementById('nft-modal-btn-cart');
-            cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
+            const withdrawBtn = document.getElementById('nft-modal-btn-withdraw');
+            if (isShopItem) {
+                buyBtn.style.display = 'block';
+                cartBtn.style.display = 'flex';
+                withdrawBtn.style.display = 'none';
+                buyBtn.innerHTML = `КУПИТЬ ЗА ${item.price || 0} ₽`;
+                buyBtn.onclick = () => { closeNftModal(true); confirmBuyItem(item.id, item.price, item.name, item.image_url); };
+                cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
+            } else {
+                buyBtn.style.display = 'none';
+                cartBtn.style.display = 'none';
+                if (item.status !== 'withdrawn') {
+                    withdrawBtn.style.display = 'block';
+                    withdrawBtn.onclick = () => { closeNftModal(true); withdraw(item.id); };
+                } else {
+                    withdrawBtn.style.display = 'none';
+                }
+            }
             document.getElementById('nft-detail-overlay').classList.add('active');
         }
         function closeNftModal(force=false) {
@@ -797,35 +717,34 @@
             if(!cart.find(c => c.id === item.id)) {
                 cart.push(item);
                 localStorage.setItem('dnx_cart', JSON.stringify(cart));
-                document.getElementById('cart-counter').innerText = cart.length;
-                try { tg.HapticFeedback.impactOccurred('light'); } catch(e){}
+                updateCartFab();
                 showAlert(`Добавлено: ${item.name}`);
                 renderCart();
             }
         }
         function renderCart() {
-            document.getElementById('cart-counter').innerText = cart.length;
             const list = document.getElementById('cart-items-list');
             if(!cart.length) {
-                list.innerHTML = '<div style="text-align:center; padding: 40px; color:var(--text-muted);">Корзина пуста</div>';
+                list.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Корзина пуста</div>';
                 document.getElementById('pay-footer').style.display = 'none';
-                return;
+            } else {
+                list.innerHTML = cart.map((c, i) => `
+                    <div class="cart-item">
+                        <img src="${c.image_url}">
+                        <div class="cart-item-info">
+                            <div style="font-weight:500">${escapeHtml(c.name)}</div>
+                            <div style="color:var(--accent-gold); margin-top:4px;">${c.price} ₽</div>
+                        </div>
+                        <div style="font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 10px;" onclick="removeFromCart(${i})">×</div>
+                    </div>`).join('');
+                document.getElementById('pay-footer').style.display = 'block';
             }
-            list.innerHTML = cart.map((c, i) => `
-                <div class="cart-item">
-                    <img src="${c.image_url}">
-                    <div class="cart-item-info">
-                        <div style="font-weight:500">${escapeHtml(c.name)}</div>
-                        <div style="color:var(--accent-gold); margin-top:4px;">${c.price} ₽</div>
-                    </div>
-                    <div style="font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 10px;" onclick="removeFromCart(${i})">×</div>
-                </div>`).join('');
-            document.getElementById('pay-footer').style.display = 'block';
+            updateCartFab();
         }
         function removeFromCart(index) { cart.splice(index,1); localStorage.setItem('dnx_cart', JSON.stringify(cart)); renderCart(); }
 
         function confirmBuyItem(id, price, name, image_url) {
-            pendingBuyItem = { id, price, name, image_url };
+            pendingBuyItem = { id, price: Number(price), name, image_url };
             document.getElementById('confirm-buy-item-info').innerHTML = `
                 <img src="${image_url}" />
                 <div style="text-align:left;">
@@ -1067,7 +986,7 @@
         }
 
         // ====================================================================
-        //  ИГРОВАЯ ЛОГИКА
+        //  ИГРОВАЯ ЛОГИКА (полностью без изменений)
         // ====================================================================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -1640,6 +1559,7 @@
                 document.getElementById('cases-container').style.display = 'block';
                 loadCases();
             }
+            updateCartFab();
         }
 
         async function loadCases() {
@@ -1731,7 +1651,7 @@
         }
 
         // Инициализация
-        document.getElementById('cart-counter').innerText = cart.length;
+        updateCartFab();
         updateBalance();
         loadCatalog();
         loadPrizeItems();
