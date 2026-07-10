@@ -335,7 +335,7 @@
             animation: idleScroll 80s linear infinite !important;
         }
 
-        /* ========== КАРТОЧКИ ДРОПОВ (СКРУГЛЕННЫЕ) ========== */
+        /* ========== КАРТОЧКИ ДРОПОВ ========== */
         .drop-list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -993,16 +993,33 @@
             document.getElementById('nft-modal-img').src = item.image_url;
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
+
+            // Telegram-ссылка: показываем только если есть nft_link И предмет не из инвентаря (на всякий случай)
+            const isInventoryItem = !currentCatalog.some(i => String(i.id) === String(id));
             const tgLinkBtn = document.getElementById('nft-telegram-link');
-            if (item.nft_link) {
+            if (item.nft_link && !isInventoryItem) {
                 tgLinkBtn.style.display = 'block';
                 tgLinkBtn.onclick = () => tg.openTelegramLink(item.nft_link);
-            } else tgLinkBtn.style.display = 'none';
+            } else {
+                tgLinkBtn.style.display = 'none';
+            }
+
+            // Характеристики
             let traits = [];
             if(item.traits) {
                 if(typeof item.traits === 'string') try { traits = JSON.parse(item.traits); } catch(e) {}
                 else if(Array.isArray(item.traits)) traits = item.traits;
             }
+
+            // Если характеристик нет и предмет из инвентаря (выбитый), генерируем дефолтные
+            if (traits.length === 0 && isInventoryItem) {
+                traits = [
+                    { label: 'Модель', value: item.name },
+                    { label: 'Фон', value: 'Random' },
+                    { label: 'Узор', value: 'Random' }
+                ];
+            }
+
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
                 `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
                 '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
@@ -1930,7 +1947,7 @@
                 document.getElementById('case-open-btn').disabled = false;
                 document.getElementById('case-detail-overlay').classList.add('active');
 
-                startIdleRoulette(sortedDrops); // используем отсортированный массив
+                startIdleRoulette(sortedDrops);
             } catch(e) {
                 showAlert('Ошибка загрузки кейса');
             }
@@ -2073,16 +2090,14 @@
         document.addEventListener('click', initAudio, { once: true });
 
         function showWinItem(wonItem) {
-            // Показываем рулетку и очищаем предыдущее состояние
             document.getElementById('roulette-container').style.display = 'none';
             document.getElementById('win-image').src = wonItem.image_url;
             document.getElementById('win-name').innerText = wonItem.name;
 
-            // Номер предмета
             const winNumber = wonItem.number ? `#${wonItem.number}` : '';
             document.getElementById('win-number').innerText = winNumber;
 
-            // Характеристики: если traits есть — показываем, иначе подставляем "Random"
+            // Характеристики для выигрыша
             let traits = [];
             if(wonItem.traits) {
                 if(typeof wonItem.traits === 'string') {
@@ -2092,21 +2107,20 @@
                 }
             }
 
-            let traitsHtml = '';
-            if (traits.length > 0) {
-                traitsHtml = '<div class="traits-table">' + traits.map(t => {
-                    const name = t.label || t.name || '—';
-                    const value = t.value || 'Random'; // fallback "Random"
-                    return `<div class="trait-row"><div class="trait-name">${name}</div><div class="trait-value">${value}</div></div>`;
-                }).join('') + '</div>';
-            } else {
-                // Если вообще нет traits, показываем два поля по умолчанию: Фон и Узор = Random
-                traitsHtml = `
-                <div class="traits-table">
-                    <div class="trait-row"><div class="trait-name">Фон</div><div class="trait-value">Random</div></div>
-                    <div class="trait-row"><div class="trait-name">Узор</div><div class="trait-value">Random</div></div>
-                </div>`;
+            if (traits.length === 0) {
+                // Дефолтные атрибуты для выбитых предметов
+                traits = [
+                    { label: 'Модель', value: wonItem.name },
+                    { label: 'Фон', value: 'Random' },
+                    { label: 'Узор', value: 'Random' }
+                ];
             }
+
+            const traitsHtml = '<div class="traits-table">' + traits.map(t => {
+                const name = t.label || t.name || '—';
+                const value = t.value || 'Random';
+                return `<div class="trait-row"><div class="trait-name">${name}</div><div class="trait-value">${value}</div></div>`;
+            }).join('') + '</div>';
 
             document.getElementById('win-traits').innerHTML = traitsHtml;
             document.getElementById('win-display').style.display = 'block';
@@ -2138,7 +2152,6 @@
                     await updateBalance();
                     document.getElementById('case-actions').style.display = 'none';
                     startSpinEffects(6500);
-                    // используем текущие дропы (уже отсортированные)
                     startActiveRoulette(currentCase.drops, result.won_item);
                 } else {
                     showAlert(result.error || 'Ошибка открытия');
