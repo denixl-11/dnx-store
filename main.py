@@ -6,7 +6,7 @@ import random
 import math
 from urllib.parse import parse_qs
 from datetime import datetime, timezone
-from contextlib import closing  # ← добавлено для закрытия соединений
+from contextlib import closing
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -66,7 +66,6 @@ game_state = {
 
 def init_db():
     try:
-        # ВАЖНО: теперь соединение закрывается
         with closing(get_db_connection()) as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -155,6 +154,8 @@ def init_db():
                         value NUMERIC DEFAULT 0.0
                     )
                 """)
+                # Добавляем столбец real_chance, если его ещё нет
+                cur.execute("ALTER TABLE case_drops ADD COLUMN IF NOT EXISTS real_chance NUMERIC DEFAULT 0")
                 conn.commit()
                 logging.info(f"DB initialized. Game number: {last_num}")
     except Exception as e:
@@ -960,7 +961,7 @@ async def handle_get_requisites(request):
 
 
 # ------------------------------------------------------------
-#  КЕЙСЫ – эндпоинты (исправленные)
+#  КЕЙСЫ – эндпоинты
 # ------------------------------------------------------------
 async def handle_get_cases(request):
     with closing(get_db_connection()) as conn:
@@ -982,7 +983,9 @@ async def handle_get_case_details(request):
             if not case:
                 return web.json_response({"error": "case_not_found"}, status=404,
                                          headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-            cur.execute("SELECT id, name, image_url, chance::FLOAT, value::FLOAT FROM case_drops WHERE case_id = %s", (case_id,))
+            # для отображения берём chance (визуальный)
+            cur.execute(
+                "SELECT id, name, image_url, chance::FLOAT, value::FLOAT FROM case_drops WHERE case_id = %s", (case_id,))
             drops = cur.fetchall()
             case['drops'] = drops
     return web.json_response(case, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -995,17 +998,16 @@ async def handle_open_case(request):
         user_id = request['telegram_user']['id']
         case_id = data.get('caseId')
 
-        # ГАРАНТИРОВАННОЕ закрытие соединения
         with closing(get_db_connection()) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # 1. Проверяем наличие кейса
+                # Проверяем наличие кейса
                 cur.execute("SELECT price FROM cases WHERE id = %s", (case_id,))
                 case = cur.fetchone()
                 if not case:
                     return web.json_response({"success": False, "error": "case_not_found"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                # 2. АТОМАРНОЕ списание баланса (одним запросом, проверка баланса внутри SQL)
+                # Атомарное списание баланса
                 cur.execute("""
                     UPDATE users 
                     SET balance = balance - %s 
@@ -1017,33 +1019,39 @@ async def handle_open_case(request):
                     return web.json_response({"success": False, "error": "insufficient_funds"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                # 3. Список дропов кейса
-                cur.execute("SELECT id, case_id, name, image_url, nft_link, chance::FLOAT, value::FLOAT FROM case_drops WHERE case_id = %s", (case_id,))
+                # Получаем дропы кейса с real_chance (реальный шанс)
+                cur.execute("""
+                    SELECT id, case_id, name, image_url, nft_link, 
+                           chance::FLOAT, real_chance::FLOAT, value::FLOAT 
+                    FROM case_drops 
+                    WHERE case_id = %s
+                """, (case_id,))
                 drops = cur.fetchall()
                 if not drops:
                     return web.json_response({"success": False, "error": "empty_case"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                # 4. Розыгрыш предмета
-                total_chance = sum(float(drop['chance']) for drop in drops)
+                # Розыгрыш на основе real_chance
+                total_chance = sum(float(drop['real_chance']) for drop in drops)
                 rand_val = random.uniform(0, total_chance)
                 current_sum = 0
                 won_drop = drops[-1]  # fallback
                 for drop in drops:
-                    current_sum += float(drop['chance'])
+                    current_sum += float(drop['real_chance'])
                     if rand_val <= current_sum:
                         won_drop = drop
                         break
 
-                # 5. Сохранение предмета в инвентарь
+                # Сохраняем предмет в инвентарь
                 cur.execute("""
                     INSERT INTO items (name, price, status, image_url, nft_link, buyer_id, last_event) 
                     VALUES (%s, %s, 'Продан', %s, %s, %s, 'case_drop') RETURNING id
                 """, (won_drop['name'], won_drop['value'], won_drop['image_url'], won_drop['nft_link'], user_id))
                 new_item_id = cur.fetchone()['id']
 
-                # Преобразуем в обычный dict для безопасной JSON-сериализации
+                # Формируем ответ БЕЗ real_chance (чтобы не светить клиенту)
                 won_item_dict = dict(won_drop)
+                won_item_dict.pop('real_chance', None)
                 won_item_dict['generated_item_id'] = new_item_id
 
                 conn.commit()
