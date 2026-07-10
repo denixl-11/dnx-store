@@ -174,6 +174,7 @@
             background: rgba(212, 175, 55, 0.1);
         }
 
+        /* ========== ПРЕМИАЛЬНЫЕ КАРТОЧКИ КЕЙСОВ ========== */
         .case-card {
             background: linear-gradient(160deg, #1f1c16 0%, #0d0c0a 100%);
             border: 1px solid rgba(212, 175, 55, 0.2);
@@ -248,66 +249,183 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .cart-fab {
-            position: fixed;
-            bottom: 100px;
-            right: 24px;
-            width: 60px;
-            height: 60px;
-            background: rgba(20, 18, 15, 0.65);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(212, 175, 55, 0.4);
-            border-radius: 50%;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 95;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 0 4px rgba(212, 175, 55, 0.05);
-            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        /* ========== РУЛЕТКА (КИНЕМАТОГРАФИЧНАЯ) ========== */
+        #roulette-inline-container { width: 100%; overflow: hidden; position: relative; margin-top: 15px; }
+
+        #roulette-container {
+            width: 100% !important;
+            height: 140px !important;
+            margin: 24px 0;
+            background: rgba(0,0,0,0.6) !important;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            overflow: hidden !important;
+            border-radius: 0 !important;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.9);
+            position: relative !important;
+            display: block !important;
         }
-        .cart-fab:hover {
-            transform: translateY(-4px) scale(1.05);
-            border-color: rgba(212, 175, 55, 0.9);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(212, 175, 55, 0.3);
-        }
-        .cart-fab:active { transform: scale(0.92); }
-        .cart-fab.visible {
-            display: flex;
-            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .cart-fab svg {
-            width: 26px;
-            height: 26px;
-            stroke: #d4af37;
-            transition: stroke 0.3s;
-        }
-        .cart-fab:hover svg { stroke: #f3e5ab; }
-        .cart-fab .cart-badge {
+
+        #roulette-container::before,
+        #roulette-container::after {
+            content: '';
             position: absolute;
-            top: -2px;
-            right: -2px;
-            background: linear-gradient(135deg, #e5c07b 0%, #cba153 100%);
-            color: #050505;
-            font-size: 0.75rem;
-            font-weight: 800;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            top: 0;
+            width: 96px;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        #roulette-container::before {
+            left: 0;
+            background: linear-gradient(to right, #070709, transparent);
+        }
+        #roulette-container::after {
+            right: 0;
+            background: linear-gradient(to left, #070709, transparent);
+        }
+
+        .roulette-pointer {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3px;
+            background: linear-gradient(to bottom, #fbbf24, #f59e0b, #d97706);
+            z-index: 20;
+            box-shadow: 0 0 15px rgba(245,158,11,0.8);
+        }
+        .roulette-pointer::before,
+        .roulette-pointer::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+        }
+        .roulette-pointer::before {
+            top: 0;
+            border-top: 8px solid #fbbf24;
+        }
+        .roulette-pointer::after {
+            bottom: 0;
+            border-bottom: 8px solid #fbbf24;
+        }
+
+        #roulette-track {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            width: max-content !important;
+            height: 100% !important;
+            align-items: center !important;
+            padding: 0 50% !important;
+            margin: 0 !important;
+            gap: 16px;
+            transition: transform 6.5s cubic-bezier(0.15, 0.9, 0.1, 1);
+        }
+        .roulette-item {
+            display: flex !important;
+            flex: 0 0 auto !important;
+            width: 100px !important;
+            height: 100px !important;
+            margin-right: 0 !important;
+            background: linear-gradient(145deg, #1f1c16, #0d0c0a) !important;
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+            border-radius: 10px !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 10px;
+        }
+        .roulette-item img {
+            max-width: 80% !important;
+            max-height: 80% !important;
+            display: block !important;
+        }
+
+        /* ========== КАРТОЧКИ ДРОПОВ (СТЕКЛОМОРФИЗМ) ========== */
+        .drop-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .drop-row {
+            background: linear-gradient(to bottom, #181820, #0c0c0e);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 24px;
+            padding: 12px;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
-            border: 2px solid #14120f;
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        .drop-row img {
+            width: 64px;
+            height: 64px;
+            object-fit: contain;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.6));
+            transition: transform 0.5s ease;
+        }
+        .drop-row:hover img { transform: scale(1.1); }
+        .drop-chance {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #f59e0b;
+            z-index: 2;
+        }
+        .drop-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            letter-spacing: 0.3px;
+            margin-top: 4px;
         }
 
-        @keyframes popIn {
-            from { opacity: 0; transform: scale(0.5) rotate(-15deg); }
-            to { opacity: 1; transform: scale(1) rotate(0); }
+        /* ========== ЗОЛОТАЯ КНОПКА ОТКРЫТИЯ ========== */
+        #case-open-btn {
+            background: linear-gradient(to right, #b38f2d, #f5d061, #b38f2d) !important;
+            color: #0a0a0c !important;
+            font-weight: 900 !important;
+            font-size: 14px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.1em !important;
+            border-radius: 16px !important;
+            box-shadow: 0 0 25px rgba(212,175,55,0.25) !important;
+            border: none !important;
+            padding: 16px 0 !important;
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.2s ease !important;
+            cursor: pointer;
+        }
+        #case-open-btn:active {
+            transform: scale(0.97);
+            box-shadow: 0 0 10px rgba(212,175,55,0.4);
         }
 
-        /* ========== ИГРА ========== */
+        /* ========== ОСТАЛЬНЫЕ СТИЛИ (без изменений) ========== */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;
@@ -323,29 +441,11 @@
             transform: translateZ(0);
             isolation: isolate;
         }
-        #gameCanvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            border-radius: inherit;
-        }
-        .game-info-row {
-            width: 85vw;
-            max-width: 380px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 6px;
-            font-size: 0.7rem;
-            color: rgba(255,255,255,0.45);
-            font-weight: 500;
-            letter-spacing: 0.5px;
-        }
+        #gameCanvas { display: block; width: 100%; height: 100%; border-radius: inherit; }
+        .game-info-row { width: 85vw; max-width: 380px; display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.7rem; color: rgba(255,255,255,0.45); font-weight: 500; letter-spacing: 0.5px; }
         .game-timer-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; font-weight: 800; color: rgba(203, 161, 83, 0.5); pointer-events: none; }
-
         .game-controls { display: flex; gap: 12px; width: 85vw; max-width: 380px; margin-top: 16px; }
         .game-btn-cancel { width: 85vw; max-width: 380px; background: transparent; border: 1px solid #ff4d4d; color: #ff4d4d; border-radius: 12px; height: 44px; margin-top: 15px; font-weight: 600; font-size: 0.85rem; display: none; cursor: pointer; }
-
         .bets-list-container { width: 85vw; max-width: 380px; margin-top: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; display: none; flex-direction: column; overflow: hidden; }
         .bets-list-header { padding: 12px 15px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.2); text-align: center; letter-spacing: 1px; }
         .bets-list { max-height: 200px; overflow-y: auto; padding: 5px 15px; }
@@ -454,116 +554,9 @@
         .prize-modal-img { width:200px; height:200px; border-radius:16px; object-fit:cover; margin-bottom:16px; }
         .prize-modal-traits { margin:12px 0; }
 
-        /* Плавные переходы для кейса */
+        /* Прочие вспомогательные стили */
         .transition-element {
             transition: opacity 0.3s ease, transform 0.3s ease;
-        }
-        .drop-list {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            max-height: 250px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-        .drop-row {
-            background: #161616;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-        }
-        .drop-row img {
-            width: 60px;
-            height: 60px;
-            object-fit: contain;
-            margin-bottom: 8px;
-        }
-        .drop-chance {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            font-size: 0.7rem;
-            color: #888;
-            background: rgba(0,0,0,0.4);
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-
-        /* ========== ЖЕСТКАЯ ФИКСАЦИЯ РУЛЕТКИ ========== */
-        #roulette-inline-container { width: 100%; overflow: hidden; position: relative; margin-top: 15px; }
-        #roulette-container {
-            width: 100% !important;
-            height: 120px !important;
-            overflow: hidden !important;
-            border-radius: 12px !important;
-            background: #0a0908 !important;
-            border: 1px solid rgba(212, 175, 55, 0.3);
-            position: relative !important;
-            display: block !important;
-            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
-        }
-        #roulette-track {
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
-            width: max-content !important;
-            height: 100% !important;
-            align-items: center !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            gap: 8px;
-            transition: transform 6.5s cubic-bezier(0.15, 0.9, 0.1, 1);
-        }
-        .roulette-item {
-            display: flex !important;
-            flex: 0 0 auto !important;
-            width: 100px !important;
-            height: 100px !important;
-            margin-right: 0 !important;
-            background: linear-gradient(145deg, #1f1c16, #0d0c0a) !important;
-            border: 1px solid rgba(255, 255, 255, 0.05) !important;
-            border-radius: 10px !important;
-            align-items: center !important;
-            justify-content: center !important;
-            padding: 10px;
-        }
-        .roulette-item img {
-            max-width: 80% !important;
-            max-height: 80% !important;
-            display: block !important;
-        }
-        .roulette-pointer {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 3px;
-            height: 100%;
-            background: #d4af37;
-            z-index: 10;
-            box-shadow: 0 0 10px #d4af37;
-        }
-
-        /* ========== ЖЕСТКАЯ ФИКСАЦИЯ КНОПКИ ОТКРЫТИЯ КЕЙСА ========== */
-        button#case-open-btn {
-            background-color: #0d0d0d !important;
-            border: 1px solid rgba(212, 175, 55, 0.6) !important;
-            color: #d4af37 !important;
-            border-radius: 12px !important;
-            padding: 14px 20px !important;
-            font-size: 14px !important;
-            font-weight: 700 !important;
-            text-transform: uppercase !important;
-            width: 100% !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            box-shadow: none !important;
-            margin-top: 15px !important;
         }
     </style>
 </head>
@@ -586,6 +579,7 @@
         <span class="cart-badge" id="cart-badge">0</span>
     </div>
 
+    <!-- ================= СТРАНИЦЫ ================= -->
     <div id="page-game" class="page">
         <div class="game-container">
             <div class="elite-leaderboard-bar" onclick="openLeaderboardModal()">
@@ -623,7 +617,7 @@
 
     <div id="page-store" class="page page-active">
         <div style="padding: 15px 20px; display: flex; justify-content: flex-end;">
-            <div class="cart-btn-header" onclick="showPage('cart')" style="display: none;">
+            <div class="cart-btn-header" onclick="showPage('cart')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
                 </svg>
@@ -631,8 +625,8 @@
             </div>
         </div>
         <div class="store-tabs">
-            <div class="store-tab active" onclick="switchStoreTab('catalog')">Catalog</div>
-            <div class="store-tab" onclick="switchStoreTab('cases')">Cases</div>
+            <div class="store-tab" onclick="switchStoreTab('catalog')">Catalog</div>
+            <div class="store-tab active" onclick="switchStoreTab('cases')">Cases</div>
         </div>
         <div id="catalog-container" class="catalog-grid"></div>
         <div id="cases-container" style="display: none;">
@@ -672,13 +666,7 @@
         <div id="inventory-history-container" class="catalog-grid" style="display: none;"></div>
     </div>
 
-    <div class="tab-bar">
-        <div class="tab-item" id="tab-game" onclick="showPage('game')">ИГРА</div>
-        <div class="tab-item active" id="tab-store" onclick="showPage('store')">МАГАЗИН</div>
-        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
-    </div>
-
-    <!-- NFT Detail Modal -->
+    <!-- ================= МОДАЛЬНЫЕ ОКНА ================= -->
     <div id="nft-detail-overlay" class="modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;">
@@ -716,7 +704,6 @@
         </div>
     </div>
 
-    <!-- Winner Modal -->
     <div id="winner-modal" class="modal-overlay winner-modal" onclick="closeWinnerModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div style="text-align: center;">
@@ -728,7 +715,6 @@
         </div>
     </div>
 
-    <!-- History Modal -->
     <div id="history-modal" class="modal-overlay" onclick="closeModal('history-modal')">
         <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 360px;">
             <h3 class="modal-title">История игр</h3>
@@ -737,7 +723,6 @@
         </div>
     </div>
 
-    <!-- Confirm Buy Modal -->
     <div id="confirm-buy-modal" class="modal-overlay">
         <div class="modal-content" onclick="event.stopPropagation()">
             <h3 class="modal-title">Подтверждение покупки</h3>
@@ -747,27 +732,22 @@
         </div>
     </div>
 
-    <!-- Custom bet modal -->
     <div id="custom-bet-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма от 10 ₽"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
     </div>
 
-    <!-- Custom amount modal -->
     <div id="custom-amount-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">Своя сумма</h3><input type="number" id="custom-amount-input" class="input-dark" placeholder="Сумма от 50 ₽"><button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button><button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button></div>
     </div>
 
-    <!-- Alert Modal -->
     <div id="alert-modal" class="modal-overlay">
         <div class="modal-content" style="padding-top: 32px;"><div id="alert-msg" style="margin-bottom: 24px; font-weight: 500;"></div><button class="btn-main-action" style="height: 44px;" onclick="closeModal('alert-modal')">Понятно</button></div>
     </div>
 
-    <!-- Confirm Bet Modal -->
     <div id="confirm-bet-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> ₽?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
     </div>
 
-    <!-- Topup Modal -->
     <div id="topup-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">ПОПОЛНЕНИЕ НА <span id="display-topup-amount">0</span> ₽</h3>
             <ul style="font-size:0.8rem;color:var(--text-muted);text-align:left;padding-left:16px;margin-bottom:20px;"><li>Заявки без фактического перевода блокируются.</li><li>Обработка занимает до 15 минут.</li></ul>
@@ -781,7 +761,6 @@
         </div>
     </div>
 
-    <!-- Leaderboard Fullscreen Modal -->
     <div id="leaderboard-modal" class="leaderboard-fullscreen">
         <div class="leaderboard-top">
             <h2 style="color:var(--accent-gold); font-size:1.5rem;">🏆 Лидеры сезона</h2>
@@ -791,7 +770,6 @@
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
     </div>
 
-    <!-- Prize Modal -->
     <div id="prize-detail-overlay" class="modal-overlay" onclick="closePrizeModal(event)">
         <div class="prize-modal-content" onclick="event.stopPropagation()">
             <div class="modal-tg-btn" id="prize-tg-link-btn" style="display: none; top: 10px; left: 10px;">
@@ -805,7 +783,7 @@
         </div>
     </div>
 
-    <!-- ========== НОВАЯ МОДАЛКА КЕЙСА ========== -->
+    <!-- ================= МОДАЛЬНОЕ ОКНО КЕЙСА ================= -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <h3 class="modal-title" id="case-detail-title" style="font-size: 1.5rem; margin-bottom: 15px; text-align: center;"></h3>
@@ -841,6 +819,12 @@
                 <button class="btn-secondary" onclick="closeCaseDetail(event)" style="margin-top: 10px; width: 100%;">Закрыть</button>
             </div>
         </div>
+    </div>
+
+    <div class="tab-bar">
+        <div class="tab-item" id="tab-game" onclick="showPage('game')">ИГРА</div>
+        <div class="tab-item active" id="tab-store" onclick="showPage('store')">МАГАЗИН</div>
+        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -1424,22 +1408,32 @@
                     ctx.stroke();
                 }
                 for (const poly of gState.polygons) {
-                    const scaledPoints = poly.polygon.map(p => ({ x: p.x * cw, y: (1 - p.y) * ch }));
-                    const centroid = getPolygonCentroid(scaledPoints);
-                    const MAX_RADIUS = 55;
-                    const radius = getDynamicRadius(centroid, poly.polygon, MAX_RADIUS);
+                    // Используем центроид и безопасный радиус с бэкенда, если доступны
+                    let cx, cy, radius;
+                    if (poly.center && poly.avatar_radius) {
+                        cx = poly.center.x * cw;
+                        cy = (1 - poly.center.y) * ch;
+                        radius = poly.avatar_radius * Math.min(cw, ch);
+                    } else {
+                        // fallback для старых данных
+                        const scaledPoints = poly.polygon.map(p => ({ x: p.x * cw, y: (1 - p.y) * ch }));
+                        const centroid = getPolygonCentroid(scaledPoints);
+                        cx = centroid.x;
+                        cy = centroid.y;
+                        radius = getDynamicRadius(centroid, poly.polygon, 55);
+                    }
                     let isAvatarDrawn = false;
                     if (poly.photo_url && imageCache[poly.photo_url]) {
                         const img = imageCache[poly.photo_url];
                         if (img.complete && img.naturalWidth > 0) {
                             ctx.save();
                             ctx.beginPath();
-                            ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+                            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
                             ctx.clip();
-                            ctx.drawImage(img, centroid.x - radius, centroid.y - radius, radius * 2, radius * 2);
+                            ctx.drawImage(img, cx - radius, cy - radius, radius * 2, radius * 2);
                             ctx.restore();
                             ctx.beginPath();
-                            ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+                            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
                             ctx.lineWidth = 2;
                             ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
                             ctx.stroke();
@@ -1449,7 +1443,7 @@
                     if (!isAvatarDrawn) {
                         ctx.save();
                         ctx.beginPath();
-                        ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+                        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
                         ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
                         ctx.fill();
                         ctx.lineWidth = 2;
@@ -1826,7 +1820,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ (НОВАЯ РЕАЛИЗАЦИЯ) ====================
+        // ==================== КЕЙСЫ (ПРЕМИАЛЬНЫЙ UI + ТАКТИЛЬНАЯ ОТДАЧА) ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -1869,7 +1863,7 @@
                     <div class="drop-row">
                         <span class="drop-chance">${d.chance}%</span>
                         <img src="${d.image_url}">
-                        <span class="drop-name" style="font-size: 0.85rem; text-align: center;">${escapeHtml(d.name)}</span>
+                        <span class="drop-name">${escapeHtml(d.name)}</span>
                     </div>`).join('');
 
                 const imgContainer = document.getElementById('case-img-container');
@@ -1890,61 +1884,77 @@
                 document.getElementById('case-detail-overlay').classList.add('active');
             } catch(e) {
                 console.error("Ошибка загрузки кейса:", e);
-                if (typeof showAlert === 'function') showAlert('Ошибка загрузки кейса');
+                showAlert('Ошибка загрузки кейса');
             }
         }
 
-        async function openCase() {
-            if (!currentCase) return;
-            if (typeof userBalance !== 'undefined' && userBalance < currentCase.price) {
-                if (typeof showAlert === 'function') showAlert('Недостаточно средств');
-                return;
-            }
-            const openBtn = document.getElementById('case-open-btn');
-            openBtn.disabled = true;
-
-            try {
-                const result = await apiFetch(`${API_BASE}/open-case`, {
-                    method: 'POST',
-                    body: JSON.stringify({ caseId: currentCase.id })
-                });
-
-                if (result.success) {
-                    if (typeof updateBalance === 'function') {
-                        try { await updateBalance(); } catch(e) { console.warn("Balance update issue", e); }
-                    }
-
-                    const imgContainer = document.getElementById('case-img-container');
-                    const actionsContainer = document.getElementById('case-actions');
-
-                    imgContainer.style.opacity = '0';
-                    imgContainer.style.transform = 'scale(0.8)';
-                    actionsContainer.style.display = 'none';
-
-                    setTimeout(() => {
-                        imgContainer.style.display = 'none';
-
-                        const rouletteContainer = document.getElementById('roulette-inline-container');
-                        document.getElementById('win-display').style.display = 'none';
-                        document.getElementById('roulette-container').style.display = 'block';
-
-                        rouletteContainer.style.display = 'block';
-                        void rouletteContainer.offsetWidth;
-                        rouletteContainer.style.opacity = '1';
-                        rouletteContainer.style.transform = 'scale(1)';
-
-                        startRoulette(currentCase.drops, result.won_item);
-                    }, 300);
-                } else {
-                    if (typeof showAlert === 'function') showAlert(result.error || 'Ошибка открытия');
-                    openBtn.disabled = false;
-                }
-            } catch(e) {
-                console.error("Crash in openCase:", e);
-                if (typeof showAlert === 'function') showAlert('Ошибка сети');
-                openBtn.disabled = false;
+        // ========== AUDIO & HAPTIC ENGINE ==========
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
         }
+        function playTickSound() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.05);
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+        function triggerTickFeedback() {
+            playTickSound();
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+            }
+        }
+        function triggerWinFeedback() {
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+            }
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.8);
+        }
+
+        let activeSpinTimeouts = [];
+        function clearSpinEffects() {
+            activeSpinTimeouts.forEach(clearTimeout);
+            activeSpinTimeouts = [];
+        }
+        function startSpinEffects(durationMs = 6500) {
+            clearSpinEffects();
+            const totalTicks = 40;
+            let accumulatedTime = 0;
+            for (let i = 0; i < totalTicks; i++) {
+                const progress = i / totalTicks;
+                const easeProgress = Math.pow(progress, 3);
+                const nextTickDelay = 20 + (easeProgress * 300);
+                accumulatedTime += nextTickDelay;
+                if (accumulatedTime > durationMs) break;
+                const timeout = setTimeout(() => triggerTickFeedback(), accumulatedTime);
+                activeSpinTimeouts.push(timeout);
+            }
+            const winTimeout = setTimeout(() => triggerWinFeedback(), durationMs + 100);
+            activeSpinTimeouts.push(winTimeout);
+        }
+        document.addEventListener('click', initAudio, { once: true });
 
         function startRoulette(drops, wonItem) {
             if (rouletteActive) return;
@@ -1984,7 +1994,6 @@
 
         function showWinItem(wonItem) {
             document.getElementById('roulette-container').style.display = 'none';
-            document.getElementById('roulette-title')?.remove();
             const winDisplay = document.getElementById('win-display');
             const winImg = document.getElementById('win-image');
             winImg.src = wonItem.image_url;
@@ -1999,6 +2008,49 @@
             document.getElementById('case-detail-overlay').classList.remove('active');
             rouletteActive = false;
             if(typeof loadInventory === 'function') loadInventory();
+        }
+
+        async function openCase() {
+            if (!currentCase) return;
+            if (userBalance < currentCase.price) {
+                showAlert('Недостаточно средств');
+                return;
+            }
+            const openBtn = document.getElementById('case-open-btn');
+            openBtn.disabled = true;
+
+            try {
+                const result = await apiFetch(`${API_BASE}/open-case`, {
+                    method: 'POST',
+                    body: JSON.stringify({ caseId: currentCase.id })
+                });
+                if (result.success) {
+                    await updateBalance();
+                    document.getElementById('case-img-container').style.opacity = '0';
+                    document.getElementById('case-img-container').style.transform = 'scale(0.8)';
+                    document.getElementById('case-actions').style.display = 'none';
+
+                    setTimeout(() => {
+                        document.getElementById('case-img-container').style.display = 'none';
+                        const rouletteContainer = document.getElementById('roulette-inline-container');
+                        document.getElementById('win-display').style.display = 'none';
+                        document.getElementById('roulette-container').style.display = 'block';
+                        rouletteContainer.style.display = 'block';
+                        void rouletteContainer.offsetWidth;
+                        rouletteContainer.style.opacity = '1';
+                        rouletteContainer.style.transform = 'scale(1)';
+                        startSpinEffects(6500);
+                        startRoulette(currentCase.drops, result.won_item);
+                    }, 300);
+                } else {
+                    showAlert(result.error || 'Ошибка открытия');
+                    openBtn.disabled = false;
+                }
+            } catch(e) {
+                console.error(e);
+                showAlert('Ошибка сети');
+                openBtn.disabled = false;
+            }
         }
 
         function closeCaseDetail(event) {

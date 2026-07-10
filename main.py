@@ -154,7 +154,6 @@ def init_db():
                         value NUMERIC DEFAULT 0.0
                     )
                 """)
-                # Добавляем столбец real_chance, если его ещё нет
                 cur.execute("ALTER TABLE case_drops ADD COLUMN IF NOT EXISTS real_chance NUMERIC DEFAULT 0")
                 conn.commit()
                 logging.info(f"DB initialized. Game number: {last_num}")
@@ -251,6 +250,53 @@ def get_polygon_area(poly):
     for i in range(n):
         area += (poly[i][0] * poly[(i + 1) % n][1] - poly[(i + 1) % n][0] * poly[i][1])
     return abs(area) * 0.5
+
+
+def get_centroid_and_safe_radius(poly, target_ratio=0.22):
+    """
+    Вычисляет центроид полигона и безопасный радиус для аватарки.
+    target_ratio (0.22) означает, что площадь аватарки будет составлять 22% от площади полигона.
+    """
+    n = len(poly)
+    if n < 3:
+        return 0.0, 0.0, 0.0
+
+    area = 0.0
+    cx = 0.0
+    cy = 0.0
+
+    for i in range(n):
+        p1 = poly[i]
+        p2 = poly[(i + 1) % n]
+        cross = p1[0] * p2[1] - p2[0] * p1[1]
+        area += cross
+        cx += (p1[0] + p2[0]) * cross
+        cy += (p1[1] + p2[1]) * cross
+
+    signed_area = area * 0.5
+    abs_area = abs(signed_area)
+
+    if abs_area < 1e-9:
+        return poly[0][0], poly[0][1], 0.0
+
+    cx /= (6.0 * signed_area)
+    cy /= (6.0 * signed_area)
+
+    target_radius = math.sqrt((abs_area * target_ratio) / math.pi)
+
+    def point_line_dist(pt, v, w):
+        l2 = (w[0] - v[0])**2 + (w[1] - v[1])**2
+        if l2 == 0:
+            return math.hypot(pt[0] - v[0], pt[1] - v[1])
+        t = max(0.0, min(1.0, ((pt[0] - v[0]) * (w[0] - v[0]) + (pt[1] - v[1]) * (w[1] - v[1])) / l2))
+        proj_x = v[0] + t * (w[0] - v[0])
+        proj_y = v[1] + t * (w[1] - v[1])
+        return math.hypot(pt[0] - proj_x, pt[1] - proj_y)
+
+    min_dist = min(point_line_dist((cx, cy), poly[i], poly[(i + 1) % n]) for i in range(n))
+    safe_radius = min(target_radius, min_dist * 0.90)
+
+    return cx, cy, safe_radius
 
 
 def split_polygon_by_line(poly, pt, normal):
@@ -357,12 +403,17 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
         player = item["player"]
         poly = item["polygon"]
         coords = [{"x": float(p[0]), "y": float(p[1])} for p in poly]
+
+        cx, cy, avatar_radius = get_centroid_and_safe_radius(poly, target_ratio=0.22)
+
         final_polygons.append({
             "player_id": player["id"],
             "username": player["username"],
             "color": player["color"],
             "photo_url": player.get("photo_url"),
-            "polygon": coords
+            "polygon": coords,
+            "center": {"x": cx, "y": cy},
+            "avatar_radius": avatar_radius
         })
     return final_polygons
 
@@ -983,7 +1034,6 @@ async def handle_get_case_details(request):
             if not case:
                 return web.json_response({"error": "case_not_found"}, status=404,
                                          headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-            # для отображения берём chance (визуальный)
             cur.execute(
                 "SELECT id, name, image_url, chance::FLOAT, value::FLOAT FROM case_drops WHERE case_id = %s", (case_id,))
             drops = cur.fetchall()
