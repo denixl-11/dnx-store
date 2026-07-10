@@ -303,7 +303,6 @@
             display: flex;
             align-items: center;
             height: 100%;
-            /* padding-left управляется динамически */
             will-change: transform;
         }
 
@@ -336,7 +335,7 @@
             animation: idleScroll 80s linear infinite !important;
         }
 
-        /* ========== КАРТОЧКИ ДРОПОВ (СКРУГЛЕННЫЕ) ========== */
+        /* ========== КАРТОЧКИ ДРОПОВ ========== */
         .drop-list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -471,7 +470,7 @@
             to { opacity: 1; transform: scale(1) rotate(0); }
         }
 
-        /* ========== ОСТАЛЬНЫЕ СТИЛИ (БЕЗ ИЗМЕНЕНИЙ) ========== */
+        /* ========== ОСТАЛЬНЫЕ СТИЛИ ========== */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;
@@ -856,6 +855,8 @@
                         <img id="win-image" src="" style="width: 140px; height: 140px; border-radius: 20px; object-fit: cover; box-shadow: 0 0 30px rgba(212, 175, 55, 0.6); border: 2px solid #d4af37;">
                     </div>
                     <div id="win-name" style="color: #d4af37; font-size: 1.6rem; font-weight: 900; margin-top: 15px; text-transform: uppercase; text-shadow: 0 0 15px rgba(212, 175, 55, 0.6); letter-spacing: 1px;"></div>
+                    <div id="win-number" style="color: var(--text-muted); font-size: 1rem; margin-top: 5px;"></div>
+                    <div id="win-traits" style="margin-top: 10px;"></div>
                     <button class="btn-main-action" style="margin-top: 25px; width: 100%; font-size: 1.1rem; padding: 18px 0;" onclick="claimItem()">ЗАБРАТЬ НАГРАДУ</button>
                 </div>
             </div>
@@ -990,14 +991,13 @@
             if(!item) return;
             currentNftItem = item;
             document.getElementById('nft-modal-img').src = item.image_url;
-            document.getElementById('nft-modal-title').innerText = item.name; // Коллекция (name)
+            document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
 
+            // Telegram-ссылка: только для предметов из магазина, у которых есть nft_link
             const isShopItem = currentCatalog.some(i => String(i.id) === String(id));
             const tgLinkBtn = document.getElementById('nft-telegram-link');
             const modalTgBtn = document.getElementById('nft-tg-link-btn');
-
-            // Telegram-ссылка только для товаров магазина с nft_link
             if (isShopItem && item.nft_link) {
                 tgLinkBtn.style.display = 'block';
                 modalTgBtn.style.display = 'flex';
@@ -1016,7 +1016,8 @@
             }
 
             // Если характеристик нет и предмет из инвентаря (выбитый), генерируем дефолтные
-            if (traits.length === 0 && !isShopItem) {
+            const isInventoryItem = !isShopItem;
+            if (traits.length === 0 && isInventoryItem) {
                 traits = [
                     { label: 'Модель', value: item.model || item.name },
                     { label: 'Фон', value: 'Random' },
@@ -2096,6 +2097,36 @@
             document.getElementById('roulette-container').style.display = 'none';
             document.getElementById('win-image').src = wonItem.image_url;
             document.getElementById('win-name').innerText = wonItem.name;
+
+            const winNumber = wonItem.number ? `#${wonItem.number}` : '';
+            document.getElementById('win-number').innerText = winNumber;
+
+            // Характеристики для выигрыша
+            let traits = [];
+            if(wonItem.traits) {
+                if(typeof wonItem.traits === 'string') {
+                    try { traits = JSON.parse(wonItem.traits); } catch(e) {}
+                } else if(Array.isArray(wonItem.traits)) {
+                    traits = wonItem.traits;
+                }
+            }
+
+            if (traits.length === 0) {
+                // Дефолтные атрибуты для выбитых предметов
+                traits = [
+                    { label: 'Модель', value: wonItem.model || wonItem.name },
+                    { label: 'Фон', value: 'Random' },
+                    { label: 'Узор', value: 'Random' }
+                ];
+            }
+
+            const traitsHtml = '<div class="traits-table">' + traits.map(t => {
+                const name = t.label || t.name || '—';
+                const value = t.value || 'Random';
+                return `<div class="trait-row"><div class="trait-name">${name}</div><div class="trait-value">${value}</div></div>`;
+            }).join('') + '</div>';
+
+            document.getElementById('win-traits').innerHTML = traitsHtml;
             document.getElementById('win-display').style.display = 'block';
         }
 
