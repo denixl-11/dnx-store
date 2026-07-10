@@ -303,7 +303,7 @@
             display: flex;
             align-items: center;
             height: 100%;
-            /* padding-left задаётся динамически через JS */
+            /* padding-left управляется динамически */
             will-change: transform;
         }
 
@@ -990,15 +990,14 @@
             if(!item) return;
             currentNftItem = item;
             document.getElementById('nft-modal-img').src = item.image_url;
-            // Заголовок всегда name (коллекция)
-            document.getElementById('nft-modal-title').innerText = item.name;
+            document.getElementById('nft-modal-title').innerText = item.name; // Коллекция (name)
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
 
             const isShopItem = currentCatalog.some(i => String(i.id) === String(id));
             const tgLinkBtn = document.getElementById('nft-telegram-link');
             const modalTgBtn = document.getElementById('nft-tg-link-btn');
 
-            // Telegram-ссылка: только для товаров из магазина, у которых есть nft_link
+            // Telegram-ссылка только для товаров магазина с nft_link
             if (isShopItem && item.nft_link) {
                 tgLinkBtn.style.display = 'block';
                 modalTgBtn.style.display = 'flex';
