@@ -327,12 +327,13 @@
             filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
         }
 
+        /* УСКОРЕННАЯ idle-анимация */
         @keyframes idleScroll {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
         }
         .idle-scroll {
-            animation: idleScroll 30s linear infinite;
+            animation: idleScroll 15s linear infinite;  /* изменено с 30s на 15s */
         }
 
         /* ========== КАРТОЧКИ ДРОПОВ (СКРУГЛЕННЫЕ) ========== */
@@ -825,7 +826,6 @@
         <div class="modal-content" onclick="event.stopPropagation()">
             <h3 class="modal-title" id="case-detail-title" style="font-size: 1.8rem; margin-bottom: 20px; text-align: center; color: #d4af37; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 15px rgba(212,175,55,0.4);"></h3>
 
-            <!-- Рулетка теперь показывается сразу вместо картинки -->
             <div id="roulette-inline-container" class="transition-element">
                 <div id="roulette-container" class="premium-roulette">
                     <div class="roulette-pointer"></div>
@@ -1856,7 +1856,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ (НОВАЯ ЛОГИКА) ====================
+        // ==================== КЕЙСЫ (СОРТИРОВКА И УСКОРЕННАЯ АНИМАЦИЯ) ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -1894,7 +1894,9 @@
                 currentCase = await apiFetch(`${API_BASE}/case-details?id=${caseId}`);
                 document.getElementById('case-detail-title').innerText = currentCase.name;
                 document.getElementById('case-price').innerText = currentCase.price;
-                document.getElementById('case-drop-list').innerHTML = currentCase.drops.map(d => `
+                // СОРТИРОВКА ДРОПОВ ПО ВОЗРАСТАНИЮ ШАНСА
+                const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
+                document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
                         <span class="drop-chance">${d.chance}%</span>
                         <img src="${d.image_url}">
@@ -1934,7 +1936,7 @@
                 track.appendChild(div);
             });
             void track.offsetWidth;
-            track.classList.add('idle-scroll');
+            track.classList.add('idle-scroll');  // анимация 15s (ускорена)
         }
 
         let audioCtx = null;
