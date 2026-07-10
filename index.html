@@ -133,8 +133,6 @@
         .tab-item { color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: 0.3s; text-align: center; flex: 1; }
         .tab-item.active { color: var(--accent-gold); }
 
-        .cart-btn-header { display: flex; align-items: center; gap: 5px; color: var(--text-main); font-weight: 700; cursor: pointer; background: var(--border-color); padding: 5px 12px; border-radius: 10px; }
-
         .store-tabs {
             display: flex;
             gap: 12px;
@@ -425,6 +423,66 @@
             box-shadow: 0 0 10px rgba(212,175,55,0.4);
         }
 
+        /* ========== ПЛАВАЮЩАЯ КОРЗИНА (УВЕЛИЧЕННАЯ, ПОЛУПРОЗРАЧНАЯ) ========== */
+        .cart-fab {
+            position: fixed;
+            bottom: 100px;
+            right: 24px;
+            width: 64px;
+            height: 64px;
+            background: rgba(20, 18, 15, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 95;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 0 4px rgba(212, 175, 55, 0.05);
+            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .cart-fab:hover {
+            transform: translateY(-4px) scale(1.05);
+            border-color: rgba(212, 175, 55, 0.9);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(212, 175, 55, 0.3);
+        }
+        .cart-fab:active { transform: scale(0.92); }
+        .cart-fab.visible {
+            display: flex;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .cart-fab svg {
+            width: 30px;
+            height: 30px;
+            stroke: #d4af37;
+            transition: stroke 0.3s;
+        }
+        .cart-fab:hover svg { stroke: #f3e5ab; }
+        .cart-fab .cart-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: linear-gradient(135deg, #e5c07b 0%, #cba153 100%);
+            color: #050505;
+            font-size: 0.75rem;
+            font-weight: 800;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+            border: 2px solid #14120f;
+        }
+
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.5) rotate(-15deg); }
+            to { opacity: 1; transform: scale(1) rotate(0); }
+        }
+
         /* ========== ОСТАЛЬНЫЕ СТИЛИ (без изменений) ========== */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
@@ -554,7 +612,6 @@
         .prize-modal-img { width:200px; height:200px; border-radius:16px; object-fit:cover; margin-bottom:16px; }
         .prize-modal-traits { margin:12px 0; }
 
-        /* Прочие вспомогательные стили */
         .transition-element {
             transition: opacity 0.3s ease, transform 0.3s ease;
         }
@@ -572,6 +629,7 @@
         </div>
     </header>
 
+    <!-- Плавающая корзина (единственная) -->
     <div class="cart-fab" id="cart-fab" onclick="showPage('cart')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
@@ -616,14 +674,6 @@
     </div>
 
     <div id="page-store" class="page page-active">
-        <div style="padding: 15px 20px; display: flex; justify-content: flex-end;">
-            <div class="cart-btn-header" onclick="showPage('cart')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/>
-                </svg>
-                <span id="cart-counter">0</span>
-            </div>
-        </div>
         <div class="store-tabs">
             <div class="store-tab" onclick="switchStoreTab('catalog')">Catalog</div>
             <div class="store-tab active" onclick="switchStoreTab('cases')">Cases</div>
@@ -1408,14 +1458,12 @@
                     ctx.stroke();
                 }
                 for (const poly of gState.polygons) {
-                    // Используем центроид и безопасный радиус с бэкенда, если доступны
                     let cx, cy, radius;
                     if (poly.center && poly.avatar_radius) {
                         cx = poly.center.x * cw;
                         cy = (1 - poly.center.y) * ch;
                         radius = poly.avatar_radius * Math.min(cw, ch);
                     } else {
-                        // fallback для старых данных
                         const scaledPoints = poly.polygon.map(p => ({ x: p.x * cw, y: (1 - p.y) * ch }));
                         const centroid = getPolygonCentroid(scaledPoints);
                         cx = centroid.x;
