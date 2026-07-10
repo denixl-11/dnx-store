@@ -454,19 +454,43 @@
         .prize-modal-img { width:200px; height:200px; border-radius:16px; object-fit:cover; margin-bottom:16px; }
         .prize-modal-traits { margin:12px 0; }
 
-        /* Переходы для модалки кейса */
-        .transition-container {
-            transition: opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1), transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+        /* Плавные переходы для кейса */
+        .transition-element {
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
-        .fade-out {
-            opacity: 0 !important;
-            transform: scale(0.95) !important;
-            pointer-events: none;
+        .drop-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
         }
-        .fade-in {
-            display: block !important;
-            opacity: 1 !important;
-            transform: scale(1) !important;
+        .drop-row {
+            background: #161616;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .drop-row img {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+            margin-bottom: 8px;
+        }
+        .drop-chance {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 0.7rem;
+            color: #888;
+            background: rgba(0,0,0,0.4);
+            padding: 2px 6px;
+            border-radius: 4px;
         }
 
         /* ========== ЖЕСТКАЯ ФИКСАЦИЯ РУЛЕТКИ ========== */
@@ -781,29 +805,40 @@
         </div>
     </div>
 
-    <!-- Единая модалка кейса и рулетки -->
+    <!-- ========== НОВАЯ МОДАЛКА КЕЙСА ========== -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <div id="case-info-container" class="transition-container">
-                <img id="case-detail-img" class="case-detail-img" src="">
-                <h3 class="modal-title" id="case-detail-title" style="font-size: 1.4rem;"></h3>
-                <div class="drop-list" id="case-drop-list"></div>
-                <button id="case-open-btn" onclick="openCase()">
-                    ОТКРЫТЬ ЗА <span id="case-price"></span> ₽
-                </button>
-                <button class="btn-secondary" onclick="closeCaseDetail(event)">Закрыть</button>
+            <h3 class="modal-title" id="case-detail-title" style="font-size: 1.5rem; margin-bottom: 15px; text-align: center;"></h3>
+
+            <div id="case-img-container" class="transition-element">
+                <img id="case-detail-img" class="case-detail-img" src="" style="max-width: 180px; display: block; margin: 0 auto; filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.3));">
             </div>
-            <div id="roulette-inline-container" class="transition-container" style="display: none; opacity: 0;">
-                <h3 class="modal-title" id="roulette-title">Открытие...</h3>
+
+            <div id="roulette-inline-container" class="transition-element" style="display: none; opacity: 0; transform: scale(0.9);">
                 <div id="roulette-container">
                     <div class="roulette-pointer"></div>
                     <div id="roulette-track"></div>
                 </div>
-                <div id="win-display" style="display: none; text-align: center; margin-top: 20px;">
-                    <img id="win-image" src="" style="width: 140px; height: 140px; border-radius: 16px; object-fit: cover;">
-                    <div id="win-name" style="color: #d4af37; font-size: 1.4rem; font-weight: 800; margin-top: 15px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.4);"></div>
-                    <button class="btn-main-action" style="margin-top: 25px;" onclick="claimItem()">Забрать в инвентарь</button>
+                <div id="win-display" style="display: none; text-align: center; margin-top: 15px;">
+                    <img id="win-image" src="" style="width: 120px; height: 120px; border-radius: 16px; object-fit: cover; box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);">
+                    <div id="win-name" style="color: #d4af37; font-size: 1.4rem; font-weight: 800; margin-top: 10px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.4);"></div>
+                    <button class="btn-main-action" style="margin-top: 20px; width: 100%;" onclick="claimItem()">Забрать в инвентарь</button>
                 </div>
+            </div>
+
+            <div id="case-drops-section" style="margin-top: 20px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: #aaa; font-size: 0.9rem;">
+                    <span style="display: block; width: 16px; height: 16px; background: #2a2a2a; border-radius: 4px; text-align: center; line-height: 16px;">📦</span>
+                    Возможные результаты
+                </div>
+                <div class="drop-list" id="case-drop-list"></div>
+            </div>
+
+            <div id="case-actions" style="margin-top: 20px;">
+                <button id="case-open-btn" onclick="openCase()">
+                    ОТКРЫТЬ ЗА <span id="case-price"></span> ₽
+                </button>
+                <button class="btn-secondary" onclick="closeCaseDetail(event)" style="margin-top: 10px; width: 100%;">Закрыть</button>
             </div>
         </div>
     </div>
@@ -1791,7 +1826,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ ====================
+        // ==================== КЕЙСЫ (НОВАЯ РЕАЛИЗАЦИЯ) ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -1832,47 +1867,82 @@
                 document.getElementById('case-price').innerText = currentCase.price;
                 document.getElementById('case-drop-list').innerHTML = currentCase.drops.map(d => `
                     <div class="drop-row">
-                        <img src="${d.image_url}">
-                        <span class="drop-name">${escapeHtml(d.name)}</span>
                         <span class="drop-chance">${d.chance}%</span>
+                        <img src="${d.image_url}">
+                        <span class="drop-name" style="font-size: 0.85rem; text-align: center;">${escapeHtml(d.name)}</span>
                     </div>`).join('');
-                document.getElementById('case-info-container').classList.remove('fade-out');
-                document.getElementById('case-info-container').style.display = 'block';
-                document.getElementById('roulette-inline-container').classList.remove('fade-in');
-                document.getElementById('roulette-inline-container').style.display = 'none';
+
+                const imgContainer = document.getElementById('case-img-container');
+                const rouletteContainer = document.getElementById('roulette-inline-container');
+                const actionsContainer = document.getElementById('case-actions');
+
+                imgContainer.style.display = 'block';
+                imgContainer.style.opacity = '1';
+                imgContainer.style.transform = 'scale(1)';
+
+                rouletteContainer.style.display = 'none';
+                rouletteContainer.style.opacity = '0';
+                rouletteContainer.style.transform = 'scale(0.9)';
+
+                actionsContainer.style.display = 'block';
+                document.getElementById('case-open-btn').disabled = false;
+
                 document.getElementById('case-detail-overlay').classList.add('active');
-            } catch(e) { showAlert('Ошибка загрузки кейса'); }
+            } catch(e) {
+                console.error("Ошибка загрузки кейса:", e);
+                if (typeof showAlert === 'function') showAlert('Ошибка загрузки кейса');
+            }
         }
 
         async function openCase() {
             if (!currentCase) return;
-            if (userBalance < currentCase.price) { showAlert('Недостаточно средств'); return; }
-            document.getElementById('case-open-btn').disabled = true;
+            if (typeof userBalance !== 'undefined' && userBalance < currentCase.price) {
+                if (typeof showAlert === 'function') showAlert('Недостаточно средств');
+                return;
+            }
+            const openBtn = document.getElementById('case-open-btn');
+            openBtn.disabled = true;
+
             try {
-                const result = await apiFetch(`${API_BASE}/open-case`, { method: 'POST', body: JSON.stringify({ caseId: currentCase.id }) });
+                const result = await apiFetch(`${API_BASE}/open-case`, {
+                    method: 'POST',
+                    body: JSON.stringify({ caseId: currentCase.id })
+                });
+
                 if (result.success) {
-                    await updateBalance();
-                    const infoContainer = document.getElementById('case-info-container');
-                    infoContainer.classList.add('fade-out');
+                    if (typeof updateBalance === 'function') {
+                        try { await updateBalance(); } catch(e) { console.warn("Balance update issue", e); }
+                    }
+
+                    const imgContainer = document.getElementById('case-img-container');
+                    const actionsContainer = document.getElementById('case-actions');
+
+                    imgContainer.style.opacity = '0';
+                    imgContainer.style.transform = 'scale(0.8)';
+                    actionsContainer.style.display = 'none';
+
                     setTimeout(() => {
-                        infoContainer.style.display = 'none';
+                        imgContainer.style.display = 'none';
+
                         const rouletteContainer = document.getElementById('roulette-inline-container');
                         document.getElementById('win-display').style.display = 'none';
                         document.getElementById('roulette-container').style.display = 'block';
-                        document.getElementById('roulette-title').innerText = 'Открытие...';
+
                         rouletteContainer.style.display = 'block';
-                        requestAnimationFrame(() => {
-                            rouletteContainer.classList.add('fade-in');
-                            startRoulette(currentCase.drops, result.won_item);
-                        });
-                    }, 400);
+                        void rouletteContainer.offsetWidth;
+                        rouletteContainer.style.opacity = '1';
+                        rouletteContainer.style.transform = 'scale(1)';
+
+                        startRoulette(currentCase.drops, result.won_item);
+                    }, 300);
                 } else {
-                    showAlert(result.error || 'Ошибка открытия');
-                    document.getElementById('case-open-btn').disabled = false;
+                    if (typeof showAlert === 'function') showAlert(result.error || 'Ошибка открытия');
+                    openBtn.disabled = false;
                 }
             } catch(e) {
-                showAlert('Ошибка сети');
-                document.getElementById('case-open-btn').disabled = false;
+                console.error("Crash in openCase:", e);
+                if (typeof showAlert === 'function') showAlert('Ошибка сети');
+                openBtn.disabled = false;
             }
         }
 
@@ -1914,7 +1984,7 @@
 
         function showWinItem(wonItem) {
             document.getElementById('roulette-container').style.display = 'none';
-            document.getElementById('roulette-title').innerText = 'Кейс открыт!';
+            document.getElementById('roulette-title')?.remove();
             const winDisplay = document.getElementById('win-display');
             const winImg = document.getElementById('win-image');
             winImg.src = wonItem.image_url;
@@ -1926,36 +1996,20 @@
         }
 
         function claimItem() {
-            const infoContainer = document.getElementById('case-info-container');
-            const rouletteContainer = document.getElementById('roulette-inline-container');
-            infoContainer.classList.remove('fade-out');
-            infoContainer.style.display = 'block';
-            rouletteContainer.classList.remove('fade-in');
-            rouletteContainer.style.display = 'none';
             document.getElementById('case-detail-overlay').classList.remove('active');
-            document.getElementById('case-open-btn').disabled = false;
             rouletteActive = false;
             if(typeof loadInventory === 'function') loadInventory();
         }
 
         function closeCaseDetail(event) {
-            if (event && event.target.id !== 'case-detail-overlay' && event.target.tagName !== 'BUTTON') return;
+            if (event) {
+                const isOverlay = event.target.id === 'case-detail-overlay';
+                const isButton = event.target.tagName === 'BUTTON' || event.target.closest('button');
+                if (!isOverlay && !isButton) return;
+            }
             if (rouletteActive) return;
             document.getElementById('case-detail-overlay').classList.remove('active');
             currentCase = null;
-            setTimeout(() => {
-                const info = document.getElementById('case-info-container');
-                const roulette = document.getElementById('roulette-inline-container');
-                if (info) {
-                    info.classList.remove('fade-out');
-                    info.style.display = 'block';
-                }
-                if (roulette) {
-                    roulette.classList.remove('fade-in');
-                    roulette.style.display = 'none';
-                }
-                document.getElementById('case-open-btn').disabled = false;
-            }, 300);
         }
 
         updateCartFab();
