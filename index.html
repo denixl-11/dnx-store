@@ -303,8 +303,7 @@
             display: flex;
             align-items: center;
             height: 100%;
-            gap: 20px;
-            padding-left: 50%;
+            /* padding-left удалён, теперь управляется из JS */
             will-change: transform;
         }
 
@@ -327,13 +326,14 @@
             filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
         }
 
-        /* УСКОРЕННАЯ idle-анимация */
         @keyframes idleScroll {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
         }
+
         .idle-scroll {
-            animation: idleScroll 15s linear infinite;  /* изменено с 30s на 15s */
+            width: fit-content;
+            animation: idleScroll 15s linear infinite !important;
         }
 
         /* ========== КАРТОЧКИ ДРОПОВ (СКРУГЛЕННЫЕ) ========== */
@@ -663,8 +663,8 @@
 
     <div id="page-store" class="page page-active">
         <div class="store-tabs">
-            <div class="store-tab" onclick="switchStoreTab('catalog')">Catalog</div>
-            <div class="store-tab active" onclick="switchStoreTab('cases')">Cases</div>
+            <div class="store-tab active" onclick="switchStoreTab('catalog')">Catalog</div>
+            <div class="store-tab" onclick="switchStoreTab('cases')">Cases</div>
         </div>
         <div id="catalog-container" class="catalog-grid"></div>
         <div id="cases-container" style="display: none;">
@@ -1889,32 +1889,37 @@
             }
         }
 
+        // ----- Открытие деталей кейса (исправлена кнопка цены) -----
         async function openCaseDetail(caseId) {
             try {
                 currentCase = await apiFetch(`${API_BASE}/case-details?id=${caseId}`);
                 document.getElementById('case-detail-title').innerText = currentCase.name;
-                document.getElementById('case-price').innerText = currentCase.price;
-                // СОРТИРОВКА ДРОПОВ ПО ВОЗРАСТАНИЮ ШАНСА
-                const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
-                document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
+
+                // Жёстко задаём текст кнопки с нужными пробелами
+                document.getElementById('case-open-btn').innerHTML = `ОТКРЫТЬ ЗА ${currentCase.price} ₽`;
+
+                document.getElementById('case-drop-list').innerHTML = currentCase.drops.map(d => `
                     <div class="drop-row">
                         <span class="drop-chance">${d.chance}%</span>
                         <img src="${d.image_url}">
                         <span class="drop-name" style="margin-top: 8px; color: #eee; font-weight: 600;">${escapeHtml(d.name)}</span>
                     </div>`).join('');
 
+                // Подготовка UI: сразу показываем рулетку
                 document.getElementById('roulette-container').style.display = 'block';
                 document.getElementById('win-display').style.display = 'none';
                 document.getElementById('case-actions').style.display = 'block';
                 document.getElementById('case-open-btn').disabled = false;
                 document.getElementById('case-detail-overlay').classList.add('active');
 
+                // Запуск медленной, красивой анимации ожидания
                 startIdleRoulette(currentCase.drops);
             } catch(e) {
                 showAlert('Ошибка загрузки кейса');
             }
         }
 
+        // ----- Режим ожидания: ИДЕАЛЬНО бесконечный скролл -----
         function startIdleRoulette(drops) {
             const track = document.getElementById('roulette-track');
             track.classList.remove('idle-scroll');
@@ -1922,12 +1927,58 @@
             track.style.transform = 'translateX(0)';
             track.innerHTML = '';
 
+            // Убираем отступ, чтобы скролл был ровным от левого края
+            track.style.paddingLeft = '0px';
+
             const items = [];
             for (let i = 0; i < 40; i++) {
                 items.push(drops[Math.floor(Math.random() * drops.length)]);
             }
-            const infiniteItems = [...items, ...items];
-            infiniteItems.forEach(drop => {
+
+            // Создаем два абсолютно идентичных блока-обёртки для бесшовного зацикливания
+            const createSet = () => {
+                const wrapper = document.createElement('div');
+                wrapper.style.display = 'flex';
+                wrapper.style.gap = '20px';
+                wrapper.style.paddingRight = '20px';
+                wrapper.style.flexShrink = '0';
+
+                items.forEach(drop => {
+                    const div = document.createElement('div');
+                    div.className = 'roulette-item';
+                    const img = document.createElement('img');
+                    img.src = drop.image_url;
+                    div.appendChild(img);
+                    wrapper.appendChild(div);
+                });
+                return wrapper;
+            };
+
+            track.appendChild(createSet());
+            track.appendChild(createSet());
+
+            void track.offsetWidth;
+            track.classList.add('idle-scroll');
+        }
+
+        // ----- Активный спин -----
+        function startActiveRoulette(drops, wonItem) {
+            if (rouletteActive) return;
+            rouletteActive = true;
+
+            const track = document.getElementById('roulette-track');
+            track.classList.remove('idle-scroll');
+            track.style.animation = 'none';
+            track.innerHTML = '';
+
+            // Возвращаем отступ 50%, чтобы выигрыш остановился ровно по центру под стрелкой
+            track.style.paddingLeft = '50%';
+
+            const items = [];
+            for (let i = 0; i < 60; i++) items.push(drops[Math.floor(Math.random() * drops.length)]);
+            items[50] = wonItem;
+
+            items.forEach(drop => {
                 const div = document.createElement('div');
                 div.className = 'roulette-item';
                 const img = document.createElement('img');
@@ -1935,8 +1986,25 @@
                 div.appendChild(img);
                 track.appendChild(div);
             });
+
+            const itemWidth = 150;
+            const gap = 20;
+            const fullWidth = itemWidth + gap;
+            const offset = (50 * fullWidth) + (itemWidth / 2);
+
+            const randomFuzz = Math.floor(Math.random() * (itemWidth - 30)) - ((itemWidth - 30) / 2);
+            const finalOffset = offset + randomFuzz;
+
+            track.style.transition = 'none';
+            track.style.transform = 'translateX(0)';
             void track.offsetWidth;
-            track.classList.add('idle-scroll');  // анимация 15s (ускорена)
+
+            requestAnimationFrame(() => {
+                track.style.transition = 'transform 6.5s cubic-bezier(0.1, 0.9, 0.1, 1)';
+                track.style.transform = `translateX(-${finalOffset}px)`;
+            });
+
+            setTimeout(() => showWinItem(wonItem), 7000);
         }
 
         let audioCtx = null;
@@ -1991,44 +2059,6 @@
             activeSpinTimeouts.push(setTimeout(triggerWinFeedback, durationMs + 100));
         }
         document.addEventListener('click', initAudio, { once: true });
-
-        function startActiveRoulette(drops, wonItem) {
-            if (rouletteActive) return;
-            rouletteActive = true;
-            const track = document.getElementById('roulette-track');
-            track.classList.remove('idle-scroll');
-            track.style.animation = 'none';
-            track.innerHTML = '';
-
-            const items = [];
-            for (let i = 0; i < 60; i++) items.push(drops[Math.floor(Math.random() * drops.length)]);
-            items[50] = wonItem;
-
-            items.forEach(drop => {
-                const div = document.createElement('div');
-                div.className = 'roulette-item';
-                const img = document.createElement('img');
-                img.src = drop.image_url;
-                div.appendChild(img);
-                track.appendChild(div);
-            });
-
-            const itemWidth = 150;
-            const gap = 20;
-            const fullWidth = itemWidth + gap;
-            const offset = (50 * fullWidth) + (itemWidth / 2);
-            const randomFuzz = Math.floor(Math.random() * (itemWidth - 30)) - ((itemWidth - 30) / 2);
-            const finalOffset = offset + randomFuzz;
-
-            track.style.transition = 'none';
-            track.style.transform = 'translateX(0)';
-            void track.offsetWidth;
-            requestAnimationFrame(() => {
-                track.style.transition = 'transform 6.5s cubic-bezier(0.1, 0.9, 0.1, 1)';
-                track.style.transform = `translateX(-${finalOffset}px)`;
-            });
-            setTimeout(() => showWinItem(wonItem), 7000);
-        }
 
         function showWinItem(wonItem) {
             document.getElementById('roulette-container').style.display = 'none';
