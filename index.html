@@ -303,7 +303,6 @@
             display: flex;
             align-items: center;
             height: 100%;
-            /* padding-left удалён, теперь управляется из JS */
             will-change: transform;
         }
 
@@ -333,7 +332,7 @@
 
         .idle-scroll {
             width: fit-content;
-            animation: idleScroll 80s linear infinite !important;  /* супер-медленная прокрутка */
+            animation: idleScroll 80s linear infinite !important;
         }
 
         /* ========== КАРТОЧКИ ДРОПОВ (СКРУГЛЕННЫЕ) ========== */
@@ -471,7 +470,7 @@
             to { opacity: 1; transform: scale(1) rotate(0); }
         }
 
-        /* ========== ОСТАЛЬНЫЕ СТИЛИ (БЕЗ ИЗМЕНЕНИЙ) ========== */
+        /* ========== ОСТАЛЬНЫЕ СТИЛИ ========== */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;
@@ -610,14 +609,14 @@
         }
 
         #case-open-btn:active, .btn-secondary:active, .btn-main-action:active {
-            transform: scale(0.95) !important; /* Кнопка слегка уменьшается */
-            filter: brightness(0.8) !important; /* Слегка темнеет */
+            transform: scale(0.95) !important;
+            filter: brightness(0.8) !important;
         }
 
         /* --- Запрет на увеличение картинок --- */
         .roulette-item img, .drop-row img, #win-image {
-            pointer-events: none !important; /* Полностью игнорируют клики и ховеры */
-            transform: none !important;      /* Отключаем любое масштабирование */
+            pointer-events: none !important;
+            transform: none !important;
             transition: none !important;
         }
     </style>
@@ -856,6 +855,8 @@
                         <img id="win-image" src="" style="width: 140px; height: 140px; border-radius: 20px; object-fit: cover; box-shadow: 0 0 30px rgba(212, 175, 55, 0.6); border: 2px solid #d4af37;">
                     </div>
                     <div id="win-name" style="color: #d4af37; font-size: 1.6rem; font-weight: 900; margin-top: 15px; text-transform: uppercase; text-shadow: 0 0 15px rgba(212, 175, 55, 0.6); letter-spacing: 1px;"></div>
+                    <div id="win-number" style="color: var(--text-muted); font-size: 1rem; margin-top: 5px;"></div>
+                    <div id="win-traits" style="margin-top: 10px;"></div>
                     <button class="btn-main-action" style="margin-top: 25px; width: 100%; font-size: 1.1rem; padding: 18px 0;" onclick="claimItem()">ЗАБРАТЬ НАГРАДУ</button>
                 </div>
             </div>
@@ -1306,7 +1307,7 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // ==================== ИГРОВАЯ ЛОГИКА (БЕЗ ИЗМЕНЕНИЙ) ====================
+        // ==================== ИГРОВАЯ ЛОГИКА ====================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const imageCache = {};
@@ -1873,7 +1874,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ (СОРТИРОВКА И УСКОРЕННАЯ АНИМАЦИЯ) ====================
+        // ==================== КЕЙСЫ ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -1906,37 +1907,35 @@
             }
         }
 
-        // ----- Открытие деталей кейса (исправлена кнопка цены) -----
         async function openCaseDetail(caseId) {
             try {
                 currentCase = await apiFetch(`${API_BASE}/case-details?id=${caseId}`);
                 document.getElementById('case-detail-title').innerText = currentCase.name;
 
-                // Жёстко задаём текст кнопки с нужными пробелами
                 document.getElementById('case-open-btn').innerHTML = `ОТКРЫТЬ ЗА ${currentCase.price} ₽`;
 
-                document.getElementById('case-drop-list').innerHTML = currentCase.drops.map(d => `
+                // СОРТИРОВКА ДРОПОВ ПО ВОЗРАСТАНИЮ ШАНСА
+                const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
+
+                document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
                         <span class="drop-chance">${d.chance}%</span>
                         <img src="${d.image_url}">
                         <span class="drop-name" style="margin-top: 8px; color: #eee; font-weight: 600;">${escapeHtml(d.name)}</span>
                     </div>`).join('');
 
-                // Подготовка UI: сразу показываем рулетку
                 document.getElementById('roulette-container').style.display = 'block';
                 document.getElementById('win-display').style.display = 'none';
                 document.getElementById('case-actions').style.display = 'block';
                 document.getElementById('case-open-btn').disabled = false;
                 document.getElementById('case-detail-overlay').classList.add('active');
 
-                // Запуск медленной, красивой анимации ожидания
-                startIdleRoulette(currentCase.drops);
+                startIdleRoulette(sortedDrops); // используем отсортированный массив
             } catch(e) {
                 showAlert('Ошибка загрузки кейса');
             }
         }
 
-        // ----- Режим ожидания: ИДЕАЛЬНО бесконечный скролл -----
         function startIdleRoulette(drops) {
             const track = document.getElementById('roulette-track');
             track.classList.remove('idle-scroll');
@@ -1944,7 +1943,6 @@
             track.style.transform = 'translateX(0)';
             track.innerHTML = '';
 
-            // Убираем отступ, чтобы скролл был ровным от левого края
             track.style.paddingLeft = '0px';
 
             const items = [];
@@ -1952,7 +1950,6 @@
                 items.push(drops[Math.floor(Math.random() * drops.length)]);
             }
 
-            // Создаем два абсолютно идентичных блока-обёртки для бесшовного зацикливания
             const createSet = () => {
                 const wrapper = document.createElement('div');
                 wrapper.style.display = 'flex';
@@ -1978,7 +1975,6 @@
             track.classList.add('idle-scroll');
         }
 
-        // ----- Активный спин -----
         function startActiveRoulette(drops, wonItem) {
             if (rouletteActive) return;
             rouletteActive = true;
@@ -1988,7 +1984,6 @@
             track.style.animation = 'none';
             track.innerHTML = '';
 
-            // Возвращаем отступ 50%, чтобы выигрыш остановился ровно по центру под стрелкой
             track.style.paddingLeft = '50%';
 
             const items = [];
@@ -2078,9 +2073,42 @@
         document.addEventListener('click', initAudio, { once: true });
 
         function showWinItem(wonItem) {
+            // Показываем рулетку и очищаем предыдущее состояние
             document.getElementById('roulette-container').style.display = 'none';
             document.getElementById('win-image').src = wonItem.image_url;
             document.getElementById('win-name').innerText = wonItem.name;
+
+            // Номер предмета
+            const winNumber = wonItem.number ? `#${wonItem.number}` : '';
+            document.getElementById('win-number').innerText = winNumber;
+
+            // Характеристики: если traits есть — показываем, иначе подставляем "Random"
+            let traits = [];
+            if(wonItem.traits) {
+                if(typeof wonItem.traits === 'string') {
+                    try { traits = JSON.parse(wonItem.traits); } catch(e) {}
+                } else if(Array.isArray(wonItem.traits)) {
+                    traits = wonItem.traits;
+                }
+            }
+
+            let traitsHtml = '';
+            if (traits.length > 0) {
+                traitsHtml = '<div class="traits-table">' + traits.map(t => {
+                    const name = t.label || t.name || '—';
+                    const value = t.value || 'Random'; // fallback "Random"
+                    return `<div class="trait-row"><div class="trait-name">${name}</div><div class="trait-value">${value}</div></div>`;
+                }).join('') + '</div>';
+            } else {
+                // Если вообще нет traits, показываем два поля по умолчанию: Фон и Узор = Random
+                traitsHtml = `
+                <div class="traits-table">
+                    <div class="trait-row"><div class="trait-name">Фон</div><div class="trait-value">Random</div></div>
+                    <div class="trait-row"><div class="trait-name">Узор</div><div class="trait-value">Random</div></div>
+                </div>`;
+            }
+
+            document.getElementById('win-traits').innerHTML = traitsHtml;
             document.getElementById('win-display').style.display = 'block';
         }
 
@@ -2097,7 +2125,6 @@
             const btn = document.getElementById('case-open-btn');
             btn.disabled = true;
 
-            // Моментальный визуальный отклик
             const originalText = btn.innerHTML;
             btn.innerHTML = 'ОБРАБОТКА...';
             btn.style.opacity = '0.8';
@@ -2111,6 +2138,7 @@
                     await updateBalance();
                     document.getElementById('case-actions').style.display = 'none';
                     startSpinEffects(6500);
+                    // используем текущие дропы (уже отсортированные)
                     startActiveRoulette(currentCase.drops, result.won_item);
                 } else {
                     showAlert(result.error || 'Ошибка открытия');
