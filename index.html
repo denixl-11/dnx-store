@@ -992,39 +992,21 @@
             document.getElementById('nft-modal-img').src = item.image_url;
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
-
-            // Telegram-ссылка и иконка: показываем только для товаров из магазина, у которых есть nft_link
-            const isShopItem = currentCatalog.some(i => String(i.id) === String(id));
             const tgLinkBtn = document.getElementById('nft-telegram-link');
-            const modalTgBtn = document.getElementById('nft-tg-link-btn');
-            if (isShopItem && item.nft_link) {
+            if (item.nft_link) {
                 tgLinkBtn.style.display = 'block';
-                modalTgBtn.style.display = 'flex';
                 tgLinkBtn.onclick = () => tg.openTelegramLink(item.nft_link);
-                modalTgBtn.onclick = () => tg.openTelegramLink(item.nft_link);
-            } else {
-                tgLinkBtn.style.display = 'none';
-                modalTgBtn.style.display = 'none';
-            }
-
-            // Характеристики
+            } else tgLinkBtn.style.display = 'none';
             let traits = [];
             if(item.traits) {
                 if(typeof item.traits === 'string') try { traits = JSON.parse(item.traits); } catch(e) {}
                 else if(Array.isArray(item.traits)) traits = item.traits;
             }
-            // Если характеристик нет и предмет из инвентаря (выбитый), генерируем дефолтные
-            if (traits.length === 0 && !isShopItem) {
-                traits = [
-                    { label: 'Модель', value: item.model || item.name },
-                    { label: 'Фон', value: 'Random' },
-                    { label: 'Узор', value: 'Random' }
-                ];
-            }
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
                 `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
                 '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
 
+            const isShopItem = currentCatalog.some(i => String(i.id) === String(id));
             const buyBtn = document.getElementById('nft-modal-btn-buy');
             const cartBtn = document.getElementById('nft-modal-btn-cart');
             const withdrawBtn = document.getElementById('nft-modal-btn-withdraw');
@@ -1933,10 +1915,7 @@
                 // Жёстко задаём текст кнопки с нужными пробелами
                 document.getElementById('case-open-btn').innerHTML = `ОТКРЫТЬ ЗА ${currentCase.price} ₽`;
 
-                // СОРТИРОВКА ДРОПОВ ПО ВОЗРАСТАНИЮ ШАНСА
-                const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
-
-                document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
+                document.getElementById('case-drop-list').innerHTML = currentCase.drops.map(d => `
                     <div class="drop-row">
                         <span class="drop-chance">${d.chance}%</span>
                         <img src="${d.image_url}">
@@ -1951,7 +1930,7 @@
                 document.getElementById('case-detail-overlay').classList.add('active');
 
                 // Запуск медленной, красивой анимации ожидания
-                startIdleRoulette(sortedDrops);
+                startIdleRoulette(currentCase.drops);
             } catch(e) {
                 showAlert('Ошибка загрузки кейса');
             }
