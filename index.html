@@ -173,23 +173,7 @@
         }
 
         /* -------------------------------------------------------
-           Глобальные премиум-элементы
-           ------------------------------------------------------- */
-        .premium-title {
-            font-size: 1.8rem;
-            margin-bottom: 24px;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            font-weight: 900;
-            background: linear-gradient(to right, #e6c875, #ffd700, #e6c875);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
-        }
-
-        /* -------------------------------------------------------
-           Карточка кейса (в списке)
+           ПРЕМИАЛЬНЫЕ КАРТОЧКИ КЕЙСОВ
            ------------------------------------------------------- */
         .case-card {
             background: linear-gradient(145deg, #181614 0%, #0c0b0a 100%);
@@ -210,10 +194,58 @@
             border-color: rgba(212, 175, 55, 0.5);
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.9), 0 0 25px rgba(212, 175, 55, 0.15);
         }
+        .case-card:active {
+            transform: scale(0.96) translateY(0);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.9);
+            border-color: rgba(212, 175, 55, 0.4);
+            transition: all 0.1s;
+        }
+        .case-card .item-image {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border-radius: 14px;
+            margin-bottom: 16px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .case-card:hover .item-image { transform: scale(1.05); }
+        .case-card .item-name {
+            color: #f8f8f8;
+            font-weight: 700;
+            font-size: 1.05rem;
+            text-align: center;
+            margin-bottom: 8px;
+            letter-spacing: 0.3px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+        .case-card .case-price {
+            background: linear-gradient(90deg, #e5c07b, #f3e5ab, #d4af37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 1.25rem;
+            font-weight: 900;
+            text-align: center;
+            text-shadow: 0 2px 10px rgba(212, 175, 55, 0.2);
+        }
+
+        @keyframes fadeUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
 
         /* -------------------------------------------------------
-           Премиум-рулетка
+           ПРЕМИУМ-РУЛЕТКА
            ------------------------------------------------------- */
+        .section-title-premium {
+            display: flex; align-items: center; justify-content: center; margin-bottom: 24px;
+            color: rgba(255,255,255,0.5); font-size: 0.9rem; text-transform: uppercase;
+            letter-spacing: 3px; font-weight: 600;
+        }
+        .section-title-premium::before, .section-title-premium::after {
+            content: ''; flex: 1; height: 1px; margin: 0 20px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
+        }
+
         .premium-roulette {
             width: 100% !important;
             height: 240px !important;
@@ -252,7 +284,6 @@
             will-change: transform;
         }
 
-        /* 150px – строго, чтобы JS не ломался */
         .roulette-item {
             width: 150px;
             height: 150px;
@@ -265,7 +296,7 @@
         }
 
         /* -------------------------------------------------------
-           Изображения: скругляем углы и растворяем чёрный фон
+           ИЗОБРАЖЕНИЯ: скругляем углы и растворяем чёрный фон
            ------------------------------------------------------- */
         .roulette-item img,
         .drop-row img,
@@ -275,13 +306,13 @@
             max-height: 100%;
             object-fit: cover;
             border-radius: 16px;
-            mix-blend-mode: screen;          /* чёрный фон исчезает */
-            filter: drop-shadow(0 5px 15px rgba(212, 175, 55, 0.25)); /* золотистая тень */
+            mix-blend-mode: screen;
+            filter: drop-shadow(0 5px 15px rgba(212, 175, 55, 0.25));
             transition: transform 0.4s ease;
         }
 
         /* -------------------------------------------------------
-           Сетка дропов
+           СЕТКА ДРОПОВ
            ------------------------------------------------------- */
         .drop-list {
             display: grid;
@@ -328,40 +359,35 @@
             font-weight: 600;
             color: rgba(255,255,255,0.85);
             text-align: center;
+            margin-top: 4px;
         }
 
         /* -------------------------------------------------------
-           Кнопки и разделители
+           ЗОЛОТАЯ КНОПКА ОТКРЫТИЯ
            ------------------------------------------------------- */
-        .section-title-premium {
-            display: flex; align-items: center; justify-content: center; margin-bottom: 24px;
-            color: rgba(255,255,255,0.5); font-size: 0.9rem; text-transform: uppercase;
-            letter-spacing: 3px; font-weight: 600;
-        }
-        .section-title-premium::before, .section-title-premium::after {
-            content: ''; flex: 1; height: 1px; margin: 0 20px;
-            background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
-        }
-
         #case-open-btn {
             background: linear-gradient(135deg, #c49a37 0%, #f5d061 50%, #b38f2d 100%) !important;
-            color: #1a1505 !important; font-weight: 900 !important; font-size: 15px !important;
-            text-transform: uppercase !important; letter-spacing: 2px !important;
-            border-radius: 20px !important; border: none !important; padding: 18px 0 !important;
-            width: 100% !important; transition: all 0.2s ease !important; cursor: pointer;
+            color: #1a1505 !important;
+            font-weight: 900 !important;
+            font-size: 15px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 2px !important;
+            border-radius: 20px !important;
+            border: none !important;
+            padding: 18px 0 !important;
+            width: 100% !important;
+            transition: all 0.2s ease !important;
+            cursor: pointer;
             box-shadow: 0 8px 25px rgba(212,175,55,0.3), inset 0 2px 0 rgba(255,255,255,0.4) !important;
         }
-
-        @keyframes idleScroll {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-        }
-        .idle-scroll {
-            width: fit-content;
-            animation: idleScroll 80s linear infinite !important;
+        #case-open-btn:active {
+            transform: scale(0.98) translateY(2px);
+            box-shadow: 0 4px 15px rgba(212,175,55,0.3) !important;
         }
 
-        /* ========== ПЛАВАЮЩАЯ КОРЗИНА ========== */
+        /* -------------------------------------------------------
+           ПЛАВАЮЩАЯ КОРЗИНА
+           ------------------------------------------------------- */
         .cart-fab {
             position: fixed;
             bottom: 100px;
@@ -421,7 +447,9 @@
             to { opacity: 1; transform: scale(1) rotate(0); }
         }
 
-        /* ========== ОСТАЛЬНЫЕ СТИЛИ ========== */
+        /* -------------------------------------------------------
+           ОСТАЛЬНЫЕ СТИЛИ (без изменений)
+           ------------------------------------------------------- */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;
@@ -552,6 +580,16 @@
 
         .transition-element {
             transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        /* Анимация idle */
+        @keyframes idleScroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        .idle-scroll {
+            width: fit-content;
+            animation: idleScroll 80s linear infinite !important;
         }
     </style>
 </head>
