@@ -172,25 +172,7 @@
             background: rgba(212, 175, 55, 0.1);
         }
 
-        /* -------------------------------------------------------
-           Глобальные премиум-элементы
-           ------------------------------------------------------- */
-        .premium-title {
-            font-size: 1.8rem;
-            margin-bottom: 24px;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            font-weight: 900;
-            background: linear-gradient(to right, #e6c875, #ffd700, #e6c875);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
-        }
-
-        /* -------------------------------------------------------
-           Карточка кейса (в списке кейсов)
-           ------------------------------------------------------- */
+        /* ========== ПРЕМИАЛЬНЫЕ КАРТОЧКИ КЕЙСОВ ========== */
         .case-card {
             background: linear-gradient(145deg, #181614 0%, #0c0b0a 100%);
             border: 1px solid rgba(212, 175, 55, 0.15);
@@ -205,7 +187,6 @@
             transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
             cursor: pointer;
         }
-
         .case-card:hover {
             transform: translateY(-5px);
             border-color: rgba(212, 175, 55, 0.5);
@@ -213,10 +194,65 @@
                         0 0 25px rgba(212, 175, 55, 0.15),
                         inset 0 1px 2px rgba(255, 255, 255, 0.08);
         }
+        .case-card:active {
+            transform: scale(0.96) translateY(0);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.9);
+            border-color: rgba(212, 175, 55, 0.4);
+            transition: all 0.1s;
+        }
+        .case-card .item-image {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border-radius: 14px;
+            margin-bottom: 16px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .case-card:hover .item-image { transform: scale(1.05); }
+        .case-card .item-name {
+            color: #f8f8f8;
+            font-weight: 700;
+            font-size: 1.05rem;
+            text-align: center;
+            margin-bottom: 8px;
+            letter-spacing: 0.3px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+        .case-card .case-price {
+            background: linear-gradient(90deg, #e5c07b, #f3e5ab, #d4af37);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 1.25rem;
+            font-weight: 900;
+            text-align: center;
+            text-shadow: 0 2px 10px rgba(212, 175, 55, 0.2);
+        }
 
-        /* -------------------------------------------------------
-           Премиум-рулетка (в модалке кейса)
-           ------------------------------------------------------- */
+        @keyframes fadeUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ========== НОВАЯ ПРЕМИУМ-РУЛЕТКА ========== */
+        .section-title-premium {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            color: rgba(255,255,255,0.5);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 600;
+        }
+        .section-title-premium::before, .section-title-premium::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
+            margin: 0 20px;
+        }
+
         .premium-roulette {
             width: 100% !important;
             height: 240px !important;
@@ -232,7 +268,7 @@
         .roulette-fade {
             position: absolute; top: 0; bottom: 0; width: 100px; z-index: 2; pointer-events: none;
         }
-        .roulette-fade.left  { left: 0; background: linear-gradient(to right, #11100e 15%, transparent); }
+        .roulette-fade.left { left: 0; background: linear-gradient(to right, #11100e 15%, transparent); }
         .roulette-fade.right { right: 0; background: linear-gradient(to left, #11100e 15%, transparent); }
 
         .roulette-pointer {
@@ -241,13 +277,12 @@
             box-shadow: 0 0 15px rgba(212, 175, 55, 0.6);
             z-index: 3; transform: translateX(-50%);
         }
-        .roulette-pointer::before,
-        .roulette-pointer::after {
+        .roulette-pointer::before, .roulette-pointer::after {
             content: ''; position: absolute; left: 50%; transform: translateX(-50%);
             border: solid transparent; border-width: 12px 9px;
         }
         .roulette-pointer::before { top: 0; border-top-color: #f5d061; filter: drop-shadow(0 2px 5px rgba(212,175,55,0.8)); }
-        .roulette-pointer::after  { bottom: 0; border-bottom-color: #f5d061; filter: drop-shadow(0 -2px 5px rgba(212,175,55,0.8)); }
+        .roulette-pointer::after { bottom: 0; border-bottom-color: #f5d061; filter: drop-shadow(0 -2px 5px rgba(212,175,55,0.8)); }
 
         #roulette-track {
             display: flex;
@@ -257,8 +292,8 @@
         }
 
         .roulette-item {
-            width: 160px;
-            height: 160px;
+            width: 150px;
+            height: 150px;
             flex-shrink: 0;
             background: transparent;
             display: flex;
@@ -283,13 +318,7 @@
             transition: transform 0.4s ease;
         }
 
-        .case-card:hover .item-image {
-            transform: scale(1.05);
-        }
-
-        /* -------------------------------------------------------
-           Сетка и карточки дропов (возможные предметы)
-           ------------------------------------------------------- */
+        /* ========== КАРТОЧКИ ДРОПОВ (СКРУГЛЕННЫЕ) ========== */
         .drop-list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -298,7 +327,6 @@
             overflow-y: auto;
             padding-right: 8px;
         }
-
         .drop-list::-webkit-scrollbar { width: 4px; }
         .drop-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
         .drop-list::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 10px; }
@@ -316,17 +344,14 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.4);
             transition: all 0.3s ease;
         }
-
         .drop-row:hover {
             background: rgba(28, 25, 22, 0.8);
             border-color: rgba(212,175,55,0.2);
         }
-
         .drop-row img {
             width: 85px; height: 85px;
             margin-bottom: 12px;
         }
-
         .drop-chance {
             position: absolute;
             top: 10px; right: 10px;
@@ -341,41 +366,16 @@
             z-index: 2;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
-
         .drop-name {
             font-size: 14px;
             font-weight: 600;
             color: rgba(255,255,255,0.85);
             text-align: center;
             letter-spacing: 0.5px;
+            margin-top: 4px;
         }
 
-        /* -------------------------------------------------------
-           Разделительная полоса "Возможные предметы"
-           ------------------------------------------------------- */
-        .section-title-premium {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 24px;
-            color: rgba(255,255,255,0.5);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            font-weight: 600;
-        }
-        .section-title-premium::before,
-        .section-title-premium::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
-            margin: 0 20px;
-        }
-
-        /* -------------------------------------------------------
-           Кнопка открытия кейса
-           ------------------------------------------------------- */
+        /* ========== ЗОЛОТАЯ КНОПКА ОТКРЫТИЯ ========== */
         #case-open-btn {
             background: linear-gradient(135deg, #c49a37 0%, #f5d061 50%, #b38f2d 100%) !important;
             color: #1a1505 !important;
@@ -400,7 +400,7 @@
             box-shadow: 0 4px 15px rgba(212,175,55,0.3) !important;
         }
 
-        /* Анимации */
+        /* Анимация idle */
         @keyframes idleScroll {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
@@ -823,7 +823,7 @@
     <!-- ================= НОВОЕ МОДАЛЬНОЕ ОКНО КЕЙСА ================= -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <h3 class="modal-title premium-title" id="case-detail-title"></h3>
+            <h3 class="modal-title" id="case-detail-title" style="font-size: 1.8rem; margin-bottom: 20px; text-align: center; color: #d4af37; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 15px rgba(212,175,55,0.4);"></h3>
 
             <div id="roulette-inline-container" class="transition-element">
                 <div id="roulette-container" class="premium-roulette">
