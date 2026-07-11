@@ -203,10 +203,10 @@
         .case-card .item-image {
             width: 100%;
             aspect-ratio: 1 / 1;
-            object-fit: contain;
+            object-fit: cover;
             border-radius: 14px;
             margin-bottom: 16px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+            filter: drop-shadow(0 8px 15px rgba(0, 0, 0, 0.5));
             transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
         }
         .case-card:hover .item-image { transform: scale(1.05); }
@@ -297,16 +297,21 @@
             align-items: center;
         }
 
-        /* ИСПРАВЛЕНО: object-fit: contain, чтобы картинки не обрезались */
-        .roulette-item img,
-        .drop-row img,
-        .case-card .item-image,
-        #win-image {
+        /* ИСПРАВЛЕНО: object-fit: contain, без mix-blend-mode */
+        .roulette-item img {
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
             border-radius: 16px;
-            mix-blend-mode: screen;
+            filter: drop-shadow(0 5px 15px rgba(212, 175, 55, 0.25));
+            transition: transform 0.4s ease;
+        }
+
+        .drop-row img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 16px;
             filter: drop-shadow(0 5px 15px rgba(212, 175, 55, 0.25));
             transition: transform 0.4s ease;
         }
@@ -383,6 +388,16 @@
         #case-open-btn:active {
             transform: scale(0.98) translateY(2px);
             box-shadow: 0 4px 15px rgba(212,175,55,0.3) !important;
+        }
+
+        #win-image {
+            width: 140px;
+            height: 140px;
+            border-radius: 20px;
+            object-fit: contain;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.6);
+            border: 2px solid #d4af37;
+            background: rgba(0, 0, 0, 0.3);
         }
 
         /* ИСПРАВЛЕНО: адаптивный заголовок модального окна */
@@ -864,6 +879,31 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
+        // --- ГЕНЕРАТОР ЗВУКА ЩЕЛЧКА ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playTickSound() {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // Тип волны 'triangle' дает хороший механический "стук"
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.03);
+
+            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.03);
+        }
+
         const tg = window.Telegram.WebApp;
         tg.ready();
         const API_BASE = 'https://dnx-shop.onrender.com';
@@ -1979,7 +2019,6 @@
             track.classList.remove('idle-scroll');
             track.style.animation = 'none';
             track.innerHTML = '';
-
             track.style.paddingLeft = '50%';
 
             const items = [];
@@ -1999,20 +2038,59 @@
             const gap = 15;
             const fullWidth = itemWidth + gap;
             const offset = (50 * fullWidth) + (itemWidth / 2);
-
             const randomFuzz = Math.floor(Math.random() * (itemWidth - 30)) - ((itemWidth - 30) / 2);
             const finalOffset = offset + randomFuzz;
 
             track.style.transition = 'none';
             track.style.transform = 'translateX(0)';
-            void track.offsetWidth;
+
+            // --- СИНХРОНИЗАЦИЯ ТИКОВ И ВИБРАЦИИ ---
+            let lastPassedItem = 0;
+            function checkTick() {
+                if (!rouletteActive) return;
+                const style = window.getComputedStyle(track);
+                const matrix = style.transform || style.webkitTransform || style.mozTransform;
+
+                if (matrix && matrix !== 'none') {
+                    const values = matrix.split('(')[1].split(')')[0].split(',');
+                    // Достаем текущее смещение (translateX) из матрицы трансформации
+                    const tx = Math.abs(parseFloat(values[4]));
+
+                    // Вычисляем, сколько предметов уже проехала стрелка
+                    const currentPassedItem = Math.floor(tx / fullWidth);
+
+                    if (currentPassedItem > lastPassedItem) {
+                        lastPassedItem = currentPassedItem;
+
+                        // Проигрываем звук
+                        playTickSound();
+
+                        // Вызываем вибрацию Telegram (работает на мобилках)
+                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                            window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                        }
+                    }
+                }
+
+                // Продолжаем следить, пока активна рулетка
+                if (rouletteActive) {
+                    requestAnimationFrame(checkTick);
+                }
+            }
+
+            void track.offsetWidth; // Принудительный reflow
 
             requestAnimationFrame(() => {
                 track.style.transition = 'transform 6.5s cubic-bezier(0.1, 0.9, 0.1, 1)';
                 track.style.transform = `translateX(-${finalOffset}px)`;
+                // Запускаем трекинг позиции для звука
+                requestAnimationFrame(checkTick);
             });
 
-            setTimeout(() => showWinItem(wonItem), 7000);
+            setTimeout(() => {
+                rouletteActive = false; // Останавливаем трекинг звука
+                showWinItem(wonItem);
+            }, 7000);
         }
 
         function showWinItem(wonItem) {
