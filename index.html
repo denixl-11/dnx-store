@@ -230,23 +230,23 @@
         }
 
 
-        /* Премиум-кнопка Назад (Шеврон) – финальный фикс */
+        /* Премиум-кнопка Назад (финальный вариант — на одном уровне с заголовком) */
         .premium-back-btn {
             position: absolute;
-            top: 15px;
-            left: 15px;
+            top: 25px;
+            left: 20px;
             background: rgba(24, 22, 20, 0.8);
             border: 1px solid rgba(212, 175, 55, 0.3);
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 38px;
+            height: 38px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #e5c07b;
             cursor: pointer;
             z-index: 1000;
-            transition: all 0.2s ease;
+            transition: opacity 0.3s ease;
         }
         .premium-back-btn:hover {
             background: rgba(212, 175, 55, 0.2);
@@ -258,16 +258,17 @@
             margin-right: 2px;
         }
 
-        /* Фикс названия – перенос строки */
+        /* Фикс названия — адаптирован под кнопку слева */
         .modal-title {
             text-align: center;
             color: #e5c07b;
             font-size: 1.4rem;
             font-weight: 900;
-            margin: 0 45px 20px 45px;
+            margin: 0 65px 20px 65px;
             line-height: 1.2;
-            white-space: normal;
-            word-wrap: break-word;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         @keyframes fadeUp {
@@ -305,7 +306,6 @@
         .roulette-fade.left  { left: 0; background: linear-gradient(to right, #11100e 15%, transparent); }
         .roulette-fade.right { right: 0; background: linear-gradient(to left, #11100e 15%, transparent); }
 
-        /* Стрелочка – финальный фикс (треугольники смотрят внутрь) */
         .roulette-pointer {
             position: absolute;
             top: 0;
@@ -571,7 +571,6 @@
             width: 90%;
             max-width: 400px;
             text-align: center;
-            /* overflow: hidden;  Убрали, чтобы кнопка "Назад" не обрезалась */
         }
 
         .input-dark { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 14px; border-radius: 10px; font-size: 1rem; margin-bottom: 20px; box-sizing: border-box; text-align: center; }
@@ -893,12 +892,12 @@
         </div>
     </div>
 
-    <!-- Модальное окно деталей кейса (исправлено) -->
+    <!-- Модальное окно деталей кейса (финальная версия) -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()" style="position: relative; padding-top: 50px;">
 
-            <!-- Кнопка назад (исправленная) -->
-            <button class="premium-back-btn" onclick="closeCaseDetail(event)" aria-label="Назад" type="button">
+            <!-- Кнопка назад (на одном уровне с заголовком) -->
+            <button class="premium-back-btn" id="case-back-btn" onclick="closeCaseDetail(event)" aria-label="Назад" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M15 18l-6-6 6-6"/>
                 </svg>
@@ -1972,7 +1971,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ (исправленная логика) ====================
+        // ==================== КЕЙСЫ (исправленная логика с управлением видимостью кнопки) ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -2025,6 +2024,8 @@
                 document.getElementById('win-display').style.display = 'none';
                 document.getElementById('case-actions').style.display = 'flex';
                 document.getElementById('case-open-btn').disabled = false;
+                document.getElementById('case-back-btn').style.opacity = '1';
+                document.getElementById('case-back-btn').style.pointerEvents = 'auto';
                 document.getElementById('case-detail-overlay').classList.add('active');
 
                 startIdleRoulette(sortedDrops);
@@ -2140,6 +2141,9 @@
             setTimeout(() => {
                 rouletteActive = false;
                 showWinItem(wonItem);
+                // Возвращаем кнопку назад
+                document.getElementById('case-back-btn').style.opacity = '1';
+                document.getElementById('case-back-btn').style.pointerEvents = 'auto';
             }, 7000);
         }
 
@@ -2167,6 +2171,10 @@
             btn.innerHTML = 'ОБРАБОТКА...';
             btn.style.opacity = '0.8';
 
+            // Скрываем кнопку "Назад" на время анимации
+            document.getElementById('case-back-btn').style.opacity = '0';
+            document.getElementById('case-back-btn').style.pointerEvents = 'none';
+
             try {
                 const result = await apiFetch(`${API_BASE}/open-case`, {
                     method: 'POST',
@@ -2181,12 +2189,17 @@
                     btn.disabled = false;
                     btn.innerHTML = originalText;
                     btn.style.opacity = '1';
+                    // Возвращаем кнопку, если ошибка
+                    document.getElementById('case-back-btn').style.opacity = '1';
+                    document.getElementById('case-back-btn').style.pointerEvents = 'auto';
                 }
             } catch(e) {
                 showAlert('Ошибка сети');
                 btn.disabled = false;
                 btn.innerHTML = originalText;
                 btn.style.opacity = '1';
+                document.getElementById('case-back-btn').style.opacity = '1';
+                document.getElementById('case-back-btn').style.pointerEvents = 'auto';
             }
         }
 
