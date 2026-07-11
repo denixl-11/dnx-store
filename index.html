@@ -614,28 +614,49 @@
             transition: opacity 0.3s ease, transform 0.3s ease;
         }
 
-        /* Кнопка Назад в модальном окне кейса */
-        .back-btn {
+        /* ========== ПРЕМИАЛЬНАЯ КНОПКА НАЗАД (Glassmorphism) ========== */
+        .premium-back-btn {
             position: absolute;
-            top: 15px;
-            left: 15px;
-            background: transparent;
-            border: none;
-            color: #d4af37;
-            padding: 8px;
+            top: 20px;
+            left: 20px;
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(145deg, rgba(24, 22, 20, 0.8) 0%, rgba(12, 11, 10, 0.95) 100%);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            z-index: 10;
-            transition: transform 0.2s ease, opacity 0.2s ease;
+            z-index: 9999;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.05);
+            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
         }
-        .back-btn:hover {
-            opacity: 0.8;
+
+        .premium-back-btn:hover {
+            border-color: rgba(212, 175, 55, 0.6);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8), 0 0 15px rgba(212, 175, 55, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .premium-back-btn:active {
+            transform: translateY(0) scale(0.92);
+            border-color: rgba(212, 175, 55, 0.8);
+        }
+
+        .premium-back-btn svg {
+            width: 22px;
+            height: 22px;
+            color: #d4af37;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+            transition: transform 0.3s ease;
+            margin-right: 2px;
+        }
+
+        .premium-back-btn:hover svg {
             transform: translateX(-3px);
-        }
-        .back-btn:active {
-            transform: translateX(-3px) scale(0.9);
         }
     </style>
 </head>
@@ -855,15 +876,14 @@
         </div>
     </div>
 
-    <!-- ================= МОДАЛЬНОЕ ОКНО КЕЙСА (полностью исправлено) ================= -->
+    <!-- ================= МОДАЛЬНОЕ ОКНО КЕЙСА (премиум-кнопка назад) ================= -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
-        <div class="modal-content" onclick="event.stopPropagation()" style="position: relative; padding-top: 60px;">
+        <div class="modal-content" onclick="event.stopPropagation()" style="position: relative; padding-top: 65px;">
 
-            <!-- Кнопка "Назад" всегда видна при открытом кейсе, скрывается только на время прокрутки рулетки -->
-            <button class="back-btn" id="case-back-btn" onclick="closeCaseDetail(event)"
-                    style="position: absolute; top: 15px; left: 15px; background: none; border: none; padding: 10px; cursor: pointer; z-index: 9999; display: flex; align-items: center; justify-content: center; color: #d4af37; transition: opacity 0.2s;">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+            <!-- ПРЕМИАЛЬНАЯ КНОПКА НАЗАД -->
+            <button id="case-back-btn" class="premium-back-btn" onclick="closeCaseDetail(event)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 18l-6-6 6-6"/>
                 </svg>
             </button>
 
@@ -1374,7 +1394,7 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // ==================== ИГРОВАЯ ЛОГИКА (без изменений) ====================
+        // ==================== ИГРОВАЯ ЛОГИКА ====================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const imageCache = {};
@@ -1959,7 +1979,7 @@
 
         async function loadCases() {
             const grid = document.getElementById('cases-grid');
-            grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #cba153; font-weight: 600; padding: 40px 0; animation: pulseText 1.5s infinite;">Загрузка коллекций...</div>`;
+            grid.innerHTML = '...';
             try {
                 const cases = await apiFetch(`${API_BASE}/cases`);
                 grid.innerHTML = cases.map((c, index) => `
@@ -1970,7 +1990,7 @@
                     </div>
                 `).join('');
             } catch(e) {
-                grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #e74c3c; padding: 40px 0; font-weight: 600;">Ошибка синхронизации. Попробуйте позже.</div>`;
+                grid.innerHTML = 'Ошибка загрузки кейсов';
             }
         }
 
@@ -1994,8 +2014,9 @@
                 document.getElementById('win-display').style.display = 'none';
                 document.getElementById('case-actions').style.display = 'block';
                 document.getElementById('case-open-btn').disabled = false;
-                // Показываем кнопку «Назад» (на случай, если была скрыта)
-                document.getElementById('case-back-btn').style.display = 'flex';
+                // Показываем премиум-кнопку «Назад»
+                const backBtn = document.getElementById('case-back-btn');
+                if (backBtn) backBtn.style.display = 'flex';
                 document.getElementById('case-detail-overlay').classList.add('active');
 
                 startIdleRoulette(sortedDrops);
@@ -2010,13 +2031,10 @@
             track.style.transition = 'none';
             track.style.transform = 'translateX(0)';
             track.innerHTML = '';
-
             track.style.paddingLeft = '0px';
 
             const items = [];
-            for (let i = 0; i < 40; i++) {
-                items.push(drops[Math.floor(Math.random() * drops.length)]);
-            }
+            for (let i = 0; i < 40; i++) items.push(drops[Math.floor(Math.random() * drops.length)]);
 
             const createSet = () => {
                 const wrapper = document.createElement('div');
@@ -2024,7 +2042,6 @@
                 wrapper.style.gap = '15px';
                 wrapper.style.paddingRight = '15px';
                 wrapper.style.flexShrink = '0';
-
                 items.forEach(drop => {
                     const div = document.createElement('div');
                     div.className = 'roulette-item';
@@ -2038,7 +2055,6 @@
 
             track.appendChild(createSet());
             track.appendChild(createSet());
-
             void track.offsetWidth;
             track.classList.add('idle-scroll');
         }
@@ -2070,9 +2086,7 @@
                 track.appendChild(div);
             });
 
-            const itemWidth = 130;
-            const gap = 15;
-            const fullWidth = itemWidth + gap;
+            const itemWidth = 130, gap = 15, fullWidth = itemWidth + gap;
             const offset = (50 * fullWidth) + (itemWidth / 2);
             const randomFuzz = Math.floor(Math.random() * (itemWidth - 30)) - ((itemWidth - 30) / 2);
             const finalOffset = offset + randomFuzz;
@@ -2085,28 +2099,22 @@
                 if (!rouletteActive) return;
                 const style = window.getComputedStyle(track);
                 const matrix = style.transform || style.webkitTransform || style.mozTransform;
-
                 if (matrix && matrix !== 'none') {
                     const values = matrix.split('(')[1].split(')')[0].split(',');
                     const tx = Math.abs(parseFloat(values[4]));
                     const currentPassedItem = Math.floor(tx / fullWidth);
-
                     if (currentPassedItem > lastPassedItem) {
                         lastPassedItem = currentPassedItem;
                         playTickSound();
-                        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                        if (window.Telegram?.WebApp?.HapticFeedback) {
                             window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
                         }
                     }
                 }
-
-                if (rouletteActive) {
-                    requestAnimationFrame(checkTick);
-                }
+                if (rouletteActive) requestAnimationFrame(checkTick);
             }
 
             void track.offsetWidth;
-
             requestAnimationFrame(() => {
                 track.style.transition = 'transform 6.5s cubic-bezier(0.1, 0.9, 0.1, 1)';
                 track.style.transform = `translateX(-${finalOffset}px)`;
@@ -2124,7 +2132,7 @@
             document.getElementById('win-image').src = wonItem.image_url;
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
             document.getElementById('win-display').style.display = 'block';
-            // Показываем кнопку «Назад» снова после выигрыша
+            // Показываем кнопку «Назад» после выигрыша
             const backBtn = document.getElementById('case-back-btn');
             if (backBtn) backBtn.style.display = 'flex';
         }
@@ -2141,7 +2149,6 @@
 
             const btn = document.getElementById('case-open-btn');
             btn.disabled = true;
-
             const originalText = btn.innerHTML;
             btn.innerHTML = 'ОБРАБОТКА...';
             btn.style.opacity = '0.8';
@@ -2154,9 +2161,6 @@
                 if (result.success) {
                     await updateBalance();
                     document.getElementById('case-actions').style.display = 'none';
-                    if (typeof startSpinEffects === 'function') {
-                        startSpinEffects(6500);
-                    }
                     startActiveRoulette(currentCase.drops, result.won_item);
                 } else {
                     showAlert(result.error || 'Ошибка открытия');
