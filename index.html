@@ -172,28 +172,42 @@
             background: rgba(212, 175, 55, 0.1);
         }
 
-        /* -------------------------------------------------------
-           КАРТОЧКИ КЕЙСОВ (ОБНОВЛЁННЫЙ ДИЗАЙН)
-           ------------------------------------------------------- */
+        /* ========== ПРЕМИАЛЬНЫЕ КАРТОЧКИ КЕЙСОВ ========== */
         .case-card {
-            background: linear-gradient(145deg, #181614 0%, #0c0b0a 100%);
-            border: 1px solid rgba(212, 175, 55, 0.15);
-            border-radius: 24px;
-            padding: 20px;
+            background: linear-gradient(160deg, #1f1c16 0%, #0d0c0a 100%);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            border-radius: 20px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
             align-items: center;
             position: relative;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8),
-                        inset 0 1px 1px rgba(255, 255, 255, 0.03);
-            transition: all 0.4s ease;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             cursor: pointer;
+            animation: fadeUp 0.6s ease forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .case-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(212, 175, 55, 0.08) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
         }
         .case-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(212, 175, 55, 0.5);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.9), 0 0 25px rgba(212, 175, 55, 0.15);
+            transform: translateY(-6px) scale(1.02);
+            border-color: rgba(212, 175, 55, 0.7);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.95), 0 0 20px rgba(212, 175, 55, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.1);
         }
+        .case-card:hover::before { opacity: 1; }
         .case-card:active {
             transform: scale(0.96) translateY(0);
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.9);
@@ -209,7 +223,7 @@
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
             transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
         }
-        .case-card:hover .item-image { transform: scale(1.05); }
+        .case-card:hover .item-image { transform: scale(1.08); }
         .case-card .item-name {
             color: #f8f8f8;
             font-weight: 700;
@@ -233,49 +247,57 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* -------------------------------------------------------
-           ПРЕМИУМ-РУЛЕТКА (РАБОЧАЯ ГЕОМЕТРИЯ)
-           ------------------------------------------------------- */
+        /* ========== НОВАЯ ПРЕМИУМ-РУЛЕТКА ========== */
         .section-title-premium {
-            display: flex; align-items: center; justify-content: center; margin-bottom: 24px;
-            color: rgba(255,255,255,0.5); font-size: 0.9rem; text-transform: uppercase;
-            letter-spacing: 3px; font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            color: #a8a8b3;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 700;
         }
         .section-title-premium::before, .section-title-premium::after {
-            content: ''; flex: 1; height: 1px; margin: 0 20px;
-            background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(212,175,55,0.3), transparent);
+            margin: 0 15px;
         }
 
         .premium-roulette {
             width: 100% !important;
-            height: 240px !important;
-            margin: 10px 0 30px 0;
-            background: linear-gradient(180deg, #11100e 0%, #171512 50%, #11100e 100%) !important;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            height: 220px !important;
+            margin: 10px 0 24px 0;
+            background: linear-gradient(180deg, #12100d 0%, #1a1712 50%, #12100d 100%) !important;
+            border-top: 1px solid rgba(212,175,55,0.3);
+            border-bottom: 1px solid rgba(212,175,55,0.3);
             overflow: hidden !important;
-            border-radius: 28px !important;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.95), inset 0 0 80px rgba(0,0,0,0.8);
+            border-radius: 24px !important;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.9), inset 0 0 60px rgba(0,0,0,0.8);
             position: relative !important;
         }
 
         .roulette-fade {
-            position: absolute; top: 0; bottom: 0; width: 100px; z-index: 2; pointer-events: none;
+            position: absolute; top: 0; bottom: 0; width: 80px; z-index: 2; pointer-events: none;
         }
-        .roulette-fade.left  { left: 0; background: linear-gradient(to right, #11100e 15%, transparent); }
-        .roulette-fade.right { right: 0; background: linear-gradient(to left, #11100e 15%, transparent); }
+        .roulette-fade.left { left: 0; background: linear-gradient(to right, #12100d 10%, transparent); }
+        .roulette-fade.right { right: 0; background: linear-gradient(to left, #12100d 10%, transparent); }
 
         .roulette-pointer {
             position: absolute; top: 0; bottom: 0; left: 50%; width: 2px;
-            background: rgba(212, 175, 55, 0.4);
-            box-shadow: 0 0 15px rgba(212, 175, 55, 0.6);
+            background: #d4af37;
+            box-shadow: 0 0 20px #d4af37, 0 0 40px #d4af37;
             z-index: 3; transform: translateX(-50%);
         }
         .roulette-pointer::before, .roulette-pointer::after {
             content: ''; position: absolute; left: 50%; transform: translateX(-50%);
-            border: solid transparent; border-width: 12px 9px;
+            border: solid transparent; border-width: 14px 10px;
         }
-        .roulette-pointer::before { top: 0; border-top-color: #f5d061; }
-        .roulette-pointer::after  { bottom: 0; border-bottom-color: #f5d061; }
+        .roulette-pointer::before { top: 0; border-top-color: #d4af37; border-bottom: none; }
+        .roulette-pointer::after { bottom: 0; border-bottom-color: #d4af37; border-top: none; }
 
         #roulette-track {
             display: flex;
@@ -297,110 +319,158 @@
             box-shadow: 0 10px 25px rgba(0,0,0,0.6);
             padding: 15px;
         }
-
-        /* -------------------------------------------------------
-           ИЗОБРАЖЕНИЯ: растворяем чёрный фон, золотое свечение
-           ------------------------------------------------------- */
-        .roulette-item img,
-        .drop-row img,
-        .case-card .item-image,
-        #win-image {
+        .roulette-item img {
             max-width: 100%;
             max-height: 100%;
-            object-fit: cover;
-            border-radius: 16px;
-            mix-blend-mode: screen;
-            filter: drop-shadow(0 5px 15px rgba(212, 175, 55, 0.25));
-            transition: transform 0.4s ease;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
         }
 
-        /* -------------------------------------------------------
-           СЕТКА ДРОПОВ
-           ------------------------------------------------------- */
-        .drop-list {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-            max-height: 280px;
-            overflow-y: auto;
-            padding-right: 8px;
-        }
-        .drop-list::-webkit-scrollbar { width: 4px; }
-        .drop-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
-        .drop-list::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 10px; }
-
-        .drop-row {
-            background: rgba(20, 18, 16, 0.6);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.04);
-            border-radius: 22px;
-            padding: 20px 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: relative;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-            transition: all 0.3s ease;
-        }
-        .drop-row img {
-            width: 85px; height: 85px;
-            margin-bottom: 12px;
-        }
-        .drop-chance {
-            position: absolute; top: 10px; right: 10px;
-            background: linear-gradient(135deg, rgba(212,175,55,0.2), rgba(138,110,24,0.1));
-            border: 1px solid rgba(212,175,55,0.3);
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 800;
-            color: #e5c07b;
-            z-index: 2;
-        }
-        .drop-name {
-            font-size: 14px;
-            font-weight: 600;
-            color: rgba(255,255,255,0.85);
-            text-align: center;
-            margin-top: 4px;
-        }
-
-        /* -------------------------------------------------------
-           ЗОЛОТАЯ КНОПКА ОТКРЫТИЯ
-           ------------------------------------------------------- */
-        #case-open-btn {
-            background: linear-gradient(135deg, #c49a37 0%, #f5d061 50%, #b38f2d 100%) !important;
-            color: #1a1505 !important;
-            font-weight: 900 !important;
-            font-size: 15px !important;
-            text-transform: uppercase !important;
-            letter-spacing: 2px !important;
-            border-radius: 20px !important;
-            border: none !important;
-            padding: 18px 0 !important;
-            width: 100% !important;
-            transition: all 0.2s ease !important;
-            cursor: pointer;
-            box-shadow: 0 8px 25px rgba(212,175,55,0.3), inset 0 2px 0 rgba(255,255,255,0.4) !important;
-        }
-        #case-open-btn:active {
-            transform: scale(0.98) translateY(2px);
-            box-shadow: 0 4px 15px rgba(212,175,55,0.3) !important;
-        }
-
-        /* -------------------------------------------------------
-           АНИМАЦИЯ IDLE
-           ------------------------------------------------------- */
         @keyframes idleScroll {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
         }
+
         .idle-scroll {
             width: fit-content;
             animation: idleScroll 80s linear infinite !important;
         }
 
-        /* ---------- ОСТАЛЬНЫЕ СТИЛИ (КАК В РАБОЧЕЙ ВЕРСИИ) ---------- */
+        /* ========== КАРТОЧКИ ДРОПОВ ========== */
+        .drop-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        .drop-row {
+            background: linear-gradient(to bottom, #1c1a17, #0d0c0a);
+            border: 1px solid rgba(212,175,55,0.1);
+            border-radius: 20px;
+            padding: 16px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        .drop-row img {
+            width: 70px; height: 70px;
+            border-radius: 12px;
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.4));
+            margin-bottom: 8px;
+        }
+        .drop-chance {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #f59e0b;
+            z-index: 2;
+        }
+        .drop-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            letter-spacing: 0.3px;
+            margin-top: 4px;
+        }
+
+        /* ========== ЗОЛОТАЯ КНОПКА ОТКРЫТИЯ ========== */
+        #case-open-btn {
+            background: linear-gradient(to right, #b38f2d, #f5d061, #b38f2d) !important;
+            color: #0a0a0c !important;
+            font-weight: 900 !important;
+            font-size: 14px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.1em !important;
+            border-radius: 16px !important;
+            box-shadow: 0 0 25px rgba(212,175,55,0.25) !important;
+            border: none !important;
+            padding: 16px 0 !important;
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.2s ease !important;
+            cursor: pointer;
+        }
+        #case-open-btn:active {
+            transform: scale(0.97);
+            box-shadow: 0 0 10px rgba(212,175,55,0.4);
+        }
+
+        /* ========== ПЛАВАЮЩАЯ КОРЗИНА ========== */
+        .cart-fab {
+            position: fixed;
+            bottom: 100px;
+            right: 24px;
+            width: 64px;
+            height: 64px;
+            background: rgba(20, 18, 15, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 95;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 0 4px rgba(212, 175, 55, 0.05);
+            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .cart-fab:hover {
+            transform: translateY(-4px) scale(1.05);
+            border-color: rgba(212, 175, 55, 0.9);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(212, 175, 55, 0.3);
+        }
+        .cart-fab:active { transform: scale(0.92); }
+        .cart-fab.visible {
+            display: flex;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .cart-fab svg {
+            width: 30px;
+            height: 30px;
+            stroke: #d4af37;
+            transition: stroke 0.3s;
+        }
+        .cart-fab:hover svg { stroke: #f3e5ab; }
+        .cart-fab .cart-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: linear-gradient(135deg, #e5c07b 0%, #cba153 100%);
+            color: #050505;
+            font-size: 0.75rem;
+            font-weight: 800;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+            border: 2px solid #14120f;
+        }
+
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.5) rotate(-15deg); }
+            to { opacity: 1; transform: scale(1) rotate(0); }
+        }
+
+        /* ========== ОСТАЛЬНЫЕ СТИЛИ ========== */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;
@@ -533,14 +603,17 @@
             transition: opacity 0.3s ease, transform 0.3s ease;
         }
 
-        /* Эффекты кнопок */
+        /* --- Эффект "вдавливания" для всех кнопок --- */
         #case-open-btn, .btn-secondary, .btn-main-action {
             transition: transform 0.05s ease, filter 0.1s ease !important;
         }
+
         #case-open-btn:active, .btn-secondary:active, .btn-main-action:active {
             transform: scale(0.95) !important;
             filter: brightness(0.8) !important;
         }
+
+        /* --- Запрет на увеличение картинок --- */
         .roulette-item img, .drop-row img, #win-image {
             pointer-events: none !important;
             transform: none !important;
@@ -764,7 +837,7 @@
         </div>
     </div>
 
-    <!-- ================= МОДАЛЬНОЕ ОКНО КЕЙСА ================= -->
+    <!-- ================= НОВОЕ МОДАЛЬНОЕ ОКНО КЕЙСА ================= -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <h3 class="modal-title" id="case-detail-title" style="font-size: 1.8rem; margin-bottom: 20px; text-align: center; color: #d4af37; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 15px rgba(212,175,55,0.4);"></h3>
@@ -1857,13 +1930,14 @@
 
                 document.getElementById('case-open-btn').innerHTML = `ОТКРЫТЬ ЗА ${currentCase.price} ₽`;
 
+                // СОРТИРОВКА ДРОПОВ ПО ВОЗРАСТАНИЮ ШАНСА
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
 
                 document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
                         <span class="drop-chance">${d.chance}%</span>
                         <img src="${d.image_url}">
-                        <span class="drop-name">${escapeHtml(d.model || d.name)}</span>
+                        <span class="drop-name" style="margin-top: 8px; color: #eee; font-weight: 600;">${escapeHtml(d.model || d.name)}</span>
                     </div>`).join('');
 
                 document.getElementById('roulette-container').style.display = 'block';
@@ -2017,6 +2091,7 @@
         function showWinItem(wonItem) {
             document.getElementById('roulette-container').style.display = 'none';
             document.getElementById('win-image').src = wonItem.image_url;
+            // Отображаем model, если его нет — fallback на name
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
             document.getElementById('win-display').style.display = 'block';
         }
