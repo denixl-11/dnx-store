@@ -940,6 +940,22 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
+        // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM WEB APP (FULLSCREEN) ---
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+
+        // Пробуем убрать верхнюю панель Telegram («челку»)
+        try {
+            tg.setHeaderColor('#0a0a0c');
+            tg.setBackgroundColor('#0a0a0c');
+        } catch (e) {}
+
+        if (tg.requestFullscreen) {
+            tg.requestFullscreen();
+        } else {
+            tg.expand(); // фолбэк для старых версий
+        }
+
         // --- ГЕНЕРАТОР ЗВУКА ЩЕЛЧКА ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -964,8 +980,6 @@
             osc.stop(audioCtx.currentTime + 0.03);
         }
 
-        const tg = window.Telegram.WebApp;
-        tg.ready();
         const API_BASE = 'https://dnx-shop.onrender.com';
         const initData = tg.initData || '';
         const userDisplayName = tg.initDataUnsafe?.user?.username || "Guest";
@@ -1971,7 +1985,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ (исправленная логика с управлением видимостью кнопки) ====================
+        // ==================== КЕЙСЫ (управление видимостью кнопки) ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -2214,7 +2228,6 @@
         loadCatalog();
         loadPrizeItems();
         loadLeaderboardPreview();
-        try { tg.expand(); } catch(e) {}
     </script>
 </body>
 </html>
