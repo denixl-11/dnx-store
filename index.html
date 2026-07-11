@@ -2094,7 +2094,8 @@
         function showWinItem(wonItem) {
             document.getElementById('roulette-container').style.display = 'none';
             document.getElementById('win-image').src = wonItem.image_url;
-            document.getElementById('win-name').innerText = wonItem.name;
+            // Отображаем model, если его нет — fallback на name
+            document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
             document.getElementById('win-display').style.display = 'block';
         }
 
