@@ -230,57 +230,44 @@
         }
 
 
-        /* Премиум-кнопка Назад (Шеврон) */
+        /* Премиум-кнопка Назад (Шеврон) – финальный фикс */
         .premium-back-btn {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 44px;
-            height: 44px;
-            background: linear-gradient(145deg, rgba(24, 22, 20, 0.8) 0%, rgba(12, 11, 10, 0.95) 100%);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(212, 175, 55, 0.25);
-            border-radius: 14px;
+            top: 15px;
+            left: 15px;
+            background: rgba(24, 22, 20, 0.8);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
+            color: #e5c07b;
             cursor: pointer;
-            z-index: 9999;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.05);
-            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 1000;
+            transition: all 0.2s ease;
         }
-
         .premium-back-btn:hover {
-            border-color: rgba(212, 175, 55, 0.6);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8), 0 0 15px rgba(212, 175, 55, 0.2);
-            transform: translateY(-2px);
+            background: rgba(212, 175, 55, 0.2);
+            transform: scale(1.05);
         }
-
-        .premium-back-btn:active {
-            transform: translateY(0) scale(0.92);
-            border-color: rgba(212, 175, 55, 0.8);
-        }
-
         .premium-back-btn svg {
-            width: 22px;
-            height: 22px;
-            color: #d4af37;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
-            transition: transform 0.3s ease;
+            width: 20px;
+            height: 20px;
             margin-right: 2px;
         }
 
-        .premium-back-btn:hover svg {
-            transform: translateX(-3px);
-        }
-
-        /* Стрелка скрывается на время анимации открытия кейса */
-        .premium-back-btn.is-hidden {
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            transform: translateY(-8px) scale(0.9);
+        /* Фикс названия – перенос строки */
+        .modal-title {
+            text-align: center;
+            color: #e5c07b;
+            font-size: 1.4rem;
+            font-weight: 900;
+            margin: 0 45px 20px 45px;
+            line-height: 1.2;
+            white-space: normal;
+            word-wrap: break-word;
         }
 
         @keyframes fadeUp {
@@ -303,7 +290,7 @@
         .premium-roulette {
             width: 100% !important;
             height: 240px !important;
-            margin: 10px 0 30px 0;
+            margin: 10px 0 10px 0;
             background: linear-gradient(180deg, #11100e 0%, #171512 50%, #11100e 100%) !important;
             border: 1px solid rgba(255, 255, 255, 0.05);
             overflow: hidden !important;
@@ -318,20 +305,40 @@
         .roulette-fade.left  { left: 0; background: linear-gradient(to right, #11100e 15%, transparent); }
         .roulette-fade.right { right: 0; background: linear-gradient(to left, #11100e 15%, transparent); }
 
+        /* Стрелочка – финальный фикс (треугольники смотрят внутрь) */
         .roulette-pointer {
-            position: absolute; top: 0; bottom: 0; left: 50%; width: 2px;
-            background: rgba(212, 175, 55, 0.4);
-            box-shadow: 0 0 15px rgba(212, 175, 55, 0.6);
-            z-index: 3; transform: translateX(-50%);
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            background: rgba(212, 175, 55, 0.8);
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.9);
+            z-index: 20;
+            transform: translateX(-50%);
         }
-        .roulette-pointer::before, .roulette-pointer::after {
-            content: ''; position: absolute; left: 50%; transform: translateX(-50%);
-            border: solid transparent; border-width: 12px 9px;
-        }
-        .roulette-pointer::before { top: 0; border-top-color: #f5d061; }
-        .roulette-pointer::after  { bottom: 0; border-bottom-color: #f5d061; }
 
-        /* ИСПРАВЛЕНО: width: max-content + единый gap */
+        .roulette-pointer::before, .roulette-pointer::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 21;
+            border-style: solid;
+        }
+
+        .roulette-pointer::before {
+            top: 0;
+            border-width: 14px 8px 0 8px;
+            border-color: #f5d061 transparent transparent transparent;
+        }
+
+        .roulette-pointer::after  {
+            bottom: 0;
+            border-width: 0 8px 14px 8px;
+            border-color: transparent transparent #f5d061 transparent;
+        }
+
         #roulette-track {
             display: flex;
             align-items: center;
@@ -351,7 +358,6 @@
             align-items: center;
         }
 
-        /* ИСПРАВЛЕНО: object-fit: contain, без mix-blend-mode */
         .roulette-item img {
             max-width: 100%;
             max-height: 100%;
@@ -422,7 +428,7 @@
         }
 
         /* -------------------------------------------------------
-           ЗОЛОТАЯ КНОПКА ОТКРЫТИЯ
+           ЗОЛОТАЯ КНОПКА ОТКРЫТИЯ – по центру
            ------------------------------------------------------- */
         #case-open-btn {
             background: linear-gradient(135deg, #c49a37 0%, #f5d061 50%, #b38f2d 100%) !important;
@@ -435,13 +441,17 @@
             border: none !important;
             padding: 18px 0 !important;
             width: 100% !important;
-            transition: all 0.2s ease !important;
-            cursor: pointer;
+            max-width: 320px !important;
             box-shadow: 0 8px 25px rgba(212,175,55,0.3), inset 0 2px 0 rgba(255,255,255,0.4) !important;
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.2s;
         }
         #case-open-btn:active {
-            transform: scale(0.98) translateY(2px);
-            box-shadow: 0 4px 15px rgba(212,175,55,0.3) !important;
+            transform: scale(0.97) !important;
+        }
+        #case-open-btn:disabled {
+            filter: grayscale(1) brightness(0.6);
+            cursor: not-allowed;
         }
 
         #win-image {
@@ -452,19 +462,6 @@
             box-shadow: 0 0 30px rgba(212, 175, 55, 0.6);
             border: 2px solid #d4af37;
             background: rgba(0, 0, 0, 0.3);
-        }
-
-        /* ИСПРАВЛЕНО: адаптивный заголовок модального окна */
-        .modal-title {
-            font-size: 1.4rem !important;
-            line-height: 1.3;
-            margin-bottom: 20px;
-            text-align: center;
-            color: #d4af37;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-shadow: 0 0 15px rgba(212,175,55,0.4);
-            word-wrap: break-word;
         }
 
         /* Анимация idle */
@@ -566,7 +563,16 @@
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
-        .modal-content { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; width: 90%; max-width: 400px; text-align: center; }
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            /* overflow: hidden;  Убрали, чтобы кнопка "Назад" не обрезалась */
+        }
 
         .input-dark { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff; padding: 14px; border-radius: 10px; font-size: 1rem; margin-bottom: 20px; box-sizing: border-box; text-align: center; }
 
@@ -887,13 +893,12 @@
         </div>
     </div>
 
-    <!-- Модальное окно деталей кейса (рулетка, дропы, кнопка открытия) -->
+    <!-- Модальное окно деталей кейса (исправлено) -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
-        <!-- Добавили position: relative и отступ сверху -->
         <div class="modal-content" onclick="event.stopPropagation()" style="position: relative; padding-top: 50px;">
 
-            <!-- Премиум-кнопка «Назад». Находится в корне modal-content и видна всегда -->
-            <button id="case-back-btn" class="premium-back-btn" onclick="backToCases(event)" aria-label="Вернуться к кейсам" type="button">
+            <!-- Кнопка назад (исправленная) -->
+            <button class="premium-back-btn" onclick="closeCaseDetail(event)" aria-label="Назад" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M15 18l-6-6 6-6"/>
                 </svg>
@@ -909,20 +914,21 @@
                     <div id="roulette-track"></div>
                 </div>
                 <div id="win-display" style="display: none; text-align: center; margin-top: 15px;">
-                    <img id="win-image" src="" alt="Выигранный предмет">
-                    <div id="win-name"></div>
-                    <button class="btn-main-action" onclick="claimItem()">ЗАБРАТЬ НАГРАДУ</button>
+                    <img id="win-image" src="" alt="Выигранный предмет" style="width: 120px; height: 120px; object-fit: contain; filter: drop-shadow(0 5px 15px rgba(212, 175, 55, 0.4));">
+                    <div id="win-name" style="color: #e5c07b; font-size: 1.2rem; font-weight: bold; margin: 10px 0;"></div>
+                    <button class="btn-main-action" onclick="claimItem()" style="margin-top: 10px;">ЗАБРАТЬ НАГРАДУ</button>
                 </div>
             </div>
 
-            <div id="case-drops-section" style="margin-top: 30px;">
-                <div class="section-title-premium">Возможные предметы</div>
-                <div class="drop-list" id="case-drop-list"></div>
+            <!-- Кнопка открытия (по центру) -->
+            <div id="case-actions" style="margin-top: 25px; display: flex; justify-content: center; width: 100%;">
+                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ₽</button>
             </div>
 
-            <div id="case-actions" style="margin-top: 25px;">
-                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ₽</button>
-                <button class="btn-secondary" onclick="closeCaseDetail(event)">Закрыть</button>
+            <!-- Сетка дропов -->
+            <div id="case-drops-section" style="margin-top: 35px;">
+                <div class="section-title-premium" style="text-align: center; margin-bottom: 20px; color: rgba(255,255,255,0.7); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Возможные предметы</div>
+                <div class="drop-list" id="case-drop-list"></div>
             </div>
         </div>
     </div>
@@ -948,7 +954,6 @@
             osc.connect(gainNode);
             gainNode.connect(audioCtx.destination);
 
-            // Тип волны 'triangle' дает хороший механический "стук"
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(600, audioCtx.currentTime);
             osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.03);
@@ -2018,12 +2023,9 @@
 
                 document.getElementById('roulette-container').style.display = 'block';
                 document.getElementById('win-display').style.display = 'none';
-                document.getElementById('case-actions').style.display = 'block';
+                document.getElementById('case-actions').style.display = 'flex';
                 document.getElementById('case-open-btn').disabled = false;
                 document.getElementById('case-detail-overlay').classList.add('active');
-
-                const caseBackBtn = document.getElementById('case-back-btn');
-                if (caseBackBtn) caseBackBtn.classList.remove('is-hidden');
 
                 startIdleRoulette(sortedDrops);
             } catch(e) {
@@ -2037,7 +2039,6 @@
             track.style.transition = 'none';
             track.style.transform = 'translateX(0)';
             track.innerHTML = '';
-
             track.style.paddingLeft = '0px';
 
             const items = [];
@@ -2074,9 +2075,6 @@
             if (rouletteActive) return;
             rouletteActive = true;
 
-            const caseBackBtn = document.getElementById('case-back-btn');
-            if (caseBackBtn) caseBackBtn.classList.add('is-hidden');
-
             const track = document.getElementById('roulette-track');
             track.classList.remove('idle-scroll');
             track.style.animation = 'none';
@@ -2106,7 +2104,6 @@
             track.style.transition = 'none';
             track.style.transform = 'translateX(0)';
 
-            // --- СИНХРОНИЗАЦИЯ ТИКОВ И ВИБРАЦИИ ---
             let lastPassedItem = 0;
             function checkTick() {
                 if (!rouletteActive) return;
@@ -2115,50 +2112,38 @@
 
                 if (matrix && matrix !== 'none') {
                     const values = matrix.split('(')[1].split(')')[0].split(',');
-                    // Достаем текущее смещение (translateX) из матрицы трансформации
                     const tx = Math.abs(parseFloat(values[4]));
-
-                    // Вычисляем, сколько предметов уже проехала стрелка
                     const currentPassedItem = Math.floor(tx / fullWidth);
 
                     if (currentPassedItem > lastPassedItem) {
                         lastPassedItem = currentPassedItem;
-
-                        // Проигрываем звук
                         playTickSound();
-
-                        // Вызываем вибрацию Telegram (работает на мобилках)
                         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
                             window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
                         }
                     }
                 }
 
-                // Продолжаем следить, пока активна рулетка
                 if (rouletteActive) {
                     requestAnimationFrame(checkTick);
                 }
             }
 
-            void track.offsetWidth; // Принудительный reflow
+            void track.offsetWidth;
 
             requestAnimationFrame(() => {
                 track.style.transition = 'transform 6.5s cubic-bezier(0.1, 0.9, 0.1, 1)';
                 track.style.transform = `translateX(-${finalOffset}px)`;
-                // Запускаем трекинг позиции для звука
                 requestAnimationFrame(checkTick);
             });
 
             setTimeout(() => {
-                rouletteActive = false; // Останавливаем трекинг звука
+                rouletteActive = false;
                 showWinItem(wonItem);
             }, 7000);
         }
 
         function showWinItem(wonItem) {
-            const caseBackBtn = document.getElementById('case-back-btn');
-            if (caseBackBtn) caseBackBtn.classList.remove('is-hidden');
-
             document.getElementById('roulette-container').style.display = 'none';
             document.getElementById('win-image').src = wonItem.image_url;
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
@@ -2190,9 +2175,6 @@
                 if (result.success) {
                     await updateBalance();
                     document.getElementById('case-actions').style.display = 'none';
-                    if (typeof startSpinEffects === 'function') {
-                        startSpinEffects(6500);
-                    }
                     startActiveRoulette(currentCase.drops, result.won_item);
                 } else {
                     showAlert(result.error || 'Ошибка открытия');
@@ -2206,17 +2188,6 @@
                 btn.innerHTML = originalText;
                 btn.style.opacity = '1';
             }
-        }
-
-        function backToCases(event) {
-            if (event) event.stopPropagation();
-            if (rouletteActive) return;
-
-            document.getElementById('case-detail-overlay').classList.remove('active');
-            currentCase = null;
-
-            // Гарантированно возвращаем пользователя именно к вкладке Cases.
-            switchStoreTab('cases');
         }
 
         function closeCaseDetail(event) {
