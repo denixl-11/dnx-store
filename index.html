@@ -303,7 +303,6 @@
             display: flex;
             align-items: center;
             height: 100%;
-            /* padding-left управляется динамически */
             will-change: transform;
         }
 
@@ -336,7 +335,7 @@
             animation: idleScroll 80s linear infinite !important;
         }
 
-        /* ========== КАРТОЧКИ ДРОПОВ (СКРУГЛЕННЫЕ) ========== */
+        /* ========== КАРТОЧКИ ДРОПОВ ========== */
         .drop-list {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -471,7 +470,7 @@
             to { opacity: 1; transform: scale(1) rotate(0); }
         }
 
-        /* ========== ОСТАЛЬНЫЕ СТИЛИ (БЕЗ ИЗМЕНЕНИЙ) ========== */
+        /* ========== ОСТАЛЬНЫЕ СТИЛИ ========== */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;

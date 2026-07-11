@@ -89,6 +89,8 @@ def init_db():
                         last_event VARCHAR(50)
                     )
                 """)
+                # Добавляем колонку model, если её ещё нет
+                cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS model VARCHAR(255) DEFAULT ''")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -149,7 +151,7 @@ def init_db():
                         case_id INTEGER REFERENCES cases(id),
                         name VARCHAR(255),
                         image_url TEXT,
-                        nft_link TEXT DEFAULT '',
+                        model VARCHAR(255) DEFAULT '',
                         chance NUMERIC,
                         value NUMERIC DEFAULT 0.0
                     )
@@ -253,10 +255,6 @@ def get_polygon_area(poly):
 
 
 def get_centroid_and_safe_radius(poly, target_ratio=0.22):
-    """
-    Вычисляет центроид полигона и безопасный радиус для аватарки.
-    target_ratio (0.22) означает, что площадь аватарки будет составлять 22% от площади полигона.
-    """
     n = len(poly)
     if n < 3:
         return 0.0, 0.0, 0.0
@@ -724,7 +722,7 @@ async def handle_get_inventory(request):
         with closing(get_db_connection()) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    "SELECT id, name, image_url, nft_link, status, traits, number FROM items WHERE buyer_id = %s AND status IN ('Продан','withdrawn','Выведен','pending_withdraw')",
+                    "SELECT id, name, image_url, nft_link, model, status, traits, number FROM items WHERE buyer_id = %s AND status IN ('Продан','withdrawn','Выведен','pending_withdraw')",
                     (user_id,))
                 items = cur.fetchall()
                 for item in items:
@@ -1012,7 +1010,7 @@ async def handle_get_requisites(request):
 
 
 # ------------------------------------------------------------
-#  КЕЙСЫ – эндпоинты
+#  КЕЙСЫ – эндпоинты (исправлены: nft_link → model)
 # ------------------------------------------------------------
 async def handle_get_cases(request):
     with closing(get_db_connection()) as conn:
@@ -1035,7 +1033,8 @@ async def handle_get_case_details(request):
                 return web.json_response({"error": "case_not_found"}, status=404,
                                          headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
             cur.execute(
-                "SELECT id, name, image_url, chance::FLOAT, value::FLOAT FROM case_drops WHERE case_id = %s", (case_id,))
+                "SELECT id, name, image_url, model, chance::FLOAT, value::FLOAT FROM case_drops WHERE case_id = %s",
+                (case_id,))
             drops = cur.fetchall()
             case['drops'] = drops
     return web.json_response(case, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -1050,28 +1049,25 @@ async def handle_open_case(request):
 
         with closing(get_db_connection()) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Проверяем наличие кейса
                 cur.execute("SELECT price FROM cases WHERE id = %s", (case_id,))
                 case = cur.fetchone()
                 if not case:
                     return web.json_response({"success": False, "error": "case_not_found"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                # Атомарное списание баланса
                 cur.execute("""
                     UPDATE users 
                     SET balance = balance - %s 
                     WHERE id = %s AND balance >= %s 
                     RETURNING balance
                 """, (case['price'], user_id, case['price']))
-                updated_user = cur.fetchone()
-                if not updated_user:
+                if not cur.fetchone():
                     return web.json_response({"success": False, "error": "insufficient_funds"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                # Получаем дропы кейса с real_chance (реальный шанс)
+                # Используем model вместо nft_link
                 cur.execute("""
-                    SELECT id, case_id, name, image_url, nft_link, 
+                    SELECT id, case_id, name, image_url, model, 
                            chance::FLOAT, real_chance::FLOAT, value::FLOAT 
                     FROM case_drops 
                     WHERE case_id = %s
@@ -1081,25 +1077,24 @@ async def handle_open_case(request):
                     return web.json_response({"success": False, "error": "empty_case"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                # Розыгрыш на основе real_chance
                 total_chance = sum(float(drop['real_chance']) for drop in drops)
                 rand_val = random.uniform(0, total_chance)
                 current_sum = 0
-                won_drop = drops[-1]  # fallback
+                won_drop = drops[-1]
                 for drop in drops:
                     current_sum += float(drop['real_chance'])
                     if rand_val <= current_sum:
                         won_drop = drop
                         break
 
-                # Сохраняем предмет в инвентарь
+                # Сохраняем model в инвентарь
                 cur.execute("""
-                    INSERT INTO items (name, price, status, image_url, nft_link, buyer_id, last_event) 
+                    INSERT INTO items (name, price, status, image_url, model, buyer_id, last_event) 
                     VALUES (%s, %s, 'Продан', %s, %s, %s, 'case_drop') RETURNING id
-                """, (won_drop['name'], won_drop['value'], won_drop['image_url'], won_drop['nft_link'], user_id))
+                """, (won_drop['name'], won_drop['value'], won_drop['image_url'],
+                      won_drop['model'], user_id))
                 new_item_id = cur.fetchone()['id']
 
-                # Формируем ответ БЕЗ real_chance (чтобы не светить клиенту)
                 won_item_dict = dict(won_drop)
                 won_item_dict.pop('real_chance', None)
                 won_item_dict['generated_item_id'] = new_item_id
