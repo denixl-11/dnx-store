@@ -264,11 +264,11 @@
             color: #e5c07b;
             font-size: 1.4rem;
             font-weight: 900;
-            margin: 0 65px 20px 65px;
+            margin: 0 40px 20px 40px; /* уменьшен отступ для длинных названий */
             line-height: 1.2;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            white-space: normal; /* разрешаем перенос строки */
+            word-wrap: break-word;
+            overflow: visible; /* больше не обрезаем */
         }
 
         @keyframes fadeUp {
@@ -565,7 +565,7 @@
             background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
             display: flex; align-items: center; justify-content: center;
             z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s;
-            padding-top: var(--safe-area-top, 0px); /* отступ для модалок */
+            padding-top: var(--safe-area-top, 0px);
         }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content {
@@ -966,7 +966,10 @@
             document.documentElement.style.setProperty('--safe-area-top', topInset + 'px');
         }
 
+        // Принудительно применяем сразу и после следующего кадра, чтобы избежать "глюка" при входе
         applySafeAreaTop();
+        requestAnimationFrame(() => applySafeAreaTop());
+
         tg.onEvent('viewportChanged', () => {
             applySafeAreaTop();
         });
