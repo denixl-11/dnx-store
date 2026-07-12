@@ -2216,12 +2216,30 @@
         }
 
         function claimItem() {
+            // Закрываем оверлей
             document.getElementById('case-detail-overlay').classList.remove('active');
+
+            // Возвращаем рулетку и кнопки к исходному состоянию
+            document.getElementById('roulette-container').style.display = 'block';
+            document.getElementById('win-display').style.display = 'none';
+            document.getElementById('case-actions').style.display = 'flex';
+            document.getElementById('case-open-btn').disabled = false;
+            document.getElementById('case-open-btn').style.opacity = '1';
+            document.getElementById('case-back-btn').style.opacity = '1';
+            document.getElementById('case-back-btn').style.pointerEvents = 'auto';
+
+            // Полностью очищаем трек рулетки
+            const track = document.getElementById('roulette-track');
+            track.innerHTML = '';
+            track.classList.remove('idle-scroll');
+            track.style.transition = 'none';
+            track.style.transform = 'translateX(0)';
+
+            // Сбрасываем флаги
             rouletteActive = false;
             currentCase = null;
-            currentWonItem = null; // сброс
+            currentWonItem = null;
         }
-
         async function sellItem() {
             if (!currentWonItem || !currentWonItem.generated_item_id) return;
 
