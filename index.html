@@ -963,10 +963,10 @@
             let topInset = 0;
             if (tg.safeAreaInset && typeof tg.safeAreaInset.top === 'number') {
                 // Добавляем 12px к системному safe area, чтобы точно отступить ниже кнопок
-                topInset = tg.safeAreaInset.top + 12;
+                topInset = tg.safeAreaInset.top + 28;
             } else {
                 // Фолбэк чуть больше стандартного (54px вместо 44px)
-                topInset = 54;
+                topInset = 70;
             }
             document.body.style.paddingTop = topInset + 'px';
         }
