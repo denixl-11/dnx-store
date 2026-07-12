@@ -29,11 +29,12 @@
             min-height: 100vh;
             padding-bottom: 100px;
             -webkit-font-smoothing: antialiased;
+            /* padding-top будет задан динамически через JS */
         }
 
         header {
             width: 100%;
-            padding: 20px;
+            padding: 10px 20px 20px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -940,21 +941,38 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM WEB APP (FULLSCREEN) ---
+        // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM WEB APP (FULLSCREEN + SAFE AREA) ---
         const tg = window.Telegram.WebApp;
         tg.ready();
 
-        // Пробуем убрать верхнюю панель Telegram («челку»)
+        // Устанавливаем цвета
         try {
             tg.setHeaderColor('#0a0a0c');
             tg.setBackgroundColor('#0a0a0c');
         } catch (e) {}
 
+        // Полноэкранный режим
         if (tg.requestFullscreen) {
             tg.requestFullscreen();
         } else {
-            tg.expand(); // фолбэк для старых версий
+            tg.expand();
         }
+
+        // Безопасный отступ сверху
+        function applySafeAreaTop() {
+            let topInset = 0;
+            if (tg.safeAreaInset && typeof tg.safeAreaInset.top === 'number') {
+                topInset = tg.safeAreaInset.top;
+            } else {
+                topInset = 44; // стандартная высота статус-бара + кнопка
+            }
+            document.body.style.paddingTop = topInset + 'px';
+        }
+
+        applySafeAreaTop();
+        tg.onEvent('viewportChanged', () => {
+            applySafeAreaTop();
+        });
 
         // --- ГЕНЕРАТОР ЗВУКА ЩЕЛЧКА ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
