@@ -958,13 +958,15 @@
             tg.expand();
         }
 
-        // Безопасный отступ сверху
+        // Безопасный отступ сверху с небольшим запасом
         function applySafeAreaTop() {
             let topInset = 0;
             if (tg.safeAreaInset && typeof tg.safeAreaInset.top === 'number') {
-                topInset = tg.safeAreaInset.top;
+                // Добавляем 12px к системному safe area, чтобы точно отступить ниже кнопок
+                topInset = tg.safeAreaInset.top + 12;
             } else {
-                topInset = 44; // стандартная высота статус-бара + кнопка
+                // Фолбэк чуть больше стандартного (54px вместо 44px)
+                topInset = 54;
             }
             document.body.style.paddingTop = topInset + 'px';
         }
@@ -973,7 +975,6 @@
         tg.onEvent('viewportChanged', () => {
             applySafeAreaTop();
         });
-
         // --- ГЕНЕРАТОР ЗВУКА ЩЕЛЧКА ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
