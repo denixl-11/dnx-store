@@ -2033,7 +2033,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ (ИСПРАВЛЕНО) ====================
+        // ==================== КЕЙСЫ (ФИНАЛЬНАЯ ВЕРСИЯ С ПОЛНЫМ СБРОСОМ) ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -2267,16 +2267,24 @@
 
                 if (result.success) {
                     await updateBalance();
+                    // Принудительный полный сброс перед закрытием
                     claimItem();
                 } else {
                     showAlert(result.error || 'Ошибка продажи');
                     btn.innerHTML = originalText;
                     btn.disabled = false;
+                    // В случае ошибки также возвращаем интерфейс
+                    document.getElementById('roulette-container').style.display = 'block';
+                    document.getElementById('win-display').style.display = 'none';
+                    document.getElementById('case-actions').style.display = 'flex';
                 }
             } catch (e) {
                 showAlert('Ошибка сети');
                 btn.innerHTML = originalText;
                 btn.disabled = false;
+                document.getElementById('roulette-container').style.display = 'block';
+                document.getElementById('win-display').style.display = 'none';
+                document.getElementById('case-actions').style.display = 'flex';
             }
         }
 
