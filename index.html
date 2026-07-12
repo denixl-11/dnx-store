@@ -917,7 +917,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно деталей кейса (с исправленной кнопкой продажи) -->
+    <!-- Модальное окно деталей кейса (с исправленной кнопкой продажи и звуком) -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()" style="position: relative; padding-top: 50px;">
             <button class="premium-back-btn" id="case-back-btn" onclick="closeCaseDetail(event)" aria-label="Назад" type="button">
@@ -941,7 +941,7 @@
                     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 15px;">
                         <button class="btn-main-action" onclick="claimItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">ЗАБРАТЬ В ИНВЕНТАРЬ</button>
                         <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">
-                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span> ₽
+                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> ₽</span>
                         </button>
                     </div>
                 </div>
@@ -979,6 +979,30 @@
         applySafeAreaTop();
         requestAnimationFrame(applySafeAreaTop);
         tg.onEvent('viewportChanged', applySafeAreaTop);
+
+        // --- ГЕНЕРАТОР ЗВУКА ЩЕЛЧКА ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playTickSound() {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.03);
+
+            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.03);
+        }
 
         const API_BASE = 'https://dnx-shop.onrender.com';
         const initData = tg.initData || '';
@@ -1417,7 +1441,7 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // ==================== ИГРОВАЯ ЛОГИКА ====================
+        // ==================== ИГРОВАЯ ЛОГИКА (без изменений) ====================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const imageCache = {};
@@ -1984,7 +2008,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ (ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ) ====================
+        // ==================== КЕЙСЫ (ФИНАЛЬНАЯ ВЕРСИЯ С ЗВУКОМ) ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -2164,15 +2188,11 @@
             document.getElementById('win-image').src = wonItem.image_url;
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
 
-            const winValueSpan = document.getElementById('win-value');
-            if (winValueSpan) {
-                winValueSpan.innerText = wonItem.value;
-                winValueSpan.style.display = 'inline';
-            }
-            const sellTextSpan = document.getElementById('sell-btn-text');
-            if (sellTextSpan) sellTextSpan.innerText = 'ПРОДАТЬ ЗА ';
-            const sellBtn = document.getElementById('sell-drop-btn');
-            if (sellBtn) sellBtn.disabled = false;
+            document.getElementById('win-value').innerText = wonItem.value;
+            document.getElementById('win-value').style.display = 'inline';
+            document.getElementById('win-currency').style.display = 'inline';
+            document.getElementById('sell-btn-text').innerText = 'ПРОДАТЬ ЗА ';
+            document.getElementById('sell-drop-btn').disabled = false;
 
             document.getElementById('win-display').style.display = 'block';
         }
@@ -2183,26 +2203,22 @@
             document.getElementById('roulette-container').style.display = 'block';
             document.getElementById('win-display').style.display = 'none';
             document.getElementById('case-actions').style.display = 'flex';
-            const openBtn = document.getElementById('case-open-btn');
-            if (openBtn) { openBtn.disabled = false; openBtn.style.opacity = '1'; }
-            const backBtn = document.getElementById('case-back-btn');
-            if (backBtn) { backBtn.style.opacity = '1'; backBtn.style.pointerEvents = 'auto'; }
+            document.getElementById('case-open-btn').disabled = false;
+            document.getElementById('case-open-btn').style.opacity = '1';
+            document.getElementById('case-back-btn').style.opacity = '1';
+            document.getElementById('case-back-btn').style.pointerEvents = 'auto';
 
-            const sellBtn = document.getElementById('sell-drop-btn');
-            const sellText = document.getElementById('sell-btn-text');
-            const winVal = document.getElementById('win-value');
-            if (sellBtn) sellBtn.disabled = false;
-            if (sellText) sellText.innerText = 'ПРОДАТЬ ЗА ';
-            if (winVal) winVal.style.display = 'inline';
+            document.getElementById('sell-btn-text').innerText = 'ПРОДАТЬ ЗА ';
+            document.getElementById('win-value').style.display = 'inline';
+            document.getElementById('win-currency').style.display = 'inline';
+            document.getElementById('sell-drop-btn').disabled = false;
 
             const track = document.getElementById('roulette-track');
-            if (track) {
-                track.innerHTML = '';
-                track.classList.remove('idle-scroll');
-                track.style.transition = 'none';
-                track.style.transform = 'translateX(0)';
-                track.style.paddingLeft = '0px';
-            }
+            track.innerHTML = '';
+            track.classList.remove('idle-scroll');
+            track.style.transition = 'none';
+            track.style.transform = 'translateX(0)';
+            track.style.paddingLeft = '0px';
 
             rouletteActive = false;
             currentCase = null;
@@ -2215,10 +2231,12 @@
             const btn = document.getElementById('sell-drop-btn');
             const textSpan = document.getElementById('sell-btn-text');
             const valSpan = document.getElementById('win-value');
+            const currencySpan = document.getElementById('win-currency');
 
             btn.disabled = true;
-            if (textSpan) textSpan.innerText = 'ПРОДАЖА...';
-            if (valSpan) valSpan.style.display = 'none';
+            textSpan.innerText = 'ПРОДАЖА...';
+            valSpan.style.display = 'none';
+            currencySpan.style.display = 'none';
 
             try {
                 const result = await apiFetch(`${API_BASE}/sell-drop`, {
@@ -2230,18 +2248,19 @@
                     claimItem();
                 } else {
                     showAlert(result?.error || 'Ошибка продажи');
-                    restoreSellBtn(btn, textSpan, valSpan);
+                    restoreSellBtn(btn, textSpan, valSpan, currencySpan);
                 }
             } catch (e) {
                 showAlert('Ошибка сети');
-                restoreSellBtn(btn, textSpan, valSpan);
+                restoreSellBtn(btn, textSpan, valSpan, currencySpan);
             }
         }
 
-        function restoreSellBtn(btn, textSpan, valSpan) {
+        function restoreSellBtn(btn, textSpan, valSpan, currencySpan) {
             if (btn) btn.disabled = false;
             if (textSpan) textSpan.innerText = 'ПРОДАТЬ ЗА ';
             if (valSpan) valSpan.style.display = 'inline';
+            if (currencySpan) currencySpan.style.display = 'inline';
         }
 
         async function openCase() {
@@ -2255,8 +2274,8 @@
             btn.innerHTML = 'ОБРАБОТКА...';
             btn.style.opacity = '0.8';
 
-            const backBtn = document.getElementById('case-back-btn');
-            if (backBtn) { backBtn.style.opacity = '0'; backBtn.style.pointerEvents = 'none'; }
+            document.getElementById('case-back-btn').style.opacity = '0';
+            document.getElementById('case-back-btn').style.pointerEvents = 'none';
 
             try {
                 const result = await apiFetch(`${API_BASE}/open-case`, {
@@ -2269,17 +2288,18 @@
                     startActiveRoulette(currentCase.drops, result.won_item);
                 } else {
                     showAlert(result?.error || 'Ошибка открытия');
-                    resetOpenBtn(btn, originalText, backBtn);
+                    resetOpenBtn(btn, originalText);
                 }
             } catch(e) {
                 showAlert('Ошибка сети');
-                resetOpenBtn(btn, originalText, backBtn);
+                resetOpenBtn(btn, originalText);
             }
         }
 
-        function resetOpenBtn(btn, text, backBtn) {
+        function resetOpenBtn(btn, text) {
             if (btn) { btn.disabled = false; btn.innerHTML = text; btn.style.opacity = '1'; }
-            if (backBtn) { backBtn.style.opacity = '1'; backBtn.style.pointerEvents = 'auto'; }
+            document.getElementById('case-back-btn').style.opacity = '1';
+            document.getElementById('case-back-btn').style.pointerEvents = 'auto';
         }
 
         function closeCaseDetail(event) {
