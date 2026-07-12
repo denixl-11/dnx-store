@@ -1057,7 +1057,7 @@
         let currentCase = null;
         let rouletteActive = false;
         let currentNftItem = null;
-        let currentWonItem = null; // ← ДОБАВЛЕНО: хранит выигранный предмет для продажи
+        let currentWonItem = null;
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
@@ -2033,7 +2033,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ (обновлённые функции) ====================
+        // ==================== КЕЙСЫ (ИСПРАВЛЕНО) ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -2080,12 +2080,25 @@
                         <span class="drop-name">${escapeHtml(d.model || d.name)}</span>
                     </div>`).join('');
 
+                // 💥 Полный сброс перед новым кейсом
+                rouletteActive = false;
+                currentWonItem = null;
+
                 document.getElementById('roulette-container').style.display = 'block';
                 document.getElementById('win-display').style.display = 'none';
                 document.getElementById('case-actions').style.display = 'flex';
                 document.getElementById('case-open-btn').disabled = false;
+                document.getElementById('case-open-btn').style.opacity = '1';
                 document.getElementById('case-back-btn').style.opacity = '1';
                 document.getElementById('case-back-btn').style.pointerEvents = 'auto';
+
+                const track = document.getElementById('roulette-track');
+                track.innerHTML = '';
+                track.classList.remove('idle-scroll');
+                track.style.transition = 'none';
+                track.style.transform = 'translateX(0)';
+                track.style.paddingLeft = '0px';
+
                 document.getElementById('case-detail-overlay').classList.add('active');
 
                 startIdleRoulette(sortedDrops);
@@ -2096,10 +2109,10 @@
 
         function startIdleRoulette(drops) {
             const track = document.getElementById('roulette-track');
+            track.innerHTML = '';
             track.classList.remove('idle-scroll');
             track.style.transition = 'none';
             track.style.transform = 'translateX(0)';
-            track.innerHTML = '';
             track.style.paddingLeft = '0px';
 
             const items = [];
@@ -2207,19 +2220,17 @@
         }
 
         function showWinItem(wonItem) {
-            currentWonItem = wonItem; // ← ДОБАВЛЕНО
+            currentWonItem = wonItem;
             document.getElementById('roulette-container').style.display = 'none';
             document.getElementById('win-image').src = wonItem.image_url;
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
-            document.getElementById('win-value').innerText = wonItem.value; // ← ДОБАВЛЕНО
+            document.getElementById('win-value').innerText = wonItem.value;
             document.getElementById('win-display').style.display = 'block';
         }
 
         function claimItem() {
-            // Закрываем оверлей
             document.getElementById('case-detail-overlay').classList.remove('active');
 
-            // Возвращаем рулетку и кнопки к исходному состоянию
             document.getElementById('roulette-container').style.display = 'block';
             document.getElementById('win-display').style.display = 'none';
             document.getElementById('case-actions').style.display = 'flex';
@@ -2228,18 +2239,18 @@
             document.getElementById('case-back-btn').style.opacity = '1';
             document.getElementById('case-back-btn').style.pointerEvents = 'auto';
 
-            // Полностью очищаем трек рулетки
             const track = document.getElementById('roulette-track');
             track.innerHTML = '';
             track.classList.remove('idle-scroll');
             track.style.transition = 'none';
             track.style.transform = 'translateX(0)';
+            track.style.paddingLeft = '0px';
 
-            // Сбрасываем флаги
             rouletteActive = false;
             currentCase = null;
             currentWonItem = null;
         }
+
         async function sellItem() {
             if (!currentWonItem || !currentWonItem.generated_item_id) return;
 
@@ -2256,7 +2267,7 @@
 
                 if (result.success) {
                     await updateBalance();
-                    claimItem(); // закроет окно и сбросит currentWonItem
+                    claimItem();
                 } else {
                     showAlert(result.error || 'Ошибка продажи');
                     btn.innerHTML = originalText;
