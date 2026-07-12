@@ -89,7 +89,6 @@ def init_db():
                         last_event VARCHAR(50)
                     )
                 """)
-                # Добавляем колонку model, если её ещё нет
                 cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS model VARCHAR(255) DEFAULT ''")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
@@ -1010,7 +1009,7 @@ async def handle_get_requisites(request):
 
 
 # ------------------------------------------------------------
-#  КЕЙСЫ – эндпоинты (исправлены: nft_link → model)
+#  КЕЙСЫ – эндпоинты
 # ------------------------------------------------------------
 async def handle_get_cases(request):
     with closing(get_db_connection()) as conn:
@@ -1065,7 +1064,6 @@ async def handle_open_case(request):
                     return web.json_response({"success": False, "error": "insufficient_funds"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                # Используем model вместо nft_link
                 cur.execute("""
                     SELECT id, case_id, name, image_url, model, 
                            chance::FLOAT, real_chance::FLOAT, value::FLOAT 
@@ -1087,7 +1085,6 @@ async def handle_open_case(request):
                         won_drop = drop
                         break
 
-                # Сохраняем model в инвентарь
                 cur.execute("""
                     INSERT INTO items (name, price, status, image_url, model, buyer_id, last_event) 
                     VALUES (%s, %s, 'Продан', %s, %s, %s, 'case_drop') RETURNING id
@@ -1107,6 +1104,47 @@ async def handle_open_case(request):
     except Exception as e:
         logging.error(f"Case open error: {e}")
         return web.json_response({"success": False}, status=500,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+# ------------------------------------------------------------
+#  НОВЫЙ ЭНДПОИНТ: продажа дропа сразу после рулетки
+# ------------------------------------------------------------
+@require_auth
+async def handle_sell_drop(request):
+    """Продажа предмета сразу после выпадения из кейса (или из инвентаря)"""
+    try:
+        data = await request.json()
+        user_id = request['telegram_user']['id']
+        item_id = data.get('itemId')
+
+        if not item_id:
+            return web.json_response({"success": False, "error": "missing_item_id"},
+                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+        with closing(get_db_connection()) as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Находим предмет и убеждаемся, что он принадлежит пользователю
+                cur.execute("SELECT id, price FROM items WHERE id = %s AND buyer_id = %s", (item_id, user_id))
+                item = cur.fetchone()
+
+                if not item:
+                    return web.json_response({"success": False, "error": "item_not_found"},
+                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+                # Начисляем стоимость предмета на баланс
+                cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (item['price'], user_id))
+
+                # Удаляем предмет (он не появится в инвентаре)
+                cur.execute("DELETE FROM items WHERE id = %s", (item_id,))
+
+                conn.commit()
+
+        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+    except Exception as e:
+        logging.error(f"Sell drop error: {e}")
+        return web.json_response({"success": False, "error": "server_error"}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 
@@ -1200,6 +1238,7 @@ app.router.add_get('/prize/items', handle_get_prize_items)
 app.router.add_get('/cases', handle_get_cases)
 app.router.add_get('/case-details', handle_get_case_details)
 app.router.add_post('/open-case', handle_open_case)
+app.router.add_post('/sell-drop', handle_sell_drop)  # НОВЫЙ МАРШРУТ
 app.router.add_options('/{tail:.*}', handle_options)
 
 
