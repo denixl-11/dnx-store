@@ -29,7 +29,6 @@
             min-height: 100vh;
             padding-bottom: 100px;
             -webkit-font-smoothing: antialiased;
-            /* padding-top задаётся динамически */
         }
 
         header {
@@ -230,7 +229,6 @@
             text-shadow: 0 2px 10px rgba(212, 175, 55, 0.2);
         }
 
-
         /* Премиум-кнопка Назад */
         .premium-back-btn {
             position: absolute;
@@ -268,10 +266,6 @@
             line-height: 1.2;
             white-space: normal;
             word-wrap: break-word;
-        }
-
-        @keyframes fadeUp {
-            to { opacity: 1; transform: translateY(0); }
         }
 
         /* -------------------------------------------------------
@@ -923,11 +917,11 @@
         </div>
     </div>
 
-    <!-- Модальное окно деталей кейса (обновлён блок с кнопками) -->
+    <!-- Модальное окно деталей кейса (с исправленной кнопкой продажи) -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()" style="position: relative; padding-top: 50px;">
             <button class="premium-back-btn" id="case-back-btn" onclick="closeCaseDetail(event)" aria-label="Назад" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M15 18l-6-6 6-6"/>
                 </svg>
             </button>
@@ -946,7 +940,9 @@
 
                     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 15px;">
                         <button class="btn-main-action" onclick="claimItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">ЗАБРАТЬ В ИНВЕНТАРЬ</button>
-                        <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">ПРОДАТЬ ЗА <span id="win-value"></span> ₽</button>
+                        <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">
+                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span> ₽
+                        </button>
                     </div>
                 </div>
             </div>
@@ -970,62 +966,19 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        // --- ИНИЦИАЛИЗАЦИЯ TELEGRAM WEB APP (FULLSCREEN + SAFE AREA) ---
         const tg = window.Telegram.WebApp;
         tg.ready();
-
-        try {
-            tg.setHeaderColor('#0a0a0c');
-            tg.setBackgroundColor('#0a0a0c');
-        } catch (e) {}
-
-        if (tg.requestFullscreen) {
-            tg.requestFullscreen();
-        } else {
-            tg.expand();
-        }
+        try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
+        if (tg.requestFullscreen) tg.requestFullscreen(); else tg.expand();
 
         function applySafeAreaTop() {
-            let topInset = 0;
-            if (tg.safeAreaInset && typeof tg.safeAreaInset.top === 'number') {
-                topInset = tg.safeAreaInset.top + 35;
-            } else {
-                topInset = 70;
-            }
+            let topInset = tg.safeAreaInset?.top ? tg.safeAreaInset.top + 35 : 70;
             document.body.style.paddingTop = topInset + 'px';
             document.documentElement.style.setProperty('--safe-area-top', topInset + 'px');
         }
-
         applySafeAreaTop();
-        requestAnimationFrame(() => applySafeAreaTop());
-
-        tg.onEvent('viewportChanged', () => {
-            applySafeAreaTop();
-        });
-
-        // --- ГЕНЕРАТОР ЗВУКА ЩЕЛЧКА ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-        function playTickSound() {
-            if (!audioCtx) return;
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-
-            const osc = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-
-            osc.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.03);
-
-            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
-
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.03);
-        }
+        requestAnimationFrame(applySafeAreaTop);
+        tg.onEvent('viewportChanged', applySafeAreaTop);
 
         const API_BASE = 'https://dnx-shop.onrender.com';
         const initData = tg.initData || '';
@@ -1371,7 +1324,6 @@
             } catch(e) { list.innerHTML = 'Ошибка загрузки'; }
         }
 
-        // Призы
         let currentPrizeItems = [];
         async function loadPrizeItems() {
             try {
@@ -1402,7 +1354,6 @@
             document.getElementById('prize-detail-overlay').classList.remove('active');
         }
 
-        // Лидеры и сезон
         async function loadLeaderboardPreview() {
             try {
                 const data = await apiFetch(`${API_BASE}/leaderboard`);
@@ -2033,7 +1984,7 @@
                 .catch(() => { cancelInProgress = false; updateBalance(); pollGame(); });
         }
 
-        // ==================== КЕЙСЫ (ФИНАЛЬНАЯ ВЕРСИЯ С ПОЛНЫМ СБРОСОМ) ====================
+        // ==================== КЕЙСЫ (ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ) ====================
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
@@ -2051,18 +2002,18 @@
 
         async function loadCases() {
             const grid = document.getElementById('cases-grid');
-            grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #cba153; font-weight: 600; padding: 40px 0; animation: pulseText 1.5s infinite;">Загрузка коллекций...</div>`;
+            grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #cba153; padding: 40px 0;">Загрузка...</div>`;
             try {
                 const cases = await apiFetch(`${API_BASE}/cases`);
-                grid.innerHTML = cases.map((c, index) => `
-                    <div class="case-card" onclick="openCaseDetail(${c.id})" style="animation-delay: ${index * 0.08}s">
+                grid.innerHTML = cases.map((c, i) => `
+                    <div class="case-card" onclick="openCaseDetail(${c.id})" style="animation-delay: ${i * 0.08}s">
                         <img src="${c.image_url}" class="item-image" alt="${escapeHtml(c.name)}">
                         <div class="item-name">${escapeHtml(c.name)}</div>
                         <div class="case-price">${c.price} ₽</div>
                     </div>
                 `).join('');
             } catch(e) {
-                grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #e74c3c; padding: 40px 0; font-weight: 600;">Ошибка синхронизации. Попробуйте позже.</div>`;
+                grid.innerHTML = `<div style="grid-column: 1 / -1; color: #e74c3c; padding: 40px 0;">Ошибка</div>`;
             }
         }
 
@@ -2078,9 +2029,9 @@
                         <span class="drop-chance">${d.chance}%</span>
                         <img src="${d.image_url}">
                         <span class="drop-name">${escapeHtml(d.model || d.name)}</span>
-                    </div>`).join('');
+                    </div>
+                `).join('');
 
-                // 💥 Полный сброс перед новым кейсом
                 rouletteActive = false;
                 currentWonItem = null;
 
@@ -2100,7 +2051,6 @@
                 track.style.paddingLeft = '0px';
 
                 document.getElementById('case-detail-overlay').classList.add('active');
-
                 startIdleRoulette(sortedDrops);
             } catch(e) {
                 showAlert('Ошибка загрузки кейса');
@@ -2116,9 +2066,7 @@
             track.style.paddingLeft = '0px';
 
             const items = [];
-            for (let i = 0; i < 40; i++) {
-                items.push(drops[Math.floor(Math.random() * drops.length)]);
-            }
+            for (let i = 0; i < 40; i++) items.push(drops[Math.floor(Math.random() * drops.length)]);
 
             const createSet = () => {
                 const wrapper = document.createElement('div');
@@ -2126,7 +2074,6 @@
                 wrapper.style.gap = '15px';
                 wrapper.style.paddingRight = '15px';
                 wrapper.style.flexShrink = '0';
-
                 items.forEach(drop => {
                     const div = document.createElement('div');
                     div.className = 'roulette-item';
@@ -2137,10 +2084,8 @@
                 });
                 return wrapper;
             };
-
             track.appendChild(createSet());
             track.appendChild(createSet());
-
             void track.offsetWidth;
             track.classList.add('idle-scroll');
         }
@@ -2183,12 +2128,10 @@
                 if (!rouletteActive) return;
                 const style = window.getComputedStyle(track);
                 const matrix = style.transform || style.webkitTransform || style.mozTransform;
-
                 if (matrix && matrix !== 'none') {
                     const values = matrix.split('(')[1].split(')')[0].split(',');
                     const tx = Math.abs(parseFloat(values[4]));
                     const currentPassedItem = Math.floor(tx / fullWidth);
-
                     if (currentPassedItem > lastPassedItem) {
                         lastPassedItem = currentPassedItem;
                         playTickSound();
@@ -2197,14 +2140,10 @@
                         }
                     }
                 }
-
-                if (rouletteActive) {
-                    requestAnimationFrame(checkTick);
-                }
+                if (rouletteActive) requestAnimationFrame(checkTick);
             }
 
             void track.offsetWidth;
-
             requestAnimationFrame(() => {
                 track.style.transition = 'transform 6.5s cubic-bezier(0.1, 0.9, 0.1, 1)';
                 track.style.transform = `translateX(-${finalOffset}px)`;
@@ -2224,7 +2163,17 @@
             document.getElementById('roulette-container').style.display = 'none';
             document.getElementById('win-image').src = wonItem.image_url;
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
-            document.getElementById('win-value').innerText = wonItem.value;
+
+            const winValueSpan = document.getElementById('win-value');
+            if (winValueSpan) {
+                winValueSpan.innerText = wonItem.value;
+                winValueSpan.style.display = 'inline';
+            }
+            const sellTextSpan = document.getElementById('sell-btn-text');
+            if (sellTextSpan) sellTextSpan.innerText = 'ПРОДАТЬ ЗА ';
+            const sellBtn = document.getElementById('sell-drop-btn');
+            if (sellBtn) sellBtn.disabled = false;
+
             document.getElementById('win-display').style.display = 'block';
         }
 
@@ -2234,17 +2183,26 @@
             document.getElementById('roulette-container').style.display = 'block';
             document.getElementById('win-display').style.display = 'none';
             document.getElementById('case-actions').style.display = 'flex';
-            document.getElementById('case-open-btn').disabled = false;
-            document.getElementById('case-open-btn').style.opacity = '1';
-            document.getElementById('case-back-btn').style.opacity = '1';
-            document.getElementById('case-back-btn').style.pointerEvents = 'auto';
+            const openBtn = document.getElementById('case-open-btn');
+            if (openBtn) { openBtn.disabled = false; openBtn.style.opacity = '1'; }
+            const backBtn = document.getElementById('case-back-btn');
+            if (backBtn) { backBtn.style.opacity = '1'; backBtn.style.pointerEvents = 'auto'; }
+
+            const sellBtn = document.getElementById('sell-drop-btn');
+            const sellText = document.getElementById('sell-btn-text');
+            const winVal = document.getElementById('win-value');
+            if (sellBtn) sellBtn.disabled = false;
+            if (sellText) sellText.innerText = 'ПРОДАТЬ ЗА ';
+            if (winVal) winVal.style.display = 'inline';
 
             const track = document.getElementById('roulette-track');
-            track.innerHTML = '';
-            track.classList.remove('idle-scroll');
-            track.style.transition = 'none';
-            track.style.transform = 'translateX(0)';
-            track.style.paddingLeft = '0px';
+            if (track) {
+                track.innerHTML = '';
+                track.classList.remove('idle-scroll');
+                track.style.transition = 'none';
+                track.style.transform = 'translateX(0)';
+                track.style.paddingLeft = '0px';
+            }
 
             rouletteActive = false;
             currentCase = null;
@@ -2255,37 +2213,35 @@
             if (!currentWonItem || !currentWonItem.generated_item_id) return;
 
             const btn = document.getElementById('sell-drop-btn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = 'ПРОДАЖА...';
+            const textSpan = document.getElementById('sell-btn-text');
+            const valSpan = document.getElementById('win-value');
+
             btn.disabled = true;
+            if (textSpan) textSpan.innerText = 'ПРОДАЖА...';
+            if (valSpan) valSpan.style.display = 'none';
 
             try {
                 const result = await apiFetch(`${API_BASE}/sell-drop`, {
                     method: 'POST',
                     body: JSON.stringify({ itemId: currentWonItem.generated_item_id })
                 });
-
-                if (result.success) {
+                if (result && result.success) {
                     await updateBalance();
-                    // Принудительный полный сброс перед закрытием
                     claimItem();
                 } else {
-                    showAlert(result.error || 'Ошибка продажи');
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    // В случае ошибки также возвращаем интерфейс
-                    document.getElementById('roulette-container').style.display = 'block';
-                    document.getElementById('win-display').style.display = 'none';
-                    document.getElementById('case-actions').style.display = 'flex';
+                    showAlert(result?.error || 'Ошибка продажи');
+                    restoreSellBtn(btn, textSpan, valSpan);
                 }
             } catch (e) {
                 showAlert('Ошибка сети');
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-                document.getElementById('roulette-container').style.display = 'block';
-                document.getElementById('win-display').style.display = 'none';
-                document.getElementById('case-actions').style.display = 'flex';
+                restoreSellBtn(btn, textSpan, valSpan);
             }
+        }
+
+        function restoreSellBtn(btn, textSpan, valSpan) {
+            if (btn) btn.disabled = false;
+            if (textSpan) textSpan.innerText = 'ПРОДАТЬ ЗА ';
+            if (valSpan) valSpan.style.display = 'inline';
         }
 
         async function openCase() {
@@ -2293,39 +2249,37 @@
             if (userBalance < currentCase.price) { showAlert('Недостаточно средств'); return; }
 
             const btn = document.getElementById('case-open-btn');
+            if (btn.disabled) return;
             btn.disabled = true;
             const originalText = btn.innerHTML;
             btn.innerHTML = 'ОБРАБОТКА...';
             btn.style.opacity = '0.8';
 
-            document.getElementById('case-back-btn').style.opacity = '0';
-            document.getElementById('case-back-btn').style.pointerEvents = 'none';
+            const backBtn = document.getElementById('case-back-btn');
+            if (backBtn) { backBtn.style.opacity = '0'; backBtn.style.pointerEvents = 'none'; }
 
             try {
                 const result = await apiFetch(`${API_BASE}/open-case`, {
                     method: 'POST',
                     body: JSON.stringify({ caseId: currentCase.id })
                 });
-                if (result.success) {
+                if (result && result.success) {
                     await updateBalance();
                     document.getElementById('case-actions').style.display = 'none';
                     startActiveRoulette(currentCase.drops, result.won_item);
                 } else {
-                    showAlert(result.error || 'Ошибка открытия');
-                    btn.disabled = false;
-                    btn.innerHTML = originalText;
-                    btn.style.opacity = '1';
-                    document.getElementById('case-back-btn').style.opacity = '1';
-                    document.getElementById('case-back-btn').style.pointerEvents = 'auto';
+                    showAlert(result?.error || 'Ошибка открытия');
+                    resetOpenBtn(btn, originalText, backBtn);
                 }
             } catch(e) {
                 showAlert('Ошибка сети');
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-                btn.style.opacity = '1';
-                document.getElementById('case-back-btn').style.opacity = '1';
-                document.getElementById('case-back-btn').style.pointerEvents = 'auto';
+                resetOpenBtn(btn, originalText, backBtn);
             }
+        }
+
+        function resetOpenBtn(btn, text, backBtn) {
+            if (btn) { btn.disabled = false; btn.innerHTML = text; btn.style.opacity = '1'; }
+            if (backBtn) { backBtn.style.opacity = '1'; backBtn.style.pointerEvents = 'auto'; }
         }
 
         function closeCaseDetail(event) {
