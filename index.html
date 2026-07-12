@@ -29,7 +29,7 @@
             min-height: 100vh;
             padding-bottom: 100px;
             -webkit-font-smoothing: antialiased;
-            /* padding-top будет задан динамически через JS */
+            /* padding-top задаётся динамически */
         }
 
         header {
@@ -231,7 +231,7 @@
         }
 
 
-        /* Премиум-кнопка Назад (финальный вариант — на одном уровне с заголовком) */
+        /* Премиум-кнопка Назад */
         .premium-back-btn {
             position: absolute;
             top: 25px;
@@ -259,7 +259,6 @@
             margin-right: 2px;
         }
 
-        /* Фикс названия — адаптирован под кнопку слева */
         .modal-title {
             text-align: center;
             color: #e5c07b;
@@ -429,7 +428,7 @@
         }
 
         /* -------------------------------------------------------
-           ЗОЛОТАЯ КНОПКА ОТКРЫТИЯ – по центру
+           ЗОЛОТАЯ КНОПКА ОТКРЫТИЯ
            ------------------------------------------------------- */
         #case-open-btn {
             background: linear-gradient(135deg, #c49a37 0%, #f5d061 50%, #b38f2d 100%) !important;
@@ -465,7 +464,6 @@
             background: rgba(0, 0, 0, 0.3);
         }
 
-        /* Анимация idle */
         @keyframes idleScroll {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
@@ -535,7 +533,7 @@
             to { opacity: 1; transform: scale(1) rotate(0); }
         }
 
-        /* ========== ОСТАЛЬНЫЕ СТИЛИ (без изменений) ========== */
+        /* ========== ОСТАЛЬНЫЕ СТИЛИ ========== */
         .game-container { padding: 20px; display: flex; flex-direction: column; align-items: center; width: 100%; box-sizing: border-box; }
         .game-canvas-wrap {
             position: relative;
@@ -562,7 +560,13 @@
         .bet-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; align-items: center; }
         .bet-row:last-child { border-bottom: none; }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s; }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; pointer-events: none; transition: 0.3s;
+            padding-top: var(--safe-area-top, 0px); /* отступ для модалок */
+        }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content {
             background: var(--bg-card);
@@ -893,17 +897,14 @@
         </div>
     </div>
 
-    <!-- Модальное окно деталей кейса (финальная версия) -->
+    <!-- Модальное окно деталей кейса -->
     <div id="case-detail-overlay" class="modal-overlay" onclick="closeCaseDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()" style="position: relative; padding-top: 50px;">
-
-            <!-- Кнопка назад (на одном уровне с заголовком) -->
             <button class="premium-back-btn" id="case-back-btn" onclick="closeCaseDetail(event)" aria-label="Назад" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M15 18l-6-6 6-6"/>
                 </svg>
             </button>
-
             <h3 class="modal-title" id="case-detail-title"></h3>
 
             <div id="roulette-inline-container" class="transition-element">
@@ -920,12 +921,10 @@
                 </div>
             </div>
 
-            <!-- Кнопка открытия (по центру) -->
             <div id="case-actions" style="margin-top: 25px; display: flex; justify-content: center; width: 100%;">
                 <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ₽</button>
             </div>
 
-            <!-- Сетка дропов -->
             <div id="case-drops-section" style="margin-top: 35px;">
                 <div class="section-title-premium" style="text-align: center; margin-bottom: 20px; color: rgba(255,255,255,0.7); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px;">Возможные предметы</div>
                 <div class="drop-list" id="case-drop-list"></div>
@@ -945,36 +944,33 @@
         const tg = window.Telegram.WebApp;
         tg.ready();
 
-        // Устанавливаем цвета
         try {
             tg.setHeaderColor('#0a0a0c');
             tg.setBackgroundColor('#0a0a0c');
         } catch (e) {}
 
-        // Полноэкранный режим
         if (tg.requestFullscreen) {
             tg.requestFullscreen();
         } else {
             tg.expand();
         }
 
-        // Безопасный отступ сверху с небольшим запасом
         function applySafeAreaTop() {
             let topInset = 0;
             if (tg.safeAreaInset && typeof tg.safeAreaInset.top === 'number') {
-                // Добавляем 12px к системному safe area, чтобы точно отступить ниже кнопок
-                topInset = tg.safeAreaInset.top + 28;
+                topInset = tg.safeAreaInset.top + 35;
             } else {
-                // Фолбэк чуть больше стандартного (54px вместо 44px)
                 topInset = 70;
             }
             document.body.style.paddingTop = topInset + 'px';
+            document.documentElement.style.setProperty('--safe-area-top', topInset + 'px');
         }
 
         applySafeAreaTop();
         tg.onEvent('viewportChanged', () => {
             applySafeAreaTop();
         });
+
         // --- ГЕНЕРАТОР ЗВУКА ЩЕЛЧКА ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -1437,7 +1433,7 @@
             seasonTimerInterval = setInterval(update, 1000);
         }
 
-        // ==================== ИГРОВАЯ ЛОГИКА (без изменений) ====================
+        // ==================== ИГРОВАЯ ЛОГИКА ====================
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const imageCache = {};
@@ -2174,7 +2170,6 @@
             setTimeout(() => {
                 rouletteActive = false;
                 showWinItem(wonItem);
-                // Возвращаем кнопку назад
                 document.getElementById('case-back-btn').style.opacity = '1';
                 document.getElementById('case-back-btn').style.pointerEvents = 'auto';
             }, 7000);
@@ -2204,7 +2199,6 @@
             btn.innerHTML = 'ОБРАБОТКА...';
             btn.style.opacity = '0.8';
 
-            // Скрываем кнопку "Назад" на время анимации
             document.getElementById('case-back-btn').style.opacity = '0';
             document.getElementById('case-back-btn').style.pointerEvents = 'none';
 
@@ -2222,7 +2216,6 @@
                     btn.disabled = false;
                     btn.innerHTML = originalText;
                     btn.style.opacity = '1';
-                    // Возвращаем кнопку, если ошибка
                     document.getElementById('case-back-btn').style.opacity = '1';
                     document.getElementById('case-back-btn').style.pointerEvents = 'auto';
                 }
