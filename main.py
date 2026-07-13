@@ -42,10 +42,49 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+# ======================== ГЛОБАЛЬНЫЙ КЕШ КЕЙСОВ ========================
+# Загружается из переменной окружения CASES_JSON (хранится в Render).
+# Если переменная не задана, используется демо-кейс (для тестов).
+def load_cases_from_env():
+    global CASES_CACHE
+    raw = os.getenv("CASES_JSON")
+    if raw:
+        try:
+            CASES_CACHE = json.loads(raw)
+            # Преобразуем ключи-строки в int (JSON всегда строковые ключи)
+            CASES_CACHE = {int(k): v for k, v in CASES_CACHE.items()}
+            logging.info(f"✅ Загружено {len(CASES_CACHE)} кейсов из CASES_JSON")
+        except Exception as e:
+            logging.error(f"❌ Ошибка парсинга CASES_JSON: {e}")
+            CASES_CACHE = {}
+    else:
+        logging.warning("⚠️ CASES_JSON не задан. Используется демо-кейс.")
+        # Демо-кейс (замените на свои данные после заполнения переменной в Render)
+        CASES_CACHE = {
+            1: {
+                "id": 1,
+                "name": "Демо-кейс",
+                "price": 50.0,
+                "image_url": "https://via.placeholder.com/150",
+                "drops": [
+                    {
+                        "id": 1,
+                        "case_id": 1,
+                        "name": "Демо-скин",
+                        "image_url": "https://via.placeholder.com/100",
+                        "model": "Demo",
+                        "chance": 100.0,
+                        "value": 25.0,
+                        "real_chance": 100.0
+                    }
+                ]
+            }
+        }
+
+load_cases_from_env()   # заполнили CASES_CACHE
 
 def get_db_connection():
     return psycopg2.connect(**DB_CONFIG)
-
 
 game_lock = asyncio.Lock()
 game_state = {
@@ -62,7 +101,6 @@ game_state = {
     "polygons": None,
     "last_polygons": None
 }
-
 
 def init_db():
     try:
@@ -135,7 +173,7 @@ def init_db():
                         traits JSONB DEFAULT '[]'::jsonb
                     )
                 """)
-                # Кейсы
+                # Таблицы cases и case_drops больше не нужны для чтения, но оставим для совместимости и администрирования
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS cases (
                         id SERIAL PRIMARY KEY,
@@ -161,9 +199,7 @@ def init_db():
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
 
-
 init_db()
-
 
 def extract_user_from_initdata(init_data_str: str) -> dict | None:
     if not init_data_str:
@@ -177,7 +213,6 @@ def extract_user_from_initdata(init_data_str: str) -> dict | None:
         return {"id": str(user.get('id')), "username": user.get('username', 'Unknown')}
     except:
         return None
-
 
 def require_auth(handler):
     async def wrapper(request):
@@ -201,7 +236,6 @@ def require_auth(handler):
         return await handler(request)
 
     return wrapper
-
 
 # ------------------------------------------------------------
 #  ГЕОМЕТРИЯ: BSP RECURSIVE POLYGON CLIPPING (TRIANGLES)
@@ -243,7 +277,6 @@ def adjust_weights_to_minimum(weights, min_ratio=0.02):
 
     return ratios
 
-
 def get_polygon_area(poly):
     area = 0.0
     n = len(poly)
@@ -251,7 +284,6 @@ def get_polygon_area(poly):
     for i in range(n):
         area += (poly[i][0] * poly[(i + 1) % n][1] - poly[(i + 1) % n][0] * poly[i][1])
     return abs(area) * 0.5
-
 
 def get_centroid_and_safe_radius(poly, target_ratio=0.22):
     n = len(poly)
@@ -295,7 +327,6 @@ def get_centroid_and_safe_radius(poly, target_ratio=0.22):
 
     return cx, cy, safe_radius
 
-
 def split_polygon_by_line(poly, pt, normal):
     poly1, poly2 = [], []
     n = len(poly)
@@ -326,7 +357,6 @@ def split_polygon_by_line(poly, pt, normal):
 
     return clean_poly(poly1), clean_poly(poly2)
 
-
 def clip_polygon_exact_area(poly, target_ratio, angle):
     total_area = get_polygon_area(poly)
     if total_area < 1e-12:
@@ -347,7 +377,6 @@ def clip_polygon_exact_area(poly, target_ratio, angle):
 
     mid = (low + high) / 2.0
     return split_polygon_by_line(poly, (mid * nx, mid * ny), (nx, ny))
-
 
 def recursive_bsp_split(poly, players, weights, depth=0):
     if len(players) == 1:
@@ -377,7 +406,6 @@ def recursive_bsp_split(poly, players, weights, depth=0):
     res.extend(recursive_bsp_split(poly_right, players[half:], weights[half:], depth + 1))
 
     return res
-
 
 def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
     if not players: return []
@@ -413,7 +441,6 @@ def build_weighted_voronoi(players, bounds, target_areas=None, iterations=0):
             "avatar_radius": avatar_radius
         })
     return final_polygons
-
 
 # ------------------------------------------------------------
 # Генерация траектории
@@ -461,7 +488,6 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
     frames.append({"x": x / 1000, "y": y / 1000})
     return frames
 
-
 def generate_spin_params(polygons: list) -> dict:
     start_x = random.uniform(0.1, 0.9) * 1000
     start_y = random.uniform(0.1, 0.9) * 1000
@@ -492,7 +518,6 @@ def generate_spin_params(polygons: list) -> dict:
         "polygons": polygons
     }
 
-
 # ------------------------------------------------------------
 # Игровая механика
 # ------------------------------------------------------------
@@ -508,7 +533,6 @@ PLAYER_COLORS = [
     ("#00FF87", "#60EFFF"),
     ("#A8BFFF", "#884AF6")
 ]
-
 
 def point_in_polygon(point, polygon):
     x, y = point
@@ -526,7 +550,6 @@ def point_in_polygon(point, polygon):
                         inside = not inside
         p1x, p1y = p2x, p2y
     return inside
-
 
 async def finish_round(final_point: dict, pool: float, players: dict, polygons: list) -> dict | None:
     if not final_point or not polygons:
@@ -592,13 +615,11 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
         logging.error(f"DB error finish_round: {e}")
         return None
 
-
 async def clear_last_polygons_after_delay(delay=0.3):
     await asyncio.sleep(delay)
     async with game_lock:
         if game_state["status"] == "waiting" and not game_state["players"]:
             game_state["last_polygons"] = None
-
 
 async def game_worker():
     global game_state
@@ -644,7 +665,6 @@ async def game_worker():
                     game_state["polygons"] = None
                     asyncio.create_task(clear_last_polygons_after_delay(0.3))
 
-
 # ------------------- API -------------------
 async def handle_options(request):
     return web.Response(headers={
@@ -652,7 +672,6 @@ async def handle_options(request):
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, X-Telegram-Init-Data",
     })
-
 
 @require_auth
 async def handle_get_user(request):
@@ -674,7 +693,6 @@ async def handle_get_user(request):
         balance = 0.0
     return web.json_response({"balance": balance}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 @require_auth
 async def handle_topup_request(request):
     try:
@@ -694,7 +712,6 @@ async def handle_topup_request(request):
         logging.error(f"Topup error: {e}")
         return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 async def handle_get_items(request):
     try:
         with closing(get_db_connection()) as conn:
@@ -711,7 +728,6 @@ async def handle_get_items(request):
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         return web.json_response([], headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
 
 @require_auth
 async def handle_get_inventory(request):
@@ -734,7 +750,6 @@ async def handle_get_inventory(request):
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         return web.json_response([], headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
 
 @require_auth
 async def handle_buy(request):
@@ -768,7 +783,6 @@ async def handle_buy(request):
     except Exception as e:
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 @require_auth
 async def handle_request_withdraw(request):
     try:
@@ -801,7 +815,6 @@ async def handle_request_withdraw(request):
     except Exception as e:
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 async def handle_game_state(request):
     async with game_lock:
         sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
@@ -819,7 +832,6 @@ async def handle_game_state(request):
             "polygons": polys
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
 
 @require_auth
 async def handle_game_bet(request):
@@ -890,7 +902,6 @@ async def handle_game_bet(request):
         logging.error(f"Bet error: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 @require_auth
 async def handle_game_cancel(request):
     global game_state
@@ -916,11 +927,9 @@ async def handle_game_cancel(request):
         logging.error(f"Cancel error: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 async def handle_game_finish(request):
     return web.json_response({"success": True, "message": "Server handles finish"},
                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
 
 @require_auth
 async def handle_game_history(request):
@@ -943,7 +952,6 @@ async def handle_game_history(request):
         logging.error(f"Game history error: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 @require_auth
 async def handle_leaderboard(request):
     user_id = request['telegram_user']['id']
@@ -965,7 +973,6 @@ async def handle_leaderboard(request):
         return web.json_response({"top": [], "user": None}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 @require_auth
 async def handle_season_state(request):
     try:
@@ -982,7 +989,6 @@ async def handle_season_state(request):
         return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
 
 async def handle_get_prize_items(request):
     try:
@@ -1002,58 +1008,66 @@ async def handle_get_prize_items(request):
         logging.error(f"Prize items error: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 @require_auth
 async def handle_get_requisites(request):
     return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
 # ------------------------------------------------------------
-#  КЕЙСЫ – эндпоинты
+#  НОВЫЕ ЭНДПОИНТЫ КЕЙСОВ (используют CASES_CACHE)
 # ------------------------------------------------------------
 async def handle_get_cases(request):
-    with closing(get_db_connection()) as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT id, name, price::FLOAT, image_url FROM cases")
-            cases = cur.fetchall()
-    return web.json_response(cases, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
+    """Возвращает список кейсов (без дропов) из кеша"""
+    cases_list = []
+    for case_id, case_data in CASES_CACHE.items():
+        cases_list.append({
+            "id": case_data["id"],
+            "name": case_data["name"],
+            "price": case_data["price"],
+            "image_url": case_data["image_url"]
+        })
+    return web.json_response(cases_list, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 async def handle_get_case_details(request):
+    """Детали кейса + дропы из кеша"""
     case_id = request.query.get('id')
     if not case_id:
         return web.json_response({"error": "missing_id"}, status=400,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-    with closing(get_db_connection()) as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute("SELECT id, name, price::FLOAT, image_url FROM cases WHERE id = %s", (case_id,))
-            case = cur.fetchone()
-            if not case:
-                return web.json_response({"error": "case_not_found"}, status=404,
-                                         headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-            cur.execute(
-                "SELECT id, name, image_url, model, chance::FLOAT, value::FLOAT FROM case_drops WHERE case_id = %s",
-                (case_id,))
-            drops = cur.fetchall()
-            case['drops'] = drops
-    return web.json_response(case, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    try:
+        case_id = int(case_id)
+    except ValueError:
+        return web.json_response({"error": "invalid_id"}, status=400,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+    case = CASES_CACHE.get(case_id)
+    if not case:
+        return web.json_response({"error": "case_not_found"}, status=404,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+    result = {
+        "id": case["id"],
+        "name": case["name"],
+        "price": case["price"],
+        "image_url": case["image_url"],
+        "drops": case["drops"]   # уже список словарей
+    }
+    return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
 async def handle_open_case(request):
+    """Открытие кейса (цена и дропы из кеша, запись в БД)"""
     try:
         data = await request.json()
         user_id = request['telegram_user']['id']
         case_id = data.get('caseId')
 
+        case = CASES_CACHE.get(int(case_id))
+        if not case:
+            return web.json_response({"success": False, "error": "case_not_found"},
+                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
         with closing(get_db_connection()) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT price FROM cases WHERE id = %s", (case_id,))
-                case = cur.fetchone()
-                if not case:
-                    return web.json_response({"success": False, "error": "case_not_found"},
-                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
                 cur.execute("""
                     UPDATE users 
                     SET balance = balance - %s 
@@ -1064,13 +1078,7 @@ async def handle_open_case(request):
                     return web.json_response({"success": False, "error": "insufficient_funds"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                cur.execute("""
-                    SELECT id, case_id, name, image_url, model, 
-                           chance::FLOAT, real_chance::FLOAT, value::FLOAT 
-                    FROM case_drops 
-                    WHERE case_id = %s
-                """, (case_id,))
-                drops = cur.fetchall()
+                drops = case['drops']
                 if not drops:
                     return web.json_response({"success": False, "error": "empty_case"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -1106,47 +1114,31 @@ async def handle_open_case(request):
         return web.json_response({"success": False}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-
-# ------------------------------------------------------------
-#  НОВЫЙ ЭНДПОИНТ: продажа дропа сразу после рулетки
-# ------------------------------------------------------------
 @require_auth
 async def handle_sell_drop(request):
-    """Продажа предмета сразу после выпадения из кейса (или из инвентаря)"""
+    """Продажа предмета (работает с таблицей items)"""
     try:
         data = await request.json()
         user_id = request['telegram_user']['id']
         item_id = data.get('itemId')
-
         if not item_id:
             return web.json_response({"success": False, "error": "missing_item_id"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
         with closing(get_db_connection()) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                # Находим предмет и убеждаемся, что он принадлежит пользователю
                 cur.execute("SELECT id, price FROM items WHERE id = %s AND buyer_id = %s", (item_id, user_id))
                 item = cur.fetchone()
-
                 if not item:
                     return web.json_response({"success": False, "error": "item_not_found"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
-                # Начисляем стоимость предмета на баланс
                 cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (item['price'], user_id))
-
-                # Удаляем предмет (он не появится в инвентаре)
                 cur.execute("DELETE FROM items WHERE id = %s", (item_id,))
-
                 conn.commit()
-
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
     except Exception as e:
         logging.error(f"Sell drop error: {e}")
         return web.json_response({"success": False, "error": "server_error"}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
 
 # ---------- Админ-коллбэки ----------
 @dp.callback_query(F.data.startswith("topup_yes_"))
@@ -1165,7 +1157,6 @@ async def admin_topup_approve(callback: types.CallbackQuery):
     except:
         pass
 
-
 @dp.callback_query(F.data.startswith("topup_no_"))
 async def admin_topup_reject(callback: types.CallbackQuery):
     parts = callback.data.split("_")
@@ -1175,7 +1166,6 @@ async def admin_topup_reject(callback: types.CallbackQuery):
         await bot.send_message(int(uid), f"❌ Заявка на пополнение {amount} ₽ отклонена.")
     except:
         pass
-
 
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
@@ -1193,7 +1183,6 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
     except:
         pass
 
-
 @dp.callback_query(F.data.startswith("with_no_"))
 async def admin_withdraw_reject(callback: types.CallbackQuery):
     parts = callback.data.split("_")
@@ -1210,13 +1199,11 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
     except:
         pass
 
-
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     kb = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]])
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
-
 
 # ---------- Настройка сервера ----------
 app = web.Application()
@@ -1238,9 +1225,8 @@ app.router.add_get('/prize/items', handle_get_prize_items)
 app.router.add_get('/cases', handle_get_cases)
 app.router.add_get('/case-details', handle_get_case_details)
 app.router.add_post('/open-case', handle_open_case)
-app.router.add_post('/sell-drop', handle_sell_drop)  # НОВЫЙ МАРШРУТ
+app.router.add_post('/sell-drop', handle_sell_drop)
 app.router.add_options('/{tail:.*}', handle_options)
-
 
 async def main():
     asyncio.create_task(game_worker())
@@ -1249,7 +1235,6 @@ async def main():
     await runner.setup()
     await web.TCPSite(runner, '0.0.0.0', port).start()
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
