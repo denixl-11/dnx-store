@@ -699,17 +699,313 @@
         .transition-element {
             transition: opacity 0.3s ease, transform 0.3s ease;
         }
+
+        /* ================= DNX COSMIC REDESIGN ================= */
+        :root {
+            --bg-main: #04030a;
+            --bg-card: linear-gradient(155deg, rgba(17, 10, 28, .96), rgba(5, 4, 12, .98));
+            --accent-gold: #ff4f87;
+            --accent-purple: #c83cff;
+            --accent-red: #ff324f;
+            --accent-warm: #ffb06a;
+            --text-main: #fff8fb;
+            --text-muted: #918a99;
+            --border-color: rgba(255, 70, 125, .24);
+        }
+        html { background: #030208; }
+        body {
+            max-width: none;
+            background:
+                radial-gradient(circle at 8% 30%, rgba(169, 26, 205, .16), transparent 25%),
+                radial-gradient(circle at 95% 72%, rgba(255, 39, 69, .13), transparent 28%),
+                radial-gradient(circle at 50% -10%, rgba(102, 41, 173, .13), transparent 32%),
+                #04030a;
+            padding-bottom: 104px;
+            overflow-x: hidden;
+        }
+        body::before, body::after {
+            content: "";
+            position: fixed;
+            pointer-events: none;
+            inset: 0;
+            z-index: -1;
+        }
+        body::before {
+            opacity: .68;
+            background-image:
+                radial-gradient(circle at 12% 18%, #ff466a 0 1px, transparent 1.5px),
+                radial-gradient(circle at 75% 22%, #d85aff 0 1px, transparent 1.5px),
+                radial-gradient(circle at 86% 74%, #ff334f 0 1px, transparent 1.5px),
+                radial-gradient(circle at 31% 82%, #862cff 0 1px, transparent 1.5px);
+            background-size: 83px 97px, 127px 109px, 151px 139px, 113px 131px;
+        }
+        body::after {
+            background: linear-gradient(105deg, transparent 25%, rgba(218, 49, 255, .035) 50%, transparent 75%);
+            mix-blend-mode: screen;
+        }
+        header {
+            width: calc(100% - 24px);
+            max-width: 480px;
+            min-height: 72px;
+            margin: 0 auto 10px;
+            padding: 12px 18px;
+            border: 1px solid rgba(225, 85, 169, .42);
+            border-radius: 18px;
+            background: linear-gradient(120deg, rgba(24, 10, 39, .86), rgba(5, 4, 12, .93) 55%, rgba(31, 7, 18, .75));
+            box-shadow: inset 0 1px rgba(255,255,255,.04), 0 0 30px rgba(197, 45, 225, .08);
+        }
+        .header-left { gap: 11px; }
+        .avatar {
+            width: 42px; height: 42px;
+            border: 1px solid #c341ff;
+            box-shadow: 0 0 16px rgba(193, 48, 255, .43), inset 0 0 10px rgba(255,255,255,.08);
+            background: radial-gradient(circle at 35% 30%, #6130aa, #140721 70%);
+        }
+        .username { color: #fff; font-size: .86rem; font-weight: 600; }
+        .header-right {
+            display: flex; align-items: center; gap: 9px;
+            min-height: 39px;
+            padding: 8px 10px 8px 13px;
+            border-color: rgba(255, 70, 125, .32);
+            border-radius: 12px;
+            background: rgba(5, 3, 12, .72);
+            box-shadow: inset 0 0 18px rgba(167, 39, 255, .06);
+        }
+        .header-right::before { content: "◆"; color: #ffb86b; font-size: .73rem; }
+        .header-right::after {
+            content: "+";
+            display: grid; place-items: center;
+            width: 28px; height: 28px;
+            margin-left: 2px;
+            border: 1px solid rgba(255, 59, 116, .4);
+            border-radius: 8px;
+            color: #ffb0d1; font-size: 1.4rem; font-weight: 300;
+        }
+        .balance-text { color: #fff5ec; font-size: .78rem; white-space: nowrap; }
+        .page {
+            width: calc(100% - 24px);
+            max-width: 480px;
+            min-height: calc(100vh - var(--safe-area-top, 70px) - 174px);
+            margin: 0 auto;
+            border: 1px solid rgba(225, 85, 169, .24);
+            border-radius: 18px;
+            background: linear-gradient(150deg, rgba(11, 6, 20, .83), rgba(4, 3, 10, .94));
+            box-shadow: 0 20px 70px rgba(0,0,0,.45), inset 0 0 40px rgba(184, 34, 220, .025);
+            overflow: hidden;
+        }
+        #page-game, #page-store, #page-inventory { padding-top: 14px; }
+        .store-tabs {
+            gap: 0; margin: 0 14px 14px; padding: 0;
+            border: 1px solid rgba(255, 80, 139, .15);
+            border-radius: 12px;
+            overflow: hidden;
+            background: rgba(3, 2, 9, .7);
+        }
+        .store-tab {
+            height: 42px; border: 0; border-radius: 10px;
+            background: transparent; color: #89838d;
+            font-size: .76rem; font-weight: 600;
+        }
+        .store-tab.active,
+        #page-inventory > div:first-child .tab-item.active {
+            color: #fff !important;
+            border: 1px solid #d34bff !important;
+            background:
+                radial-gradient(circle at 65% 80%, rgba(255, 38, 72, .36), transparent 42%),
+                linear-gradient(110deg, rgba(93, 24, 157, .7), rgba(9, 5, 18, .72) 52%, rgba(112, 12, 62, .55));
+            box-shadow: 0 0 22px rgba(222, 45, 255, .28), inset 0 0 19px rgba(255, 61, 108, .12);
+            text-shadow: 0 0 10px rgba(255,255,255,.35);
+        }
+        .catalog-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            padding: 0 12px 18px;
+        }
+        .item-card, .case-card {
+            min-width: 0;
+            padding: 7px;
+            border: 1px solid rgba(255, 66, 104, .34);
+            border-radius: 12px;
+            background:
+                radial-gradient(circle at 70% 18%, rgba(140, 45, 230, .12), transparent 45%),
+                linear-gradient(155deg, rgba(15, 8, 27, .97), rgba(5, 3, 10, .98));
+            box-shadow: inset 0 0 18px rgba(183, 41, 255, .025), 0 8px 22px rgba(0,0,0,.25);
+        }
+        .item-card:nth-child(3n+2) { border-color: rgba(177, 59, 255, .34); }
+        .item-image, .case-card .item-image {
+            border-radius: 9px; margin-bottom: 7px;
+            /* Исходную картинку не меняем: только подгоняем её свет под neon UI. */
+            filter: saturate(1.08) contrast(1.03) drop-shadow(0 0 7px rgba(187, 50, 255, .18)) drop-shadow(0 5px 9px rgba(0,0,0,.55));
+        }
+        .item-name, .case-card .item-name {
+            margin: 1px 0 7px;
+            color: #fff; font-size: .64rem; font-weight: 600;
+            letter-spacing: 0; line-height: 1.25;
+        }
+        .card-buttons { gap: 5px; align-items: center; }
+        .btn-buy-now {
+            height: 29px; padding: 0 2px;
+            color: #ffc878; font-size: .6rem; font-weight: 700;
+            background: transparent;
+            border: 0;
+            text-transform: none;
+        }
+        .btn-add-cart {
+            width: 29px; height: 29px; border-radius: 8px;
+            color: #ff8aa8; border-color: rgba(255, 65, 97, .42);
+            background: rgba(255, 35, 80, .035);
+        }
+        .btn-add-cart svg { width: 14px; height: 14px; }
+        #cases-grid { grid-template-columns: minmax(180px, 235px); justify-content: center; padding-top: 2px; }
+        .case-card { padding: 12px; border-color: rgba(203, 69, 255, .52); }
+        .case-card .item-name { font-size: .86rem; }
+        .case-price { color: #f6d6ff; border: 1px solid rgba(212, 72, 255, .3); border-radius: 16px; padding: 6px 13px; }
+        .btn-main-action, #case-open-btn {
+            border: 1px solid rgba(225, 74, 255, .72);
+            color: #fff;
+            background:
+                radial-gradient(circle at 20% 100%, rgba(255, 43, 63, .88), transparent 47%),
+                linear-gradient(105deg, #7412a8, #240b3e 50%, #d11d4f);
+            box-shadow: 0 0 18px rgba(255, 43, 87, .23), inset 0 0 16px rgba(255,255,255,.05);
+        }
+        .btn-secondary, .btn-secondary-action, .btn-gold-outline {
+            border: 1px solid rgba(199, 58, 255, .31);
+            color: #f5eaf8;
+            background: rgba(6, 4, 13, .82);
+        }
+        .btn-gold-outline:last-child {
+            border-color: rgba(255, 63, 91, .72);
+            background: linear-gradient(110deg, rgba(105, 15, 106, .42), rgba(255, 35, 61, .36));
+            box-shadow: 0 0 16px rgba(255, 37, 65, .22);
+        }
+        .game-container { padding: 0 14px 20px; }
+        .elite-leaderboard-bar {
+            width: 100%; max-width: none;
+            border: 1px solid rgba(255, 64, 103, .36);
+            border-radius: 13px;
+            background: linear-gradient(105deg, rgba(65, 14, 93, .72), rgba(7,5,13,.92) 48%, rgba(90, 15, 30, .55));
+            box-shadow: inset 0 0 24px rgba(255, 43, 91, .05);
+        }
+        .elite-title { color: #fff; font-size: .86rem; text-transform: uppercase; }
+        .elite-subtitle { color: #9d94a3; font-size: .62rem; text-transform: uppercase; }
+        .elite-icon-container { border-color: rgba(210, 70, 255, .5); background: rgba(83, 16, 125, .35); }
+        .elite-right { border-color: rgba(255, 71, 107, .3); background: rgba(9,5,13,.65); }
+        .elite-score { color: #fff; }
+        .history-btn { color: #b8a7b7; border-color: rgba(255, 86, 118, .22); }
+        .game-canvas-wrap {
+            width: min(84vw, 366px); height: min(84vw, 366px);
+            border: 1px solid rgba(219, 65, 255, .36);
+            border-radius: 15px;
+            background:
+                radial-gradient(circle, rgba(91, 20, 139, .2), transparent 56%),
+                repeating-radial-gradient(circle, transparent 0 36px, rgba(217, 65, 255, .055) 37px 38px),
+                #07040e;
+            box-shadow: inset 0 0 38px rgba(181, 37, 239, .09), 0 0 24px rgba(167, 34, 212, .08);
+        }
+        .game-info-row { width: 100%; max-width: none; color: #aaa0ac; }
+        #game-number-display { color: #ff537d; }
+        .game-controls { width: 100%; max-width: none; }
+        .bets-list-container { width: 100%; max-width: none; border-color: rgba(255, 69, 102, .22); background: rgba(7,4,13,.72); }
+        #page-inventory > div:first-child {
+            gap: 0; margin: 0 14px 15px; padding: 0 !important;
+            border: 1px solid rgba(255, 75, 120, .17) !important;
+            border-radius: 12px; overflow: hidden;
+        }
+        #page-inventory > div:first-child .tab-item { padding: 13px 0 !important; border: 0 !important; color: #8e8792 !important; }
+        .modal-overlay { backdrop-filter: blur(13px); background: rgba(1, 1, 5, .83); }
+        .modal-content, .nft-modal-sheet, .prize-modal-content {
+            border: 1px solid rgba(227, 78, 180, .48);
+            border-radius: 18px;
+            background:
+                radial-gradient(circle at 20% 5%, rgba(119, 33, 188, .24), transparent 33%),
+                radial-gradient(circle at 95% 90%, rgba(255, 38, 66, .16), transparent 36%),
+                linear-gradient(150deg, #0e0818, #05030b 62%);
+            box-shadow: 0 25px 90px rgba(0,0,0,.72), inset 0 0 35px rgba(193, 45, 255, .025);
+        }
+        .input-dark { border-color: rgba(213, 64, 255, .32); background: rgba(3,2,8,.75); color: #fff; }
+        .ton-payment-modal { text-align: center; }
+        .ton-orb {
+            display: grid; place-items: center;
+            width: 82px; height: 82px; margin: 5px auto 15px;
+            border: 1px solid #b739ff; border-radius: 50%;
+            color: #ff6aa2; font-size: 2.2rem;
+            background: radial-gradient(circle, rgba(138, 41, 225, .35), rgba(9,4,17,.9) 65%);
+            box-shadow: 0 0 30px rgba(186, 45, 255, .32), inset 0 0 22px rgba(255, 53, 105, .16);
+        }
+        .ton-payment-note { color: #a9a0ad; font-size: .78rem; line-height: 1.55; }
+        #ton-connect { display: flex; justify-content: center; min-height: 44px; margin: 14px 0 10px; }
+        .ton-payment-status { margin: 9px 0 15px; color: #ffadc7; font-size: .76rem; word-break: break-all; }
+        .topup-btn {
+            border-color: rgba(207, 64, 255, .3);
+            background: linear-gradient(145deg, rgba(48, 14, 72, .45), rgba(8,5,14,.9));
+            color: #fff; box-shadow: inset 0 0 14px rgba(218, 47, 255, .04);
+        }
+        .topup-btn.custom-btn { border-color: rgba(255, 55, 93, .48); color: #ff9fbd; }
+        .tab-bar {
+            left: 50%; transform: translateX(-50%);
+            width: calc(100% - 24px); max-width: 480px;
+            padding: 0; height: 67px;
+            border: 1px solid rgba(225, 85, 169, .38);
+            border-radius: 0 0 18px 18px;
+            background: rgba(5, 3, 11, .92);
+            backdrop-filter: blur(18px);
+            overflow: hidden;
+        }
+        .tab-bar .tab-item {
+            position: relative; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 5px;
+            height: 100%; color: #858087; font-size: .64rem;
+        }
+        .tab-bar .tab-item::before { font-size: 1.16rem; line-height: 1; }
+        #tab-game::before { content: "⌂"; }
+        #tab-store::before { content: "□"; }
+        #tab-inventory::before { content: "◇"; }
+        .tab-bar .tab-item.active {
+            color: #fff;
+            background: radial-gradient(ellipse at 50% 100%, rgba(255, 37, 76, .29), transparent 64%);
+            text-shadow: 0 0 9px rgba(255,255,255,.3);
+        }
+        .tab-bar .tab-item.active::before { color: #ff6798; filter: drop-shadow(0 0 6px #ff335f); }
+        .cart-fab { border-color: #ff466e; background: #0d0715; box-shadow: 0 0 18px rgba(255, 44, 86, .35); }
+        .cart-fab svg, .history-btn svg, .modal-tg-btn svg, .btn-add-cart svg {
+            filter: drop-shadow(0 0 5px rgba(221, 70, 255, .5));
+        }
+        .empty-state {
+            grid-column: 1 / -1;
+            min-height: 370px; padding: 50px 20px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; color: #9e929f;
+        }
+        .empty-state-icon {
+            display: grid; place-items: center; width: 148px; height: 148px;
+            border: 1px solid rgba(205, 57, 255, .3); border-radius: 50%;
+            color: #f05cff; font-size: 4.8rem;
+            background: radial-gradient(circle, rgba(136, 29, 190, .2), transparent 65%);
+            box-shadow: 0 0 50px rgba(177, 36, 230, .13), inset 0 0 35px rgba(255, 48, 99, .07);
+        }
+        .empty-state h3 { color: #ffd2dd; font-size: 1rem; letter-spacing: .08em; margin: 20px 0 8px; }
+        .empty-state p { max-width: 260px; font-size: .75rem; line-height: 1.55; }
+        @media (max-width: 390px) {
+            .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            #cases-grid { grid-template-columns: minmax(175px, 220px); }
+            .header-right { padding-left: 9px; }
+            .header-right::after { width: 26px; height: 26px; }
+            .balance-text { font-size: .7rem; }
+        }
+        @media (max-width: 330px) {
+            .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
     </style>
 </head>
 <body>
 
     <header>
         <div class="header-left">
-            <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdib3g9IjAgMCAyNCAyNCIgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTEyIDJDMiAyIDIgNiAyIDZzMCA0IDQgNGgxMnM0IDAgNCA0Yy00IDAtNC00LTQtNEgyQzIgMiAxMiAyIDEyIDJ6Ii8+PC9zdmc+">
+            <img id="avatar-img" class="avatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zLm9yZy8yMDAwL3N2ZyIgdmlld2JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZmZmIj48cGF0aCBkPSJNMTIgMkMyIDIgMiA2IDIgNnMwIDQgNCA0aDEyczQgMCA0IDRjLTQgMC00LTQtNC00SDJDMiAyIDEyIDIgMTIgMnoiLz48L3N2Zz4=" alt="Аватар">
             <div class="username" id="username-display">User</div>
         </div>
         <div class="header-right" onclick="showPage('balance')">
-            <span class="balance-text" id="header-balance">0 ₽</span>
+            <span class="balance-text" id="header-balance">0 TON</span>
         </div>
     </header>
 
@@ -727,7 +1023,7 @@
             <div class="elite-leaderboard-bar" onclick="openLeaderboardModal()">
                 <div class="elite-left">
                     <div class="elite-icon-container"><div class="elite-pulse"></div><span class="elite-icon">🏆</span></div>
-                    <div class="elite-text-group"><span class="elite-title">Leaderboard</span><span class="elite-subtitle">Season Ranking</span></div>
+                    <div class="elite-text-group"><span class="elite-title">Лидерборд</span><span class="elite-subtitle">Рейтинг сезона</span></div>
                 </div>
                 <div class="elite-right"><span id="leaderboard-preview" class="elite-score">...</span></div>
             </div>
@@ -746,12 +1042,12 @@
                 <span id="game-number-display">#...</span>
             </div>
             <div class="game-controls">
-                <button class="btn-gold-outline" onclick="openBetConfirm(10)">+10 ₽</button>
+                <button class="btn-gold-outline" onclick="openBetConfirm(0.1)">+0.1 TON</button>
                 <button class="btn-gold-outline" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
             <div class="bets-list-container" id="bets-list-container">
-                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 ₽</span>)</div>
+                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 TON</span>)</div>
                 <div class="bets-list" id="game-bets-list"></div>
             </div>
         </div>
@@ -759,8 +1055,8 @@
 
     <div id="page-store" class="page page-active">
         <div class="store-tabs">
-            <div class="store-tab active" onclick="switchStoreTab('catalog')">Catalog</div>
-            <div class="store-tab" onclick="switchStoreTab('cases')">Cases</div>
+            <div class="store-tab active" onclick="switchStoreTab('catalog')">КАТАЛОГ</div>
+            <div class="store-tab" onclick="switchStoreTab('cases')">КЕЙСЫ</div>
         </div>
         <div id="catalog-container" class="catalog-grid"></div>
         <div id="cases-container" style="display: none;">
@@ -778,14 +1074,14 @@
     <div id="page-balance" class="page">
         <div style="padding: 30px 20px; display: flex; flex-direction: column; align-items: center;">
             <h2 style="color: var(--text-main); margin-bottom: 10px;">БАЛАНС</h2>
-            <div style="font-size: 2.5rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 30px;" id="big-balance">0 ₽</div>
+            <div style="font-size: 2.5rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 30px;" id="big-balance">0 TON</div>
             <div class="topup-grid">
-                <button class="topup-btn" onclick="initTopup(50)">50 ₽</button>
-                <button class="topup-btn" onclick="initTopup(100)">100 ₽</button>
-                <button class="topup-btn" onclick="initTopup(250)">250 ₽</button>
-                <button class="topup-btn" onclick="initTopup(500)">500 ₽</button>
-                <button class="topup-btn" onclick="initTopup(1000)">1000 ₽</button>
-                <button class="topup-btn" onclick="initTopup(5000)">5000 ₽</button>
+                <button class="topup-btn" onclick="initTopup(0.1)">0.1 TON</button>
+                <button class="topup-btn" onclick="initTopup(0.25)">0.25 TON</button>
+                <button class="topup-btn" onclick="initTopup(0.5)">0.5 TON</button>
+                <button class="topup-btn" onclick="initTopup(1)">1 TON</button>
+                <button class="topup-btn" onclick="initTopup(2)">2 TON</button>
+                <button class="topup-btn" onclick="initTopup(5)">5 TON</button>
                 <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
             </div>
         </div>
@@ -843,7 +1139,7 @@
             <div style="text-align: center;">
                 <div id="winner-avatar-container"></div>
                 <div class="winner-name" id="winner-name"></div>
-                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> ₽</div>
+                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> TON</div>
                 <button class="btn-main-action" onclick="closeWinnerModal()">Продолжить</button>
             </div>
         </div>
@@ -867,11 +1163,11 @@
     </div>
 
     <div id="custom-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" placeholder="Сумма от 10 ₽"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" min="0.1" step="0.01" inputmode="decimal" placeholder="Сумма от 0.1 TON"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
     </div>
 
     <div id="custom-amount-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Своя сумма</h3><input type="number" id="custom-amount-input" class="input-dark" placeholder="Сумма от 50 ₽"><button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button><button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Своя сумма</h3><input type="number" step="0.01" id="custom-amount-input" class="input-dark" placeholder="Сумма от 0.05 TON"><button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button><button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button></div>
     </div>
 
     <div id="alert-modal" class="modal-overlay">
@@ -879,18 +1175,15 @@
     </div>
 
     <div id="confirm-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> ₽?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> TON?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
     </div>
 
     <div id="topup-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">ПОПОЛНЕНИЕ НА <span id="display-topup-amount">0</span> ₽</h3>
-            <ul style="font-size:0.8rem;color:var(--text-muted);text-align:left;padding-left:16px;margin-bottom:20px;"><li>Заявки без фактического перевода блокируются.</li><li>Обработка занимает до 15 минут.</li></ul>
-            <div style="font-size:0.85rem;color:var(--text-main);margin-bottom:20px;font-weight:bold;word-break:break-all;" id="req-text">Загрузка реквизитов...</div>
-            <label style="display:flex;align-items:center;font-size:0.8rem;text-align:left;cursor:pointer;gap:10px;margin-bottom:20px;">
-                <input type="checkbox" id="terms-checkbox" onchange="document.getElementById('btn-send-topup').disabled = !this.checked;" style="display:none;">
-                <span style="width:22px;height:22px;border:2px solid var(--border-color);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;" id="custom-chk"></span> Я подтверждаю перевод
-            </label>
-            <button class="btn-main-action" id="btn-send-topup" onclick="sendTopup()" disabled>Отправить заявку</button>
+        <div class="modal-content ton-payment-modal"><h3 class="modal-title">ПОПОЛНЕНИЕ <span id="display-topup-amount">0</span> TON</h3>
+            <div class="ton-orb">◆</div>
+            <p class="ton-payment-note">Подключите Telegram Wallet или другой TON Connect-кошелёк. Сумма будет зачислена автоматически после подтверждения в TON.</p>
+            <div class="ton-payment-status" id="ton-payment-status">Кошелёк не подключён</div>
+            <button class="btn-main-action" id="btn-send-topup" onclick="sendTopup()">ПОДКЛЮЧИТЬ КОШЕЛЁК</button>
             <button class="btn-secondary" onclick="closeModal('topup-modal')">Отмена</button>
         </div>
     </div>
@@ -941,14 +1234,14 @@
                     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 15px;">
                         <button class="btn-main-action" onclick="claimItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">ЗАБРАТЬ В ИНВЕНТАРЬ</button>
                         <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">
-                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> ₽</span>
+                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> TON</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <div id="case-actions" style="margin-top: 25px; display: flex; justify-content: center; width: 100%;">
-                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ₽</button>
+                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> TON</button>
             </div>
 
             <div id="case-drops-section" style="margin-top: 35px;">
@@ -965,11 +1258,18 @@
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
-        if (tg.requestFullscreen) tg.requestFullscreen(); else tg.expand();
+        try {
+            if (typeof tg.requestFullscreen === 'function' && tg.version && parseFloat(tg.version) >= 8.0) {
+                tg.requestFullscreen();
+            } else {
+                tg.expand();
+            }
+        } catch (e) { tg.expand(); }
 
         function applySafeAreaTop() {
             let topInset = tg.safeAreaInset?.top ? tg.safeAreaInset.top + 35 : 70;
@@ -1005,11 +1305,37 @@
         }
 
         const API_BASE = 'https://dnx-shop.onrender.com';
+        const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const initData = tg.initData || '';
         const userDisplayName = tg.initDataUnsafe?.user?.username || "Guest";
         const userAvatar = tg.initDataUnsafe?.user?.photo_url || "";
         document.getElementById('username-display').innerText = userDisplayName;
-        if(userAvatar) document.getElementById('avatar-img').src = userAvatar;
+        if(userAvatar) document.getElementById('avatar-img').src = safeImageUrl(userAvatar) || document.getElementById('avatar-img').src;
+
+        const tonConnectUI = window.TON_CONNECT_UI ? new TON_CONNECT_UI.TonConnectUI({
+            manifestUrl: TON_MANIFEST_URL,
+            buttonRootId: null,
+            language: 'ru',
+            analytics: { mode: 'off' },
+            uiPreferences: {
+                theme: 'DARK',
+                borderRadius: 'm',
+                colorsSet: {
+                    DARK: {
+                        connectButton: { background: '#d72d68', foreground: '#ffffff' },
+                        accent: '#d84bff',
+                        telegramButton: '#d72d68',
+                        background: { primary: '#08040f', secondary: '#12091d', segment: '#1b0b25' },
+                        text: { primary: '#ffffff', secondary: '#b7a8ba' }
+                    }
+                }
+            }
+        }) : null;
+        if (tonConnectUI) {
+            tonConnectUI.setConnectionNetwork('-239');
+            tonConnectUI.onStatusChange(() => updateTonWalletUI());
+            tonConnectUI.connectionRestored.finally(() => updateTonWalletUI());
+        }
 
         async function apiFetch(url, options = {}) {
             const headers = {
@@ -1038,7 +1364,11 @@
         }
 
         let userBalance = 0.0;
-        let cart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
+        let cart = [];
+        try {
+            const storedCart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
+            if (Array.isArray(storedCart)) cart = storedCart.slice(0, 50);
+        } catch (_) { localStorage.removeItem('dnx_cart'); }
         let currentCatalog = [];
         let inventoryData = [];
         let pendingTopupAmount = 0;
@@ -1047,6 +1377,8 @@
         let rouletteActive = false;
         let currentNftItem = null;
         let currentWonItem = null;
+        let tonDepositPollTimer = null;
+        let tonPaymentInProgress = false;
 
         function showAlert(msg) {
             document.getElementById('alert-msg').innerText = msg;
@@ -1091,8 +1423,8 @@
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
             } catch(e) { console.error('Balance update failed', e); }
-            document.getElementById('header-balance').innerText = userBalance.toFixed(2) + ' ₽';
-            document.getElementById('big-balance').innerText = userBalance.toFixed(2) + ' ₽';
+            document.getElementById('header-balance').innerText = formatTon(userBalance) + ' TON';
+            document.getElementById('big-balance').innerText = formatTon(userBalance) + ' TON';
         }
 
         async function loadCatalog() {
@@ -1103,7 +1435,7 @@
                         <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" onclick="openNftModal(${Number(item.id)})">
                         <div class="item-name">${escapeHtml(item.name)}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${Number(item.price)} ₽</button>
+                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${formatTon(item.price)} TON</button>
                             <button class="btn-add-cart" onclick="addCatalogItemToCart(${Number(item.id)})">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                             </button>
@@ -1117,6 +1449,14 @@
             return String(value ?? '').replace(/[&<>"'`]/g, char => ({
                 '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '`':'&#96;'
             })[char]);
+        }
+        function formatTon(value, maximumDigits = 6) {
+            const amount = Number(value || 0);
+            if (!Number.isFinite(amount)) return '0';
+            return amount.toLocaleString('ru-RU', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: maximumDigits
+            });
         }
         function safeImageUrl(value) {
             try {
@@ -1187,7 +1527,7 @@
                 buyBtn.style.display = 'block';
                 cartBtn.style.display = 'flex';
                 withdrawBtn.style.display = 'none';
-                buyBtn.innerText = `КУПИТЬ ЗА ${Number(item.price) || 0} ₽`;
+                buyBtn.innerText = `КУПИТЬ ЗА ${formatTon(item.price)} TON`;
                 buyBtn.onclick = () => { closeNftModal(true); confirmBuyItem(item.id, item.price, item.name, item.image_url); };
                 cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
             } else {
@@ -1227,7 +1567,7 @@
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}">
                         <div class="cart-item-info">
                             <div style="font-weight:500">${escapeHtml(c.name)}</div>
-                            <div style="color:var(--accent-gold); margin-top:4px;">${c.price} ₽</div>
+                            <div style="color:var(--accent-gold); margin-top:4px;">${formatTon(c.price)} TON</div>
                         </div>
                         <div style="font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 10px;" onclick="removeFromCart(${i})">×</div>
                     </div>`).join('');
@@ -1243,7 +1583,7 @@
                 <img src="${escapeHtml(safeImageUrl(image_url))}" />
                 <div style="text-align:left;">
                     <div style="font-weight:600;">${escapeHtml(name)}</div>
-                    <div style="color:var(--accent-gold);">${Number(price)} ₽</div>
+                    <div style="color:var(--accent-gold);">${formatTon(price)} TON</div>
                 </div>`;
             document.getElementById('confirm-buy-modal').classList.add('active');
         }
@@ -1290,42 +1630,97 @@
             } catch(e) { showAlert('Ошибка сети'); }
         }
 
-        document.getElementById('terms-checkbox')?.addEventListener('change', function() {
-            const chkSpan = document.getElementById('custom-chk');
-            if(chkSpan) {
-                chkSpan.innerHTML = this.checked ? '✓' : '';
-                chkSpan.style.borderColor = this.checked ? 'var(--accent-gold)' : 'var(--border-color)';
-                chkSpan.style.color = '#000';
-                chkSpan.style.background = this.checked ? 'var(--accent-gold)' : 'transparent';
-            }
-        });
-        function initTopup(amount) { if (amount < 50) { showAlert("Минимальная сумма 50 ₽"); return; } pendingTopupAmount = amount; openTopupModal(); }
+        function initTopup(amount) { if (amount < 0.05) { showAlert("Минимальная сумма 0.05 TON"); return; } pendingTopupAmount = amount; openTopupModal(); }
         function openCustomAmountModal() { document.getElementById('custom-amount-input').value = ''; document.getElementById('custom-amount-modal').classList.add('active'); }
         function submitCustomAmount() {
-            const val = parseFloat(document.getElementById('custom-amount-input').value);
-            if (!val || val < 50) { showAlert("Минимальная сумма 50 ₽"); return; }
+            const normalized = document.getElementById('custom-amount-input').value.trim().replace(',', '.');
+            const val = Number(normalized);
+            const decimals = (normalized.split('.')[1] || '').length;
+            if (!Number.isFinite(val) || val < 0.05 || val > 10000 || decimals > 9) { showAlert("Введите сумму от 0.05 до 10 000 TON, не более 9 знаков после запятой"); return; }
             closeModal('custom-amount-modal'); initTopup(val);
         }
-        async function openTopupModal() {
-            document.getElementById('display-topup-amount').innerText = pendingTopupAmount;
-            const chk = document.getElementById('terms-checkbox');
-            if(chk) { chk.checked = false; const chkSpan = document.getElementById('custom-chk'); if(chkSpan) { chkSpan.innerHTML = ''; chkSpan.style.background = 'transparent'; } }
-            const btn = document.getElementById('btn-send-topup'); if(btn) btn.disabled = true;
+        function updateTonWalletUI() {
+            const status = document.getElementById('ton-payment-status');
+            const button = document.getElementById('btn-send-topup');
+            if (!status || !button) return;
+            if (!tonConnectUI) {
+                status.innerText = 'TON Connect не загрузился';
+                button.disabled = true;
+                return;
+            }
+            if (tonConnectUI.connected && tonConnectUI.account) {
+                const address = tonConnectUI.account.address;
+                status.innerText = `Кошелёк: ${address.slice(0, 6)}…${address.slice(-6)}`;
+                button.innerText = `ОПЛАТИТЬ ${formatTon(pendingTopupAmount)} TON`;
+                button.disabled = tonPaymentInProgress;
+            } else {
+                status.innerText = 'Кошелёк не подключён';
+                button.innerText = 'ПОДКЛЮЧИТЬ КОШЕЛЁК';
+                button.disabled = false;
+            }
+        }
+        function openTopupModal() {
+            document.getElementById('display-topup-amount').innerText = formatTon(pendingTopupAmount);
             document.getElementById('topup-modal').classList.add('active');
-            try {
-                const data = await apiFetch(`${API_BASE}/req`);
-                document.getElementById('req-text').innerText = "Реквизиты: " + data.req;
-            } catch(e) { document.getElementById('req-text').innerText = "Ошибка загрузки реквизитов"; }
+            updateTonWalletUI();
         }
         async function sendTopup() {
-            if(!pendingTopupAmount || pendingTopupAmount < 50) return;
-            closeModal('topup-modal');
+            if (!pendingTopupAmount || pendingTopupAmount < 0.05 || tonPaymentInProgress) return;
+            if (!tonConnectUI) { showAlert('TON Connect недоступен'); return; }
+            if (!tonConnectUI.connected || !tonConnectUI.account) {
+                await tonConnectUI.openModal();
+                return;
+            }
+            tonPaymentInProgress = true;
+            updateTonWalletUI();
+            const status = document.getElementById('ton-payment-status');
             try {
-                const data = await apiFetch(`${API_BASE}/topup`, { method: 'POST', body: JSON.stringify({amount: pendingTopupAmount}) });
-                if(data.success) showAlert("Заявка отправлена. Ожидайте зачисления.");
-                else showAlert("Ошибка при отправке заявки.");
-            } catch(e) { showAlert(`Ошибка: ${e.message}`); }
-            await updateBalance();
+                status.innerText = 'Создаём защищённый платёж…';
+                const deposit = await apiFetch(`${API_BASE}/ton/deposit/create`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        amount: pendingTopupAmount,
+                        walletAddress: tonConnectUI.account.address
+                    })
+                });
+                status.innerText = `Подтвердите ${formatTon(deposit.amountTon, 9)} TON в кошельке`;
+                await tonConnectUI.sendTransaction({
+                    validUntil: Math.floor(Date.now() / 1000) + 600,
+                    network: '-239',
+                    messages: [{
+                        address: deposit.receiverAddress,
+                        amount: deposit.amountNano
+                    }]
+                });
+                localStorage.setItem('dnx_ton_deposit', deposit.depositId);
+                status.innerText = 'Транзакция отправлена. Ожидаем подтверждения…';
+                pollTonDeposit(deposit.depositId);
+            } catch(e) {
+                status.innerText = 'Платёж не завершён';
+                showAlert(e?.message || 'Ошибка TON-платежа');
+            } finally {
+                tonPaymentInProgress = false;
+                updateTonWalletUI();
+            }
+        }
+        async function pollTonDeposit(depositId) {
+            if (tonDepositPollTimer) clearTimeout(tonDepositPollTimer);
+            try {
+                const result = await apiFetch(`${API_BASE}/ton/deposit/status?id=${encodeURIComponent(depositId)}`);
+                if (result.status === 'credited') {
+                    localStorage.removeItem('dnx_ton_deposit');
+                    await updateBalance();
+                    closeModal('topup-modal');
+                    showAlert(`Зачислено ${formatTon(result.amountTon, 9)} TON`);
+                    return;
+                }
+                if (result.status === 'expired') {
+                    localStorage.removeItem('dnx_ton_deposit');
+                    document.getElementById('ton-payment-status').innerText = 'Время ожидания платежа истекло';
+                    return;
+                }
+            } catch(e) { console.error('TON deposit status error', e); }
+            tonDepositPollTimer = setTimeout(() => pollTonDeposit(depositId), 4000);
         }
 
         function switchInv(el, type) {
@@ -1347,7 +1742,7 @@
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button>
                         </div>`).join('')
-                    : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
+                    : `<div class="empty-state"><div class="empty-state-icon">◇</div><h3>ИНВЕНТАРЬ ПУСТ</h3><p>Купленные и выигранные NFT появятся здесь.</p></div>`;
                 document.getElementById('inventory-history-container').innerHTML = withdrawn.length
                     ? withdrawn.map(i => `
                         <div class="item-card" style="opacity:0.5">
@@ -1355,7 +1750,7 @@
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <div style="text-align:center; font-size:0.7rem; border:1px dashed #555; border-radius:8px; padding:4px;">ВЫВЕДЕНО</div>
                         </div>`).join('')
-                    : '<div style="grid-column: span 2; text-align:center; color:var(--text-muted);">Пусто</div>';
+                    : `<div class="empty-state"><div class="empty-state-icon">⌛</div><h3>ИСТОРИЯ ПУСТА</h3><p>Начните играть, участвуйте в активностях — события появятся здесь.</p><button class="btn-main-action" style="max-width:250px;margin-top:18px" onclick="switchInv(document.querySelector('#page-inventory > div:first-child .tab-item:first-child'),'active')">ПЕРЕЙТИ К МОИМ NFT</button></div>`;
             } catch(e) { console.error(e); }
         }
         async function withdraw(id) {
@@ -1379,7 +1774,7 @@
                     <div class="history-modal-row">
                         <span>#${h.game_number}</span>
                         <span>${escapeHtml(h.winner_name)}</span>
-                        <span style="color:var(--accent-gold)">${h.win_amount.toFixed(2)} ₽ (${h.win_percent}%)</span>
+                        <span style="color:var(--accent-gold)">${formatTon(h.win_amount)} TON (${h.win_percent}%)</span>
                     </div>`).join('');
             } catch(e) { list.innerHTML = 'Ошибка загрузки'; }
         }
@@ -1718,7 +2113,9 @@
                 }
             }
             if (!isWaitingMode && highlightPts && highlightPts.length >= 3) {
-                const INSET = 1;
+                // Визуально отводим подсветку от внешней рамки canvas. Геометрия
+                // победителя не меняется: inset применяется только при отрисовке.
+                const INSET = Math.max(16, Math.min(cw, ch) * 0.022);
                 const dw = cw - INSET * 2, dh = ch - INSET * 2;
                 ctx.save();
                 ctx.beginPath();
@@ -1734,12 +2131,9 @@
                 ctx.lineJoin = "round";
                 ctx.lineCap = "round";
                 ctx.strokeStyle = goldGrad;
-                // Свечение обрезаем по самому полигону: оно всегда лежит внутри
-                // игрового поля и не прячется под его внешней рамкой.
-                ctx.clip();
-                ctx.lineWidth = 12;
+                ctx.lineWidth = 10;
                 ctx.shadowColor = "rgba(212, 175, 55, 0.95)";
-                ctx.shadowBlur = 20;
+                ctx.shadowBlur = 18;
                 ctx.stroke();
                 ctx.shadowBlur = 0;
                 ctx.lineWidth = 4;
@@ -1992,7 +2386,7 @@
             const hasPlayers = gState.players && gState.players.length > 0;
             container.style.display = hasPlayers ? 'flex' : 'none';
             if (!hasPlayers) return;
-            document.getElementById('game-total-pool').innerText = `${gState.pool} ₽`;
+            document.getElementById('game-total-pool').innerText = `${formatTon(gState.pool)} TON`;
             const sorted = [...gState.players].sort((a,b) => String(a.id).localeCompare(String(b.id)));
             list.innerHTML = sorted.map(p => {
                 const winPercent = formatWinChance(p.amount, gState.pool);
@@ -2005,7 +2399,7 @@
                     </span>
                     <span style="display:flex;gap:15px;align-items:center;">
                         <span style="color:rgba(255,255,255,0.6);font-size:14px;">${winPercent}%</span>
-                        <span style="color:var(--accent-gold);font-weight:600;font-size:15px;min-width:50px;text-align:right;">${p.amount} ₽</span>
+                        <span style="color:var(--accent-gold);font-weight:600;font-size:15px;min-width:70px;text-align:right;">${formatTon(p.amount)} TON</span>
                     </span>
                 </div>`;
             }).join('');
@@ -2022,8 +2416,10 @@
         }
         function submitCustomBet() {
             const inputVal = document.getElementById('custom-bet-input').value;
-            const v = parseInt(inputVal, 10);
-            if (!v || isNaN(v) || v < 10 || v !== Number(inputVal)) { showAlert("Введите целое число от 10 ₽"); return; }
+            const normalized = inputVal.trim().replace(',', '.');
+            const v = Number(normalized);
+            const decimals = (normalized.split('.')[1] || '').length;
+            if (!Number.isFinite(v) || v < 0.1 || decimals > 9) { showAlert("Введите сумму от 0.1 TON, не более 9 знаков после запятой"); return; }
             closeModal('custom-bet-modal');
             openBetConfirm(v);
         }
@@ -2044,8 +2440,8 @@
                     if (data.error === 'insufficient_funds') msg = "Недостаточно средств!";
                     else if (data.error === 'game_started') msg = "Игра уже началась!";
                     else if (data.error === 'room_full') msg = "Слишком много игроков!";
-                    else if (data.error === 'min_bet') msg = "Минимальная ставка 10 ₽";
-                    else if (data.error === 'invalid_amount') msg = "Ставка должна быть целым числом";
+                    else if (data.error === 'min_bet') msg = "Минимальная ставка 0.1 TON";
+                    else if (data.error === 'invalid_amount') msg = "Некорректная сумма ставки";
                     showAlert(msg);
                 }
             } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети"); }
@@ -2086,7 +2482,7 @@
                     <div class="case-card" onclick="openCaseDetail(${Number(c.id)})" style="animation-delay: ${i * 0.08}s">
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}" class="item-image" alt="${escapeHtml(c.name)}">
                         <div class="item-name">${escapeHtml(c.name)}</div>
-                        <div class="case-price">${Number(c.price)} ₽</div>
+                        <div class="case-price">${formatTon(c.price)} TON</div>
                     </div>
                 `).join('');
             } catch(e) {
@@ -2098,7 +2494,7 @@
             try {
                 currentCase = await apiFetch(`${API_BASE}/case-details?id=${caseId}`);
                 document.getElementById('case-detail-title').innerText = currentCase.name;
-                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${Number(currentCase.price)} ₽`;
+                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${formatTon(currentCase.price)} TON`;
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
                 document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
@@ -2366,6 +2762,8 @@
         loadCatalog();
         loadPrizeItems();
         loadLeaderboardPreview();
+        const pendingTonDeposit = localStorage.getItem('dnx_ton_deposit');
+        if (pendingTonDeposit) pollTonDeposit(pendingTonDeposit);
     </script>
 </body>
 </html>

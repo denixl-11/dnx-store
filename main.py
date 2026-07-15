@@ -7,6 +7,8 @@ import json
 import random
 import math
 import time
+import secrets
+import uuid
 from collections import defaultdict, deque
 from decimal import Decimal, InvalidOperation
 from functools import wraps
@@ -14,6 +16,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 from datetime import timezone
 
 import asyncpg
+import aiohttp
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -25,13 +28,18 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-PAYMENT_REQUISITES = os.getenv("PAYMENT_REQUISITES", "Реквизиты скрыты")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://denixl-11.github.io/dnx-store/")
 CORS_ORIGIN = os.getenv("CORS_ORIGIN", "https://denixl-11.github.io")
 DATABASE_URL = os.getenv("DATABASE_URL")
 INIT_DATA_MAX_AGE = int(os.getenv("INIT_DATA_MAX_AGE", "86400"))
 DB_POOL_MIN_SIZE = int(os.getenv("DB_POOL_MIN_SIZE", "1"))
 DB_POOL_MAX_SIZE = int(os.getenv("DB_POOL_MAX_SIZE", "10"))
+TON_RECEIVER_ADDRESS = os.getenv("TON_RECEIVER_ADDRESS", "").strip()
+TONCENTER_API_URL = os.getenv("TONCENTER_API_URL", "https://toncenter.com/api/v2").rstrip("/")
+TONCENTER_API_KEY = os.getenv("TONCENTER_API_KEY", "").strip()
+TON_MIN_DEPOSIT = Decimal(os.getenv("TON_MIN_DEPOSIT", "0.05"))
+TON_DEPOSIT_TIMEOUT = int(os.getenv("TON_DEPOSIT_TIMEOUT", "900"))
+TON_MIN_BET = Decimal(os.getenv("TON_MIN_BET", "0.1"))
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is required")
@@ -51,6 +59,7 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 db_pool: asyncpg.Pool | None = None
+ton_http_session: aiohttp.ClientSession | None = None
 
 # ======================== ГЛОБАЛЬНЫЙ КЕШ КЕЙСОВ ========================
 # Загружается из переменной окружения CASES_JSON (хранится в Render).
@@ -74,7 +83,7 @@ def load_cases_from_env():
             1: {
                 "id": 1,
                 "name": "Демо-кейс",
-                "price": 50.0,
+                "price": 0.5,
                 "image_url": "https://via.placeholder.com/150",
                 "drops": [
                     {
@@ -84,7 +93,7 @@ def load_cases_from_env():
                         "image_url": "https://via.placeholder.com/100",
                         "model": "Demo",
                         "chance": 100.0,
-                        "value": 25.0,
+                        "value": 0.25,
                         "real_chance": 100.0
                     }
                 ]
@@ -124,6 +133,33 @@ def get_pool() -> asyncpg.Pool:
     if db_pool is None:
         raise RuntimeError("Database pool is not initialized")
     return db_pool
+
+
+def get_ton_session() -> aiohttp.ClientSession:
+    if ton_http_session is None:
+        raise RuntimeError("TON HTTP session is not initialized")
+    return ton_http_session
+
+
+def ton_api_headers() -> dict[str, str]:
+    return {"X-API-Key": TONCENTER_API_KEY} if TONCENTER_API_KEY else {}
+
+
+async def normalize_ton_address(address: str) -> str:
+    if not isinstance(address, str) or not 20 <= len(address) <= 100:
+        raise ValueError("invalid TON address")
+    async with get_ton_session().get(
+        f"{TONCENTER_API_URL}/detectAddress",
+        params={"address": address},
+        headers=ton_api_headers(),
+    ) as response:
+        payload = await response.json(content_type=None)
+        if response.status != 200 or not payload.get("ok"):
+            raise ValueError("TON address was not recognized")
+        raw = payload.get("result", {}).get("raw_form")
+        if not raw:
+            raise ValueError("TON API did not return a raw address")
+        return str(raw).lower()
 
 game_lock = asyncio.Lock()
 game_state = {
@@ -232,12 +268,29 @@ async def init_db():
                     )
                 """)
                 await conn.execute("ALTER TABLE case_drops ADD COLUMN IF NOT EXISTS real_chance NUMERIC DEFAULT 0")
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS ton_deposits (
+                        id UUID PRIMARY KEY,
+                        user_id VARCHAR(255) NOT NULL,
+                        wallet_address TEXT NOT NULL,
+                        wallet_raw TEXT NOT NULL,
+                        amount_nano BIGINT NOT NULL UNIQUE,
+                        amount_ton NUMERIC(20, 9) NOT NULL,
+                        status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                        tx_hash TEXT UNIQUE,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        expires_at TIMESTAMPTZ NOT NULL,
+                        credited_at TIMESTAMPTZ
+                    )
+                """)
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_items_status ON items(status)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_items_buyer_status ON items(buyer_id, status)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_game_history_number ON game_history(game_number DESC)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_ton_deposits_pending ON ton_deposits(status, expires_at)")
                 logging.info(f"DB initialized. Game number: {last_num}")
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
+        raise
 
 def extract_user_from_initdata(init_data_str: str) -> dict | None:
     if not init_data_str:
@@ -774,6 +827,91 @@ async def game_worker():
                     game_state["polygons"] = None
                     asyncio.create_task(clear_last_polygons_after_delay(0.3))
 
+
+async def scan_ton_deposits() -> int:
+    if not TON_RECEIVER_ADDRESS:
+        return 0
+    await get_pool().execute(
+        "UPDATE ton_deposits SET status = 'expired' WHERE status = 'pending' AND expires_at < NOW()")
+    pending = await get_pool().fetch("""
+        SELECT id, user_id, wallet_raw, amount_nano, amount_ton, created_at, expires_at
+        FROM ton_deposits
+        WHERE status = 'pending' AND expires_at >= NOW()
+        ORDER BY created_at
+        LIMIT 200
+    """)
+    if not pending:
+        return 0
+
+    async with get_ton_session().get(
+        f"{TONCENTER_API_URL}/getTransactions",
+        params={"address": TON_RECEIVER_ADDRESS, "limit": 100, "archival": "false"},
+        headers=ton_api_headers(),
+    ) as response:
+        payload = await response.json(content_type=None)
+        if response.status != 200 or not payload.get("ok"):
+            raise RuntimeError(f"TON Center error: {payload.get('error', response.status)}")
+
+    by_amount = {int(row["amount_nano"]): row for row in pending}
+    credited = 0
+    for transaction in payload.get("result", []):
+        if transaction.get("aborted") is True:
+            continue
+        incoming = transaction.get("in_msg") or {}
+        try:
+            value = int(incoming.get("value", "0"))
+            created_at = int(transaction.get("utime", 0))
+        except (TypeError, ValueError):
+            continue
+        deposit = by_amount.get(value)
+        if not deposit:
+            continue
+        source = str(incoming.get("source") or "").lower()
+        if not source or source != deposit["wallet_raw"]:
+            continue
+        earliest = int(deposit["created_at"].timestamp()) - 30
+        latest = int(deposit["expires_at"].timestamp()) + 300
+        if not earliest <= created_at <= latest:
+            continue
+        tx_hash = str((transaction.get("transaction_id") or {}).get("hash") or incoming.get("hash") or "")
+        if not tx_hash:
+            continue
+
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow("""
+                    UPDATE ton_deposits
+                    SET status = 'credited', tx_hash = $1, credited_at = NOW()
+                    WHERE id = $2 AND status = 'pending'
+                    RETURNING user_id, amount_ton
+                """, tx_hash, deposit["id"])
+                if not row:
+                    continue
+                result = await conn.execute(
+                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
+                    row["amount_ton"], row["user_id"])
+                if result != "UPDATE 1":
+                    raise RuntimeError("TON deposit user does not exist")
+        credited += 1
+        by_amount.pop(value, None)
+    return credited
+
+
+async def ton_payment_worker():
+    if not TON_RECEIVER_ADDRESS:
+        logging.warning("TON_RECEIVER_ADDRESS is not set; TON deposits are disabled")
+        return
+    while True:
+        try:
+            credited = await scan_ton_deposits()
+            if credited:
+                logging.info("Credited %s TON deposit(s)", credited)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logging.error("TON deposit scan failed: %s", exc)
+        await asyncio.sleep(5)
+
 # ------------------- API -------------------
 async def handle_options(request):
     return web.Response(headers={
@@ -786,6 +924,8 @@ async def handle_options(request):
 @web.middleware
 async def security_headers_middleware(request, handler):
     response = await handler(request)
+    response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
+    response.headers["Vary"] = "Origin"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -821,26 +961,107 @@ async def handle_get_user(request):
     return web.json_response({"balance": balance}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
-@rate_limit(5, 60)
-async def handle_topup_request(request):
+@rate_limit(10, 60)
+async def handle_create_ton_deposit(request):
+    if not TON_RECEIVER_ADDRESS:
+        return web.json_response({"error": "ton_deposits_disabled"}, status=503,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     try:
         data = await request.json()
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
-        amount = parse_positive_amount(data.get('amount'), minimum=Decimal("50"))
+        amount = parse_positive_amount(data.get('amount'), minimum=TON_MIN_DEPOSIT,
+                                       maximum=Decimal("10000"))
         if amount is None:
             return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
-        admin_msg = f"💸 **Заявка на пополнение**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} ₽"
-        admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"topup_no_{user_id}_{amount}"),
-            InlineKeyboardButton(text="✅ Зачислить", callback_data=f"topup_yes_{user_id}_{amount}")
-        ]])
-        await bot.send_message(ADMIN_ID, admin_msg, reply_markup=admin_kb)
-        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        scaled = amount * Decimal("1000000000")
+        if scaled != scaled.to_integral_value():
+            return web.json_response({"success": False, "error": "too_many_decimals"}, status=400)
+        wallet_address = str(data.get("walletAddress") or "").strip()
+        try:
+            wallet_raw = await normalize_ton_address(wallet_address)
+        except ValueError:
+            return web.json_response({"success": False, "error": "invalid_wallet"}, status=400)
+
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
+                    user_id, username)
+                existing = await conn.fetchrow("""
+                    SELECT id, amount_nano, amount_ton, expires_at
+                    FROM ton_deposits
+                    WHERE user_id = $1 AND wallet_raw = $2 AND status = 'pending'
+                      AND expires_at > NOW() AND amount_ton >= $3 AND amount_ton < $3 + 0.001
+                    ORDER BY created_at DESC LIMIT 1
+                """, user_id, wallet_raw, amount)
+                if existing:
+                    return web.json_response({
+                        "success": True,
+                        "depositId": str(existing["id"]),
+                        "receiverAddress": TON_RECEIVER_ADDRESS,
+                        "amountNano": str(existing["amount_nano"]),
+                        "amountTon": format(existing["amount_ton"], "f"),
+                        "expiresAt": existing["expires_at"].isoformat(),
+                    }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+                pending_count = await conn.fetchval(
+                    "SELECT COUNT(*) FROM ton_deposits WHERE user_id = $1 AND status = 'pending' AND expires_at > NOW()",
+                    user_id)
+                if pending_count >= 3:
+                    return web.json_response({"success": False, "error": "too_many_pending"}, status=429)
+
+                deposit_id = uuid.uuid4()
+                for _ in range(10):
+                    amount_nano = int(scaled) + secrets.randbelow(999999) + 1
+                    amount_ton = Decimal(amount_nano) / Decimal("1000000000")
+                    try:
+                        async with conn.transaction():
+                            expires_at = await conn.fetchval("""
+                                INSERT INTO ton_deposits
+                                    (id, user_id, wallet_address, wallet_raw, amount_nano, amount_ton, expires_at)
+                                VALUES ($1, $2, $3, $4, $5, $6, NOW() + $7 * INTERVAL '1 second')
+                                RETURNING expires_at
+                            """, deposit_id, user_id, wallet_address, wallet_raw, amount_nano,
+                                 amount_ton, TON_DEPOSIT_TIMEOUT)
+                        break
+                    except asyncpg.UniqueViolationError:
+                        continue
+                else:
+                    raise RuntimeError("could not allocate a unique TON amount")
+
+        return web.json_response({
+            "success": True,
+            "depositId": str(deposit_id),
+            "receiverAddress": TON_RECEIVER_ADDRESS,
+            "amountNano": str(amount_nano),
+            "amountTon": format(amount_ton, "f"),
+            "expiresAt": expires_at.isoformat(),
+        }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
-        logging.error(f"Topup error: {e}")
-        return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        logging.error(f"TON deposit creation error: {e}")
+        return web.json_response({"success": False, "error": "ton_payment_error"}, status=500,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+async def handle_ton_deposit_status(request):
+    try:
+        deposit_id = uuid.UUID(request.query.get("id", ""))
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid_deposit_id"}, status=400)
+    row = await get_pool().fetchrow("""
+        SELECT status, amount_ton, tx_hash, expires_at
+        FROM ton_deposits WHERE id = $1 AND user_id = $2
+    """, deposit_id, request['telegram_user']['id'])
+    if not row:
+        return web.json_response({"error": "deposit_not_found"}, status=404)
+    return web.json_response({
+        "status": row["status"],
+        "amountTon": format(row["amount_ton"], "f"),
+        "txHash": row["tx_hash"],
+        "expiresAt": row["expires_at"].isoformat(),
+    }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
 async def handle_get_items(request):
@@ -983,11 +1204,11 @@ async def handle_game_bet(request):
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
-        parsed_amount = parse_positive_amount(data.get('amount'), minimum=Decimal("10"))
+        parsed_amount = parse_positive_amount(data.get('amount'), minimum=TON_MIN_BET)
         if parsed_amount is None:
             return web.json_response({"success": False, "error": "min_bet"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-        if parsed_amount != parsed_amount.to_integral_value():
+        if parsed_amount.as_tuple().exponent < -9:
             return web.json_response({"success": False, "error": "invalid_amount"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         amount = float(parsed_amount)
@@ -1130,10 +1351,6 @@ async def handle_get_prize_items(request):
     except Exception as e:
         logging.error(f"Prize items error: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
-@require_auth
-async def handle_get_requisites(request):
-    return web.json_response({"req": PAYMENT_REQUISITES}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 # ------------------------------------------------------------
 #  НОВЫЕ ЭНДПОИНТЫ КЕЙСОВ (используют CASES_CACHE)
@@ -1292,37 +1509,6 @@ async def is_admin_callback(callback: types.CallbackQuery) -> bool:
     return True
 
 
-@dp.callback_query(F.data.startswith("topup_yes_"))
-async def admin_topup_approve(callback: types.CallbackQuery):
-    if not await is_admin_callback(callback):
-        return
-    parts = callback.data.split("_")
-    _, _, uid, amount = parts
-    parsed_amount = parse_positive_amount(amount, minimum=Decimal("50"))
-    if parsed_amount is None:
-        await callback.answer("Неверная сумма", show_alert=True)
-        return
-    await get_pool().execute(
-        "INSERT INTO users (id, balance) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET balance = users.balance + EXCLUDED.balance",
-        uid, parsed_amount)
-    await callback.message.edit_text(f"✅ Баланс пополнен на {amount} ₽!")
-    try:
-        await bot.send_message(int(uid), f"💰 Ваш баланс пополнен на {amount} ₽!")
-    except Exception:
-        pass
-
-@dp.callback_query(F.data.startswith("topup_no_"))
-async def admin_topup_reject(callback: types.CallbackQuery):
-    if not await is_admin_callback(callback):
-        return
-    parts = callback.data.split("_")
-    _, _, uid, amount = parts
-    await callback.message.edit_text(f"❌ Заявка на {amount} ₽ отклонена.")
-    try:
-        await bot.send_message(int(uid), f"❌ Заявка на пополнение {amount} ₽ отклонена.")
-    except Exception:
-        pass
-
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
     if not await is_admin_callback(callback):
@@ -1373,8 +1559,8 @@ app.router.add_get('/health', handle_health)
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)
 app.router.add_get('/inventory', handle_get_inventory)
-app.router.add_get('/req', handle_get_requisites)
-app.router.add_post('/topup', handle_topup_request)
+app.router.add_post('/ton/deposit/create', handle_create_ton_deposit)
+app.router.add_get('/ton/deposit/status', handle_ton_deposit_status)
 app.router.add_post('/buy', handle_buy)
 app.router.add_post('/request-withdraw', handle_request_withdraw)
 app.router.add_get('/game/state', handle_game_state)
@@ -1392,22 +1578,34 @@ app.router.add_post('/sell-drop', handle_sell_drop)
 app.router.add_options('/{tail:.*}', handle_options)
 
 async def main():
-    global db_pool
-    db_pool = await create_db_pool()
-    await init_db()
-    game_task = asyncio.create_task(game_worker())
-    port = int(os.environ.get("PORT", 8080))
-    runner = web.AppRunner(app)
-    await runner.setup()
-    await web.TCPSite(runner, '0.0.0.0', port).start()
+    global db_pool, ton_http_session
+    runner = None
+    game_task = None
+    ton_task = None
     try:
+        db_pool = await create_db_pool()
+        ton_http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
+        await init_db()
+        game_task = asyncio.create_task(game_worker())
+        ton_task = asyncio.create_task(ton_payment_worker())
+        port = int(os.environ.get("PORT", 8080))
+        runner = web.AppRunner(app)
+        await runner.setup()
+        await web.TCPSite(runner, '0.0.0.0', port).start()
         await dp.start_polling(bot)
     finally:
-        game_task.cancel()
-        await asyncio.gather(game_task, return_exceptions=True)
-        await runner.cleanup()
+        tasks = [task for task in (game_task, ton_task) if task is not None]
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        if runner is not None:
+            await runner.cleanup()
         await bot.session.close()
-        await db_pool.close()
+        if ton_http_session is not None:
+            await ton_http_session.close()
+        if db_pool is not None:
+            await db_pool.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
