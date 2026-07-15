@@ -1017,12 +1017,24 @@
                 'X-Telegram-Init-Data': initData,
                 ...(options.headers || {})
             };
-            const response = await fetch(url, { ...options, headers });
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error(err.error || `HTTP ${response.status}`);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers,
+                    signal: controller.signal,
+                    credentials: 'omit',
+                    cache: 'no-store'
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${response.status}`);
+                }
+                return response.json();
+            } finally {
+                clearTimeout(timeoutId);
             }
-            return response.json();
         }
 
         let userBalance = 0.0;
@@ -1078,22 +1090,21 @@
             try {
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
-            } catch(e) { userBalance = 0; }
+            } catch(e) { console.error('Balance update failed', e); }
             document.getElementById('header-balance').innerText = userBalance.toFixed(2) + ' ₽';
             document.getElementById('big-balance').innerText = userBalance.toFixed(2) + ' ₽';
         }
 
         async function loadCatalog() {
             try {
-                const res = await fetch(`${API_BASE}/items`);
-                currentCatalog = await res.json();
+                currentCatalog = await apiFetch(`${API_BASE}/items`);
                 document.getElementById('catalog-container').innerHTML = currentCatalog.map(item => `
                     <div class="item-card">
-                        <img src="${item.image_url}" class="item-image" onclick="openNftModal('${item.id}')">
+                        <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" onclick="openNftModal(${Number(item.id)})">
                         <div class="item-name">${escapeHtml(item.name)}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="confirmBuyItem('${item.id}', ${item.price}, '${escapeHtml(item.name)}', '${item.image_url}')">${item.price} ₽</button>
-                            <button class="btn-add-cart" onclick='addToCart(${JSON.stringify(item).replace(/'/g, "&#39;")})'>
+                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${Number(item.price)} ₽</button>
+                            <button class="btn-add-cart" onclick="addCatalogItemToCart(${Number(item.id)})">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                             </button>
                         </div>
@@ -1102,13 +1113,37 @@
             } catch(e) { console.error(e); }
         }
 
-        function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"'`]/g, char => ({
+                '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '`':'&#96;'
+            })[char]);
+        }
+        function safeImageUrl(value) {
+            try {
+                const url = new URL(String(value || ''));
+                return url.protocol === 'https:' ? url.href : '';
+            } catch (_) { return ''; }
+        }
+        function safeTelegramUrl(value) {
+            try {
+                const url = new URL(String(value || ''));
+                return url.protocol === 'https:' && ['t.me', 'telegram.me'].includes(url.hostname) ? url.href : '';
+            } catch (_) { return ''; }
+        }
+        function confirmCatalogItem(id) {
+            const item = currentCatalog.find(entry => Number(entry.id) === Number(id));
+            if (item) confirmBuyItem(item.id, item.price, item.name, item.image_url);
+        }
+        function addCatalogItemToCart(id) {
+            const item = currentCatalog.find(entry => Number(entry.id) === Number(id));
+            if (item) addToCart(item);
+        }
 
         function openNftModal(id) {
             const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
             if(!item) return;
             currentNftItem = item;
-            document.getElementById('nft-modal-img').src = item.image_url;
+            document.getElementById('nft-modal-img').src = safeImageUrl(item.image_url);
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
 
@@ -1116,11 +1151,12 @@
             const tgLinkBtn = document.getElementById('nft-telegram-link');
             const modalTgBtn = document.getElementById('nft-tg-link-btn');
 
-            if (isShopItem && item.nft_link) {
+            const telegramLink = safeTelegramUrl(item.nft_link);
+            if (isShopItem && telegramLink) {
                 tgLinkBtn.style.display = 'block';
                 modalTgBtn.style.display = 'flex';
-                tgLinkBtn.onclick = () => tg.openTelegramLink(item.nft_link);
-                modalTgBtn.onclick = () => tg.openTelegramLink(item.nft_link);
+                tgLinkBtn.onclick = () => tg.openTelegramLink(telegramLink);
+                modalTgBtn.onclick = () => tg.openTelegramLink(telegramLink);
             } else {
                 tgLinkBtn.style.display = 'none';
                 modalTgBtn.style.display = 'none';
@@ -1141,7 +1177,7 @@
             }
 
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
-                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
+                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${escapeHtml(t.label || t.name || '—')}</div><div class="trait-value">${escapeHtml(t.value || '—')}</div></div>`).join('')}</div>` :
                 '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
 
             const buyBtn = document.getElementById('nft-modal-btn-buy');
@@ -1151,7 +1187,7 @@
                 buyBtn.style.display = 'block';
                 cartBtn.style.display = 'flex';
                 withdrawBtn.style.display = 'none';
-                buyBtn.innerHTML = `КУПИТЬ ЗА ${item.price || 0} ₽`;
+                buyBtn.innerText = `КУПИТЬ ЗА ${Number(item.price) || 0} ₽`;
                 buyBtn.onclick = () => { closeNftModal(true); confirmBuyItem(item.id, item.price, item.name, item.image_url); };
                 cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
             } else {
@@ -1188,7 +1224,7 @@
             } else {
                 list.innerHTML = cart.map((c, i) => `
                     <div class="cart-item">
-                        <img src="${c.image_url}">
+                        <img src="${escapeHtml(safeImageUrl(c.image_url))}">
                         <div class="cart-item-info">
                             <div style="font-weight:500">${escapeHtml(c.name)}</div>
                             <div style="color:var(--accent-gold); margin-top:4px;">${c.price} ₽</div>
@@ -1204,10 +1240,10 @@
         function confirmBuyItem(id, price, name, image_url) {
             pendingBuyItem = { id, price: Number(price), name, image_url };
             document.getElementById('confirm-buy-item-info').innerHTML = `
-                <img src="${image_url}" />
+                <img src="${escapeHtml(safeImageUrl(image_url))}" />
                 <div style="text-align:left;">
-                    <div style="font-weight:600;">${name}</div>
-                    <div style="color:var(--accent-gold);">${price} ₽</div>
+                    <div style="font-weight:600;">${escapeHtml(name)}</div>
+                    <div style="color:var(--accent-gold);">${Number(price)} ₽</div>
                 </div>`;
             document.getElementById('confirm-buy-modal').classList.add('active');
         }
@@ -1307,7 +1343,7 @@
                 document.getElementById('inventory-active-container').innerHTML = active.length
                     ? active.map(i => `
                         <div class="item-card">
-                            <img src="${i.image_url}" class="item-image" onclick="openNftModal('${i.id}')">
+                            <img src="${escapeHtml(safeImageUrl(i.image_url))}" class="item-image" onclick="openNftModal(${Number(i.id)})">
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button>
                         </div>`).join('')
@@ -1315,7 +1351,7 @@
                 document.getElementById('inventory-history-container').innerHTML = withdrawn.length
                     ? withdrawn.map(i => `
                         <div class="item-card" style="opacity:0.5">
-                            <img src="${i.image_url}" class="item-image" style="filter:grayscale(100%)">
+                            <img src="${escapeHtml(safeImageUrl(i.image_url))}" class="item-image" style="filter:grayscale(100%)">
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <div style="text-align:center; font-size:0.7rem; border:1px dashed #555; border-radius:8px; padding:4px;">ВЫВЕДЕНО</div>
                         </div>`).join('')
@@ -1351,25 +1387,24 @@
         let currentPrizeItems = [];
         async function loadPrizeItems() {
             try {
-                const res = await fetch(`${API_BASE}/prize/items`);
-                if (res.ok) currentPrizeItems = await res.json();
-                else currentPrizeItems = [];
+                currentPrizeItems = await apiFetch(`${API_BASE}/prize/items`);
             } catch(e) { currentPrizeItems = []; }
         }
         function openPrizeModal() {
             if (!currentPrizeItem) return;
-            document.getElementById('prize-modal-img').src = currentPrizeItem.image_url;
+            document.getElementById('prize-modal-img').src = safeImageUrl(currentPrizeItem.image_url);
             document.getElementById('prize-modal-title').innerText = currentPrizeItem.name;
             document.getElementById('prize-modal-number').innerText = currentPrizeItem.number ? `#${currentPrizeItem.number}` : '';
             let traits = currentPrizeItem.traits || [];
             if (typeof traits === 'string') { try { traits = JSON.parse(traits); } catch(e) { traits = []; } }
             document.getElementById('prize-modal-traits').innerHTML = traits.length ?
-                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${t.label || t.name || '—'}</div><div class="trait-value">${t.value || '—'}</div></div>`).join('')}</div>` :
+                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${escapeHtml(t.label || t.name || '—')}</div><div class="trait-value">${escapeHtml(t.value || '—')}</div></div>`).join('')}</div>` :
                 '<p style="color:var(--text-muted);">Нет характеристик</p>';
             const tgBtn = document.getElementById('prize-tg-link-btn');
-            if (currentPrizeItem.nft_link) {
+            const prizeLink = safeTelegramUrl(currentPrizeItem.nft_link);
+            if (prizeLink) {
                 tgBtn.style.display = 'flex';
-                tgBtn.onclick = (e) => { e.stopPropagation(); window.open(currentPrizeItem.nft_link, '_blank'); };
+                tgBtn.onclick = (e) => { e.stopPropagation(); tg.openTelegramLink(prizeLink); };
             } else tgBtn.style.display = 'none';
             document.getElementById('prize-detail-overlay').classList.add('active');
         }
@@ -1402,7 +1437,7 @@
                                 <div class="leaderboard-rank">#${idx+1}</div>
                                 <div class="leaderboard-name">${escapeHtml(p.username)}</div>
                                 <div class="leaderboard-wins">${p.wins} поб.</div>
-                                ${currentPrizeItem ? `<img class="leaderboard-nft" src="${currentPrizeItem.image_url}" onclick="event.stopPropagation(); openPrizeModal()" />` : ''}
+                                ${currentPrizeItem ? `<img class="leaderboard-nft" src="${escapeHtml(safeImageUrl(currentPrizeItem.image_url))}" onclick="event.stopPropagation(); openPrizeModal()" />` : ''}
                             </div>`;
                     });
                 }
@@ -1411,7 +1446,7 @@
                         <div class="leaderboard-rank">Вы</div>
                         <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
                         <div class="leaderboard-wins">${data.user.wins} поб.</div>
-                        ${currentPrizeItem ? `<img class="leaderboard-nft" src="${currentPrizeItem.image_url}" onclick="event.stopPropagation(); openPrizeModal()" />` : ''}
+                        ${currentPrizeItem ? `<img class="leaderboard-nft" src="${escapeHtml(safeImageUrl(currentPrizeItem.image_url))}" onclick="event.stopPropagation(); openPrizeModal()" />` : ''}
                     </div>`;
                 }
                 listEl.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Нет данных</div>';
@@ -1461,6 +1496,8 @@
         let betAmountTemp = null;
         let winnerTimer = null;
         let lastLeaderboardUpdate = 0;
+        let gamePollInFlight = false;
+        let gamePollTimer = null;
 
         function parseColors(colorData) {
             if (Array.isArray(colorData)) {
@@ -1681,7 +1718,7 @@
                 }
             }
             if (!isWaitingMode && highlightPts && highlightPts.length >= 3) {
-                const INSET = 2;
+                const INSET = 1;
                 const dw = cw - INSET * 2, dh = ch - INSET * 2;
                 ctx.save();
                 ctx.beginPath();
@@ -1697,9 +1734,15 @@
                 ctx.lineJoin = "round";
                 ctx.lineCap = "round";
                 ctx.strokeStyle = goldGrad;
-                ctx.lineWidth = 8;
-                ctx.shadowColor = "rgba(212, 175, 55, 0.9)";
-                ctx.shadowBlur = 30;
+                // Свечение обрезаем по самому полигону: оно всегда лежит внутри
+                // игрового поля и не прячется под его внешней рамкой.
+                ctx.clip();
+                ctx.lineWidth = 12;
+                ctx.shadowColor = "rgba(212, 175, 55, 0.95)";
+                ctx.shadowBlur = 20;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                ctx.lineWidth = 4;
                 ctx.stroke();
                 ctx.restore();
             }
@@ -1834,8 +1877,7 @@
 
         async function fetchWinnerNow() {
             try {
-                const res = await fetch(`${API_BASE}/game/state`);
-                const state = await res.json();
+                const state = await apiFetch(`${API_BASE}/game/state`);
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     await showWinnerSequence(state.winner, state.round_id);
                 }
@@ -1846,8 +1888,13 @@
             if(!winner) return;
             document.getElementById('winner-name').innerText = winner.username;
             document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
-            const avatarUrl = winner.photo_url || 'data:image/svg+xml;base64,...';
-            document.getElementById('winner-avatar-container').innerHTML = `<img src="${avatarUrl}" class="winner-avatar">`;
+            const avatarContainer = document.getElementById('winner-avatar-container');
+            avatarContainer.replaceChildren();
+            const avatar = document.createElement('img');
+            avatar.src = safeImageUrl(winner.photo_url);
+            avatar.className = 'winner-avatar';
+            avatar.alt = '';
+            avatarContainer.appendChild(avatar);
             document.getElementById('winner-modal').classList.add('active');
             if (winnerTimer) clearTimeout(winnerTimer);
             winnerTimer = setTimeout(() => closeWinnerModal(), 2500);
@@ -1859,9 +1906,10 @@
         }
 
         async function pollGame() {
+            if (gamePollInFlight) return;
+            gamePollInFlight = true;
             try {
-                const r = await fetch(`${API_BASE}/game/state`);
-                const newState = await r.json();
+                const newState = await apiFetch(`${API_BASE}/game/state`);
                 if (!initialGameStateLoaded) {
                     initialGameStateLoaded = true;
                     if (newState.round_id) {
@@ -1928,8 +1976,13 @@
                     loadLeaderboardPreview();
                     lastLeaderboardUpdate = Date.now();
                 }
-            } catch(e) { console.error("Game poll error", e); }
-            setTimeout(pollGame, 1000);
+            } catch(e) {
+                console.error("Game poll error", e);
+            } finally {
+                gamePollInFlight = false;
+                if (gamePollTimer) clearTimeout(gamePollTimer);
+                gamePollTimer = setTimeout(pollGame, 1000);
+            }
         }
         pollGame();
 
@@ -2030,10 +2083,10 @@
             try {
                 const cases = await apiFetch(`${API_BASE}/cases`);
                 grid.innerHTML = cases.map((c, i) => `
-                    <div class="case-card" onclick="openCaseDetail(${c.id})" style="animation-delay: ${i * 0.08}s">
-                        <img src="${c.image_url}" class="item-image" alt="${escapeHtml(c.name)}">
+                    <div class="case-card" onclick="openCaseDetail(${Number(c.id)})" style="animation-delay: ${i * 0.08}s">
+                        <img src="${escapeHtml(safeImageUrl(c.image_url))}" class="item-image" alt="${escapeHtml(c.name)}">
                         <div class="item-name">${escapeHtml(c.name)}</div>
-                        <div class="case-price">${c.price} ₽</div>
+                        <div class="case-price">${Number(c.price)} ₽</div>
                     </div>
                 `).join('');
             } catch(e) {
@@ -2045,13 +2098,13 @@
             try {
                 currentCase = await apiFetch(`${API_BASE}/case-details?id=${caseId}`);
                 document.getElementById('case-detail-title').innerText = currentCase.name;
-                document.getElementById('case-open-btn').innerHTML = `ОТКРЫТЬ ЗА ${currentCase.price} ₽`;
+                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${Number(currentCase.price)} ₽`;
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
                 document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
-                        <span class="drop-chance">${d.chance}%</span>
-                        <img src="${d.image_url}">
+                        <span class="drop-chance">${Number(d.chance)}%</span>
+                        <img src="${escapeHtml(safeImageUrl(d.image_url))}">
                         <span class="drop-name">${escapeHtml(d.model || d.name)}</span>
                     </div>
                 `).join('');
@@ -2102,7 +2155,7 @@
                     const div = document.createElement('div');
                     div.className = 'roulette-item';
                     const img = document.createElement('img');
-                    img.src = drop.image_url;
+                    img.src = safeImageUrl(drop.image_url);
                     div.appendChild(img);
                     wrapper.appendChild(div);
                 });
@@ -2132,7 +2185,7 @@
                 const div = document.createElement('div');
                 div.className = 'roulette-item';
                 const img = document.createElement('img');
-                img.src = drop.image_url;
+                img.src = safeImageUrl(drop.image_url);
                 div.appendChild(img);
                 track.appendChild(div);
             });
@@ -2185,7 +2238,7 @@
         function showWinItem(wonItem) {
             currentWonItem = wonItem;
             document.getElementById('roulette-container').style.display = 'none';
-            document.getElementById('win-image').src = wonItem.image_url;
+            document.getElementById('win-image').src = safeImageUrl(wonItem.image_url);
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
 
             document.getElementById('win-value').innerText = wonItem.value;

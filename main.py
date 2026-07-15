@@ -1,15 +1,19 @@
 import asyncio
+import hashlib
+import hmac
 import logging
 import os
 import json
 import random
 import math
-from urllib.parse import parse_qs
-from datetime import datetime, timezone
-from contextlib import closing
+import time
+from collections import defaultdict, deque
+from decimal import Decimal, InvalidOperation
+from functools import wraps
+from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
+from datetime import timezone
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import asyncpg
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -22,25 +26,31 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 PAYMENT_REQUISITES = os.getenv("PAYMENT_REQUISITES", "Реквизиты скрыты")
-WEBAPP_URL = "https://denixl-11.github.io/dnx-store/"
-CORS_ORIGIN = "https://denixl-11.github.io"
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://denixl-11.github.io/dnx-store/")
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", "https://denixl-11.github.io")
+DATABASE_URL = os.getenv("DATABASE_URL")
+INIT_DATA_MAX_AGE = int(os.getenv("INIT_DATA_MAX_AGE", "86400"))
+DB_POOL_MIN_SIZE = int(os.getenv("DB_POOL_MIN_SIZE", "1"))
+DB_POOL_MAX_SIZE = int(os.getenv("DB_POOL_MAX_SIZE", "10"))
 
 if not BOT_TOKEN:
-    print("❌ BOT_TOKEN не найден!")
-    exit(1)
+    raise RuntimeError("BOT_TOKEN is required")
+if not DATABASE_URL and not DB_PASSWORD:
+    raise RuntimeError("DATABASE_URL or DB_PASSWORD is required")
 
 DB_CONFIG = {
-    "dbname": "neondb",
+    "database": "neondb",
     "user": "neondb_owner",
     "password": DB_PASSWORD,
     "host": "ep-shy-sun-an8be4el.c-6.us-east-1.aws.neon.tech",
-    "port": "5432",
-    "sslmode": "require"
+    "port": 5432,
+    "ssl": "require"
 }
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+db_pool: asyncpg.Pool | None = None
 
 # ======================== ГЛОБАЛЬНЫЙ КЕШ КЕЙСОВ ========================
 # Загружается из переменной окружения CASES_JSON (хранится в Render).
@@ -83,8 +93,37 @@ def load_cases_from_env():
 
 load_cases_from_env()   # заполнили CASES_CACHE
 
-def get_db_connection():
-    return psycopg2.connect(**DB_CONFIG)
+async def create_db_pool() -> asyncpg.Pool:
+    if DATABASE_URL:
+        dsn = normalize_database_url(DATABASE_URL)
+        return await asyncpg.create_pool(
+            dsn=dsn,
+            min_size=DB_POOL_MIN_SIZE,
+            max_size=DB_POOL_MAX_SIZE,
+            command_timeout=15,
+            max_inactive_connection_lifetime=300,
+        )
+    return await asyncpg.create_pool(
+        **DB_CONFIG,
+        min_size=DB_POOL_MIN_SIZE,
+        max_size=DB_POOL_MAX_SIZE,
+        command_timeout=15,
+        max_inactive_connection_lifetime=300,
+    )
+
+
+def normalize_database_url(value: str) -> str:
+    """Remove libpq-only options that asyncpg would send as PostgreSQL settings."""
+    parts = urlsplit(value)
+    query = [(key, item) for key, item in parse_qsl(parts.query, keep_blank_values=True)
+             if key.lower() != "channel_binding"]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def get_pool() -> asyncpg.Pool:
+    if db_pool is None:
+        raise RuntimeError("Database pool is not initialized")
+    return db_pool
 
 game_lock = asyncio.Lock()
 game_state = {
@@ -102,18 +141,18 @@ game_state = {
     "last_polygons": None
 }
 
-def init_db():
+async def init_db():
     try:
-        with closing(get_db_connection()) as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
                         username VARCHAR(255),
                         balance NUMERIC DEFAULT 0.0
                     )
                 """)
-                cur.execute("""
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS items (
                         id SERIAL PRIMARY KEY,
                         name VARCHAR(255),
@@ -127,8 +166,8 @@ def init_db():
                         last_event VARCHAR(50)
                     )
                 """)
-                cur.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS model VARCHAR(255) DEFAULT ''")
-                cur.execute("""
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS model VARCHAR(255) DEFAULT ''")
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
                         game_number INT,
@@ -137,34 +176,33 @@ def init_db():
                         created_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
-                cur.execute("ALTER TABLE game_history ADD COLUMN IF NOT EXISTS win_percent NUMERIC DEFAULT 0")
-                cur.execute("""
+                await conn.execute("ALTER TABLE game_history ADD COLUMN IF NOT EXISTS win_percent NUMERIC DEFAULT 0")
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS game_counter (
                         id INT PRIMARY KEY DEFAULT 1,
                         last_game_number INT NOT NULL DEFAULT 0
                     )
                 """)
-                cur.execute("INSERT INTO game_counter (id, last_game_number) VALUES (1, 0) ON CONFLICT (id) DO NOTHING")
-                cur.execute("SELECT last_game_number FROM game_counter WHERE id = 1")
-                last_num = cur.fetchone()[0]
+                await conn.execute("INSERT INTO game_counter (id, last_game_number) VALUES (1, 0) ON CONFLICT (id) DO NOTHING")
+                last_num = await conn.fetchval("SELECT last_game_number FROM game_counter WHERE id = 1")
                 game_state["game_number"] = last_num
 
-                cur.execute("""
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS leaderboard (
                         user_id VARCHAR(255) PRIMARY KEY,
                         username VARCHAR(255),
                         wins INT DEFAULT 0
                     )
                 """)
-                cur.execute("""
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS season (
                         id INT PRIMARY KEY DEFAULT 1,
                         end_time TIMESTAMPTZ
                     )
                 """)
-                cur.execute(
+                await conn.execute(
                     "INSERT INTO season (id, end_time) VALUES (1, '2026-06-30 15:00:00+00') ON CONFLICT (id) DO NOTHING")
-                cur.execute("""
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS prize_items (
                         id SERIAL PRIMARY KEY,
                         name TEXT NOT NULL,
@@ -174,7 +212,7 @@ def init_db():
                     )
                 """)
                 # Таблицы cases и case_drops больше не нужны для чтения, но оставим для совместимости и администрирования
-                cur.execute("""
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS cases (
                         id SERIAL PRIMARY KEY,
                         name VARCHAR(255),
@@ -182,7 +220,7 @@ def init_db():
                         image_url TEXT
                     )
                 """)
-                cur.execute("""
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS case_drops (
                         id SERIAL PRIMARY KEY,
                         case_id INTEGER REFERENCES cases(id),
@@ -193,38 +231,83 @@ def init_db():
                         value NUMERIC DEFAULT 0.0
                     )
                 """)
-                cur.execute("ALTER TABLE case_drops ADD COLUMN IF NOT EXISTS real_chance NUMERIC DEFAULT 0")
-                conn.commit()
+                await conn.execute("ALTER TABLE case_drops ADD COLUMN IF NOT EXISTS real_chance NUMERIC DEFAULT 0")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_items_status ON items(status)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_items_buyer_status ON items(buyer_id, status)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_game_history_number ON game_history(game_number DESC)")
                 logging.info(f"DB initialized. Game number: {last_num}")
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
-
-init_db()
 
 def extract_user_from_initdata(init_data_str: str) -> dict | None:
     if not init_data_str:
         return None
     try:
-        parsed = parse_qs(init_data_str)
-        user_json = parsed.get('user')
-        if not user_json:
+        pairs = dict(parse_qsl(init_data_str, keep_blank_values=True))
+        received_hash = pairs.pop("hash", None)
+        if not received_hash:
             return None
-        user = json.loads(user_json[0])
-        return {"id": str(user.get('id')), "username": user.get('username', 'Unknown')}
-    except:
+        data_check_string = "\n".join(f"{key}={pairs[key]}" for key in sorted(pairs))
+        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+        expected_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected_hash, received_hash):
+            return None
+        auth_date = int(pairs.get("auth_date", "0"))
+        now = int(time.time())
+        if auth_date <= 0 or auth_date > now + 60 or now - auth_date > INIT_DATA_MAX_AGE:
+            return None
+        user = json.loads(pairs.get("user", "{}"))
+        user_id = user.get("id")
+        if not isinstance(user_id, int) or user_id <= 0:
+            return None
+        username = user.get("username") or user.get("first_name") or "Unknown"
+        return {
+            "id": str(user_id),
+            "username": str(username)[:255],
+            "photo_url": safe_https_url(user.get("photo_url")),
+        }
+    except (ValueError, TypeError, json.JSONDecodeError):
         return None
 
+
+def safe_https_url(value) -> str:
+    if not isinstance(value, str) or len(value) > 2048:
+        return ""
+    parsed = urlparse(value)
+    return value if parsed.scheme == "https" and parsed.netloc else ""
+
+
+def parse_positive_amount(value, *, minimum=Decimal("0.01"), maximum=Decimal("1000000")) -> Decimal | None:
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if not amount.is_finite() or amount < minimum or amount > maximum:
+        return None
+    return amount
+
+
+def normalize_records(rows) -> list[dict]:
+    result = []
+    for row in rows:
+        item = dict(row)
+        for key, value in list(item.items()):
+            if isinstance(value, Decimal):
+                item[key] = float(value)
+        if isinstance(item.get("traits"), str):
+            try:
+                item["traits"] = json.loads(item["traits"])
+            except json.JSONDecodeError:
+                item["traits"] = []
+        result.append(item)
+    return result
+
 def require_auth(handler):
+    @wraps(handler)
     async def wrapper(request):
         if request.method == "OPTIONS":
             return await handler(request)
-        init_data = request.headers.get('X-Telegram-Init-Data') or request.query.get('initData')
-        if not init_data and request.method == "POST":
-            try:
-                body = await request.json()
-                init_data = body.get('initData')
-            except:
-                pass
+        init_data = request.headers.get('X-Telegram-Init-Data')
         if not init_data:
             return web.json_response({"error": "missing_init_data"}, status=401,
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -236,6 +319,32 @@ def require_auth(handler):
         return await handler(request)
 
     return wrapper
+
+
+_rate_limit_events: dict[tuple[str, str], deque] = defaultdict(deque)
+
+
+def rate_limit(limit: int, window_seconds: int):
+    def decorator(handler):
+        @wraps(handler)
+        async def wrapper(request):
+            user = request.get('telegram_user')
+            identity = user['id'] if user else (request.remote or 'unknown')
+            key = (handler.__name__, identity)
+            now = time.monotonic()
+            events = _rate_limit_events[key]
+            while events and now - events[0] >= window_seconds:
+                events.popleft()
+            if len(events) >= limit:
+                return web.json_response(
+                    {"success": False, "error": "rate_limited"},
+                    status=429,
+                    headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
+                )
+            events.append(now)
+            return await handler(request)
+        return wrapper
+    return decorator
 
 # ------------------------------------------------------------
 #  ГЕОМЕТРИЯ: BSP RECURSIVE POLYGON CLIPPING (TRIANGLES)
@@ -582,27 +691,27 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
         win_percent = 100.0
 
     try:
-        with closing(get_db_connection()) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id FROM users WHERE id = %s", (winner_id,))
-                if not cur.fetchone():
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                if not await conn.fetchval("SELECT id FROM users WHERE id = $1", winner_id):
                     return None
-                cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (profit, winner_id))
-                cur.execute("""
-                    INSERT INTO leaderboard (user_id, username, wins) VALUES (%s, %s, 1)
+                await conn.execute(
+                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
+                    Decimal(str(profit)), winner_id)
+                await conn.execute("""
+                    INSERT INTO leaderboard (user_id, username, wins) VALUES ($1, $2, 1)
                     ON CONFLICT (user_id) DO UPDATE SET wins = leaderboard.wins + 1, username = EXCLUDED.username
-                """, (winner_id, winner_username))
-                cur.execute(
-                    "INSERT INTO game_history (game_number, winner_name, win_amount, win_percent) VALUES (%s, %s, %s, %s)",
-                    (game_state["game_number"], winner_username, profit, win_percent)
+                """, winner_id, winner_username)
+                await conn.execute(
+                    "INSERT INTO game_history (game_number, winner_name, win_amount, win_percent) VALUES ($1, $2, $3, $4)",
+                    game_state["game_number"], winner_username,
+                    Decimal(str(profit)), Decimal(str(win_percent))
                 )
-                cur.execute(
+                await conn.execute(
                     "DELETE FROM game_history WHERE id NOT IN (SELECT id FROM game_history ORDER BY game_number DESC LIMIT 100)")
-                cur.execute(
+                new_num = await conn.fetchval(
                     "UPDATE game_counter SET last_game_number = last_game_number + 1 WHERE id = 1 RETURNING last_game_number")
-                new_num = cur.fetchone()[0]
                 game_state["game_number"] = new_num
-                conn.commit()
         return {
             "user_id": winner_id,
             "username": winner_username,
@@ -673,34 +782,55 @@ async def handle_options(request):
         "Access-Control-Allow-Headers": "Content-Type, X-Telegram-Init-Data",
     })
 
+
+@web.middleware
+async def security_headers_middleware(request, handler):
+    response = await handler(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
+
+async def handle_health(request):
+    try:
+        await asyncio.wait_for(get_pool().fetchval("SELECT 1"), timeout=3)
+        return web.json_response({"status": "ok"})
+    except Exception:
+        return web.json_response({"status": "unavailable"}, status=503)
+
 @require_auth
 async def handle_get_user(request):
     user = request['telegram_user']
     user_id = user['id']
     username = user['username']
     try:
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    "INSERT INTO users (id, username) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
-                    (user_id, username))
-                cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
-                db_user = cur.fetchone()
-                conn.commit()
-                balance = float(db_user['balance']) if db_user else 0.0
+        balance_value = await get_pool().fetchval(
+            """INSERT INTO users (id, username) VALUES ($1, $2)
+               ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
+               RETURNING balance""",
+            user_id, username,
+        )
+        balance = float(balance_value or 0)
     except Exception as e:
         logging.error(f"Get user error: {e}")
-        balance = 0.0
+        return web.json_response({"error": "database_unavailable"}, status=503,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     return web.json_response({"balance": balance}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
+@rate_limit(5, 60)
 async def handle_topup_request(request):
     try:
         data = await request.json()
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
-        amount = float(data.get('amount', 0))
+        amount = parse_positive_amount(data.get('amount'), minimum=Decimal("50"))
+        if amount is None:
+            return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
         admin_msg = f"💸 **Заявка на пополнение**\n👤 @{username} (ID: {user_id})\n💰 Сумма: {amount} ₽"
         admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"topup_no_{user_id}_{amount}"),
@@ -712,109 +842,120 @@ async def handle_topup_request(request):
         logging.error(f"Topup error: {e}")
         return web.json_response({"success": False}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+@require_auth
 async def handle_get_items(request):
     try:
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    "SELECT id, name, price, status, image_url, nft_link, traits, number FROM items WHERE status = 'Доступен'")
-                items = cur.fetchall()
-                for item in items:
-                    if isinstance(item.get('traits'), str):
-                        try:
-                            item['traits'] = json.loads(item['traits'])
-                        except:
-                            item['traits'] = []
+        rows = await get_pool().fetch(
+            "SELECT id, name, price, status, image_url, nft_link, traits, number FROM items WHERE status = 'Доступен'")
+        items = normalize_records(rows)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
-        return web.json_response([], headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        logging.error(f"Get items error: {e}")
+        return web.json_response({"error": "database_unavailable"}, status=503,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
 async def handle_get_inventory(request):
     user = request['telegram_user']
     user_id = user['id']
     try:
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    "SELECT id, name, image_url, nft_link, model, status, traits, number FROM items WHERE buyer_id = %s AND status IN ('Продан','withdrawn','Выведен','pending_withdraw')",
-                    (user_id,))
-                items = cur.fetchall()
-                for item in items:
-                    if item['status'] in ('Выведен', 'withdrawn'): item['status'] = 'withdrawn'
-                    if isinstance(item.get('traits'), str):
-                        try:
-                            item['traits'] = json.loads(item['traits'])
-                        except:
-                            item['traits'] = []
+        rows = await get_pool().fetch(
+            "SELECT id, name, image_url, nft_link, model, status, traits, number FROM items WHERE buyer_id = $1 AND status IN ('Продан','withdrawn','Выведен','pending_withdraw')",
+            user_id)
+        items = normalize_records(rows)
+        for item in items:
+            if item['status'] in ('Выведен', 'withdrawn'):
+                item['status'] = 'withdrawn'
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
-        return web.json_response([], headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        logging.error(f"Get inventory error: {e}")
+        return web.json_response({"error": "database_unavailable"}, status=503,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
+@rate_limit(30, 60)
 async def handle_buy(request):
     try:
         data = await request.json()
         user = request['telegram_user']
         user_id = user['id']
-        item_ids = data.get('items', [])
-        if not item_ids:
+        raw_item_ids = data.get('items', [])
+        if not isinstance(raw_item_ids, list) or not raw_item_ids or len(raw_item_ids) > 50:
             return web.json_response({"success": False, "error": "no_items"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT id, price FROM items WHERE id = ANY(%s) AND status = 'Доступен'", (item_ids,))
-                items = cur.fetchall()
+        try:
+            item_ids = [int(item_id) for item_id in raw_item_ids]
+        except (TypeError, ValueError):
+            return web.json_response({"success": False, "error": "invalid_items"}, status=400)
+        if any(item_id <= 0 for item_id in item_ids) or len(set(item_ids)) != len(item_ids):
+            return web.json_response({"success": False, "error": "invalid_items"}, status=400)
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                items = await conn.fetch(
+                    "SELECT id, price FROM items WHERE id = ANY($1::int[]) AND status = 'Доступен' FOR UPDATE",
+                    item_ids)
                 if len(items) != len(item_ids):
                     return web.json_response({"success": False, "error": "items_unavailable"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
                 total_price = sum(i['price'] for i in items)
-                cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
-                db_user = cur.fetchone()
-                if not db_user or float(db_user['balance']) < float(total_price):
+                new_balance = await conn.fetchval(
+                    "UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance",
+                    total_price, user_id)
+                if new_balance is None:
                     return web.json_response({"success": False, "error": "insufficient_funds"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (total_price, user_id))
-                cur.execute(
-                    "UPDATE items SET status = 'Продан', buyer_id = %s, last_event = 'approved' WHERE id = ANY(%s)",
-                    (user_id, item_ids))
-                conn.commit()
+                await conn.execute(
+                    "UPDATE items SET status = 'Продан', buyer_id = $1, last_event = 'approved' WHERE id = ANY($2::int[])",
+                    user_id, item_ids)
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
+        logging.error(f"Buy error: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
+@rate_limit(10, 60)
 async def handle_request_withdraw(request):
     try:
         data = await request.json()
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
-        item_id = data.get('itemId')
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    "SELECT id, name, nft_link FROM items WHERE id = %s AND buyer_id = %s AND status = 'Продан'",
-                    (item_id, user_id))
-                item = cur.fetchone()
+        try:
+            item_id = int(data.get('itemId'))
+        except (TypeError, ValueError):
+            return web.json_response({"success": False, "error": "invalid_item"}, status=400)
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                item = await conn.fetchrow(
+                    """UPDATE items SET status = 'pending_withdraw', last_event = 'withdraw_requested'
+                       WHERE id = $1 AND buyer_id = $2 AND status = 'Продан'
+                       RETURNING id, name, nft_link""",
+                    item_id, user_id)
                 if not item:
                     return web.json_response({"success": False, "error": "not_found"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                cur.execute(
-                    "UPDATE items SET status = 'pending_withdraw', last_event = 'withdraw_requested' WHERE id = %s",
-                    (item_id,))
-                conn.commit()
         admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"with_no_{user_id}_{item_id}"),
             InlineKeyboardButton(text="✅ Вывести", callback_data=f"with_yes_{user_id}_{item_id}")
         ]])
-        await bot.send_message(ADMIN_ID,
-                               f"📤 **Запрос на вывод**\n👤 @{username} (ID: {user_id})\n📦 {item['name']} (ID: {item['id']})\n🔗 {item['nft_link']}",
-                               reply_markup=admin_kb, disable_web_page_preview=True)
+        try:
+            await bot.send_message(
+                ADMIN_ID,
+                f"📤 **Запрос на вывод**\n👤 @{username} (ID: {user_id})\n📦 {item['name']} (ID: {item['id']})\n🔗 {item['nft_link']}",
+                reply_markup=admin_kb,
+                disable_web_page_preview=True,
+            )
+        except Exception:
+            await get_pool().execute(
+                """UPDATE items SET status = 'Продан', last_event = 'withdraw_notification_failed'
+                   WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'""",
+                item_id, user_id)
+            raise
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+@require_auth
 async def handle_game_state(request):
     async with game_lock:
         sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
@@ -834,6 +975,7 @@ async def handle_game_state(request):
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
+@rate_limit(60, 60)
 async def handle_game_bet(request):
     global game_state
     try:
@@ -841,13 +983,14 @@ async def handle_game_bet(request):
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
-        amount = float(data.get('amount', 0))
-        if amount < 10:
+        parsed_amount = parse_positive_amount(data.get('amount'), minimum=Decimal("10"))
+        if parsed_amount is None:
             return web.json_response({"success": False, "error": "min_bet"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-        if amount != int(amount):
+        if parsed_amount != parsed_amount.to_integral_value():
             return web.json_response({"success": False, "error": "invalid_amount"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        amount = float(parsed_amount)
         async with game_lock:
             if game_state["status"] not in ("waiting", "counting"):
                 return web.json_response({"success": False, "error": "game_started"},
@@ -855,15 +998,12 @@ async def handle_game_bet(request):
             if len(game_state["players"]) >= 20 and user_id not in game_state["players"]:
                 return web.json_response({"success": False, "error": "room_full"},
                                          headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-            with closing(get_db_connection()) as conn:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute("SELECT balance FROM users WHERE id = %s", (user_id,))
-                    db_user = cur.fetchone()
-                    if not db_user or float(db_user['balance']) < amount:
-                        return web.json_response({"success": False, "error": "insufficient_funds"},
-                                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                    cur.execute("UPDATE users SET balance = balance - %s WHERE id = %s", (amount, user_id))
-                    conn.commit()
+            new_balance = await get_pool().fetchval(
+                "UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance",
+                parsed_amount, user_id)
+            if new_balance is None:
+                return web.json_response({"success": False, "error": "insufficient_funds"},
+                                         headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
                 game_state["players"][user_id]["bets_count"] += 1
@@ -876,7 +1016,7 @@ async def handle_game_bet(request):
                         "#" + ''.join(random.choices('0123456789ABCDEF', k=6))
                     )]
                 color = random.choice(available)
-                photo_url = data.get('photo_url', '')
+                photo_url = user.get('photo_url', '')
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
                     "amount": amount, "color": color,
@@ -903,6 +1043,7 @@ async def handle_game_bet(request):
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
+@rate_limit(10, 60)
 async def handle_game_cancel(request):
     global game_state
     try:
@@ -911,10 +1052,9 @@ async def handle_game_cancel(request):
         async with game_lock:
             if len(game_state["players"]) == 1 and user_id in game_state["players"]:
                 refund = game_state["players"][user_id]["amount"]
-                with closing(get_db_connection()) as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (refund, user_id))
-                        conn.commit()
+                await get_pool().execute(
+                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
+                    Decimal(str(refund)), user_id)
                 game_state["players"] = {}
                 game_state["pool"] = 0.0
                 game_state["polygons"] = None
@@ -927,6 +1067,7 @@ async def handle_game_cancel(request):
         logging.error(f"Cancel error: {e}")
         return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+@require_auth
 async def handle_game_finish(request):
     return web.json_response({"success": True, "message": "Server handles finish"},
                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -934,11 +1075,8 @@ async def handle_game_finish(request):
 @require_auth
 async def handle_game_history(request):
     try:
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute(
-                    "SELECT game_number, winner_name, win_amount, win_percent FROM game_history ORDER BY game_number DESC LIMIT 100")
-                rows = cur.fetchall()
+        rows = await get_pool().fetch(
+            "SELECT game_number, winner_name, win_amount, win_percent FROM game_history ORDER BY game_number DESC LIMIT 100")
         result = []
         for row in rows:
             result.append({
@@ -956,12 +1094,9 @@ async def handle_game_history(request):
 async def handle_leaderboard(request):
     user_id = request['telegram_user']['id']
     try:
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT username, wins FROM leaderboard ORDER BY wins DESC LIMIT 5")
-                top_rows = cur.fetchall()
-                cur.execute("SELECT username, wins FROM leaderboard WHERE user_id = %s", (user_id,))
-                user_row = cur.fetchone()
+        async with get_pool().acquire() as conn:
+            top_rows = await conn.fetch("SELECT username, wins FROM leaderboard ORDER BY wins DESC LIMIT 5")
+            user_row = await conn.fetchrow("SELECT username, wins FROM leaderboard WHERE user_id = $1", user_id)
         result = {"top": [], "user": None}
         for r in top_rows:
             result["top"].append({"username": r["username"], "wins": r["wins"]})
@@ -976,33 +1111,21 @@ async def handle_leaderboard(request):
 @require_auth
 async def handle_season_state(request):
     try:
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT end_time FROM season WHERE id = 1")
-                row = cur.fetchone()
-                if row:
-                    end_time = row["end_time"]
-                    if end_time.tzinfo is None:
-                        end_time = end_time.replace(tzinfo=timezone.utc)
-                    return web.json_response({"end_time": end_time.timestamp() * 1000},
-                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        end_time = await get_pool().fetchval("SELECT end_time FROM season WHERE id = 1")
+        if end_time:
+            if end_time.tzinfo is None:
+                end_time = end_time.replace(tzinfo=timezone.utc)
+            return web.json_response({"end_time": end_time.timestamp() * 1000},
+                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         return web.json_response({"end_time": None}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+@require_auth
 async def handle_get_prize_items(request):
     try:
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT id, name, image_url, nft_link, traits FROM prize_items ORDER BY id")
-                items = cur.fetchall()
-                for item in items:
-                    traits = item.get('traits')
-                    if isinstance(traits, str):
-                        try:
-                            item['traits'] = json.loads(traits)
-                        except:
-                            item['traits'] = []
+        rows = await get_pool().fetch("SELECT id, name, image_url, nft_link, traits FROM prize_items ORDER BY id")
+        items = normalize_records(rows)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Prize items error: {e}")
@@ -1015,6 +1138,7 @@ async def handle_get_requisites(request):
 # ------------------------------------------------------------
 #  НОВЫЕ ЭНДПОИНТЫ КЕЙСОВ (используют CASES_CACHE)
 # ------------------------------------------------------------
+@require_auth
 async def handle_get_cases(request):
     """Возвращает список кейсов (без дропов) из кеша"""
     cases_list = []
@@ -1027,6 +1151,7 @@ async def handle_get_cases(request):
         })
     return web.json_response(cases_list, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
+@require_auth
 async def handle_get_case_details(request):
     """Детали кейса + дропы из кеша"""
     case_id = request.query.get('id')
@@ -1049,62 +1174,77 @@ async def handle_get_case_details(request):
         "name": case["name"],
         "price": case["price"],
         "image_url": case["image_url"],
-        "drops": case["drops"]   # уже список словарей
+        "drops": [
+            {key: value for key, value in drop.items() if key != "real_chance"}
+            for drop in case["drops"]
+        ],
     }
     return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
+@rate_limit(30, 60)
 async def handle_open_case(request):
     """Открытие кейса (цена и дропы из кеша, запись в БД)"""
     try:
         data = await request.json()
         user_id = request['telegram_user']['id']
-        case_id = data.get('caseId')
-
-        case = CASES_CACHE.get(int(case_id))
+        try:
+            case_id = int(data.get('caseId'))
+        except (TypeError, ValueError):
+            return web.json_response({"success": False, "error": "invalid_case_id"}, status=400)
+        case = CASES_CACHE.get(case_id)
         if not case:
             return web.json_response({"success": False, "error": "case_not_found"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("""
-                    UPDATE users 
-                    SET balance = balance - %s 
-                    WHERE id = %s AND balance >= %s 
+        drops = case.get('drops')
+        if not isinstance(drops, list) or not drops:
+            return web.json_response({"success": False, "error": "empty_case"},
+                                     headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        case_price = parse_positive_amount(case.get('price'))
+        if case_price is None:
+            logging.error("Invalid price in CASES_JSON for case %s", case_id)
+            return web.json_response({"success": False, "error": "invalid_case_config"}, status=500)
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                new_balance = await conn.fetchval("""
+                    UPDATE users
+                    SET balance = balance - $1
+                    WHERE id = $2 AND balance >= $1
                     RETURNING balance
-                """, (case['price'], user_id, case['price']))
-                if not cur.fetchone():
+                """, case_price, user_id)
+                if new_balance is None:
                     return web.json_response({"success": False, "error": "insufficient_funds"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
-                drops = case['drops']
-                if not drops:
-                    return web.json_response({"success": False, "error": "empty_case"},
-                                             headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-
-                total_chance = sum(float(drop['real_chance']) for drop in drops)
+                real_chances = [float(drop['real_chance']) for drop in drops]
+                if any(not math.isfinite(chance) or chance < 0 for chance in real_chances):
+                    raise ValueError("invalid real_chance in CASES_JSON")
+                total_chance = sum(real_chances)
+                if total_chance <= 0:
+                    raise ValueError("total real_chance must be positive")
                 rand_val = random.uniform(0, total_chance)
                 current_sum = 0
                 won_drop = drops[-1]
-                for drop in drops:
-                    current_sum += float(drop['real_chance'])
+                for drop, real_chance in zip(drops, real_chances):
+                    current_sum += real_chance
                     if rand_val <= current_sum:
                         won_drop = drop
                         break
 
-                cur.execute("""
-                    INSERT INTO items (name, price, status, image_url, model, buyer_id, last_event) 
-                    VALUES (%s, %s, 'Продан', %s, %s, %s, 'case_drop') RETURNING id
-                """, (won_drop['name'], won_drop['value'], won_drop['image_url'],
-                      won_drop['model'], user_id))
-                new_item_id = cur.fetchone()['id']
+                drop_value = Decimal(str(won_drop['value']))
+                if not drop_value.is_finite() or drop_value < 0 or drop_value > Decimal("1000000"):
+                    raise ValueError("invalid drop value in CASES_JSON")
+
+                new_item_id = await conn.fetchval("""
+                    INSERT INTO items (name, price, status, image_url, model, buyer_id, last_event)
+                    VALUES ($1, $2, 'Продан', $3, $4, $5, 'case_drop') RETURNING id
+                """, str(won_drop['name'])[:255], drop_value,
+                      safe_https_url(won_drop.get('image_url')), str(won_drop.get('model', ''))[:255], user_id)
 
                 won_item_dict = dict(won_drop)
                 won_item_dict.pop('real_chance', None)
                 won_item_dict['generated_item_id'] = new_item_id
-
-                conn.commit()
 
         return web.json_response({"success": True, "won_item": won_item_dict},
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -1115,25 +1255,28 @@ async def handle_open_case(request):
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
+@rate_limit(30, 60)
 async def handle_sell_drop(request):
     """Продажа предмета (работает с таблицей items)"""
     try:
         data = await request.json()
         user_id = request['telegram_user']['id']
-        item_id = data.get('itemId')
-        if not item_id:
+        try:
+            item_id = int(data.get('itemId'))
+        except (TypeError, ValueError):
             return web.json_response({"success": False, "error": "missing_item_id"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-        with closing(get_db_connection()) as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT id, price FROM items WHERE id = %s AND buyer_id = %s", (item_id, user_id))
-                item = cur.fetchone()
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                item = await conn.fetchrow(
+                    """DELETE FROM items
+                       WHERE id = $1 AND buyer_id = $2 AND status = 'Продан' AND last_event = 'case_drop'
+                       RETURNING id, price""",
+                    item_id, user_id)
                 if not item:
                     return web.json_response({"success": False, "error": "item_not_found"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                cur.execute("UPDATE users SET balance = balance + %s WHERE id = %s", (item['price'], user_id))
-                cur.execute("DELETE FROM items WHERE id = %s", (item_id,))
-                conn.commit()
+                await conn.execute("UPDATE users SET balance = balance + $1 WHERE id = $2", item['price'], user_id)
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Sell drop error: {e}")
@@ -1141,62 +1284,81 @@ async def handle_sell_drop(request):
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 # ---------- Админ-коллбэки ----------
+async def is_admin_callback(callback: types.CallbackQuery) -> bool:
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Нет доступа", show_alert=True)
+        logging.warning("Unauthorized admin callback from Telegram user %s", callback.from_user.id)
+        return False
+    return True
+
+
 @dp.callback_query(F.data.startswith("topup_yes_"))
 async def admin_topup_approve(callback: types.CallbackQuery):
+    if not await is_admin_callback(callback):
+        return
     parts = callback.data.split("_")
     _, _, uid, amount = parts
-    with closing(get_db_connection()) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO users (id, balance) VALUES (%s, %s) ON CONFLICT (id) DO UPDATE SET balance = users.balance + EXCLUDED.balance",
-                (uid, float(amount)))
-            conn.commit()
+    parsed_amount = parse_positive_amount(amount, minimum=Decimal("50"))
+    if parsed_amount is None:
+        await callback.answer("Неверная сумма", show_alert=True)
+        return
+    await get_pool().execute(
+        "INSERT INTO users (id, balance) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET balance = users.balance + EXCLUDED.balance",
+        uid, parsed_amount)
     await callback.message.edit_text(f"✅ Баланс пополнен на {amount} ₽!")
     try:
         await bot.send_message(int(uid), f"💰 Ваш баланс пополнен на {amount} ₽!")
-    except:
+    except Exception:
         pass
 
 @dp.callback_query(F.data.startswith("topup_no_"))
 async def admin_topup_reject(callback: types.CallbackQuery):
+    if not await is_admin_callback(callback):
+        return
     parts = callback.data.split("_")
     _, _, uid, amount = parts
     await callback.message.edit_text(f"❌ Заявка на {amount} ₽ отклонена.")
     try:
         await bot.send_message(int(uid), f"❌ Заявка на пополнение {amount} ₽ отклонена.")
-    except:
+    except Exception:
         pass
 
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
+    if not await is_admin_callback(callback):
+        return
     parts = callback.data.split("_")
     _, _, uid, item_id = parts
-    with closing(get_db_connection()) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved' WHERE id = %s AND buyer_id = %s",
-                (int(item_id), uid))
-            conn.commit()
+    result = await get_pool().execute(
+        """UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved'
+           WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'""",
+        int(item_id), uid)
+    if result != "UPDATE 1":
+        await callback.answer("Запрос уже обработан", show_alert=True)
+        return
     await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
     try:
         await bot.send_message(int(uid), f"🎉 NFT (ID: {item_id}) выведен!")
-    except:
+    except Exception:
         pass
 
 @dp.callback_query(F.data.startswith("with_no_"))
 async def admin_withdraw_reject(callback: types.CallbackQuery):
+    if not await is_admin_callback(callback):
+        return
     parts = callback.data.split("_")
     _, _, uid, item_id = parts
-    with closing(get_db_connection()) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE items SET status = 'Продан', last_event = 'withdraw_rejected' WHERE id = %s AND buyer_id = %s",
-                (int(item_id), uid))
-            conn.commit()
+    result = await get_pool().execute(
+        """UPDATE items SET status = 'Продан', last_event = 'withdraw_rejected'
+           WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'""",
+        int(item_id), uid)
+    if result != "UPDATE 1":
+        await callback.answer("Запрос уже обработан", show_alert=True)
+        return
     await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
     try:
         await bot.send_message(int(uid), f"❌ Вывод NFT (ID: {item_id}) отклонён.")
-    except:
+    except Exception:
         pass
 
 @dp.message(Command("start"))
@@ -1206,7 +1368,8 @@ async def cmd_start(message: types.Message):
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
 
 # ---------- Настройка сервера ----------
-app = web.Application()
+app = web.Application(middlewares=[security_headers_middleware], client_max_size=64 * 1024)
+app.router.add_get('/health', handle_health)
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)
 app.router.add_get('/inventory', handle_get_inventory)
@@ -1229,12 +1392,22 @@ app.router.add_post('/sell-drop', handle_sell_drop)
 app.router.add_options('/{tail:.*}', handle_options)
 
 async def main():
-    asyncio.create_task(game_worker())
+    global db_pool
+    db_pool = await create_db_pool()
+    await init_db()
+    game_task = asyncio.create_task(game_worker())
     port = int(os.environ.get("PORT", 8080))
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, '0.0.0.0', port).start()
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        game_task.cancel()
+        await asyncio.gather(game_task, return_exceptions=True)
+        await runner.cleanup()
+        await bot.session.close()
+        await db_pool.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
