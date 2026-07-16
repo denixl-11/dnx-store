@@ -1125,19 +1125,19 @@
         .header-right::before { content: none; }
         .header-right::after { flex: 0 0 auto; }
         .balance-text {
-            color: transparent;
-            background: linear-gradient(105deg, var(--star-gold-1), var(--star-gold-2) 52%, var(--star-gold-3));
-            -webkit-background-clip: text;
-            background-clip: text;
-            text-shadow: 0 0 14px rgba(255, 174, 72, .25);
+            color: #fff6e7;
+            background: none;
+            -webkit-text-fill-color: initial;
+            text-shadow: 0 0 12px rgba(255, 201, 86, .18);
         }
         .premium-star {
             display: inline-block;
-            color: #ffd36a;
-            font-weight: 900;
+            color: initial;
+            font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+            font-weight: 400;
             line-height: 1;
-            text-shadow: 0 0 5px #ff9d42, 0 0 13px rgba(255, 74, 117, .5);
-            filter: drop-shadow(0 1px 0 rgba(255,255,255,.35));
+            text-shadow: none;
+            filter: none;
         }
         .page {
             width: calc(100% - 24px);
@@ -1147,8 +1147,22 @@
             border-radius: 18px;
             overflow: clip;
         }
-        .store-tabs, .inventory-tabs { border-radius: 14px !important; }
-        .store-tab { border-radius: 12px; }
+        .store-tabs, .inventory-tabs {
+            gap: 3px !important;
+            height: auto !important;
+            padding: 3px !important;
+            border-radius: 15px !important;
+            overflow: visible !important;
+        }
+        #page-inventory > .inventory-tabs { gap: 3px !important; padding: 3px !important; overflow: visible !important; }
+        #page-inventory > .inventory-tabs .tab-item {
+            padding: 12px 4px !important;
+            border: 1px solid transparent !important;
+            border-radius: 11px;
+        }
+        #page-inventory > .inventory-tabs .tab-item.active { border-color: #d34bff !important; }
+        .store-tab { height: 42px; border-radius: 11px; }
+        .inventory-tabs .tab-item { border-radius: 11px; }
         .catalog-grid,
         #cases-grid,
         #page-inventory .catalog-grid {
@@ -1170,6 +1184,7 @@
             margin-bottom: 9px;
             border-radius: 12px;
         }
+        .item-image.non-interactive { cursor: default; pointer-events: none; }
         .item-name, .case-card .item-name { margin: 2px 0 9px; font-size: .78rem; min-height: 1em; }
         .case-card .item-name { font-size: .82rem; }
         .case-price { width: max-content; max-width: 100%; margin: auto; padding: 5px 10px; font-size: .78rem; }
@@ -1287,7 +1302,7 @@
             <div class="username" id="username-display">User</div>
         </div>
         <div class="header-right" onclick="showPage('balance')">
-            <span class="balance-text" id="header-balance">✦ 0</span>
+            <span class="balance-text" id="header-balance">⭐ 0</span>
         </div>
     </header>
 
@@ -1324,12 +1339,12 @@
                 <span id="game-number-display">#...</span>
             </div>
             <div class="game-controls">
-                <button class="btn-gold-outline" onclick="openBetConfirm(10)">+10 <span class="premium-star">✦</span></button>
+                <button class="btn-gold-outline" onclick="openBetConfirm(10)">+10 <span class="premium-star">⭐</span></button>
                 <button class="btn-gold-outline" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
             <div class="bets-list-container" id="bets-list-container">
-                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 ✦</span>)</div>
+                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 ⭐</span>)</div>
                 <div class="bets-list" id="game-bets-list"></div>
             </div>
         </div>
@@ -1341,8 +1356,8 @@
             <div class="store-tab" onclick="switchStoreTab('cases')">КЕЙСЫ</div>
         </div>
         <div id="collection-filter" class="collection-filter">
-            <select id="collection-filter-select" aria-label="Фильтр по коллекции" onchange="applyCollectionFilter(this.value)">
-                <option value="">Все коллекции</option>
+            <select id="collection-filter-select" aria-label="Фильтр по названию NFT" onchange="applyCollectionFilter(this.value)">
+                <option value="">Все NFT</option>
             </select>
             <button id="collection-filter-clear" class="collection-filter-clear" type="button" aria-label="Сбросить фильтр" onclick="resetCollectionFilter()" disabled>×</button>
         </div>
@@ -1362,16 +1377,16 @@
     <div id="page-balance" class="page">
         <div class="balance-page-inner">
             <div class="section-eyebrow">ВНУТРЕННИЙ БАЛАНС</div>
-            <div class="big-balance-card"><span class="star-coin">★</span><strong id="big-balance">0</strong><small>STARS</small></div>
+            <div class="big-balance-card"><span class="star-coin premium-star">⭐</span><strong id="big-balance">0</strong><small>STARS</small></div>
             <h2 class="balance-title">ПОПОЛНИТЬ БАЛАНС</h2>
             <p class="balance-subtitle">Выберите количество звёзд, затем способ оплаты</p>
             <div class="topup-grid">
-                <button class="topup-btn" onclick="initTopup(85)"><b>85</b><span class="premium-star">✦</span></button>
-                <button class="topup-btn" onclick="initTopup(255)"><b>255</b><span class="premium-star">✦</span></button>
-                <button class="topup-btn" onclick="initTopup(425)"><b>425</b><span class="premium-star">✦</span></button>
-                <button class="topup-btn" onclick="initTopup(850)"><b>850</b><span class="premium-star">✦</span></button>
-                <button class="topup-btn" onclick="initTopup(1700)"><b>1 700</b><span class="premium-star">✦</span></button>
-                <button class="topup-btn" onclick="initTopup(4250)"><b>4 250</b><span class="premium-star">✦</span></button>
+                <button class="topup-btn" onclick="initTopup(85)"><b>85</b><span class="premium-star">⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(255)"><b>255</b><span class="premium-star">⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(425)"><b>425</b><span class="premium-star">⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(850)"><b>850</b><span class="premium-star">⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(1700)"><b>1 700</b><span class="premium-star">⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(4250)"><b>4 250</b><span class="premium-star">⭐</span></button>
                 <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
             </div>
         </div>
@@ -1429,7 +1444,7 @@
             <div style="text-align: center;">
                 <div id="winner-avatar-container"></div>
                 <div class="winner-name" id="winner-name"></div>
-                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> <span class="premium-star">✦</span></div>
+                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> <span class="premium-star">⭐</span></div>
                 <button class="btn-main-action" onclick="closeWinnerModal()">Продолжить</button>
             </div>
         </div>
@@ -1466,7 +1481,7 @@
 
     <div id="payment-success-modal" class="modal-overlay">
         <div class="modal-content success-payment-card" onclick="event.stopPropagation()">
-            <div class="success-payment-icon">✦</div>
+            <div class="success-payment-icon">⭐</div>
             <h3>ПОПОЛНЕНИЕ УСПЕШНО</h3>
             <p>Ваш баланс успешно пополнен на<br><strong id="payment-success-amount">0 Stars</strong></p>
             <button class="btn-main-action" onclick="closeModal('payment-success-modal')">ПРОДОЛЖИТЬ</button>
@@ -1474,15 +1489,15 @@
     </div>
 
     <div id="confirm-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> <span class="premium-star">✦</span>?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> <span class="premium-star">⭐</span>?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
     </div>
 
     <div id="payment-method-modal" class="modal-overlay">
         <div class="modal-content payment-method-sheet">
             <div class="section-eyebrow">ПОПОЛНЕНИЕ</div>
-            <h3 class="modal-title"><span id="method-stars-amount">0</span> <span class="premium-star">✦</span></h3>
+            <h3 class="modal-title"><span id="method-stars-amount">0</span> <span class="premium-star">⭐</span></h3>
             <p class="ton-payment-note">Выберите способ оплаты</p>
-            <button class="payment-method-card stars-method" onclick="payWithTelegramStars()"><span class="method-icon premium-star">✦</span><span><b>Telegram Stars</b><small>Оплатить напрямую в Telegram</small></span><i>›</i></button>
+            <button class="payment-method-card stars-method" onclick="payWithTelegramStars()"><span class="method-icon premium-star">⭐</span><span><b>Telegram Stars</b><small>Оплатить напрямую в Telegram</small></span><i>›</i></button>
             <button class="payment-method-card ton-method" onclick="openTonPayment()"><span class="method-icon">◆</span><span><b>Toncoin</b><small>1 TON = 85 Stars</small></span><i>›</i></button>
             <button class="payment-method-card rub-method" disabled><span class="method-icon">₽</span><span><b>Рубли</b><small>Скоро</small></span><em>СКОРО</em></button>
             <div class="ton-payment-status" id="stars-payment-status"></div>
@@ -1491,7 +1506,7 @@
     </div>
 
     <div id="topup-modal" class="modal-overlay">
-        <div class="modal-content ton-payment-modal"><h3 class="modal-title"><span id="display-topup-stars">0</span> <span class="premium-star">✦</span> ЗА TON</h3>
+        <div class="modal-content ton-payment-modal"><h3 class="modal-title"><span id="display-topup-stars">0</span> <span class="premium-star">⭐</span> ЗА TON</h3>
             <div class="ton-orb">◆</div>
             <p class="ton-payment-note">К оплате: <strong id="display-topup-ton">0</strong> TON<br>Курс фиксирован: 1 TON = 85 Stars</p>
             <div class="ton-payment-status" id="ton-payment-status">Кошелёк не подключён</div>
@@ -1546,14 +1561,14 @@
                     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 15px;">
                         <button class="btn-main-action" onclick="claimItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">ЗАБРАТЬ В ИНВЕНТАРЬ</button>
                         <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">
-                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> ✦</span>
+                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> ⭐</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <div id="case-actions" style="margin-top: 25px; display: flex; justify-content: center; width: 100%;">
-                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ✦</button>
+                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ⭐</button>
             </div>
 
             <div id="case-drops-section" style="margin-top: 35px;">
@@ -1589,12 +1604,14 @@
             const readInset = (side) => {
                 const contentValue = Number(contentInset[side]);
                 const deviceValue = Number(deviceInset[side]);
-                if (Number.isFinite(contentValue) && contentValue >= 0) return contentValue;
-                if (Number.isFinite(deviceValue) && deviceValue >= 0) return deviceValue;
-                return 0;
+                return Math.max(
+                    Number.isFinite(contentValue) && contentValue >= 0 ? contentValue : 0,
+                    Number.isFinite(deviceValue) && deviceValue >= 0 ? deviceValue : 0
+                );
             };
             const root = document.documentElement;
-            root.style.setProperty('--content-safe-top', readInset('top') + 'px');
+            const fullscreenControlsTop = tg.isFullscreen ? 82 : 0;
+            root.style.setProperty('--content-safe-top', Math.max(readInset('top'), fullscreenControlsTop) + 'px');
             root.style.setProperty('--content-safe-right', readInset('right') + 'px');
             root.style.setProperty('--content-safe-bottom', readInset('bottom') + 'px');
             root.style.setProperty('--content-safe-left', readInset('left') + 'px');
@@ -1760,18 +1777,18 @@
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
             } catch(e) { console.error('Balance update failed', e); }
-            document.getElementById('header-balance').innerHTML = `<span class="premium-star">✦</span> ${formatStars(userBalance)}`;
+            document.getElementById('header-balance').innerHTML = `<span class="premium-star">⭐</span> ${formatStars(userBalance)}`;
             document.getElementById('big-balance').innerText = formatStars(userBalance);
         }
 
         async function loadCatalog() {
             try {
                 currentCatalog = await apiFetch(`${API_BASE}/items`);
-                const collections = [...new Set(currentCatalog.map(getItemCollection).filter(Boolean))]
+                const collections = [...new Set(currentCatalog.map(item => String(item?.name || '').trim()).filter(Boolean))]
                     .sort((a, b) => a.localeCompare(b, 'ru'));
                 if (currentCollectionFilter && !collections.includes(currentCollectionFilter)) currentCollectionFilter = '';
                 const select = document.getElementById('collection-filter-select');
-                select.innerHTML = `<option value="">Все коллекции</option>${collections.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}`;
+                select.innerHTML = `<option value="">Все NFT</option>${collections.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}`;
                 select.value = currentCollectionFilter;
                 renderCatalogItems();
                 updateCollectionFilterUi();
@@ -1779,33 +1796,21 @@
             } catch(e) { console.error(e); }
         }
 
-        function getItemCollection(item) {
-            if (typeof item?.model === 'string' && item.model.trim()) return item.model.trim();
-            if (Array.isArray(item?.traits)) {
-                const trait = item.traits.find(entry => {
-                    const key = String(entry?.trait_type || entry?.name || '').trim().toLowerCase();
-                    return key === 'collection' || key === 'коллекция';
-                });
-                if (trait?.value != null) return String(trait.value).trim();
-            }
-            return '';
-        }
-
         function renderCatalogItems() {
             const items = currentCollectionFilter
-                ? currentCatalog.filter(item => getItemCollection(item) === currentCollectionFilter)
+                ? currentCatalog.filter(item => String(item?.name || '').trim() === currentCollectionFilter)
                 : currentCatalog;
             document.getElementById('catalog-container').innerHTML = items.length ? items.map(item => `
                     <div class="item-card">
                         <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" alt="${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">
                         <div class="item-name">${escapeHtml(item.name)}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${formatStars(item.price)} <span class="premium-star">✦</span></button>
+                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${formatStars(item.price)} <span class="premium-star">⭐</span></button>
                             <button class="btn-add-cart" onclick="addCatalogItemToCart(${Number(item.id)})">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                             </button>
                         </div>
-                    </div>`).join('') : `<div class="empty-state"><h3>НЕТ ПРЕДМЕТОВ</h3><p>В выбранной коллекции пока нет доступных NFT.</p></div>`;
+                    </div>`).join('') : `<div class="empty-state"><h3>НЕТ ПРЕДМЕТОВ</h3><p>Для выбранного названия пока нет доступных NFT.</p></div>`;
         }
 
         function applyCollectionFilter(value) {
@@ -1869,12 +1874,13 @@
         function openNftModal(id) {
             const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
             if(!item) return;
+            const isShopItem = currentCatalog.some(i => String(i.id) === String(id));
+            if (!isShopItem && isSimpleInventoryNft(item)) return;
             currentNftItem = item;
             document.getElementById('nft-modal-img').src = safeImageUrl(item.image_url);
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
 
-            const isShopItem = currentCatalog.some(i => String(i.id) === String(id));
             const tgLinkBtn = document.getElementById('nft-telegram-link');
             const modalTgBtn = document.getElementById('nft-tg-link-btn');
 
@@ -1895,16 +1901,17 @@
                 else if(Array.isArray(item.traits)) traits = item.traits;
             }
 
-            if (traits.length === 0 && !isShopItem) {
-                traits = [
-                    { label: 'Модель', value: item.model || item.name },
-                    { label: 'Фон', value: 'Random' },
-                    { label: 'Узор', value: 'Random' }
-                ];
+            if (!isShopItem) {
+                const withoutModel = traits.filter(t => !['модель', 'model'].includes(
+                    String(t?.label || t?.name || t?.trait_type || '').trim().toLowerCase()
+                ));
+                traits = item.model
+                    ? [{ label: 'Модель', value: item.model }, ...withoutModel]
+                    : withoutModel;
             }
 
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
-                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${escapeHtml(t.label || t.name || '—')}</div><div class="trait-value">${escapeHtml(t.value || '—')}</div></div>`).join('')}</div>` :
+                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${escapeHtml(t.label || t.name || t.trait_type || '—')}</div><div class="trait-value">${escapeHtml(t.value || '—')}</div></div>`).join('')}</div>` :
                 '<div style="text-align:center; color:#8e8e93; padding:20px;">Нет характеристик</div>';
 
             const buyBtn = document.getElementById('nft-modal-btn-buy');
@@ -1914,7 +1921,7 @@
                 buyBtn.style.display = 'block';
                 cartBtn.style.display = 'flex';
                 withdrawBtn.style.display = 'none';
-                buyBtn.innerText = `КУПИТЬ ЗА ${formatStars(item.price)} ✦`;
+                buyBtn.innerText = `КУПИТЬ ЗА ${formatStars(item.price)} ⭐`;
                 buyBtn.onclick = () => { closeNftModal(true); confirmBuyItem(item.id, item.price, item.name, item.image_url); };
                 cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
             } else {
@@ -1954,7 +1961,7 @@
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}">
                         <div class="cart-item-info">
                             <div style="font-weight:500">${escapeHtml(c.name)}</div>
-                            <div style="color:#ffd274; margin-top:4px;">${formatStars(c.price)} ✦</div>
+                            <div style="color:#ffd274; margin-top:4px;">${formatStars(c.price)} ⭐</div>
                         </div>
                         <div style="font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 10px;" onclick="removeFromCart(${i})">×</div>
                     </div>`).join('');
@@ -1970,7 +1977,7 @@
                 <img src="${escapeHtml(safeImageUrl(image_url))}" />
                 <div style="text-align:left;">
                     <div style="font-weight:600;">${escapeHtml(name)}</div>
-                    <div style="color:#ffd274;">${formatStars(price)} ✦</div>
+                    <div style="color:#ffd274;">${formatStars(price)} ⭐</div>
                 </div>`;
             document.getElementById('confirm-buy-modal').classList.add('active');
         }
@@ -2168,6 +2175,9 @@
             document.getElementById('inventory-history-container').style.display = type === 'history' ? 'grid' : 'none';
             document.getElementById('page-inventory').classList.toggle('history-active', type === 'history');
         }
+        function isSimpleInventoryNft(item) {
+            return ['ring', 'diamond', 'cup'].includes(String(item?.name || '').trim().toLowerCase());
+        }
         async function loadInventory() {
             try {
                 const data = await apiFetch(`${API_BASE}/inventory`);
@@ -2175,13 +2185,15 @@
                 const active = inventoryData.filter(i => i.status !== 'withdrawn');
                 const withdrawn = inventoryData.filter(i => i.status === 'withdrawn');
                 document.getElementById('inventory-active-container').innerHTML = active.length
-                    ? active.map(i => `
+                    ? active.map(i => {
+                        const simpleNft = isSimpleInventoryNft(i);
+                        return `
                         <div class="item-card">
-                            <img src="${escapeHtml(safeImageUrl(i.image_url))}" class="item-image" onclick="openNftModal(${Number(i.id)})">
-                            <div class="item-rarity">${escapeHtml(i.model || 'NFT')}</div>
+                            <img src="${escapeHtml(safeImageUrl(i.image_url))}" class="item-image${simpleNft ? ' non-interactive' : ''}" alt="${escapeHtml(i.name)}"${simpleNft ? '' : ` onclick="openNftModal(${Number(i.id)})"`}>
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button>
-                        </div>`).join('')
+                        </div>`;
+                    }).join('')
                     : `<div class="empty-state"><div class="empty-state-icon">◇</div><h3>ИНВЕНТАРЬ ПУСТ</h3><p>Купленные и выигранные NFT появятся здесь.</p></div>`;
                 document.getElementById('inventory-history-container').innerHTML = withdrawn.length
                     ? withdrawn.map(i => `
@@ -2214,7 +2226,7 @@
                     <div class="history-modal-row">
                         <span>#${h.game_number}</span>
                         <span>${escapeHtml(h.winner_name)}</span>
-                        <span style="color:#ffd274">${formatStars(h.win_amount)} ✦ (${h.win_percent}%)</span>
+                        <span style="color:#ffd274">${formatStars(h.win_amount)} ⭐ (${h.win_percent}%)</span>
                     </div>`).join('');
             } catch(e) { list.innerHTML = 'Ошибка загрузки'; }
         }
@@ -2338,6 +2350,7 @@
         let lastLeaderboardUpdate = 0;
         let gamePollInFlight = false;
         let gamePollTimer = null;
+        let lastWaitingAnimationTime = 0;
 
         function parseColors(colorData) {
             if (Array.isArray(colorData)) {
@@ -2386,22 +2399,69 @@
             context.drawImage(image, sx, sy, sw, sh, 0, 0, width, height);
         }
 
+        const waitingTwinkles = [
+            [.13,.18,0], [.79,.16,1.3], [.22,.35,2.1], [.88,.39,.7],
+            [.09,.68,2.8], [.72,.62,1.8], [.34,.82,.4], [.91,.79,2.4]
+        ];
+        const waitingLightning = [
+            { phase: 0, points: [[.10,.56],[.18,.51],[.15,.47],[.27,.43],[.23,.38]] },
+            { phase: 2.2, points: [[.74,.47],[.82,.43],[.79,.39],[.91,.34]] },
+            { phase: 4.1, points: [[.31,.72],[.38,.68],[.36,.64],[.46,.59]] }
+        ];
+
+        function drawWaitingEnergy(context, width, height, now) {
+            const time = now * .001;
+            context.save();
+            context.globalCompositeOperation = 'screen';
+            context.lineCap = 'round';
+            context.lineJoin = 'round';
+
+            const cloudPulse = .07 + (Math.sin(time * 1.45) + 1) * .035;
+            context.beginPath();
+            context.moveTo(width * .04, height * .58);
+            context.bezierCurveTo(width * .18, height * .48, width * .30, height * .52, width * .43, height * .42);
+            context.moveTo(width * .57, height * .46);
+            context.bezierCurveTo(width * .70, height * .38, width * .84, height * .44, width * .97, height * .31);
+            context.strokeStyle = `rgba(244,78,255,${cloudPulse})`;
+            context.lineWidth = Math.max(1.2, width * .0018);
+            context.shadowColor = 'rgba(219,55,255,.55)';
+            context.shadowBlur = Math.max(3, width * .008);
+            context.stroke();
+
+            for (const bolt of waitingLightning) {
+                const wave = Math.max(0, Math.sin(time * 1.7 + bolt.phase));
+                const alpha = .025 + wave * .16;
+                context.beginPath();
+                bolt.points.forEach((point, index) => {
+                    const x = point[0] * width, y = point[1] * height;
+                    if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+                });
+                context.strokeStyle = `rgba(255,150,243,${alpha})`;
+                context.lineWidth = Math.max(1, width * .00125);
+                context.shadowColor = `rgba(221,72,255,${alpha * 2.2})`;
+                context.shadowBlur = Math.max(2, width * .006);
+                context.stroke();
+            }
+
+            for (const [px, py, phase] of waitingTwinkles) {
+                const glow = Math.max(0, Math.sin(time * 1.9 + phase));
+                const radius = Math.max(1, width * (.0015 + glow * .0016));
+                context.beginPath();
+                context.arc(px * width, py * height, radius, 0, Math.PI * 2);
+                context.fillStyle = `rgba(255,205,250,${.06 + glow * .4})`;
+                context.shadowColor = 'rgba(236,94,255,.75)';
+                context.shadowBlur = Math.max(2, width * .009 * glow);
+                context.fill();
+            }
+            context.restore();
+        }
+
         function drawWaitingState(ctx, canvas) {
             const width = canvas.width, height = canvas.height;
             drawCoverImage(ctx, waitingFieldImage, width, height);
             const pulse = (Math.sin(Date.now() * 0.003) + 1) / 2;
+            drawWaitingEnergy(ctx, width, height, Date.now());
             ctx.save();
-            const sweep = ((Date.now() % 5200) / 5200) * 1.8 - .4;
-            const shimmer = ctx.createLinearGradient(width * (sweep - .32), 0, width * (sweep + .32), height);
-            shimmer.addColorStop(0, 'rgba(255,255,255,0)');
-            shimmer.addColorStop(.46, 'rgba(210,110,255,0)');
-            shimmer.addColorStop(.5, `rgba(255,210,245,${.045 + pulse * .025})`);
-            shimmer.addColorStop(.54, 'rgba(255,95,145,.035)');
-            shimmer.addColorStop(1, 'rgba(255,255,255,0)');
-            ctx.globalCompositeOperation = 'screen';
-            ctx.fillStyle = shimmer;
-            ctx.fillRect(0, 0, width, height);
-            ctx.globalCompositeOperation = 'source-over';
             ctx.fillStyle = `rgba(255, 220, 185, ${0.68 + pulse * .2})`;
             ctx.shadowColor = 'rgba(224, 66, 255, .75)';
             ctx.shadowBlur = 12 + pulse * 8;
@@ -2560,30 +2620,40 @@
             }
             }
             if (!isWaitingMode && highlightPts && highlightPts.length >= 3) {
-                // Визуально отводим подсветку от внешней рамки canvas. Геометрия
-                // победителя не меняется: inset применяется только при отрисовке.
-                const INSET = Math.max(16, Math.min(cw, ch) * 0.022);
-                const dw = cw - INSET * 2, dh = ch - INSET * 2;
+                // Геометрию победителя не масштабируем: линия идёт по реальной
+                // границе полигона. Только точки на самом краю удерживаем внутри
+                // canvas на половину ширины свечения, чтобы его не обрезало рамкой.
+                const EDGE_PAD = Math.max(7, Math.min(cw, ch) * .011);
+                const projectHighlightPoint = point => ({
+                    x: Math.max(EDGE_PAD, Math.min(cw - EDGE_PAD, point.x * cw)),
+                    y: Math.max(EDGE_PAD, Math.min(ch - EDGE_PAD, (1 - point.y) * ch))
+                });
+                const highlightPath = highlightPts.map(projectHighlightPoint);
                 ctx.save();
                 ctx.beginPath();
-                ctx.moveTo(INSET + highlightPts[0].x * dw, INSET + (1 - highlightPts[0].y) * dh);
-                for (let i = 1; i < highlightPts.length; i++) ctx.lineTo(INSET + highlightPts[i].x * dw, INSET + (1 - highlightPts[i].y) * dh);
+                ctx.moveTo(highlightPath[0].x, highlightPath[0].y);
+                for (let i = 1; i < highlightPath.length; i++) ctx.lineTo(highlightPath[i].x, highlightPath[i].y);
                 ctx.closePath();
-                ctx.fillStyle = "rgba(212, 175, 55, 0.3)";
+                ctx.fillStyle = "rgba(226, 181, 53, .16)";
                 ctx.fill();
                 const goldGrad = ctx.createLinearGradient(0, 0, cw, ch);
-                goldGrad.addColorStop(0, "#F9F295");
-                goldGrad.addColorStop(0.5, "#D4AF37");
-                goldGrad.addColorStop(1, "#997A00");
+                goldGrad.addColorStop(0, "#FFF5B8");
+                goldGrad.addColorStop(.48, "#E7BE45");
+                goldGrad.addColorStop(1, "#A97812");
                 ctx.lineJoin = "round";
                 ctx.lineCap = "round";
+                ctx.strokeStyle = "rgba(226, 181, 53, .22)";
+                ctx.lineWidth = Math.max(12, Math.min(cw, ch) * .019);
+                ctx.shadowBlur = 0;
+                ctx.stroke();
                 ctx.strokeStyle = goldGrad;
-                ctx.lineWidth = 10;
-                ctx.shadowColor = "rgba(212, 175, 55, 0.95)";
-                ctx.shadowBlur = 18;
+                ctx.lineWidth = Math.max(5, Math.min(cw, ch) * .0075);
+                ctx.shadowColor = "rgba(234, 190, 65, .72)";
+                ctx.shadowBlur = Math.max(6, Math.min(cw, ch) * .01);
                 ctx.stroke();
                 ctx.shadowBlur = 0;
-                ctx.lineWidth = 4;
+                ctx.strokeStyle = "rgba(255, 249, 199, .82)";
+                ctx.lineWidth = Math.max(1.5, Math.min(cw, ch) * .0022);
                 ctx.stroke();
                 ctx.restore();
             }
@@ -2628,7 +2698,17 @@
                 ctx.closePath();
                 ctx.restore();
             }
-            if (isWaitingMode && !isSpinning) animationFrameId = requestAnimationFrame(() => drawGameFrame(ballPos, highlightPts));
+            if (isWaitingMode && !isSpinning) animationFrameId = requestAnimationFrame(animateWaitingFrame);
+        }
+
+        function animateWaitingFrame(timestamp) {
+            if (isSpinning || gState.players.length !== 0 || gState.status === 'spinning') return;
+            if (timestamp - lastWaitingAnimationTime >= 32) {
+                lastWaitingAnimationTime = timestamp;
+                drawGameFrame();
+            } else {
+                animationFrameId = requestAnimationFrame(animateWaitingFrame);
+            }
         }
 
         function preloadAvatars(polygons) {
@@ -2833,7 +2913,7 @@
             const hasPlayers = gState.players && gState.players.length > 0;
             container.style.display = hasPlayers ? 'flex' : 'none';
             if (!hasPlayers) return;
-            document.getElementById('game-total-pool').innerText = `${formatStars(gState.pool)} ✦`;
+            document.getElementById('game-total-pool').innerText = `${formatStars(gState.pool)} ⭐`;
             const sorted = [...gState.players].sort((a,b) => String(a.id).localeCompare(String(b.id)));
             list.innerHTML = sorted.map(p => {
                 const winPercent = formatWinChance(p.amount, gState.pool);
@@ -2846,7 +2926,7 @@
                     </span>
                     <span style="display:flex;gap:15px;align-items:center;">
                         <span style="color:rgba(255,255,255,0.6);font-size:14px;">${winPercent}%</span>
-                        <span style="color:#ffd274;font-weight:600;font-size:15px;min-width:70px;text-align:right;">${formatStars(p.amount)} ✦</span>
+                        <span style="color:#ffd274;font-weight:600;font-size:15px;min-width:70px;text-align:right;">${formatStars(p.amount)} ⭐</span>
                     </span>
                 </div>`;
             }).join('');
@@ -2932,7 +3012,7 @@
                     <div class="case-card" onclick="openCaseDetail(${Number(c.id)})" style="animation-delay: ${i * 0.08}s">
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}" class="item-image" alt="${escapeHtml(c.name)}">
                         <div class="item-name">${escapeHtml(c.name)}</div>
-                        <div class="case-price">${formatStars(c.price)} <span class="premium-star">✦</span></div>
+                        <div class="case-price">${formatStars(c.price)} <span class="premium-star">⭐</span></div>
                     </div>
                 `).join('');
             } catch(e) {
@@ -2944,7 +3024,7 @@
             try {
                 currentCase = await apiFetch(`${API_BASE}/case-details?id=${caseId}`);
                 document.getElementById('case-detail-title').innerText = currentCase.name;
-                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${formatStars(currentCase.price)} ✦`;
+                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${formatStars(currentCase.price)} ⭐`;
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
                 document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
