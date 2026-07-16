@@ -1130,15 +1130,22 @@
             -webkit-text-fill-color: initial;
             text-shadow: 0 0 12px rgba(255, 201, 86, .18);
         }
-        .premium-star {
+        .premium-star, .telegram-star {
             display: inline-block;
-            color: initial;
-            font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-            font-weight: 400;
+            flex: 0 0 auto;
+            width: 1.08em;
+            height: 1.08em;
+            margin: 0 .08em;
+            vertical-align: -.15em;
+            color: transparent;
+            font-size: 1em;
             line-height: 1;
-            text-shadow: none;
-            filter: none;
+            background: url('telegram-star.svg') center / contain no-repeat;
+            filter: drop-shadow(0 0 .22em rgba(255, 171, 31, .26));
         }
+        .star-amount { display: inline-flex; align-items: center; justify-content: center; gap: .18em; white-space: nowrap; }
+        .big-balance-card > .telegram-star { font-size: 2.2rem; }
+        .method-icon .telegram-star { font-size: 1.45rem; }
         .page {
             width: calc(100% - 24px);
             max-width: 480px;
@@ -1260,16 +1267,67 @@
             transform: translateX(-50%);
             border-radius: 22px 22px 0 0;
         }
+        .nft-modal-sheet {
+            max-height: min(88vh, calc(var(--app-height) - var(--content-safe-top) - 12px));
+            border-color: rgba(217, 74, 187, .52);
+            background:
+                radial-gradient(circle at 8% 2%, rgba(161, 53, 232, .28), transparent 29%),
+                radial-gradient(circle at 92% 96%, rgba(255, 38, 80, .17), transparent 38%),
+                linear-gradient(160deg, #10071d 0%, #07030e 48%, #050208 100%);
+            box-shadow: 0 -18px 70px rgba(0,0,0,.72), inset 0 0 44px rgba(206,51,255,.04);
+        }
+        .nft-modal-header-rocket { padding: 58px 18px 0; }
+        .nft-modal-header-rocket > img {
+            width: min(64vw, 258px); height: min(64vw, 258px);
+            border: 1px solid rgba(236, 104, 180, .34); border-radius: 20px;
+            box-shadow: 0 18px 48px rgba(0,0,0,.45), 0 0 34px rgba(204,50,255,.12);
+        }
+        .nft-modal-title-wrap { padding: 19px 16px 8px; text-align: center; }
+        #nft-modal-title { color: #fff7fb; font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; }
+        #nft-modal-number { margin-top: 4px; color: #a98da8; font-size: .72rem; }
+        .modal-tg-btn, .nft-modal-close {
+            position: absolute; top: 15px; z-index: 10;
+            display: grid; place-items: center; width: 44px; height: 44px;
+            border: 1px solid rgba(214, 75, 255, .5); border-radius: 50%;
+            background: radial-gradient(circle at 35% 28%, rgba(226,93,255,.3), rgba(32,9,51,.94) 64%);
+            box-shadow: 0 0 20px rgba(200,55,255,.18), inset 0 0 14px rgba(255,75,140,.08);
+            cursor: pointer;
+        }
+        .modal-tg-btn { left: 15px; }
+        .nft-modal-close { right: 15px; color: #fff4fa; }
+        .modal-tg-btn svg { width: 23px; height: 23px; fill: #f8ecff; stroke: none; filter: drop-shadow(0 0 5px rgba(232,118,255,.65)); }
+        .nft-modal-close svg { width: 21px; height: 21px; }
+        #nft-modal-traits-container { padding: 0 20px; overflow-y: auto; flex: 1; }
+        .traits-table {
+            margin: 10px 0 4px; border-color: rgba(218, 83, 166, .25); border-radius: 14px;
+            background: linear-gradient(150deg, rgba(31,18,42,.92), rgba(13,8,20,.96));
+            box-shadow: inset 0 0 18px rgba(210,55,255,.035);
+        }
+        .trait-row { min-height: 50px; align-items: center; padding: 13px 16px; border-color: rgba(255,255,255,.07); gap: 18px; }
+        .trait-row:last-child { border-bottom: 0; }
+        .trait-row .trait-name { color: #ff76a4; }
+        .trait-row .trait-value { color: #f3d8ee; text-align: right; }
+        #nft-modal-actions { padding-top: 2px; }
+        #nft-modal-btn-buy {
+            color: #fffaf2; border: 1px solid rgba(255,191,74,.52);
+            background: linear-gradient(105deg, #9d5a15, #d49c35 45%, #8e2462 100%);
+            box-shadow: 0 0 20px rgba(255,148,37,.13), inset 0 1px rgba(255,255,255,.16);
+        }
         .leaderboard-fullscreen {
             height: var(--app-height);
             padding: calc(18px + var(--content-safe-top)) calc(16px + var(--content-safe-right)) calc(18px + var(--content-safe-bottom)) calc(16px + var(--content-safe-left));
         }
         .fixed-footer { left: 50%; bottom: calc(78px + var(--content-safe-bottom)); width: min(480px, calc(100% - 24px)); transform: translateX(-50%); }
         .tab-bar {
-            bottom: var(--content-safe-bottom);
+            bottom: 0;
             width: min(480px, calc(100vw - var(--content-safe-left) - var(--content-safe-right) - 24px));
-            border-radius: 18px;
+            height: calc(68px + var(--content-safe-bottom));
+            padding: 0 0 var(--content-safe-bottom);
+            border-bottom: 0;
+            border-radius: 18px 18px 0 0;
+            overflow: hidden;
         }
+        .tab-bar .tab-item { height: 68px; min-height: 68px; }
         .success-payment-card { overflow: hidden; }
         .success-payment-icon {
             position: relative; display: grid; place-items: center;
@@ -1302,7 +1360,7 @@
             <div class="username" id="username-display">User</div>
         </div>
         <div class="header-right" onclick="showPage('balance')">
-            <span class="balance-text" id="header-balance">⭐ 0</span>
+            <span class="balance-text star-amount" id="header-balance"><span class="telegram-star" aria-hidden="true"></span><span>0</span></span>
         </div>
     </header>
 
@@ -1339,12 +1397,12 @@
                 <span id="game-number-display">#...</span>
             </div>
             <div class="game-controls">
-                <button class="btn-gold-outline" onclick="openBetConfirm(10)">+10 <span class="premium-star">⭐</span></button>
+                <button class="btn-gold-outline" onclick="openBetConfirm(10)"><span class="star-amount"><span>+10</span><span class="telegram-star" aria-hidden="true"></span></span></button>
                 <button class="btn-gold-outline" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
             <div class="bets-list-container" id="bets-list-container">
-                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 ⭐</span>)</div>
+                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" class="star-amount" style="color:var(--accent-gold);"><span>0</span><span class="telegram-star" aria-hidden="true"></span></span>)</div>
                 <div class="bets-list" id="game-bets-list"></div>
             </div>
         </div>
@@ -1377,16 +1435,16 @@
     <div id="page-balance" class="page">
         <div class="balance-page-inner">
             <div class="section-eyebrow">ВНУТРЕННИЙ БАЛАНС</div>
-            <div class="big-balance-card"><span class="star-coin premium-star">⭐</span><strong id="big-balance">0</strong><small>STARS</small></div>
+            <div class="big-balance-card"><span class="star-coin telegram-star" aria-hidden="true"></span><strong id="big-balance">0</strong></div>
             <h2 class="balance-title">ПОПОЛНИТЬ БАЛАНС</h2>
             <p class="balance-subtitle">Выберите количество звёзд, затем способ оплаты</p>
             <div class="topup-grid">
-                <button class="topup-btn" onclick="initTopup(85)"><b>85</b><span class="premium-star">⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(255)"><b>255</b><span class="premium-star">⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(425)"><b>425</b><span class="premium-star">⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(850)"><b>850</b><span class="premium-star">⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(1700)"><b>1 700</b><span class="premium-star">⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(4250)"><b>4 250</b><span class="premium-star">⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(85)"><span class="star-amount"><b>85</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(255)"><span class="star-amount"><b>255</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(425)"><span class="star-amount"><b>425</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(850)"><span class="star-amount"><b>850</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(1700)"><span class="star-amount"><b>1 700</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(4250)"><span class="star-amount"><b>4 250</b><span class="telegram-star" aria-hidden="true"></span></span></button>
                 <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
             </div>
         </div>
@@ -1404,27 +1462,20 @@
     <!-- ================= МОДАЛЬНЫЕ ОКНА ================= -->
     <div id="nft-detail-overlay" class="modal-overlay" onclick="closeNftModal(event)">
         <div class="nft-modal-sheet" onclick="event.stopPropagation()">
-            <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;">
-                <svg viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="modal-tg-btn" id="nft-tg-link-btn" style="display: none;" title="Открыть в Telegram">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.7 3.2 18.8 20c-.2 1.2-.9 1.5-1.9.9l-4.4-3.2-2.1 2c-.2.2-.4.4-.9.4l.3-4.5 8.2-7.4c.4-.3-.1-.5-.5-.2L7.4 14.4 3 13c-1.2-.4-1.2-1.2.2-1.8l17.1-6.6c1-.4 1.8.2 1.4-1.4Z"/></svg>
             </div>
-            <div style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.4); border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10;" onclick="closeNftModal(true)">
+            <div class="nft-modal-close" onclick="closeNftModal(true)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </div>
             <div class="nft-modal-header-rocket">
                 <img src="" id="nft-modal-img">
-                <div style="padding: 20px; text-align: center;">
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
-                        <div style="font-size: 24px; font-weight: 800;" id="nft-modal-title">Name</div>
-                        <div id="nft-telegram-link" style="display: none; cursor: pointer; color: #2AABEE;" title="Открыть в Telegram">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.888-.666 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                            </svg>
-                        </div>
-                    </div>
+                <div class="nft-modal-title-wrap">
+                    <div id="nft-modal-title">Name</div>
                     <div style="color: var(--text-muted);" id="nft-modal-number">#0000</div>
                 </div>
             </div>
-            <div style="padding: 0 20px; overflow-y: auto; flex: 1;" id="nft-modal-traits-container"></div>
+            <div id="nft-modal-traits-container"></div>
             <div style="padding: 20px;">
                 <div class="modal-buttons-row" id="nft-modal-actions">
                     <button class="btn-buy-modal" id="nft-modal-btn-buy">КУПИТЬ</button>
@@ -1444,7 +1495,7 @@
             <div style="text-align: center;">
                 <div id="winner-avatar-container"></div>
                 <div class="winner-name" id="winner-name"></div>
-                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> <span class="premium-star">⭐</span></div>
+                <div class="winner-amount">Выигрыш: <span class="star-amount"><span id="winner-amount"></span><span class="telegram-star" aria-hidden="true"></span></span></div>
                 <button class="btn-main-action" onclick="closeWinnerModal()">Продолжить</button>
             </div>
         </div>
@@ -1468,11 +1519,11 @@
     </div>
 
     <div id="custom-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" min="10" step="10" inputmode="numeric" placeholder="10, 20, 30… Stars"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" min="10" step="10" inputmode="numeric" placeholder="10, 20, 30…"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
     </div>
 
     <div id="custom-amount-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Своя сумма</h3><input type="number" min="10" max="10000" step="1" inputmode="numeric" id="custom-amount-input" class="input-dark" placeholder="От 10 до 10 000 Stars"><button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button><button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Своя сумма</h3><input type="number" min="10" max="10000" step="1" inputmode="numeric" id="custom-amount-input" class="input-dark" placeholder="От 10 до 10 000"><button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button><button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button></div>
     </div>
 
     <div id="alert-modal" class="modal-overlay">
@@ -1481,24 +1532,24 @@
 
     <div id="payment-success-modal" class="modal-overlay">
         <div class="modal-content success-payment-card" onclick="event.stopPropagation()">
-            <div class="success-payment-icon">⭐</div>
+            <div class="success-payment-icon"><span class="telegram-star" aria-hidden="true"></span></div>
             <h3>ПОПОЛНЕНИЕ УСПЕШНО</h3>
-            <p>Ваш баланс успешно пополнен на<br><strong id="payment-success-amount">0 Stars</strong></p>
+            <p>Ваш баланс успешно пополнен на<br><strong id="payment-success-amount" class="star-amount"><span>0</span><span class="telegram-star" aria-hidden="true"></span></strong></p>
             <button class="btn-main-action" onclick="closeModal('payment-success-modal')">ПРОДОЛЖИТЬ</button>
         </div>
     </div>
 
     <div id="confirm-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> <span class="premium-star">⭐</span>?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span class="star-amount"><span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span><span class="telegram-star" aria-hidden="true"></span></span>?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
     </div>
 
     <div id="payment-method-modal" class="modal-overlay">
         <div class="modal-content payment-method-sheet">
             <div class="section-eyebrow">ПОПОЛНЕНИЕ</div>
-            <h3 class="modal-title"><span id="method-stars-amount">0</span> <span class="premium-star">⭐</span></h3>
+            <h3 class="modal-title star-amount"><span id="method-stars-amount">0</span><span class="telegram-star" aria-hidden="true"></span></h3>
             <p class="ton-payment-note">Выберите способ оплаты</p>
-            <button class="payment-method-card stars-method" onclick="payWithTelegramStars()"><span class="method-icon premium-star">⭐</span><span><b>Telegram Stars</b><small>Оплатить напрямую в Telegram</small></span><i>›</i></button>
-            <button class="payment-method-card ton-method" onclick="openTonPayment()"><span class="method-icon">◆</span><span><b>Toncoin</b><small>1 TON = 85 Stars</small></span><i>›</i></button>
+            <button class="payment-method-card stars-method" onclick="payWithTelegramStars()"><span class="method-icon"><span class="telegram-star" aria-hidden="true"></span></span><span><b>Telegram Stars</b><small>Оплатить напрямую в Telegram</small></span><i>›</i></button>
+            <button class="payment-method-card ton-method" onclick="openTonPayment()"><span class="method-icon">◆</span><span><b>Toncoin</b><small>1 TON = <span class="star-amount"><span>85</span><span class="telegram-star" aria-hidden="true"></span></span></small></span><i>›</i></button>
             <button class="payment-method-card rub-method" disabled><span class="method-icon">₽</span><span><b>Рубли</b><small>Скоро</small></span><em>СКОРО</em></button>
             <div class="ton-payment-status" id="stars-payment-status"></div>
             <button class="btn-secondary" onclick="closeModal('payment-method-modal')">Отмена</button>
@@ -1506,9 +1557,9 @@
     </div>
 
     <div id="topup-modal" class="modal-overlay">
-        <div class="modal-content ton-payment-modal"><h3 class="modal-title"><span id="display-topup-stars">0</span> <span class="premium-star">⭐</span> ЗА TON</h3>
+        <div class="modal-content ton-payment-modal"><h3 class="modal-title"><span class="star-amount"><span id="display-topup-stars">0</span><span class="telegram-star" aria-hidden="true"></span></span> ЗА TON</h3>
             <div class="ton-orb">◆</div>
-            <p class="ton-payment-note">К оплате: <strong id="display-topup-ton">0</strong> TON<br>Курс фиксирован: 1 TON = 85 Stars</p>
+            <p class="ton-payment-note">К оплате: <strong id="display-topup-ton">0</strong> TON<br>Курс фиксирован: 1 TON = <span class="star-amount"><span>85</span><span class="telegram-star" aria-hidden="true"></span></span></p>
             <div class="ton-payment-status" id="ton-payment-status">Кошелёк не подключён</div>
             <button class="btn-main-action" id="btn-send-topup" onclick="sendTopup()">ПОДКЛЮЧИТЬ КОШЕЛЁК</button>
             <button class="btn-secondary" onclick="closeModal('topup-modal')">Отмена</button>
@@ -1561,14 +1612,14 @@
                     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 15px;">
                         <button class="btn-main-action" onclick="claimItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">ЗАБРАТЬ В ИНВЕНТАРЬ</button>
                         <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">
-                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> ⭐</span>
+                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span class="star-amount"><span id="win-value">0</span><span id="win-currency" class="telegram-star" aria-hidden="true"></span></span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <div id="case-actions" style="margin-top: 25px; display: flex; justify-content: center; width: 100%;">
-                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ⭐</button>
+                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span class="star-amount"><span id="case-price"></span><span class="telegram-star" aria-hidden="true"></span></span></button>
             </div>
 
             <div id="case-drops-section" style="margin-top: 35px;">
@@ -1735,7 +1786,7 @@
             try { tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
         }
         function showPaymentSuccess(stars) {
-            document.getElementById('payment-success-amount').innerText = `${formatStars(stars)} Stars`;
+            document.getElementById('payment-success-amount').innerHTML = `<span>${formatStars(stars)}</span>${telegramStarMarkup()}`;
             document.getElementById('payment-success-modal').classList.add('active');
             try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
         }
@@ -1777,7 +1828,7 @@
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
             } catch(e) { console.error('Balance update failed', e); }
-            document.getElementById('header-balance').innerHTML = `<span class="premium-star">⭐</span> ${formatStars(userBalance)}`;
+            document.getElementById('header-balance').innerHTML = `${telegramStarMarkup()}<span>${formatStars(userBalance)}</span>`;
             document.getElementById('big-balance').innerText = formatStars(userBalance);
         }
 
@@ -1805,7 +1856,7 @@
                         <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" alt="${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">
                         <div class="item-name">${escapeHtml(item.name)}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${formatStars(item.price)} <span class="premium-star">⭐</span></button>
+                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${starAmountMarkup(item.price)}</button>
                             <button class="btn-add-cart" onclick="addCatalogItemToCart(${Number(item.id)})">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                             </button>
@@ -1850,6 +1901,12 @@
             if (!Number.isFinite(amount)) return '0';
             return Math.trunc(amount).toLocaleString('ru-RU');
         }
+        function telegramStarMarkup() {
+            return '<span class="telegram-star" aria-hidden="true"></span>';
+        }
+        function starAmountMarkup(value) {
+            return `<span class="star-amount"><span>${formatStars(value)}</span>${telegramStarMarkup()}</span>`;
+        }
         function safeImageUrl(value) {
             try {
                 const url = new URL(String(value || ''));
@@ -1881,17 +1938,13 @@
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
 
-            const tgLinkBtn = document.getElementById('nft-telegram-link');
             const modalTgBtn = document.getElementById('nft-tg-link-btn');
 
             const telegramLink = safeTelegramUrl(item.nft_link);
-            if (isShopItem && telegramLink) {
-                tgLinkBtn.style.display = 'block';
-                modalTgBtn.style.display = 'flex';
-                tgLinkBtn.onclick = () => tg.openTelegramLink(telegramLink);
+            if (telegramLink) {
+                modalTgBtn.style.display = 'grid';
                 modalTgBtn.onclick = () => tg.openTelegramLink(telegramLink);
             } else {
-                tgLinkBtn.style.display = 'none';
                 modalTgBtn.style.display = 'none';
             }
 
@@ -1921,7 +1974,7 @@
                 buyBtn.style.display = 'block';
                 cartBtn.style.display = 'flex';
                 withdrawBtn.style.display = 'none';
-                buyBtn.innerText = `КУПИТЬ ЗА ${formatStars(item.price)} ⭐`;
+                buyBtn.innerHTML = `КУПИТЬ ЗА ${starAmountMarkup(item.price)}`;
                 buyBtn.onclick = () => { closeNftModal(true); confirmBuyItem(item.id, item.price, item.name, item.image_url); };
                 cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
             } else {
@@ -1961,7 +2014,7 @@
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}">
                         <div class="cart-item-info">
                             <div style="font-weight:500">${escapeHtml(c.name)}</div>
-                            <div style="color:#ffd274; margin-top:4px;">${formatStars(c.price)} ⭐</div>
+                            <div style="color:#ffd274; margin-top:4px;">${starAmountMarkup(c.price)}</div>
                         </div>
                         <div style="font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 10px;" onclick="removeFromCart(${i})">×</div>
                     </div>`).join('');
@@ -1977,7 +2030,7 @@
                 <img src="${escapeHtml(safeImageUrl(image_url))}" />
                 <div style="text-align:left;">
                     <div style="font-weight:600;">${escapeHtml(name)}</div>
-                    <div style="color:#ffd274;">${formatStars(price)} ⭐</div>
+                    <div style="color:#ffd274;">${starAmountMarkup(price)}</div>
                 </div>`;
             document.getElementById('confirm-buy-modal').classList.add('active');
         }
@@ -2025,7 +2078,7 @@
         }
 
         function initTopup(stars) {
-            if (!Number.isInteger(stars) || stars < 10 || stars > 10000) { showAlert("Введите целое количество от 10 до 10 000 Stars"); return; }
+            if (!Number.isInteger(stars) || stars < 10 || stars > 10000) { showAlert("Введите целое количество звёзд от 10 до 10 000"); return; }
             pendingTopupStars = stars;
             document.getElementById('method-stars-amount').innerText = formatStars(stars);
             document.getElementById('stars-payment-status').innerText = '';
@@ -2035,7 +2088,7 @@
         function submitCustomAmount() {
             const normalized = document.getElementById('custom-amount-input').value.trim();
             const val = Number(normalized);
-            if (!Number.isInteger(val) || val < 10 || val > 10000) { showAlert("Введите целое количество от 10 до 10 000 Stars"); return; }
+            if (!Number.isInteger(val) || val < 10 || val > 10000) { showAlert("Введите целое количество звёзд от 10 до 10 000"); return; }
             closeModal('custom-amount-modal'); initTopup(val);
         }
         async function payWithTelegramStars() {
@@ -2226,7 +2279,7 @@
                     <div class="history-modal-row">
                         <span>#${h.game_number}</span>
                         <span>${escapeHtml(h.winner_name)}</span>
-                        <span style="color:#ffd274">${formatStars(h.win_amount)} ⭐ (${h.win_percent}%)</span>
+                        <span style="color:#ffd274;display:inline-flex;align-items:center;gap:5px;">${starAmountMarkup(h.win_amount)}<span>(${h.win_percent}%)</span></span>
                     </div>`).join('');
             } catch(e) { list.innerHTML = 'Ошибка загрузки'; }
         }
@@ -2913,7 +2966,7 @@
             const hasPlayers = gState.players && gState.players.length > 0;
             container.style.display = hasPlayers ? 'flex' : 'none';
             if (!hasPlayers) return;
-            document.getElementById('game-total-pool').innerText = `${formatStars(gState.pool)} ⭐`;
+            document.getElementById('game-total-pool').innerHTML = `<span>${formatStars(gState.pool)}</span>${telegramStarMarkup()}`;
             const sorted = [...gState.players].sort((a,b) => String(a.id).localeCompare(String(b.id)));
             list.innerHTML = sorted.map(p => {
                 const winPercent = formatWinChance(p.amount, gState.pool);
@@ -2926,7 +2979,7 @@
                     </span>
                     <span style="display:flex;gap:15px;align-items:center;">
                         <span style="color:rgba(255,255,255,0.6);font-size:14px;">${winPercent}%</span>
-                        <span style="color:#ffd274;font-weight:600;font-size:15px;min-width:70px;text-align:right;">${formatStars(p.amount)} ⭐</span>
+                        <span style="color:#ffd274;font-weight:600;font-size:15px;min-width:70px;text-align:right;">${starAmountMarkup(p.amount)}</span>
                     </span>
                 </div>`;
             }).join('');
@@ -2945,7 +2998,7 @@
             const inputVal = document.getElementById('custom-bet-input').value;
             const normalized = inputVal.trim();
             const v = Number(normalized);
-            if (!Number.isInteger(v) || v < 10 || v % 10 !== 0) { showAlert("Ставка должна быть кратна 10 Stars"); return; }
+            if (!Number.isInteger(v) || v < 10 || v % 10 !== 0) { showAlert("Ставка должна быть кратна 10 звёздам"); return; }
             closeModal('custom-bet-modal');
             openBetConfirm(v);
         }
@@ -2966,8 +3019,8 @@
                     if (data.error === 'insufficient_funds') msg = "Недостаточно средств!";
                     else if (data.error === 'game_started') msg = "Игра уже началась!";
                     else if (data.error === 'room_full') msg = "Слишком много игроков!";
-                    else if (data.error === 'min_bet') msg = "Минимальная ставка 10 Stars";
-                    else if (data.error === 'invalid_amount') msg = "Ставка должна быть кратна 10 Stars";
+                    else if (data.error === 'min_bet') msg = "Минимальная ставка — 10 звёзд";
+                    else if (data.error === 'invalid_amount') msg = "Ставка должна быть кратна 10 звёздам";
                     showAlert(msg);
                 }
             } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети"); }
@@ -3012,7 +3065,7 @@
                     <div class="case-card" onclick="openCaseDetail(${Number(c.id)})" style="animation-delay: ${i * 0.08}s">
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}" class="item-image" alt="${escapeHtml(c.name)}">
                         <div class="item-name">${escapeHtml(c.name)}</div>
-                        <div class="case-price">${formatStars(c.price)} <span class="premium-star">⭐</span></div>
+                        <div class="case-price">${starAmountMarkup(c.price)}</div>
                     </div>
                 `).join('');
             } catch(e) {
@@ -3024,7 +3077,7 @@
             try {
                 currentCase = await apiFetch(`${API_BASE}/case-details?id=${caseId}`);
                 document.getElementById('case-detail-title').innerText = currentCase.name;
-                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${formatStars(currentCase.price)} ⭐`;
+                document.getElementById('case-price').innerText = formatStars(currentCase.price);
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
                 document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `

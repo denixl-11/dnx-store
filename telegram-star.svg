@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="shell" x1="12" y1="8" x2="50" y2="57" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD82F"/>
+      <stop offset="0.5" stop-color="#FFB414"/>
+      <stop offset="1" stop-color="#FF8718"/>
+    </linearGradient>
+    <linearGradient id="face" x1="20" y1="12" x2="43" y2="49" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF06A"/>
+      <stop offset="0.55" stop-color="#FFC526"/>
+      <stop offset="1" stop-color="#FFA51B"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g transform="rotate(-5 32 32)" filter="url(#glow)">
+    <path d="M31.9 4.5c1.65-.08 2.79.91 3.47 2.3l6.1 12.43 13.68 1.98c1.53.23 2.67 1.24 3.04 2.7.36 1.45-.1 2.81-1.24 3.91l-9.9 9.65 2.34 13.61c.27 1.57-.31 2.92-1.56 3.8-1.25.9-2.74.95-4.13.23L31.47 48.7 19.24 55.1c-1.39.72-2.87.67-4.13-.22-1.24-.9-1.83-2.24-1.56-3.81l2.34-13.61-9.9-9.65c-1.13-1.1-1.59-2.46-1.23-3.91.36-1.46 1.5-2.47 3.04-2.7l13.67-1.98 6.11-12.43c.68-1.39 1.79-2.22 3.39-2.3h.93Z" fill="#FF9418"/>
+    <path d="M31.47 9.5 39 24.76l16.82 2.44-12.17 11.86 2.87 16.75-15.05-7.9-15.05 7.9 2.87-16.75L7.12 27.2l16.82-2.44L31.47 9.5Z" fill="url(#face)"/>
+    <path d="m18.6 39.7 12.87-6.04-14.84 16.7 1.97-10.66Z" fill="#FF8A18" opacity=".98"/>
+    <path d="M24.6 23.9 31.4 10l1.24 2.48" fill="none" stroke="#FFF9B1" stroke-width="2.1" stroke-linecap="round" opacity=".88"/>
+  </g>
+</svg>
