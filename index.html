@@ -889,6 +889,8 @@
         .elite-title { color: #fff; font-size: .86rem; text-transform: uppercase; }
         .elite-subtitle { color: #9d94a3; font-size: .62rem; text-transform: uppercase; }
         .elite-icon-container { border-color: rgba(210, 70, 255, .5); background: rgba(83, 16, 125, .35); }
+        .elite-icon svg { width: 22px; height: 22px; fill: none; stroke: #f076ff; stroke-width: 1.6; filter: drop-shadow(0 0 5px #ce3cff); }
+        .elite-score small { color: #b98d84; font-size: .48rem; letter-spacing: .08em; }
         .elite-right { border-color: rgba(255, 71, 107, .3); background: rgba(9,5,13,.65); }
         .elite-score { color: #fff; }
         .history-btn { color: #b8a7b7; border-color: rgba(255, 86, 118, .22); }
@@ -995,6 +997,96 @@
         @media (max-width: 330px) {
             .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
+
+        /* ===== REFERENCE-LOCKED VISUAL SYSTEM ===== */
+        body {
+            background: #020207 url('cosmic-bg.png') center / cover fixed no-repeat;
+        }
+        body::before {
+            content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+            background: linear-gradient(180deg, rgba(1,1,6,.08), rgba(1,1,7,.66));
+        }
+        header, .page, .tab-bar {
+            background-color: rgba(4, 3, 11, .91);
+            background-image: linear-gradient(130deg, rgba(65,20,96,.08), transparent 38%, rgba(104,14,35,.045));
+            border-color: rgba(216, 83, 165, .42);
+        }
+        header { border-radius: 15px; min-height: 62px; }
+        .page { border-radius: 15px 15px 0 0; }
+        .store-tabs { margin: 9px 12px 13px; height: 43px; }
+        .store-tab.active { box-shadow: 0 0 18px rgba(226,46,255,.34), inset 0 0 22px rgba(255,57,105,.15); }
+        #page-store.cases-active .store-tab.active, #page-inventory.history-active .inventory-tabs .tab-item.active {
+            border-color: #ff416d !important;
+            background: radial-gradient(circle at 35% 80%, rgba(255,35,58,.42), transparent 45%), linear-gradient(110deg, rgba(105,13,74,.7), rgba(15,5,20,.78) 55%, rgba(77,14,102,.62));
+            box-shadow: 0 0 20px rgba(255,42,78,.32), inset 0 0 18px rgba(255,62,93,.13);
+        }
+        .catalog-grid { gap: 7px; padding: 0 12px 17px; }
+        .item-card, .case-card { border-radius: 11px; border-color: rgba(214,61,140,.42); }
+        .item-card .item-image { padding: 0; background: transparent; }
+        .game-container { align-items: stretch; }
+        .elite-leaderboard-bar { height: 68px; margin-top: 10px; }
+        .game-canvas-wrap {
+            align-self: center;
+            width: calc(100% - 28px); height: auto; aspect-ratio: 1.58;
+            max-width: 350px; max-height: 225px;
+            border-radius: 12px;
+            border: 1px solid rgba(197,58,230,.45);
+            background: #040209 url('game-waiting-bg.png') center / cover no-repeat;
+            box-shadow: inset 0 0 45px rgba(161,24,211,.12), 0 0 22px rgba(136,20,195,.1);
+        }
+        .game-controls { margin-top: 9px; }
+        .game-controls .btn-gold-outline { height: 43px; }
+        .inventory-tabs {
+            display: flex; margin: 9px 12px 14px !important; padding: 0 !important;
+            border: 1px solid rgba(255,67,120,.19) !important; border-radius: 11px; overflow: hidden;
+            background: rgba(2,2,8,.72);
+        }
+        #page-inventory .catalog-grid { min-height: 420px; align-content: start; }
+        #page-inventory .item-card { padding: 8px; }
+        .item-rarity { width: max-content; max-width: 100%; margin: -2px auto 5px; padding: 2px 7px; overflow: hidden; color: #dcb9ff; border: 1px solid rgba(166,65,255,.28); border-radius: 10px; background: rgba(75,20,123,.25); font-size: .48rem; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+        #page-inventory .item-card .btn-main-action { border-color: #ff3f69; background: rgba(106,8,35,.48); }
+        .empty-state.history-empty-state {
+            min-height: 420px; margin: -6px -12px -17px; border: 0; border-radius: 0;
+            justify-content: flex-end; padding: 0 20px 25px;
+            background: linear-gradient(180deg, transparent 48%, rgba(3,2,9,.72) 78%), url('history-empty-bg.png') center 15% / min(390px, 100%) auto no-repeat;
+            box-shadow: none;
+        }
+        .history-empty-state .empty-state-copy { text-align: center; padding-top: 300px; }
+        .history-empty-state h3 { margin-top: 0; font-size: 1.05rem; color: #ffd2de; }
+        .history-empty-state p { margin: 0 auto; }
+        .balance-page-inner { padding: 24px 18px 32px; display: flex; flex-direction: column; align-items: center; }
+        .section-eyebrow { color: #bd9fae; font-size: .62rem; letter-spacing: .18em; }
+        .big-balance-card {
+            width: 100%; margin: 12px 0 25px; padding: 20px; display: flex; align-items: center; justify-content: center; gap: 10px;
+            border: 1px solid rgba(228,70,171,.35); border-radius: 14px;
+            background: radial-gradient(circle at 50% 100%, rgba(178,26,163,.21), transparent 65%), rgba(5,3,12,.84);
+        }
+        .big-balance-card strong { font-size: 2rem; color: #fff6ee; }
+        .big-balance-card small { color: #a897a6; font-size: .62rem; }
+        .star-coin { color: #ffc56d; text-shadow: 0 0 10px #ff704e; }
+        .balance-title { margin: 0 0 6px; font-size: 1rem; }
+        .balance-subtitle { margin: 0 0 18px; color: #9e929f; font-size: .72rem; }
+        .topup-grid { gap: 9px; }
+        .topup-btn { height: 58px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; }
+        .topup-btn b { font-size: .86rem; color: #fff; }
+        .topup-btn span { font-size: .72rem; }
+        .payment-method-sheet { max-width: 390px; }
+        .payment-method-card {
+            width: 100%; min-height: 68px; margin-top: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 12px;
+            color: #fff; text-align: left; border: 1px solid rgba(213,67,195,.35); border-radius: 12px;
+            background: rgba(5,3,13,.8); cursor: pointer;
+        }
+        .payment-method-card:hover { border-color: #d84bff; box-shadow: 0 0 15px rgba(217,48,255,.2); }
+        .payment-method-card > span:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 4px; }
+        .payment-method-card small { color: #9f929f; font-size: .67rem; }
+        .payment-method-card i { color: #ff7baa; font-size: 1.4rem; font-style: normal; }
+        .method-icon { width: 39px; height: 39px; display: grid; place-items: center; border: 1px solid #c94cff; border-radius: 10px; color: #ffc572; background: #1b0928; }
+        .rub-method { opacity: .47; cursor: default; }
+        .rub-method em { color: #ff789a; font-size: .56rem; font-style: normal; letter-spacing: .1em; }
+        .tab-bar .tab-item::before { content: none !important; }
+        .tab-bar .tab-item svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+        .tab-bar .tab-item.active svg { color: #ff668c; filter: drop-shadow(0 0 6px #ff335f); }
+        .tab-bar .tab-item span { line-height: 1; }
     </style>
 </head>
 <body>
@@ -1005,7 +1097,7 @@
             <div class="username" id="username-display">User</div>
         </div>
         <div class="header-right" onclick="showPage('balance')">
-            <span class="balance-text" id="header-balance">0 TON</span>
+            <span class="balance-text" id="header-balance">⭐ 0</span>
         </div>
     </header>
 
@@ -1022,10 +1114,10 @@
         <div class="game-container">
             <div class="elite-leaderboard-bar" onclick="openLeaderboardModal()">
                 <div class="elite-left">
-                    <div class="elite-icon-container"><div class="elite-pulse"></div><span class="elite-icon">🏆</span></div>
+                    <div class="elite-icon-container"><div class="elite-pulse"></div><span class="elite-icon"><svg viewBox="0 0 24 24"><path d="m3 7 4 4 5-7 5 7 4-4-2 11H5zM6 21h12"/></svg></span></div>
                     <div class="elite-text-group"><span class="elite-title">Лидерборд</span><span class="elite-subtitle">Рейтинг сезона</span></div>
                 </div>
-                <div class="elite-right"><span id="leaderboard-preview" class="elite-score">...</span></div>
+                <div class="elite-right"><span id="leaderboard-preview" class="elite-score">0<br><small>ПОБЕД</small></span></div>
             </div>
             <div style="width:85vw; max-width:380px; display:flex; justify-content:flex-end; margin-bottom:4px;">
                 <div class="history-btn" onclick="openHistoryModal()">
@@ -1042,12 +1134,12 @@
                 <span id="game-number-display">#...</span>
             </div>
             <div class="game-controls">
-                <button class="btn-gold-outline" onclick="openBetConfirm(0.1)">+0.1 TON</button>
+                <button class="btn-gold-outline" onclick="openBetConfirm(10)">+10 ⭐</button>
                 <button class="btn-gold-outline" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
             <div class="bets-list-container" id="bets-list-container">
-                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 TON</span>)</div>
+                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 ⭐</span>)</div>
                 <div class="bets-list" id="game-bets-list"></div>
             </div>
         </div>
@@ -1072,23 +1164,25 @@
     </div>
 
     <div id="page-balance" class="page">
-        <div style="padding: 30px 20px; display: flex; flex-direction: column; align-items: center;">
-            <h2 style="color: var(--text-main); margin-bottom: 10px;">БАЛАНС</h2>
-            <div style="font-size: 2.5rem; font-weight: 800; color: var(--accent-gold); margin-bottom: 30px;" id="big-balance">0 TON</div>
+        <div class="balance-page-inner">
+            <div class="section-eyebrow">ВНУТРЕННИЙ БАЛАНС</div>
+            <div class="big-balance-card"><span class="star-coin">★</span><strong id="big-balance">0</strong><small>STARS</small></div>
+            <h2 class="balance-title">ПОПОЛНИТЬ БАЛАНС</h2>
+            <p class="balance-subtitle">Выберите количество звёзд, затем способ оплаты</p>
             <div class="topup-grid">
-                <button class="topup-btn" onclick="initTopup(0.1)">0.1 TON</button>
-                <button class="topup-btn" onclick="initTopup(0.25)">0.25 TON</button>
-                <button class="topup-btn" onclick="initTopup(0.5)">0.5 TON</button>
-                <button class="topup-btn" onclick="initTopup(1)">1 TON</button>
-                <button class="topup-btn" onclick="initTopup(2)">2 TON</button>
-                <button class="topup-btn" onclick="initTopup(5)">5 TON</button>
+                <button class="topup-btn" onclick="initTopup(85)"><b>85</b><span>⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(255)"><b>255</b><span>⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(425)"><b>425</b><span>⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(850)"><b>850</b><span>⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(1700)"><b>1 700</b><span>⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(4250)"><b>4 250</b><span>⭐</span></button>
                 <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
             </div>
         </div>
     </div>
 
     <div id="page-inventory" class="page">
-        <div style="display:flex; border-bottom: 1px solid var(--border-color); padding: 0 20px;">
+        <div class="inventory-tabs">
             <div class="tab-item active" style="padding:16px 0; border-bottom: 2px solid var(--accent-gold);" onclick="switchInv(this, 'active')">Мои NFT</div>
             <div class="tab-item" style="padding:16px 0;" onclick="switchInv(this, 'history')">История</div>
         </div>
@@ -1139,7 +1233,7 @@
             <div style="text-align: center;">
                 <div id="winner-avatar-container"></div>
                 <div class="winner-name" id="winner-name"></div>
-                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> TON</div>
+                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> ⭐</div>
                 <button class="btn-main-action" onclick="closeWinnerModal()">Продолжить</button>
             </div>
         </div>
@@ -1163,11 +1257,11 @@
     </div>
 
     <div id="custom-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" min="0.1" step="0.01" inputmode="decimal" placeholder="Сумма от 0.1 TON"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" min="10" step="10" inputmode="numeric" placeholder="10, 20, 30… Stars"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
     </div>
 
     <div id="custom-amount-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Своя сумма</h3><input type="number" step="0.01" id="custom-amount-input" class="input-dark" placeholder="Сумма от 0.05 TON"><button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button><button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Своя сумма</h3><input type="number" min="10" max="10000" step="1" inputmode="numeric" id="custom-amount-input" class="input-dark" placeholder="От 10 до 10 000 Stars"><button class="btn-main-action" onclick="submitCustomAmount()">Продолжить</button><button class="btn-secondary" onclick="closeModal('custom-amount-modal')">Отмена</button></div>
     </div>
 
     <div id="alert-modal" class="modal-overlay">
@@ -1175,13 +1269,26 @@
     </div>
 
     <div id="confirm-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> TON?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> ⭐?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
+    </div>
+
+    <div id="payment-method-modal" class="modal-overlay">
+        <div class="modal-content payment-method-sheet">
+            <div class="section-eyebrow">ПОПОЛНЕНИЕ</div>
+            <h3 class="modal-title"><span id="method-stars-amount">0</span> ⭐</h3>
+            <p class="ton-payment-note">Выберите способ оплаты</p>
+            <button class="payment-method-card stars-method" onclick="payWithTelegramStars()"><span class="method-icon">★</span><span><b>Telegram Stars</b><small>Оплатить напрямую в Telegram</small></span><i>›</i></button>
+            <button class="payment-method-card ton-method" onclick="openTonPayment()"><span class="method-icon">◆</span><span><b>Toncoin</b><small>1 TON = 85 Stars</small></span><i>›</i></button>
+            <button class="payment-method-card rub-method" disabled><span class="method-icon">₽</span><span><b>Рубли</b><small>Скоро</small></span><em>СКОРО</em></button>
+            <div class="ton-payment-status" id="stars-payment-status"></div>
+            <button class="btn-secondary" onclick="closeModal('payment-method-modal')">Отмена</button>
+        </div>
     </div>
 
     <div id="topup-modal" class="modal-overlay">
-        <div class="modal-content ton-payment-modal"><h3 class="modal-title">ПОПОЛНЕНИЕ <span id="display-topup-amount">0</span> TON</h3>
+        <div class="modal-content ton-payment-modal"><h3 class="modal-title"><span id="display-topup-stars">0</span> ⭐ ЗА TON</h3>
             <div class="ton-orb">◆</div>
-            <p class="ton-payment-note">Подключите Telegram Wallet или другой TON Connect-кошелёк. Сумма будет зачислена автоматически после подтверждения в TON.</p>
+            <p class="ton-payment-note">К оплате: <strong id="display-topup-ton">0</strong> TON<br>Курс фиксирован: 1 TON = 85 Stars</p>
             <div class="ton-payment-status" id="ton-payment-status">Кошелёк не подключён</div>
             <button class="btn-main-action" id="btn-send-topup" onclick="sendTopup()">ПОДКЛЮЧИТЬ КОШЕЛЁК</button>
             <button class="btn-secondary" onclick="closeModal('topup-modal')">Отмена</button>
@@ -1234,14 +1341,14 @@
                     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 15px;">
                         <button class="btn-main-action" onclick="claimItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">ЗАБРАТЬ В ИНВЕНТАРЬ</button>
                         <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">
-                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> TON</span>
+                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> ⭐</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <div id="case-actions" style="margin-top: 25px; display: flex; justify-content: center; width: 100%;">
-                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> TON</button>
+                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ⭐</button>
             </div>
 
             <div id="case-drops-section" style="margin-top: 35px;">
@@ -1252,9 +1359,9 @@
     </div>
 
     <div class="tab-bar">
-        <div class="tab-item" id="tab-game" onclick="showPage('game')">ИГРА</div>
-        <div class="tab-item active" id="tab-store" onclick="showPage('store')">МАГАЗИН</div>
-        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')">ИНВЕНТАРЬ</div>
+        <div class="tab-item" id="tab-game" onclick="showPage('game')"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z"/></svg><span>ИГРА</span></div>
+        <div class="tab-item active" id="tab-store" onclick="showPage('store')"><svg viewBox="0 0 24 24"><path d="M4 8h16v13H4zM8 8V5a4 4 0 0 1 8 0v3M8 12h.01M16 12h.01"/></svg><span>МАГАЗИН</span></div>
+        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')"><svg viewBox="0 0 24 24"><path d="M4 8h16v13H4zM7 8V5h10v3M9 4h6M8 12h8M12 12v5"/></svg><span>ИНВЕНТАРЬ</span></div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -1306,6 +1413,7 @@
 
         const API_BASE = 'https://dnx-shop.onrender.com';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
+        const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
         const userDisplayName = tg.initDataUnsafe?.user?.username || "Guest";
         const userAvatar = tg.initDataUnsafe?.user?.photo_url || "";
@@ -1371,13 +1479,14 @@
         } catch (_) { localStorage.removeItem('dnx_cart'); }
         let currentCatalog = [];
         let inventoryData = [];
-        let pendingTopupAmount = 0;
+        let pendingTopupStars = 0;
         let pendingBuyItem = null;
         let currentCase = null;
         let rouletteActive = false;
         let currentNftItem = null;
         let currentWonItem = null;
         let tonDepositPollTimer = null;
+        let starPaymentPollTimer = null;
         let tonPaymentInProgress = false;
 
         function showAlert(msg) {
@@ -1423,8 +1532,8 @@
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
             } catch(e) { console.error('Balance update failed', e); }
-            document.getElementById('header-balance').innerText = formatTon(userBalance) + ' TON';
-            document.getElementById('big-balance').innerText = formatTon(userBalance) + ' TON';
+            document.getElementById('header-balance').innerText = '⭐ ' + formatStars(userBalance);
+            document.getElementById('big-balance').innerText = formatStars(userBalance);
         }
 
         async function loadCatalog() {
@@ -1435,7 +1544,7 @@
                         <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" onclick="openNftModal(${Number(item.id)})">
                         <div class="item-name">${escapeHtml(item.name)}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${formatTon(item.price)} TON</button>
+                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${formatStars(item.price)} ⭐</button>
                             <button class="btn-add-cart" onclick="addCatalogItemToCart(${Number(item.id)})">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                             </button>
@@ -1457,6 +1566,11 @@
                 minimumFractionDigits: 0,
                 maximumFractionDigits: maximumDigits
             });
+        }
+        function formatStars(value) {
+            const amount = Number(value || 0);
+            if (!Number.isFinite(amount)) return '0';
+            return Math.trunc(amount).toLocaleString('ru-RU');
         }
         function safeImageUrl(value) {
             try {
@@ -1527,7 +1641,7 @@
                 buyBtn.style.display = 'block';
                 cartBtn.style.display = 'flex';
                 withdrawBtn.style.display = 'none';
-                buyBtn.innerText = `КУПИТЬ ЗА ${formatTon(item.price)} TON`;
+                buyBtn.innerText = `КУПИТЬ ЗА ${formatStars(item.price)} ⭐`;
                 buyBtn.onclick = () => { closeNftModal(true); confirmBuyItem(item.id, item.price, item.name, item.image_url); };
                 cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
             } else {
@@ -1567,7 +1681,7 @@
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}">
                         <div class="cart-item-info">
                             <div style="font-weight:500">${escapeHtml(c.name)}</div>
-                            <div style="color:var(--accent-gold); margin-top:4px;">${formatTon(c.price)} TON</div>
+                            <div style="color:var(--accent-gold); margin-top:4px;">${formatStars(c.price)} ⭐</div>
                         </div>
                         <div style="font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 10px;" onclick="removeFromCart(${i})">×</div>
                     </div>`).join('');
@@ -1583,7 +1697,7 @@
                 <img src="${escapeHtml(safeImageUrl(image_url))}" />
                 <div style="text-align:left;">
                     <div style="font-weight:600;">${escapeHtml(name)}</div>
-                    <div style="color:var(--accent-gold);">${formatTon(price)} TON</div>
+                    <div style="color:var(--accent-gold);">${formatStars(price)} ⭐</div>
                 </div>`;
             document.getElementById('confirm-buy-modal').classList.add('active');
         }
@@ -1630,14 +1744,70 @@
             } catch(e) { showAlert('Ошибка сети'); }
         }
 
-        function initTopup(amount) { if (amount < 0.05) { showAlert("Минимальная сумма 0.05 TON"); return; } pendingTopupAmount = amount; openTopupModal(); }
+        function initTopup(stars) {
+            if (!Number.isInteger(stars) || stars < 10 || stars > 10000) { showAlert("Введите целое количество от 10 до 10 000 Stars"); return; }
+            pendingTopupStars = stars;
+            document.getElementById('method-stars-amount').innerText = formatStars(stars);
+            document.getElementById('stars-payment-status').innerText = '';
+            document.getElementById('payment-method-modal').classList.add('active');
+        }
         function openCustomAmountModal() { document.getElementById('custom-amount-input').value = ''; document.getElementById('custom-amount-modal').classList.add('active'); }
         function submitCustomAmount() {
-            const normalized = document.getElementById('custom-amount-input').value.trim().replace(',', '.');
+            const normalized = document.getElementById('custom-amount-input').value.trim();
             const val = Number(normalized);
-            const decimals = (normalized.split('.')[1] || '').length;
-            if (!Number.isFinite(val) || val < 0.05 || val > 10000 || decimals > 9) { showAlert("Введите сумму от 0.05 до 10 000 TON, не более 9 знаков после запятой"); return; }
+            if (!Number.isInteger(val) || val < 10 || val > 10000) { showAlert("Введите целое количество от 10 до 10 000 Stars"); return; }
             closeModal('custom-amount-modal'); initTopup(val);
+        }
+        async function payWithTelegramStars() {
+            const status = document.getElementById('stars-payment-status');
+            if (!pendingTopupStars) return;
+            try {
+                status.innerText = 'Создаём счёт Telegram…';
+                const invoice = await apiFetch(`${API_BASE}/stars/invoice/create`, {
+                    method: 'POST', body: JSON.stringify({ stars: pendingTopupStars })
+                });
+                localStorage.setItem('dnx_star_payment', invoice.paymentId);
+                if (typeof tg.openInvoice !== 'function') throw new Error('Обновите Telegram для оплаты Stars');
+                tg.openInvoice(invoice.invoiceLink, invoiceStatus => {
+                    if (invoiceStatus === 'paid' || invoiceStatus === 'pending') {
+                        status.innerText = 'Платёж подтверждается…';
+                        pollStarPayment(invoice.paymentId);
+                    } else if (invoiceStatus === 'cancelled') {
+                        status.innerText = 'Оплата отменена';
+                    } else if (invoiceStatus === 'failed') {
+                        status.innerText = 'Telegram не завершил оплату';
+                    }
+                });
+            } catch (e) {
+                status.innerText = 'Не удалось открыть оплату Stars';
+                showAlert(e?.message || 'Ошибка оплаты Stars');
+            }
+        }
+        async function pollStarPayment(paymentId) {
+            if (starPaymentPollTimer) clearTimeout(starPaymentPollTimer);
+            try {
+                const result = await apiFetch(`${API_BASE}/stars/payment/status?id=${encodeURIComponent(paymentId)}`);
+                if (result.status === 'paid') {
+                    localStorage.removeItem('dnx_star_payment');
+                    await updateBalance();
+                    closeModal('payment-method-modal');
+                    showAlert(`Зачислено ${formatStars(result.stars)} ⭐`);
+                    return;
+                }
+                if (['expired', 'failed'].includes(result.status)) {
+                    localStorage.removeItem('dnx_star_payment');
+                    document.getElementById('stars-payment-status').innerText = 'Счёт истёк. Создайте новый.';
+                    return;
+                }
+            } catch (e) { console.error('Stars payment status error', e); }
+            starPaymentPollTimer = setTimeout(() => pollStarPayment(paymentId), 1800);
+        }
+        function openTonPayment() {
+            closeModal('payment-method-modal');
+            document.getElementById('display-topup-stars').innerText = formatStars(pendingTopupStars);
+            document.getElementById('display-topup-ton').innerText = formatTon(pendingTopupStars / TON_STAR_RATE, 6);
+            document.getElementById('topup-modal').classList.add('active');
+            updateTonWalletUI();
         }
         function updateTonWalletUI() {
             const status = document.getElementById('ton-payment-status');
@@ -1651,7 +1821,7 @@
             if (tonConnectUI.connected && tonConnectUI.account) {
                 const address = tonConnectUI.account.address;
                 status.innerText = `Кошелёк: ${address.slice(0, 6)}…${address.slice(-6)}`;
-                button.innerText = `ОПЛАТИТЬ ${formatTon(pendingTopupAmount)} TON`;
+                button.innerText = `ОПЛАТИТЬ ≈ ${formatTon(pendingTopupStars / TON_STAR_RATE, 6)} TON`;
                 button.disabled = tonPaymentInProgress;
             } else {
                 status.innerText = 'Кошелёк не подключён';
@@ -1659,13 +1829,8 @@
                 button.disabled = false;
             }
         }
-        function openTopupModal() {
-            document.getElementById('display-topup-amount').innerText = formatTon(pendingTopupAmount);
-            document.getElementById('topup-modal').classList.add('active');
-            updateTonWalletUI();
-        }
         async function sendTopup() {
-            if (!pendingTopupAmount || pendingTopupAmount < 0.05 || tonPaymentInProgress) return;
+            if (!pendingTopupStars || tonPaymentInProgress) return;
             if (!tonConnectUI) { showAlert('TON Connect недоступен'); return; }
             if (!tonConnectUI.connected || !tonConnectUI.account) {
                 await tonConnectUI.openModal();
@@ -1679,7 +1844,7 @@
                 const deposit = await apiFetch(`${API_BASE}/ton/deposit/create`, {
                     method: 'POST',
                     body: JSON.stringify({
-                        amount: pendingTopupAmount,
+                        stars: pendingTopupStars,
                         walletAddress: tonConnectUI.account.address
                     })
                 });
@@ -1711,7 +1876,7 @@
                     localStorage.removeItem('dnx_ton_deposit');
                     await updateBalance();
                     closeModal('topup-modal');
-                    showAlert(`Зачислено ${formatTon(result.amountTon, 9)} TON`);
+                    showAlert(`Зачислено ${formatStars(result.creditStars)} ⭐`);
                     return;
                 }
                 if (result.status === 'expired') {
@@ -1728,6 +1893,7 @@
             el.classList.add('active'); el.style.borderColor='var(--accent-gold)'; el.style.color='var(--accent-gold)';
             document.getElementById('inventory-active-container').style.display = type === 'active' ? 'grid' : 'none';
             document.getElementById('inventory-history-container').style.display = type === 'history' ? 'grid' : 'none';
+            document.getElementById('page-inventory').classList.toggle('history-active', type === 'history');
         }
         async function loadInventory() {
             try {
@@ -1739,6 +1905,7 @@
                     ? active.map(i => `
                         <div class="item-card">
                             <img src="${escapeHtml(safeImageUrl(i.image_url))}" class="item-image" onclick="openNftModal(${Number(i.id)})">
+                            <div class="item-rarity">${escapeHtml(i.model || 'NFT')}</div>
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <button class="btn-main-action" style="height:36px; font-size:0.75rem;" onclick="withdraw('${i.id}')">Вывести</button>
                         </div>`).join('')
@@ -1750,7 +1917,7 @@
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <div style="text-align:center; font-size:0.7rem; border:1px dashed #555; border-radius:8px; padding:4px;">ВЫВЕДЕНО</div>
                         </div>`).join('')
-                    : `<div class="empty-state"><div class="empty-state-icon">⌛</div><h3>ИСТОРИЯ ПУСТА</h3><p>Начните играть, участвуйте в активностях — события появятся здесь.</p><button class="btn-main-action" style="max-width:250px;margin-top:18px" onclick="switchInv(document.querySelector('#page-inventory > div:first-child .tab-item:first-child'),'active')">ПЕРЕЙТИ К МОИМ NFT</button></div>`;
+                    : `<div class="empty-state history-empty-state"><div class="empty-state-copy"><h3>ИСТОРИЯ ПУСТА</h3><p>Здесь пока нет событий.<br>Начните играть, участвуйте в активностях — и ваши действия появятся здесь.</p><button class="btn-main-action" style="max-width:250px;margin-top:18px" onclick="switchInv(document.querySelector('#page-inventory .inventory-tabs .tab-item:first-child'),'active')">ПЕРЕЙТИ К МОИМ NFT</button></div></div>`;
             } catch(e) { console.error(e); }
         }
         async function withdraw(id) {
@@ -1774,7 +1941,7 @@
                     <div class="history-modal-row">
                         <span>#${h.game_number}</span>
                         <span>${escapeHtml(h.winner_name)}</span>
-                        <span style="color:var(--accent-gold)">${formatTon(h.win_amount)} TON (${h.win_percent}%)</span>
+                        <span style="color:var(--accent-gold)">${formatStars(h.win_amount)} ⭐ (${h.win_percent}%)</span>
                     </div>`).join('');
             } catch(e) { list.innerHTML = 'Ошибка загрузки'; }
         }
@@ -1812,9 +1979,9 @@
             try {
                 const data = await apiFetch(`${API_BASE}/leaderboard`);
                 const previewEl = document.getElementById('leaderboard-preview');
-                if (data && data.user) previewEl.innerText = `${data.user.wins} WINS`;
-                else previewEl.innerText = '0 WINS';
-            } catch(e) { document.getElementById('leaderboard-preview').innerText = '...'; }
+                if (data && data.user) previewEl.innerHTML = `${Number(data.user.wins) || 0}<br><small>ПОБЕД</small>`;
+                else previewEl.innerHTML = '0<br><small>ПОБЕД</small>';
+            } catch(e) { document.getElementById('leaderboard-preview').innerHTML = '0<br><small>ПОБЕД</small>'; }
         }
         let seasonTimerInterval = null;
         async function openLeaderboardModal() {
@@ -1875,6 +2042,11 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const imageCache = {};
+        const waitingFieldImage = new Image();
+        waitingFieldImage.src = 'game-waiting-bg.png';
+        const activeFieldImage = new Image();
+        activeFieldImage.src = 'cosmic-bg.png';
+        waitingFieldImage.onload = activeFieldImage.onload = () => drawGameFrame();
         let gState = {
             players: [], pool: 0, status: 'waiting', timer: 15,
             spin_params: null, winner: null, last_winner_id: null,
@@ -1909,11 +2081,10 @@
 
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
-            const size = Math.min(rect.width, rect.height);
-            canvas.width = size * 2;
-            canvas.height = size * 2;
-            canvas.style.width = size + 'px';
-            canvas.style.height = size + 'px';
+            canvas.width = Math.max(1, Math.round(rect.width * 2));
+            canvas.height = Math.max(1, Math.round(rect.height * 2));
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
         }
         window.addEventListener('resize', () => { resizeCanvas(); drawGameFrame(); });
         setTimeout(() => { resizeCanvas(); drawGameFrame(); }, 100);
@@ -1932,45 +2103,27 @@
             return { x: x / f, y: y / f };
         }
 
-        function drawWaitingState(ctx, canvas) {
-            const time = Date.now() * 0.001;
-            const width = canvas.width, height = canvas.height;
-            const bgGradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width);
-            bgGradient.addColorStop(0, '#1E1E1E');
-            bgGradient.addColorStop(1, '#0A0A0A');
-            ctx.fillStyle = bgGradient;
-            ctx.fillRect(0, 0, width, height);
-            ctx.save();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-            const tileSize = 80;
-            const offset = (time * 15) % tileSize;
-            for (let x = -tileSize; x < width + tileSize; x += tileSize) {
-                for (let y = -tileSize; y < height + tileSize; y += tileSize) {
-                    const shapeType = (Math.floor(x / tileSize) + Math.floor(y / tileSize)) % 3;
-                    const cx = x + offset, cy = y + offset, size = 18;
-                    ctx.beginPath();
-                    if (shapeType === 0) ctx.arc(cx, cy, size, 0, Math.PI * 2);
-                    else if (shapeType === 1) {
-                        ctx.moveTo(cx, cy - size);
-                        ctx.lineTo(cx + size + 4, cy + size);
-                        ctx.lineTo(cx - size - 4, cy + size);
-                        ctx.closePath();
-                    } else ctx.rect(cx - size, cy - size, size * 2, size * 2);
-                    ctx.stroke();
-                }
+        function drawCoverImage(context, image, width, height) {
+            if (!image.complete || !image.naturalWidth) {
+                context.fillStyle = '#05030b'; context.fillRect(0, 0, width, height); return;
             }
-            ctx.restore();
+            const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+            const sw = width / scale, sh = height / scale;
+            const sx = (image.naturalWidth - sw) / 2, sy = (image.naturalHeight - sh) / 2;
+            context.drawImage(image, sx, sy, sw, sh, 0, 0, width, height);
+        }
+
+        function drawWaitingState(ctx, canvas) {
+            const width = canvas.width, height = canvas.height;
+            drawCoverImage(ctx, waitingFieldImage, width, height);
+            const pulse = (Math.sin(Date.now() * 0.003) + 1) / 2;
             ctx.save();
-            const pulse = (Math.sin(time * 3) + 1) / 2;
-            const alpha = 0.4 + (pulse * 0.6);
-            ctx.fillStyle = `rgba(224, 179, 102, ${alpha})`;
-            ctx.shadowColor = `rgba(224, 179, 102, ${pulse * 0.8})`;
-            ctx.shadowBlur = 15 + (pulse * 10);
-            ctx.font = "bold 24px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText("Ожидание игроков...", width / 2, height / 2);
+            ctx.fillStyle = `rgba(255, 220, 185, ${0.68 + pulse * .2})`;
+            ctx.shadowColor = 'rgba(224, 66, 255, .75)';
+            ctx.shadowBlur = 12 + pulse * 8;
+            ctx.font = "600 23px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('Ожидание игроков…', width / 2, height * .72);
             ctx.restore();
         }
 
@@ -2003,7 +2156,9 @@
             if (animationFrameId && !isSpinning) cancelAnimationFrame(animationFrameId);
             const isWaitingMode = gState.players.length === 0 && gState.status !== 'spinning';
             if (isWaitingMode) drawWaitingState(ctx, canvas);
-            else if (gState.polygons && gState.polygons.length > 0) {
+            else {
+                drawCoverImage(ctx, activeFieldImage, cw, ch);
+            if (gState.polygons && gState.polygons.length > 0) {
                 for (const poly of gState.polygons) {
                     const pts = poly.polygon;
                     if (pts.length < 3) continue;
@@ -2024,10 +2179,13 @@
                     ctx.moveTo(pts[0].x * cw, (1 - pts[0].y) * ch);
                     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * cw, (1 - pts[i].y) * ch);
                     ctx.closePath();
+                    ctx.save();
+                    ctx.globalAlpha = .78;
                     ctx.fill();
                     ctx.strokeStyle = "rgba(0,0,0,0.15)";
                     ctx.lineWidth = 1.5;
                     ctx.stroke();
+                    ctx.restore();
                 }
                 for (const poly of gState.polygons) {
                     let cx, cy, radius;
@@ -2078,8 +2236,11 @@
                 const grad = ctx.createLinearGradient(0, 0, cw, ch);
                 grad.addColorStop(0, colors[0]);
                 grad.addColorStop(1, colors[1]);
+                ctx.save();
+                ctx.globalAlpha = .78;
                 ctx.fillStyle = grad;
                 ctx.fillRect(0, 0, cw, ch);
+                ctx.restore();
                 const MAX_RADIUS = 55;
                 const radius = MAX_RADIUS;
                 let isAvatarDrawn = false;
@@ -2111,6 +2272,7 @@
                     ctx.stroke();
                     ctx.restore();
                 }
+            }
             }
             if (!isWaitingMode && highlightPts && highlightPts.length >= 3) {
                 // Визуально отводим подсветку от внешней рамки canvas. Геометрия
@@ -2281,7 +2443,7 @@
         function showWinnerModal(winner) {
             if(!winner) return;
             document.getElementById('winner-name').innerText = winner.username;
-            document.getElementById('winner-amount').innerText = winner.win_amount.toFixed(2);
+            document.getElementById('winner-amount').innerText = formatStars(winner.win_amount);
             const avatarContainer = document.getElementById('winner-avatar-container');
             avatarContainer.replaceChildren();
             const avatar = document.createElement('img');
@@ -2386,7 +2548,7 @@
             const hasPlayers = gState.players && gState.players.length > 0;
             container.style.display = hasPlayers ? 'flex' : 'none';
             if (!hasPlayers) return;
-            document.getElementById('game-total-pool').innerText = `${formatTon(gState.pool)} TON`;
+            document.getElementById('game-total-pool').innerText = `${formatStars(gState.pool)} ⭐`;
             const sorted = [...gState.players].sort((a,b) => String(a.id).localeCompare(String(b.id)));
             list.innerHTML = sorted.map(p => {
                 const winPercent = formatWinChance(p.amount, gState.pool);
@@ -2399,7 +2561,7 @@
                     </span>
                     <span style="display:flex;gap:15px;align-items:center;">
                         <span style="color:rgba(255,255,255,0.6);font-size:14px;">${winPercent}%</span>
-                        <span style="color:var(--accent-gold);font-weight:600;font-size:15px;min-width:70px;text-align:right;">${formatTon(p.amount)} TON</span>
+                        <span style="color:var(--accent-gold);font-weight:600;font-size:15px;min-width:70px;text-align:right;">${formatStars(p.amount)} ⭐</span>
                     </span>
                 </div>`;
             }).join('');
@@ -2416,10 +2578,9 @@
         }
         function submitCustomBet() {
             const inputVal = document.getElementById('custom-bet-input').value;
-            const normalized = inputVal.trim().replace(',', '.');
+            const normalized = inputVal.trim();
             const v = Number(normalized);
-            const decimals = (normalized.split('.')[1] || '').length;
-            if (!Number.isFinite(v) || v < 0.1 || decimals > 9) { showAlert("Введите сумму от 0.1 TON, не более 9 знаков после запятой"); return; }
+            if (!Number.isInteger(v) || v < 10 || v % 10 !== 0) { showAlert("Ставка должна быть кратна 10 Stars"); return; }
             closeModal('custom-bet-modal');
             openBetConfirm(v);
         }
@@ -2440,8 +2601,8 @@
                     if (data.error === 'insufficient_funds') msg = "Недостаточно средств!";
                     else if (data.error === 'game_started') msg = "Игра уже началась!";
                     else if (data.error === 'room_full') msg = "Слишком много игроков!";
-                    else if (data.error === 'min_bet') msg = "Минимальная ставка 0.1 TON";
-                    else if (data.error === 'invalid_amount') msg = "Некорректная сумма ставки";
+                    else if (data.error === 'min_bet') msg = "Минимальная ставка 10 Stars";
+                    else if (data.error === 'invalid_amount') msg = "Ставка должна быть кратна 10 Stars";
                     showAlert(msg);
                 }
             } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети"); }
@@ -2461,10 +2622,12 @@
         function switchStoreTab(tab) {
             document.querySelectorAll('.store-tab').forEach(t => t.classList.remove('active'));
             if (tab === 'catalog') {
+                document.getElementById('page-store').classList.remove('cases-active');
                 document.querySelector('.store-tab:first-child').classList.add('active');
                 document.getElementById('catalog-container').style.display = 'grid';
                 document.getElementById('cases-container').style.display = 'none';
             } else {
+                document.getElementById('page-store').classList.add('cases-active');
                 document.querySelector('.store-tab:last-child').classList.add('active');
                 document.getElementById('catalog-container').style.display = 'none';
                 document.getElementById('cases-container').style.display = 'block';
@@ -2482,7 +2645,7 @@
                     <div class="case-card" onclick="openCaseDetail(${Number(c.id)})" style="animation-delay: ${i * 0.08}s">
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}" class="item-image" alt="${escapeHtml(c.name)}">
                         <div class="item-name">${escapeHtml(c.name)}</div>
-                        <div class="case-price">${formatTon(c.price)} TON</div>
+                        <div class="case-price">${formatStars(c.price)} ⭐</div>
                     </div>
                 `).join('');
             } catch(e) {
@@ -2494,7 +2657,7 @@
             try {
                 currentCase = await apiFetch(`${API_BASE}/case-details?id=${caseId}`);
                 document.getElementById('case-detail-title').innerText = currentCase.name;
-                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${formatTon(currentCase.price)} TON`;
+                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${formatStars(currentCase.price)} ⭐`;
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
                 document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
@@ -2637,7 +2800,7 @@
             document.getElementById('win-image').src = safeImageUrl(wonItem.image_url);
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
 
-            document.getElementById('win-value').innerText = wonItem.value;
+            document.getElementById('win-value').innerText = formatStars(wonItem.value);
             document.getElementById('win-value').style.display = 'inline';
             document.getElementById('win-currency').style.display = 'inline';
             document.getElementById('sell-btn-text').innerText = 'ПРОДАТЬ ЗА ';
@@ -2764,6 +2927,8 @@
         loadLeaderboardPreview();
         const pendingTonDeposit = localStorage.getItem('dnx_ton_deposit');
         if (pendingTonDeposit) pollTonDeposit(pendingTonDeposit);
+        const pendingStarPayment = localStorage.getItem('dnx_star_payment');
+        if (pendingStarPayment) pollStarPayment(pendingStarPayment);
     </script>
 </body>
 </html>

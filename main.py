@@ -10,7 +10,7 @@ import time
 import secrets
 import uuid
 from collections import defaultdict, deque
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_CEILING
 from functools import wraps
 from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 from datetime import timezone
@@ -19,7 +19,7 @@ import asyncpg
 import aiohttp
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, LabeledPrice
 from aiohttp import web
 from dotenv import load_dotenv
 
@@ -37,9 +37,19 @@ DB_POOL_MAX_SIZE = int(os.getenv("DB_POOL_MAX_SIZE", "10"))
 TON_RECEIVER_ADDRESS = os.getenv("TON_RECEIVER_ADDRESS", "").strip()
 TONCENTER_API_URL = os.getenv("TONCENTER_API_URL", "https://toncenter.com/api/v2").rstrip("/")
 TONCENTER_API_KEY = os.getenv("TONCENTER_API_KEY", "").strip()
-TON_MIN_DEPOSIT = Decimal(os.getenv("TON_MIN_DEPOSIT", "0.05"))
 TON_DEPOSIT_TIMEOUT = int(os.getenv("TON_DEPOSIT_TIMEOUT", "900"))
-TON_MIN_BET = Decimal(os.getenv("TON_MIN_BET", "0.1"))
+TON_STAR_RATE = Decimal(os.getenv("TON_STAR_RATE", "85"))
+STAR_MIN_TOPUP = int(os.getenv("STAR_MIN_TOPUP", "10"))
+STAR_MAX_TOPUP = int(os.getenv("STAR_MAX_TOPUP", "10000"))
+STAR_MIN_BET = Decimal(os.getenv("STAR_MIN_BET", "10"))
+STAR_BET_STEP = Decimal(os.getenv("STAR_BET_STEP", "10"))
+
+if TON_STAR_RATE <= 0:
+    raise RuntimeError("TON_STAR_RATE must be positive")
+if STAR_MIN_TOPUP <= 0 or STAR_MAX_TOPUP < STAR_MIN_TOPUP:
+    raise RuntimeError("Invalid Stars top-up limits")
+if STAR_MIN_BET <= 0 or STAR_BET_STEP <= 0:
+    raise RuntimeError("Invalid Stars bet limits")
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is required")
@@ -83,7 +93,7 @@ def load_cases_from_env():
             1: {
                 "id": 1,
                 "name": "Демо-кейс",
-                "price": 0.5,
+                "price": 42,
                 "image_url": "https://via.placeholder.com/150",
                 "drops": [
                     {
@@ -93,7 +103,7 @@ def load_cases_from_env():
                         "image_url": "https://via.placeholder.com/100",
                         "model": "Demo",
                         "chance": 100.0,
-                        "value": 0.25,
+                        "value": 21,
                         "real_chance": 100.0
                     }
                 ]
@@ -276,6 +286,7 @@ async def init_db():
                         wallet_raw TEXT NOT NULL,
                         amount_nano BIGINT NOT NULL UNIQUE,
                         amount_ton NUMERIC(20, 9) NOT NULL,
+                        credit_stars BIGINT NOT NULL,
                         status VARCHAR(32) NOT NULL DEFAULT 'pending',
                         tx_hash TEXT UNIQUE,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -283,10 +294,29 @@ async def init_db():
                         credited_at TIMESTAMPTZ
                     )
                 """)
+                await conn.execute("ALTER TABLE ton_deposits ADD COLUMN IF NOT EXISTS credit_stars BIGINT")
+                await conn.execute(
+                    "UPDATE ton_deposits SET credit_stars = ROUND(amount_ton * $1)::BIGINT WHERE credit_stars IS NULL",
+                    TON_STAR_RATE)
+                await conn.execute("ALTER TABLE ton_deposits ALTER COLUMN credit_stars SET NOT NULL")
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS star_payments (
+                        id UUID PRIMARY KEY,
+                        user_id VARCHAR(255) NOT NULL,
+                        stars BIGINT NOT NULL CHECK (stars > 0),
+                        invoice_payload VARCHAR(128) NOT NULL UNIQUE,
+                        telegram_payment_charge_id TEXT UNIQUE,
+                        status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        expires_at TIMESTAMPTZ NOT NULL,
+                        paid_at TIMESTAMPTZ
+                    )
+                """)
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_items_status ON items(status)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_items_buyer_status ON items(buyer_id, status)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_game_history_number ON game_history(game_number DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_ton_deposits_pending ON ton_deposits(status, expires_at)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_star_payments_user_status ON star_payments(user_id, status, expires_at)")
                 logging.info(f"DB initialized. Game number: {last_num}")
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
@@ -338,6 +368,19 @@ def parse_positive_amount(value, *, minimum=Decimal("0.01"), maximum=Decimal("10
     if not amount.is_finite() or amount < minimum or amount > maximum:
         return None
     return amount
+
+
+def parse_star_amount(value, *, minimum=STAR_MIN_TOPUP, maximum=STAR_MAX_TOPUP) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if not amount.is_finite() or amount != amount.to_integral_value():
+        return None
+    integer = int(amount)
+    return integer if minimum <= integer <= maximum else None
 
 
 def normalize_records(rows) -> list[dict]:
@@ -834,7 +877,7 @@ async def scan_ton_deposits() -> int:
     await get_pool().execute(
         "UPDATE ton_deposits SET status = 'expired' WHERE status = 'pending' AND expires_at < NOW()")
     pending = await get_pool().fetch("""
-        SELECT id, user_id, wallet_raw, amount_nano, amount_ton, created_at, expires_at
+        SELECT id, user_id, wallet_raw, amount_nano, amount_ton, credit_stars, created_at, expires_at
         FROM ton_deposits
         WHERE status = 'pending' AND expires_at >= NOW()
         ORDER BY created_at
@@ -883,13 +926,13 @@ async def scan_ton_deposits() -> int:
                     UPDATE ton_deposits
                     SET status = 'credited', tx_hash = $1, credited_at = NOW()
                     WHERE id = $2 AND status = 'pending'
-                    RETURNING user_id, amount_ton
+                    RETURNING user_id, credit_stars
                 """, tx_hash, deposit["id"])
                 if not row:
                     continue
                 result = await conn.execute(
                     "UPDATE users SET balance = balance + $1 WHERE id = $2",
-                    row["amount_ton"], row["user_id"])
+                    row["credit_stars"], row["user_id"])
                 if result != "UPDATE 1":
                     raise RuntimeError("TON deposit user does not exist")
         credited += 1
@@ -971,13 +1014,12 @@ async def handle_create_ton_deposit(request):
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
-        amount = parse_positive_amount(data.get('amount'), minimum=TON_MIN_DEPOSIT,
-                                       maximum=Decimal("10000"))
-        if amount is None:
-            return web.json_response({"success": False, "error": "invalid_amount"}, status=400)
-        scaled = amount * Decimal("1000000000")
-        if scaled != scaled.to_integral_value():
-            return web.json_response({"success": False, "error": "too_many_decimals"}, status=400)
+        stars = parse_star_amount(data.get('stars'))
+        if stars is None:
+            return web.json_response({"success": False, "error": "invalid_stars"}, status=400)
+        base_nano = int(
+            (Decimal(stars) / TON_STAR_RATE * Decimal("1000000000")).to_integral_value(
+                rounding=ROUND_CEILING))
         wallet_address = str(data.get("walletAddress") or "").strip()
         try:
             wallet_raw = await normalize_ton_address(wallet_address)
@@ -990,12 +1032,12 @@ async def handle_create_ton_deposit(request):
                     "INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
                     user_id, username)
                 existing = await conn.fetchrow("""
-                    SELECT id, amount_nano, amount_ton, expires_at
+                    SELECT id, amount_nano, amount_ton, credit_stars, expires_at
                     FROM ton_deposits
                     WHERE user_id = $1 AND wallet_raw = $2 AND status = 'pending'
-                      AND expires_at > NOW() AND amount_ton >= $3 AND amount_ton < $3 + 0.001
+                      AND expires_at > NOW() AND credit_stars = $3
                     ORDER BY created_at DESC LIMIT 1
-                """, user_id, wallet_raw, amount)
+                """, user_id, wallet_raw, stars)
                 if existing:
                     return web.json_response({
                         "success": True,
@@ -1003,6 +1045,7 @@ async def handle_create_ton_deposit(request):
                         "receiverAddress": TON_RECEIVER_ADDRESS,
                         "amountNano": str(existing["amount_nano"]),
                         "amountTon": format(existing["amount_ton"], "f"),
+                        "creditStars": existing["credit_stars"],
                         "expiresAt": existing["expires_at"].isoformat(),
                     }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
                 pending_count = await conn.fetchval(
@@ -1013,17 +1056,17 @@ async def handle_create_ton_deposit(request):
 
                 deposit_id = uuid.uuid4()
                 for _ in range(10):
-                    amount_nano = int(scaled) + secrets.randbelow(999999) + 1
+                    amount_nano = base_nano + secrets.randbelow(999999) + 1
                     amount_ton = Decimal(amount_nano) / Decimal("1000000000")
                     try:
                         async with conn.transaction():
                             expires_at = await conn.fetchval("""
                                 INSERT INTO ton_deposits
-                                    (id, user_id, wallet_address, wallet_raw, amount_nano, amount_ton, expires_at)
-                                VALUES ($1, $2, $3, $4, $5, $6, NOW() + $7 * INTERVAL '1 second')
+                                    (id, user_id, wallet_address, wallet_raw, amount_nano, amount_ton, credit_stars, expires_at)
+                                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW() + $8 * INTERVAL '1 second')
                                 RETURNING expires_at
                             """, deposit_id, user_id, wallet_address, wallet_raw, amount_nano,
-                                 amount_ton, TON_DEPOSIT_TIMEOUT)
+                                 amount_ton, stars, TON_DEPOSIT_TIMEOUT)
                         break
                     except asyncpg.UniqueViolationError:
                         continue
@@ -1036,6 +1079,7 @@ async def handle_create_ton_deposit(request):
             "receiverAddress": TON_RECEIVER_ADDRESS,
             "amountNano": str(amount_nano),
             "amountTon": format(amount_ton, "f"),
+            "creditStars": stars,
             "expiresAt": expires_at.isoformat(),
         }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
@@ -1051,7 +1095,7 @@ async def handle_ton_deposit_status(request):
     except (ValueError, TypeError):
         return web.json_response({"error": "invalid_deposit_id"}, status=400)
     row = await get_pool().fetchrow("""
-        SELECT status, amount_ton, tx_hash, expires_at
+        SELECT status, amount_ton, credit_stars, tx_hash, expires_at
         FROM ton_deposits WHERE id = $1 AND user_id = $2
     """, deposit_id, request['telegram_user']['id'])
     if not row:
@@ -1059,9 +1103,85 @@ async def handle_ton_deposit_status(request):
     return web.json_response({
         "status": row["status"],
         "amountTon": format(row["amount_ton"], "f"),
+        "creditStars": row["credit_stars"],
         "txHash": row["tx_hash"],
         "expiresAt": row["expires_at"].isoformat(),
     }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+@rate_limit(10, 60)
+async def handle_create_star_invoice(request):
+    try:
+        data = await request.json()
+        stars = parse_star_amount(data.get("stars"))
+        if stars is None:
+            return web.json_response({"success": False, "error": "invalid_stars"}, status=400)
+        user = request["telegram_user"]
+        payment_id = uuid.uuid4()
+        payload = f"dnx-stars:{payment_id}"
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
+                    user["id"], user["username"])
+                await conn.execute("""
+                    UPDATE star_payments SET status = 'expired'
+                    WHERE user_id = $1 AND status = 'pending' AND expires_at < NOW()
+                """, user["id"])
+                pending_count = await conn.fetchval("""
+                    SELECT COUNT(*) FROM star_payments
+                    WHERE user_id = $1 AND status = 'pending' AND expires_at > NOW()
+                """, user["id"])
+                if pending_count >= 3:
+                    return web.json_response({"success": False, "error": "too_many_pending"}, status=429)
+                await conn.execute("""
+                    INSERT INTO star_payments (id, user_id, stars, invoice_payload, expires_at)
+                    VALUES ($1, $2, $3, $4, NOW() + INTERVAL '30 minutes')
+                """, payment_id, user["id"], stars, payload)
+        try:
+            invoice_link = await bot.create_invoice_link(
+                title="Пополнение DNX Store",
+                description=f"Зачисление {stars} Telegram Stars на баланс DNX Store",
+                payload=payload,
+                currency="XTR",
+                prices=[LabeledPrice(label=f"{stars} Stars", amount=stars)],
+            )
+        except Exception:
+            await get_pool().execute(
+                "UPDATE star_payments SET status = 'failed' WHERE id = $1 AND status = 'pending'",
+                payment_id)
+            raise
+        return web.json_response({
+            "success": True,
+            "paymentId": str(payment_id),
+            "stars": stars,
+            "invoiceLink": invoice_link,
+        })
+    except Exception as exc:
+        logging.error("Stars invoice creation error: %s", exc)
+        return web.json_response({"success": False, "error": "stars_invoice_error"}, status=500)
+
+
+@require_auth
+async def handle_star_payment_status(request):
+    try:
+        payment_id = uuid.UUID(request.query.get("id", ""))
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid_payment_id"}, status=400)
+    row = await get_pool().fetchrow("""
+        SELECT status, stars, expires_at FROM star_payments
+        WHERE id = $1 AND user_id = $2
+    """, payment_id, request["telegram_user"]["id"])
+    if not row:
+        return web.json_response({"error": "payment_not_found"}, status=404)
+    status = row["status"]
+    if status == "pending" and row["expires_at"].timestamp() < time.time():
+        await get_pool().execute(
+            "UPDATE star_payments SET status = 'expired' WHERE id = $1 AND status = 'pending'",
+            payment_id)
+        status = "expired"
+    return web.json_response({"status": status, "stars": row["stars"]})
 
 @require_auth
 async def handle_get_items(request):
@@ -1118,6 +1238,9 @@ async def handle_buy(request):
                 if len(items) != len(item_ids):
                     return web.json_response({"success": False, "error": "items_unavailable"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+                if any(item['price'] != item['price'].to_integral_value() or item['price'] <= 0 for item in items):
+                    logging.error("Catalog contains a non-integer or non-positive Stars price")
+                    return web.json_response({"success": False, "error": "invalid_item_price"}, status=500)
                 total_price = sum(i['price'] for i in items)
                 new_balance = await conn.fetchval(
                     "UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance",
@@ -1204,11 +1327,11 @@ async def handle_game_bet(request):
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
-        parsed_amount = parse_positive_amount(data.get('amount'), minimum=TON_MIN_BET)
+        parsed_amount = parse_positive_amount(data.get('amount'), minimum=STAR_MIN_BET)
         if parsed_amount is None:
             return web.json_response({"success": False, "error": "min_bet"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-        if parsed_amount.as_tuple().exponent < -9:
+        if parsed_amount != parsed_amount.to_integral_value() or parsed_amount % STAR_BET_STEP != 0:
             return web.json_response({"success": False, "error": "invalid_amount"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         amount = float(parsed_amount)
@@ -1419,7 +1542,7 @@ async def handle_open_case(request):
             return web.json_response({"success": False, "error": "empty_case"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         case_price = parse_positive_amount(case.get('price'))
-        if case_price is None:
+        if case_price is None or case_price != case_price.to_integral_value():
             logging.error("Invalid price in CASES_JSON for case %s", case_id)
             return web.json_response({"success": False, "error": "invalid_case_config"}, status=500)
         async with get_pool().acquire() as conn:
@@ -1450,7 +1573,8 @@ async def handle_open_case(request):
                         break
 
                 drop_value = Decimal(str(won_drop['value']))
-                if not drop_value.is_finite() or drop_value < 0 or drop_value > Decimal("1000000"):
+                if (not drop_value.is_finite() or drop_value < 0 or drop_value > Decimal("1000000")
+                        or drop_value != drop_value.to_integral_value()):
                     raise ValueError("invalid drop value in CASES_JSON")
 
                 new_item_id = await conn.fetchval("""
@@ -1547,6 +1671,82 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
     except Exception:
         pass
 
+
+@dp.pre_checkout_query()
+async def process_star_pre_checkout(query: types.PreCheckoutQuery):
+    try:
+        row = await get_pool().fetchrow("""
+            SELECT user_id, stars, status, expires_at
+            FROM star_payments WHERE invoice_payload = $1
+        """, query.invoice_payload)
+        valid = bool(
+            row
+            and row["status"] == "pending"
+            and row["expires_at"].timestamp() >= time.time()
+            and row["user_id"] == str(query.from_user.id)
+            and query.currency == "XTR"
+            and query.total_amount == row["stars"]
+        )
+        if valid:
+            await query.answer(ok=True)
+        else:
+            await query.answer(ok=False, error_message="Счёт устарел или его данные не совпадают. Создайте новый счёт в приложении.")
+    except Exception as exc:
+        logging.error("Stars pre-checkout error: %s", exc)
+        await query.answer(ok=False, error_message="Платёж временно недоступен. Попробуйте ещё раз.")
+
+
+@dp.message(F.successful_payment)
+async def process_successful_star_payment(message: types.Message):
+    payment = message.successful_payment
+    if not payment or payment.currency != "XTR":
+        return
+    try:
+        credited = False
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow("""
+                    SELECT id, user_id, stars, status, telegram_payment_charge_id
+                    FROM star_payments WHERE invoice_payload = $1 FOR UPDATE
+                """, payment.invoice_payload)
+                if not row:
+                    raise ValueError("unknown Stars invoice payload")
+                if row["status"] == "paid":
+                    if row["telegram_payment_charge_id"] != payment.telegram_payment_charge_id:
+                        raise ValueError("invoice already paid with another charge")
+                    return
+                if (
+                    row["status"] != "pending"
+                    or row["user_id"] != str(message.from_user.id)
+                    or row["stars"] != payment.total_amount
+                ):
+                    raise ValueError("Stars payment does not match invoice")
+                updated = await conn.fetchrow("""
+                    UPDATE star_payments
+                    SET status = 'paid', telegram_payment_charge_id = $1, paid_at = NOW()
+                    WHERE id = $2 AND status = 'pending'
+                    RETURNING user_id, stars
+                """, payment.telegram_payment_charge_id, row["id"])
+                if not updated:
+                    return
+                result = await conn.execute(
+                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
+                    updated["stars"], updated["user_id"])
+                if result != "UPDATE 1":
+                    raise RuntimeError("Stars payment user does not exist")
+                credited = True
+        if credited:
+            await message.answer(f"⭐ На баланс DNX Store зачислено {payment.total_amount} Stars.")
+    except Exception as exc:
+        logging.error("Successful Stars payment processing error: %s", exc)
+
+
+@dp.message(Command("paysupport"))
+async def cmd_paysupport(message: types.Message):
+    await message.answer(
+        "Поддержка платежей DNX Store. Пришлите описание проблемы, сумму, время и идентификатор платежа из чека Telegram. Никому не отправляйте seed-фразу или приватный ключ."
+    )
+
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     kb = InlineKeyboardMarkup(
@@ -1561,6 +1761,8 @@ app.router.add_get('/items', handle_get_items)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_post('/ton/deposit/create', handle_create_ton_deposit)
 app.router.add_get('/ton/deposit/status', handle_ton_deposit_status)
+app.router.add_post('/stars/invoice/create', handle_create_star_invoice)
+app.router.add_get('/stars/payment/status', handle_star_payment_status)
 app.router.add_post('/buy', handle_buy)
 app.router.add_post('/request-withdraw', handle_request_withdraw)
 app.router.add_get('/game/state', handle_game_state)
