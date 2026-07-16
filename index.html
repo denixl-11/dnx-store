@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -1087,6 +1087,196 @@
         .tab-bar .tab-item svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
         .tab-bar .tab-item.active svg { color: #ff668c; filter: drop-shadow(0 0 6px #ff335f); }
         .tab-bar .tab-item span { line-height: 1; }
+
+        /* ===== CROSS-DEVICE LAYOUT FIXES ===== */
+        :root {
+            --app-height: 100dvh;
+            --content-safe-top: 0px;
+            --content-safe-right: 0px;
+            --content-safe-bottom: 0px;
+            --content-safe-left: 0px;
+            --star-gold-1: #fff3a4;
+            --star-gold-2: #ffc857;
+            --star-gold-3: #ff8a3d;
+        }
+        html { min-height: 100%; background: #020207; }
+        body {
+            width: 100%;
+            min-height: var(--app-height);
+            padding: var(--content-safe-top) var(--content-safe-right) calc(82px + var(--content-safe-bottom)) var(--content-safe-left);
+            background-color: #020207;
+            background-attachment: scroll;
+            background-position: center top;
+            overflow-x: clip;
+        }
+        button, input, select, .page, .modal-content, .nft-modal-sheet { min-width: 0; max-width: 100%; }
+        button { font-family: inherit; }
+        header {
+            flex: 0 0 auto;
+            width: calc(100% - 24px);
+            min-height: 66px;
+            margin: 8px auto 10px;
+            padding: 10px 12px;
+            border-radius: 18px;
+        }
+        .header-left { min-width: 0; }
+        .username { max-width: clamp(74px, 25vw, 150px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .header-right { flex: 0 0 auto; gap: 7px; padding: 7px 8px 7px 10px; }
+        .header-right::before { content: none; }
+        .header-right::after { flex: 0 0 auto; }
+        .balance-text {
+            color: transparent;
+            background: linear-gradient(105deg, var(--star-gold-1), var(--star-gold-2) 52%, var(--star-gold-3));
+            -webkit-background-clip: text;
+            background-clip: text;
+            text-shadow: 0 0 14px rgba(255, 174, 72, .25);
+        }
+        .premium-star {
+            display: inline-block;
+            color: #ffd36a;
+            font-weight: 900;
+            line-height: 1;
+            text-shadow: 0 0 5px #ff9d42, 0 0 13px rgba(255, 74, 117, .5);
+            filter: drop-shadow(0 1px 0 rgba(255,255,255,.35));
+        }
+        .page {
+            width: calc(100% - 24px);
+            max-width: 480px;
+            min-height: max(320px, calc(var(--app-height) - var(--content-safe-top) - var(--content-safe-bottom) - 163px));
+            margin: 0 auto;
+            border-radius: 18px;
+            overflow: clip;
+        }
+        .store-tabs, .inventory-tabs { border-radius: 14px !important; }
+        .store-tab { border-radius: 12px; }
+        .catalog-grid,
+        #cases-grid,
+        #page-inventory .catalog-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            justify-content: stretch;
+            gap: 10px;
+            padding: 0 12px 18px;
+        }
+        .item-card, .case-card {
+            width: 100%;
+            min-width: 0;
+            padding: 10px;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        .item-image, .case-card .item-image {
+            width: 100%;
+            aspect-ratio: 1;
+            margin-bottom: 9px;
+            border-radius: 12px;
+        }
+        .item-name, .case-card .item-name { margin: 2px 0 9px; font-size: .78rem; min-height: 1em; }
+        .case-card .item-name { font-size: .82rem; }
+        .case-price { width: max-content; max-width: 100%; margin: auto; padding: 5px 10px; font-size: .78rem; }
+        .card-buttons { min-width: 0; gap: 6px; }
+        .btn-buy-now {
+            min-width: 0; height: 34px; padding: 0 5px;
+            border: 1px solid rgba(255, 181, 71, .2); border-radius: 10px;
+            color: #ffd274; font-size: .68rem;
+            background: linear-gradient(120deg, rgba(92,32,128,.28), rgba(113,21,45,.28));
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .btn-add-cart { flex: 0 0 34px; width: 34px; height: 34px; border-radius: 10px; }
+        #page-inventory .item-card .btn-main-action { height: 38px !important; border-radius: 11px; font-size: .7rem !important; }
+        .item-rarity { font-size: .55rem; }
+        .collection-filter {
+            display: flex; align-items: center; gap: 8px;
+            margin: 0 12px 13px; padding: 8px;
+            border: 1px solid rgba(208, 70, 255, .25); border-radius: 13px;
+            background: rgba(4, 2, 11, .78);
+        }
+        .collection-filter select {
+            flex: 1; width: 100%; height: 38px; padding: 0 34px 0 11px;
+            color: #eee7f1; border: 1px solid rgba(255, 73, 128, .25); border-radius: 10px;
+            background: #0c0714; font: 600 .72rem/1 'Inter', sans-serif;
+        }
+        .collection-filter-clear {
+            flex: 0 0 38px; width: 38px; height: 38px; padding: 0;
+            color: #ff9aba; border: 1px solid rgba(255, 64, 103, .38); border-radius: 10px;
+            background: rgba(83, 12, 40, .38); font-size: 1.05rem;
+        }
+        .collection-filter-clear:disabled { opacity: .3; }
+        .cart-fab {
+            right: max(calc(18px + var(--content-safe-right)), calc((100vw - 480px) / 2 + 18px));
+            bottom: calc(80px + var(--content-safe-bottom));
+            width: 52px; height: 52px;
+        }
+        .cart-fab svg { width: 23px; height: 23px; }
+        .cart-fab .cart-badge { width: 20px; height: 20px; font-size: .65rem; }
+        .game-container { width: 100%; padding: 0 14px 20px; align-items: stretch; }
+        .elite-leaderboard-bar, .game-history-row, .game-canvas-wrap, .game-info-row,
+        .game-controls, .game-btn-cancel, .bets-list-container {
+            width: 100%; max-width: none;
+        }
+        .elite-leaderboard-bar { min-width: 0; padding: 10px 12px; }
+        .elite-left { min-width: 0; gap: 10px; }
+        .elite-text-group { min-width: 0; }
+        .elite-title, .elite-subtitle { white-space: nowrap; }
+        .elite-right {
+            flex: 0 0 64px; width: 64px; height: 48px; padding: 0;
+            display: grid; place-items: center; border-radius: 12px;
+        }
+        .elite-score { display: block; width: 100%; text-align: center; line-height: 1.05; }
+        .elite-score small { display: inline-block; margin-top: 4px; }
+        .game-history-row { display: flex; justify-content: flex-end; margin-bottom: 5px; }
+        .game-canvas-wrap {
+            align-self: stretch;
+            height: auto; max-height: none;
+            aspect-ratio: 1 / 1;
+            border-radius: 16px;
+            background: #040209 url('game-waiting-bg.png') center / cover no-repeat;
+        }
+        .game-controls { gap: 10px; }
+        .game-controls .btn-gold-outline { border-radius: 12px; }
+        .modal-overlay {
+            width: 100%; height: var(--app-height);
+            padding: calc(12px + var(--content-safe-top)) calc(12px + var(--content-safe-right)) calc(12px + var(--content-safe-bottom)) calc(12px + var(--content-safe-left));
+            overflow-y: auto;
+        }
+        .modal-content { width: min(400px, 100%); padding: 20px; border-radius: 18px; }
+        .nft-modal-sheet {
+            left: 50%;
+            width: min(480px, calc(100% - 24px));
+            transform: translateX(-50%);
+            border-radius: 22px 22px 0 0;
+        }
+        .leaderboard-fullscreen {
+            height: var(--app-height);
+            padding: calc(18px + var(--content-safe-top)) calc(16px + var(--content-safe-right)) calc(18px + var(--content-safe-bottom)) calc(16px + var(--content-safe-left));
+        }
+        .fixed-footer { left: 50%; bottom: calc(78px + var(--content-safe-bottom)); width: min(480px, calc(100% - 24px)); transform: translateX(-50%); }
+        .tab-bar {
+            bottom: var(--content-safe-bottom);
+            width: min(480px, calc(100vw - var(--content-safe-left) - var(--content-safe-right) - 24px));
+            border-radius: 18px;
+        }
+        .success-payment-card { overflow: hidden; }
+        .success-payment-icon {
+            position: relative; display: grid; place-items: center;
+            width: 86px; height: 86px; margin: 2px auto 18px;
+            border: 1px solid rgba(255,207,91,.75); border-radius: 50%;
+            color: #ffe27f; font-size: 2.6rem;
+            background: radial-gradient(circle, rgba(255,184,65,.28), rgba(105,20,151,.24) 55%, rgba(5,3,13,.9) 72%);
+            box-shadow: 0 0 26px rgba(255,175,57,.25), 0 0 50px rgba(213,45,255,.18), inset 0 0 25px rgba(255,225,121,.14);
+        }
+        .success-payment-card h3 { margin: 0 0 8px; color: #fff8ed; font-size: 1.05rem; letter-spacing: .06em; }
+        .success-payment-card p { margin: 0 0 20px; color: #a99eab; font-size: .78rem; line-height: 1.55; }
+        .success-payment-card strong { color: #ffd36a; font-size: 1rem; }
+        @media (max-width: 360px) {
+            header { padding-inline: 9px; }
+            .avatar { width: 38px; height: 38px; }
+            .header-right { gap: 5px; padding-left: 7px; }
+            .header-right::after { width: 25px; height: 25px; }
+            .balance-text { font-size: .68rem; }
+            .catalog-grid, #cases-grid, #page-inventory .catalog-grid { gap: 7px; padding-inline: 9px; }
+            .item-card, .case-card { padding: 8px; }
+            .elite-subtitle { font-size: .52rem; letter-spacing: .08em; }
+        }
     </style>
 </head>
 <body>
@@ -1097,7 +1287,7 @@
             <div class="username" id="username-display">User</div>
         </div>
         <div class="header-right" onclick="showPage('balance')">
-            <span class="balance-text" id="header-balance">⭐ 0</span>
+            <span class="balance-text" id="header-balance">✦ 0</span>
         </div>
     </header>
 
@@ -1119,7 +1309,7 @@
                 </div>
                 <div class="elite-right"><span id="leaderboard-preview" class="elite-score">0<br><small>ПОБЕД</small></span></div>
             </div>
-            <div style="width:85vw; max-width:380px; display:flex; justify-content:flex-end; margin-bottom:4px;">
+            <div class="game-history-row">
                 <div class="history-btn" onclick="openHistoryModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     История
@@ -1134,12 +1324,12 @@
                 <span id="game-number-display">#...</span>
             </div>
             <div class="game-controls">
-                <button class="btn-gold-outline" onclick="openBetConfirm(10)">+10 ⭐</button>
+                <button class="btn-gold-outline" onclick="openBetConfirm(10)">+10 <span class="premium-star">✦</span></button>
                 <button class="btn-gold-outline" onclick="openCustomBet()">Своя сумма</button>
             </div>
             <button class="game-btn-cancel" id="btn-cancel-bet" onclick="cancelGameBet()">Отменить ставку</button>
             <div class="bets-list-container" id="bets-list-container">
-                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 ⭐</span>)</div>
+                <div class="bets-list-header">Ставки игроков (Банк: <span id="game-total-pool" style="color:var(--accent-gold);">0 ✦</span>)</div>
                 <div class="bets-list" id="game-bets-list"></div>
             </div>
         </div>
@@ -1149,6 +1339,12 @@
         <div class="store-tabs">
             <div class="store-tab active" onclick="switchStoreTab('catalog')">КАТАЛОГ</div>
             <div class="store-tab" onclick="switchStoreTab('cases')">КЕЙСЫ</div>
+        </div>
+        <div id="collection-filter" class="collection-filter">
+            <select id="collection-filter-select" aria-label="Фильтр по коллекции" onchange="applyCollectionFilter(this.value)">
+                <option value="">Все коллекции</option>
+            </select>
+            <button id="collection-filter-clear" class="collection-filter-clear" type="button" aria-label="Сбросить фильтр" onclick="resetCollectionFilter()" disabled>×</button>
         </div>
         <div id="catalog-container" class="catalog-grid"></div>
         <div id="cases-container" style="display: none;">
@@ -1170,12 +1366,12 @@
             <h2 class="balance-title">ПОПОЛНИТЬ БАЛАНС</h2>
             <p class="balance-subtitle">Выберите количество звёзд, затем способ оплаты</p>
             <div class="topup-grid">
-                <button class="topup-btn" onclick="initTopup(85)"><b>85</b><span>⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(255)"><b>255</b><span>⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(425)"><b>425</b><span>⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(850)"><b>850</b><span>⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(1700)"><b>1 700</b><span>⭐</span></button>
-                <button class="topup-btn" onclick="initTopup(4250)"><b>4 250</b><span>⭐</span></button>
+                <button class="topup-btn" onclick="initTopup(85)"><b>85</b><span class="premium-star">✦</span></button>
+                <button class="topup-btn" onclick="initTopup(255)"><b>255</b><span class="premium-star">✦</span></button>
+                <button class="topup-btn" onclick="initTopup(425)"><b>425</b><span class="premium-star">✦</span></button>
+                <button class="topup-btn" onclick="initTopup(850)"><b>850</b><span class="premium-star">✦</span></button>
+                <button class="topup-btn" onclick="initTopup(1700)"><b>1 700</b><span class="premium-star">✦</span></button>
+                <button class="topup-btn" onclick="initTopup(4250)"><b>4 250</b><span class="premium-star">✦</span></button>
                 <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
             </div>
         </div>
@@ -1233,7 +1429,7 @@
             <div style="text-align: center;">
                 <div id="winner-avatar-container"></div>
                 <div class="winner-name" id="winner-name"></div>
-                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> ⭐</div>
+                <div class="winner-amount">Выигрыш: <span id="winner-amount"></span> <span class="premium-star">✦</span></div>
                 <button class="btn-main-action" onclick="closeWinnerModal()">Продолжить</button>
             </div>
         </div>
@@ -1268,16 +1464,25 @@
         <div class="modal-content" style="padding-top: 32px;"><div id="alert-msg" style="margin-bottom: 24px; font-weight: 500;"></div><button class="btn-main-action" style="height: 44px;" onclick="closeModal('alert-modal')">Понятно</button></div>
     </div>
 
+    <div id="payment-success-modal" class="modal-overlay">
+        <div class="modal-content success-payment-card" onclick="event.stopPropagation()">
+            <div class="success-payment-icon">✦</div>
+            <h3>ПОПОЛНЕНИЕ УСПЕШНО</h3>
+            <p>Ваш баланс успешно пополнен на<br><strong id="payment-success-amount">0 Stars</strong></p>
+            <button class="btn-main-action" onclick="closeModal('payment-success-modal')">ПРОДОЛЖИТЬ</button>
+        </div>
+    </div>
+
     <div id="confirm-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> ⭐?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span> <span class="premium-star">✦</span>?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
     </div>
 
     <div id="payment-method-modal" class="modal-overlay">
         <div class="modal-content payment-method-sheet">
             <div class="section-eyebrow">ПОПОЛНЕНИЕ</div>
-            <h3 class="modal-title"><span id="method-stars-amount">0</span> ⭐</h3>
+            <h3 class="modal-title"><span id="method-stars-amount">0</span> <span class="premium-star">✦</span></h3>
             <p class="ton-payment-note">Выберите способ оплаты</p>
-            <button class="payment-method-card stars-method" onclick="payWithTelegramStars()"><span class="method-icon">★</span><span><b>Telegram Stars</b><small>Оплатить напрямую в Telegram</small></span><i>›</i></button>
+            <button class="payment-method-card stars-method" onclick="payWithTelegramStars()"><span class="method-icon premium-star">✦</span><span><b>Telegram Stars</b><small>Оплатить напрямую в Telegram</small></span><i>›</i></button>
             <button class="payment-method-card ton-method" onclick="openTonPayment()"><span class="method-icon">◆</span><span><b>Toncoin</b><small>1 TON = 85 Stars</small></span><i>›</i></button>
             <button class="payment-method-card rub-method" disabled><span class="method-icon">₽</span><span><b>Рубли</b><small>Скоро</small></span><em>СКОРО</em></button>
             <div class="ton-payment-status" id="stars-payment-status"></div>
@@ -1286,7 +1491,7 @@
     </div>
 
     <div id="topup-modal" class="modal-overlay">
-        <div class="modal-content ton-payment-modal"><h3 class="modal-title"><span id="display-topup-stars">0</span> ⭐ ЗА TON</h3>
+        <div class="modal-content ton-payment-modal"><h3 class="modal-title"><span id="display-topup-stars">0</span> <span class="premium-star">✦</span> ЗА TON</h3>
             <div class="ton-orb">◆</div>
             <p class="ton-payment-note">К оплате: <strong id="display-topup-ton">0</strong> TON<br>Курс фиксирован: 1 TON = 85 Stars</p>
             <div class="ton-payment-status" id="ton-payment-status">Кошелёк не подключён</div>
@@ -1341,14 +1546,14 @@
                     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 15px;">
                         <button class="btn-main-action" onclick="claimItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">ЗАБРАТЬ В ИНВЕНТАРЬ</button>
                         <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">
-                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> ⭐</span>
+                            <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span id="win-value">0</span><span id="win-currency"> ✦</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <div id="case-actions" style="margin-top: 25px; display: flex; justify-content: center; width: 100%;">
-                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ⭐</button>
+                <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span id="case-price"></span> ✦</button>
             </div>
 
             <div id="case-drops-section" style="margin-top: 35px;">
@@ -1371,21 +1576,38 @@
         tg.ready();
         try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
         try {
-            if (typeof tg.requestFullscreen === 'function' && tg.version && parseFloat(tg.version) >= 8.0) {
+            tg.expand();
+            const isAndroid = String(tg.platform || '').toLowerCase() === 'android';
+            if (!isAndroid && typeof tg.requestFullscreen === 'function' && tg.version && parseFloat(tg.version) >= 8.0) {
                 tg.requestFullscreen();
-            } else {
-                tg.expand();
             }
-        } catch (e) { tg.expand(); }
+        } catch (e) { try { tg.expand(); } catch (_) {} }
 
         function applySafeAreaTop() {
-            let topInset = tg.safeAreaInset?.top ? tg.safeAreaInset.top + 35 : 70;
-            document.body.style.paddingTop = topInset + 'px';
-            document.documentElement.style.setProperty('--safe-area-top', topInset + 'px');
+            const contentInset = tg.contentSafeAreaInset || {};
+            const deviceInset = tg.safeAreaInset || {};
+            const readInset = (side) => {
+                const contentValue = Number(contentInset[side]);
+                const deviceValue = Number(deviceInset[side]);
+                if (Number.isFinite(contentValue) && contentValue >= 0) return contentValue;
+                if (Number.isFinite(deviceValue) && deviceValue >= 0) return deviceValue;
+                return 0;
+            };
+            const root = document.documentElement;
+            root.style.setProperty('--content-safe-top', readInset('top') + 'px');
+            root.style.setProperty('--content-safe-right', readInset('right') + 'px');
+            root.style.setProperty('--content-safe-bottom', readInset('bottom') + 'px');
+            root.style.setProperty('--content-safe-left', readInset('left') + 'px');
+            const viewportHeight = Number(tg.viewportStableHeight || tg.viewportHeight || window.innerHeight);
+            root.style.setProperty('--app-height', Math.max(320, viewportHeight) + 'px');
+            requestAnimationFrame(() => { try { resizeCanvas(); drawGameFrame(); } catch (_) {} });
         }
         applySafeAreaTop();
         requestAnimationFrame(applySafeAreaTop);
         tg.onEvent('viewportChanged', applySafeAreaTop);
+        try { tg.onEvent('safeAreaChanged', applySafeAreaTop); } catch (_) {}
+        try { tg.onEvent('contentSafeAreaChanged', applySafeAreaTop); } catch (_) {}
+        try { tg.onEvent('fullscreenChanged', applySafeAreaTop); } catch (_) {}
 
         // --- ГЕНЕРАТОР ЗВУКА ЩЕЛЧКА ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1478,6 +1700,7 @@
             if (Array.isArray(storedCart)) cart = storedCart.slice(0, 50);
         } catch (_) { localStorage.removeItem('dnx_cart'); }
         let currentCatalog = [];
+        let currentCollectionFilter = '';
         let inventoryData = [];
         let pendingTopupStars = 0;
         let pendingBuyItem = null;
@@ -1493,6 +1716,11 @@
             document.getElementById('alert-msg').innerText = msg;
             document.getElementById('alert-modal').classList.add('active');
             try { tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
+        }
+        function showPaymentSuccess(stars) {
+            document.getElementById('payment-success-amount').innerText = `${formatStars(stars)} Stars`;
+            document.getElementById('payment-success-modal').classList.add('active');
+            try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
         }
         function closeModal(id) { const el = document.getElementById(id); if(el) el.classList.remove('active'); }
 
@@ -1532,26 +1760,71 @@
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
             } catch(e) { console.error('Balance update failed', e); }
-            document.getElementById('header-balance').innerText = '⭐ ' + formatStars(userBalance);
+            document.getElementById('header-balance').innerHTML = `<span class="premium-star">✦</span> ${formatStars(userBalance)}`;
             document.getElementById('big-balance').innerText = formatStars(userBalance);
         }
 
         async function loadCatalog() {
             try {
                 currentCatalog = await apiFetch(`${API_BASE}/items`);
-                document.getElementById('catalog-container').innerHTML = currentCatalog.map(item => `
+                const collections = [...new Set(currentCatalog.map(getItemCollection).filter(Boolean))]
+                    .sort((a, b) => a.localeCompare(b, 'ru'));
+                if (currentCollectionFilter && !collections.includes(currentCollectionFilter)) currentCollectionFilter = '';
+                const select = document.getElementById('collection-filter-select');
+                select.innerHTML = `<option value="">Все коллекции</option>${collections.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}`;
+                select.value = currentCollectionFilter;
+                renderCatalogItems();
+                updateCollectionFilterUi();
+                updateCartFab();
+            } catch(e) { console.error(e); }
+        }
+
+        function getItemCollection(item) {
+            if (typeof item?.model === 'string' && item.model.trim()) return item.model.trim();
+            if (Array.isArray(item?.traits)) {
+                const trait = item.traits.find(entry => {
+                    const key = String(entry?.trait_type || entry?.name || '').trim().toLowerCase();
+                    return key === 'collection' || key === 'коллекция';
+                });
+                if (trait?.value != null) return String(trait.value).trim();
+            }
+            return '';
+        }
+
+        function renderCatalogItems() {
+            const items = currentCollectionFilter
+                ? currentCatalog.filter(item => getItemCollection(item) === currentCollectionFilter)
+                : currentCatalog;
+            document.getElementById('catalog-container').innerHTML = items.length ? items.map(item => `
                     <div class="item-card">
-                        <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" onclick="openNftModal(${Number(item.id)})">
+                        <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" alt="${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">
                         <div class="item-name">${escapeHtml(item.name)}</div>
                         <div class="card-buttons">
-                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${formatStars(item.price)} ⭐</button>
+                            <button class="btn-buy-now" onclick="confirmCatalogItem(${Number(item.id)})">${formatStars(item.price)} <span class="premium-star">✦</span></button>
                             <button class="btn-add-cart" onclick="addCatalogItemToCart(${Number(item.id)})">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-gold)" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6zM3 6h18M16 10a4 4 0 01-8 0"/></svg>
                             </button>
                         </div>
-                    </div>`).join('');
-                updateCartFab();
-            } catch(e) { console.error(e); }
+                    </div>`).join('') : `<div class="empty-state"><h3>НЕТ ПРЕДМЕТОВ</h3><p>В выбранной коллекции пока нет доступных NFT.</p></div>`;
+        }
+
+        function applyCollectionFilter(value) {
+            currentCollectionFilter = String(value || '');
+            renderCatalogItems();
+            updateCollectionFilterUi();
+        }
+
+        function resetCollectionFilter() {
+            currentCollectionFilter = '';
+            const select = document.getElementById('collection-filter-select');
+            if (select) select.value = '';
+            renderCatalogItems();
+            updateCollectionFilterUi();
+        }
+
+        function updateCollectionFilterUi() {
+            const clear = document.getElementById('collection-filter-clear');
+            if (clear) clear.disabled = !currentCollectionFilter;
         }
 
         function escapeHtml(value) {
@@ -1641,7 +1914,7 @@
                 buyBtn.style.display = 'block';
                 cartBtn.style.display = 'flex';
                 withdrawBtn.style.display = 'none';
-                buyBtn.innerText = `КУПИТЬ ЗА ${formatStars(item.price)} ⭐`;
+                buyBtn.innerText = `КУПИТЬ ЗА ${formatStars(item.price)} ✦`;
                 buyBtn.onclick = () => { closeNftModal(true); confirmBuyItem(item.id, item.price, item.name, item.image_url); };
                 cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
             } else {
@@ -1681,7 +1954,7 @@
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}">
                         <div class="cart-item-info">
                             <div style="font-weight:500">${escapeHtml(c.name)}</div>
-                            <div style="color:var(--accent-gold); margin-top:4px;">${formatStars(c.price)} ⭐</div>
+                            <div style="color:#ffd274; margin-top:4px;">${formatStars(c.price)} ✦</div>
                         </div>
                         <div style="font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 10px;" onclick="removeFromCart(${i})">×</div>
                     </div>`).join('');
@@ -1697,7 +1970,7 @@
                 <img src="${escapeHtml(safeImageUrl(image_url))}" />
                 <div style="text-align:left;">
                     <div style="font-weight:600;">${escapeHtml(name)}</div>
-                    <div style="color:var(--accent-gold);">${formatStars(price)} ⭐</div>
+                    <div style="color:#ffd274;">${formatStars(price)} ✦</div>
                 </div>`;
             document.getElementById('confirm-buy-modal').classList.add('active');
         }
@@ -1791,7 +2064,7 @@
                     localStorage.removeItem('dnx_star_payment');
                     await updateBalance();
                     closeModal('payment-method-modal');
-                    showAlert(`Зачислено ${formatStars(result.stars)} ⭐`);
+                    showPaymentSuccess(result.stars);
                     return;
                 }
                 if (['expired', 'failed'].includes(result.status)) {
@@ -1876,7 +2149,7 @@
                     localStorage.removeItem('dnx_ton_deposit');
                     await updateBalance();
                     closeModal('topup-modal');
-                    showAlert(`Зачислено ${formatStars(result.creditStars)} ⭐`);
+                    showPaymentSuccess(result.creditStars);
                     return;
                 }
                 if (result.status === 'expired') {
@@ -1941,7 +2214,7 @@
                     <div class="history-modal-row">
                         <span>#${h.game_number}</span>
                         <span>${escapeHtml(h.winner_name)}</span>
-                        <span style="color:var(--accent-gold)">${formatStars(h.win_amount)} ⭐ (${h.win_percent}%)</span>
+                        <span style="color:#ffd274">${formatStars(h.win_amount)} ✦ (${h.win_percent}%)</span>
                     </div>`).join('');
             } catch(e) { list.innerHTML = 'Ошибка загрузки'; }
         }
@@ -2118,12 +2391,23 @@
             drawCoverImage(ctx, waitingFieldImage, width, height);
             const pulse = (Math.sin(Date.now() * 0.003) + 1) / 2;
             ctx.save();
+            const sweep = ((Date.now() % 5200) / 5200) * 1.8 - .4;
+            const shimmer = ctx.createLinearGradient(width * (sweep - .32), 0, width * (sweep + .32), height);
+            shimmer.addColorStop(0, 'rgba(255,255,255,0)');
+            shimmer.addColorStop(.46, 'rgba(210,110,255,0)');
+            shimmer.addColorStop(.5, `rgba(255,210,245,${.045 + pulse * .025})`);
+            shimmer.addColorStop(.54, 'rgba(255,95,145,.035)');
+            shimmer.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.globalCompositeOperation = 'screen';
+            ctx.fillStyle = shimmer;
+            ctx.fillRect(0, 0, width, height);
+            ctx.globalCompositeOperation = 'source-over';
             ctx.fillStyle = `rgba(255, 220, 185, ${0.68 + pulse * .2})`;
             ctx.shadowColor = 'rgba(224, 66, 255, .75)';
             ctx.shadowBlur = 12 + pulse * 8;
             ctx.font = "600 23px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText('Ожидание игроков…', width / 2, height * .72);
+            ctx.fillText('Ожидание игроков…', width / 2, height * .75);
             ctx.restore();
         }
 
@@ -2182,8 +2466,9 @@
                     ctx.save();
                     ctx.globalAlpha = .78;
                     ctx.fill();
-                    ctx.strokeStyle = "rgba(0,0,0,0.15)";
-                    ctx.lineWidth = 1.5;
+                    ctx.globalAlpha = 1;
+                    ctx.strokeStyle = "rgba(3,1,10,.9)";
+                    ctx.lineWidth = Math.max(3, cw * .0045);
                     ctx.stroke();
                     ctx.restore();
                 }
@@ -2548,7 +2833,7 @@
             const hasPlayers = gState.players && gState.players.length > 0;
             container.style.display = hasPlayers ? 'flex' : 'none';
             if (!hasPlayers) return;
-            document.getElementById('game-total-pool').innerText = `${formatStars(gState.pool)} ⭐`;
+            document.getElementById('game-total-pool').innerText = `${formatStars(gState.pool)} ✦`;
             const sorted = [...gState.players].sort((a,b) => String(a.id).localeCompare(String(b.id)));
             list.innerHTML = sorted.map(p => {
                 const winPercent = formatWinChance(p.amount, gState.pool);
@@ -2561,7 +2846,7 @@
                     </span>
                     <span style="display:flex;gap:15px;align-items:center;">
                         <span style="color:rgba(255,255,255,0.6);font-size:14px;">${winPercent}%</span>
-                        <span style="color:var(--accent-gold);font-weight:600;font-size:15px;min-width:70px;text-align:right;">${formatStars(p.amount)} ⭐</span>
+                        <span style="color:#ffd274;font-weight:600;font-size:15px;min-width:70px;text-align:right;">${formatStars(p.amount)} ✦</span>
                     </span>
                 </div>`;
             }).join('');
@@ -2625,11 +2910,13 @@
                 document.getElementById('page-store').classList.remove('cases-active');
                 document.querySelector('.store-tab:first-child').classList.add('active');
                 document.getElementById('catalog-container').style.display = 'grid';
+                document.getElementById('collection-filter').style.display = 'flex';
                 document.getElementById('cases-container').style.display = 'none';
             } else {
                 document.getElementById('page-store').classList.add('cases-active');
                 document.querySelector('.store-tab:last-child').classList.add('active');
                 document.getElementById('catalog-container').style.display = 'none';
+                document.getElementById('collection-filter').style.display = 'none';
                 document.getElementById('cases-container').style.display = 'block';
                 loadCases();
             }
@@ -2645,7 +2932,7 @@
                     <div class="case-card" onclick="openCaseDetail(${Number(c.id)})" style="animation-delay: ${i * 0.08}s">
                         <img src="${escapeHtml(safeImageUrl(c.image_url))}" class="item-image" alt="${escapeHtml(c.name)}">
                         <div class="item-name">${escapeHtml(c.name)}</div>
-                        <div class="case-price">${formatStars(c.price)} ⭐</div>
+                        <div class="case-price">${formatStars(c.price)} <span class="premium-star">✦</span></div>
                     </div>
                 `).join('');
             } catch(e) {
@@ -2657,7 +2944,7 @@
             try {
                 currentCase = await apiFetch(`${API_BASE}/case-details?id=${caseId}`);
                 document.getElementById('case-detail-title').innerText = currentCase.name;
-                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${formatStars(currentCase.price)} ⭐`;
+                document.getElementById('case-open-btn').innerText = `ОТКРЫТЬ ЗА ${formatStars(currentCase.price)} ✦`;
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
                 document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `

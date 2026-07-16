@@ -727,16 +727,26 @@ def generate_spin_params(polygons: list) -> dict:
 # Игровая механика
 # ------------------------------------------------------------
 PLAYER_COLORS = [
-    ("#7F00FF", "#E100FF"),
-    ("#FF416C", "#FF4B2B"),
-    ("#00C6FF", "#0072FF"),
-    ("#11998E", "#38EF7D"),
-    ("#F2994A", "#F2C94C"),
-    ("#4FACFE", "#00F2FE"),
-    ("#FF8C00", "#E0115F"),
-    ("#757F9A", "#D7DDE8"),
-    ("#00FF87", "#60EFFF"),
-    ("#A8BFFF", "#884AF6")
+    ("#5B19FF", "#C85CFF"),
+    ("#FF174F", "#FF7A18"),
+    ("#006BFF", "#31D7FF"),
+    ("#00A86B", "#75FF9B"),
+    ("#FFD000", "#FFF27A"),
+    ("#E000C6", "#FF77E7"),
+    ("#00B8A9", "#69FFF1"),
+    ("#B94700", "#FFB067"),
+    ("#3957D7", "#9DB0FF"),
+    ("#8B0D2E", "#FF5A85"),
+    ("#087F23", "#B7FF45"),
+    ("#552A00", "#D98C26"),
+    ("#3D006B", "#9D4DFF"),
+    ("#00606B", "#4AE4F2"),
+    ("#A40000", "#FF6B5E"),
+    ("#514D00", "#D9EF45"),
+    ("#003D8F", "#59A7FF"),
+    ("#760067", "#E86BD9"),
+    ("#00513F", "#45E0B6"),
+    ("#6B2D74", "#F0A0FF")
 ]
 
 def point_in_polygon(point, polygon):
@@ -935,6 +945,16 @@ async def scan_ton_deposits() -> int:
                     row["credit_stars"], row["user_id"])
                 if result != "UPDATE 1":
                     raise RuntimeError("TON deposit user does not exist")
+        try:
+            await bot.send_message(
+                int(row["user_id"]),
+                "✨ ПОПОЛНЕНИЕ УСПЕШНО\n\n"
+                f"⭐ Ваш баланс успешно пополнен на {row['credit_stars']} Stars.\n"
+                "💎 Способ оплаты: Toncoin\n\n"
+                "Спасибо, что выбираете DNX Store!"
+            )
+        except Exception as exc:
+            logging.warning("Could not send TON credit notification to %s: %s", row["user_id"], exc)
         credited += 1
         by_amount.pop(value, None)
     return credited
@@ -1187,7 +1207,7 @@ async def handle_star_payment_status(request):
 async def handle_get_items(request):
     try:
         rows = await get_pool().fetch(
-            "SELECT id, name, price, status, image_url, nft_link, traits, number FROM items WHERE status = 'Доступен'")
+            "SELECT id, name, price, status, image_url, nft_link, traits, number, model FROM items WHERE status = 'Доступен'")
         items = normalize_records(rows)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
@@ -1736,7 +1756,12 @@ async def process_successful_star_payment(message: types.Message):
                     raise RuntimeError("Stars payment user does not exist")
                 credited = True
         if credited:
-            await message.answer(f"⭐ На баланс DNX Store зачислено {payment.total_amount} Stars.")
+            await message.answer(
+                "✨ ПОПОЛНЕНИЕ УСПЕШНО\n\n"
+                f"⭐ Ваш баланс успешно пополнен на {payment.total_amount} Stars.\n"
+                "💫 Способ оплаты: Telegram Stars\n\n"
+                "Спасибо, что выбираете DNX Store!"
+            )
     except Exception as exc:
         logging.error("Successful Stars payment processing error: %s", exc)
 
