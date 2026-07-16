@@ -783,6 +783,7 @@
         }
         .balance-text { color: #fff5ec; font-size: .78rem; white-space: nowrap; }
         .page {
+            position: relative;
             width: calc(100% - 24px);
             max-width: 480px;
             min-height: calc(100vh - var(--safe-area-top, 70px) - 174px);
@@ -1140,8 +1141,9 @@
             color: transparent;
             font-size: 1em;
             line-height: 1;
-            background: url('telegram-star.svg') center / contain no-repeat;
-            filter: drop-shadow(0 0 .22em rgba(255, 171, 31, .26));
+            background: url('data:image/webp;base64,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') center / 188% 188% no-repeat;
+            mix-blend-mode: screen;
+            filter: none;
         }
         .star-amount { display: inline-flex; align-items: center; justify-content: center; gap: .18em; white-space: nowrap; }
         .big-balance-card > .telegram-star { font-size: 2.2rem; }
@@ -1154,6 +1156,21 @@
             border-radius: 18px;
             overflow: clip;
         }
+        .page::after,
+        .tab-bar::after,
+        .nft-modal-sheet::after {
+            content: "";
+            position: absolute;
+            left: 1px;
+            right: 1px;
+            bottom: 0;
+            height: 1px;
+            pointer-events: none;
+            z-index: 30;
+            background: linear-gradient(90deg, rgba(225,85,169,.16), rgba(238,85,197,.72) 18%, rgba(255,72,135,.78) 50%, rgba(201,70,255,.7) 82%, rgba(225,85,169,.16));
+            box-shadow: 0 -1px 8px rgba(225,62,186,.16);
+        }
+        .page::after { left: 12px; right: 12px; }
         .store-tabs, .inventory-tabs {
             gap: 3px !important;
             height: auto !important;
@@ -1265,7 +1282,7 @@
             left: 50%;
             width: min(480px, calc(100% - 24px));
             transform: translateX(-50%);
-            border-radius: 22px 22px 0 0;
+            border-radius: 22px;
         }
         .nft-modal-sheet {
             max-height: min(88vh, calc(var(--app-height) - var(--content-safe-top) - 12px));
@@ -1276,6 +1293,7 @@
                 linear-gradient(160deg, #10071d 0%, #07030e 48%, #050208 100%);
             box-shadow: 0 -18px 70px rgba(0,0,0,.72), inset 0 0 44px rgba(206,51,255,.04);
         }
+        .nft-modal-sheet > div:last-child { padding-bottom: calc(20px + var(--content-safe-bottom)) !important; }
         .nft-modal-header-rocket { padding: 58px 18px 0; }
         .nft-modal-header-rocket > img {
             width: min(64vw, 258px); height: min(64vw, 258px);
@@ -1323,8 +1341,8 @@
             width: min(480px, calc(100vw - var(--content-safe-left) - var(--content-safe-right) - 24px));
             height: calc(68px + var(--content-safe-bottom));
             padding: 0 0 var(--content-safe-bottom);
-            border-bottom: 0;
-            border-radius: 18px 18px 0 0;
+            border-bottom: 1px solid rgba(225, 85, 169, .48);
+            border-radius: 18px;
             overflow: hidden;
         }
         .tab-bar .tab-item { height: 68px; min-height: 68px; }
@@ -1360,7 +1378,7 @@
             <div class="username" id="username-display">User</div>
         </div>
         <div class="header-right" onclick="showPage('balance')">
-            <span class="balance-text star-amount" id="header-balance"><span class="telegram-star" aria-hidden="true"></span><span>0</span></span>
+            <span class="balance-text star-amount" id="header-balance"><span>0</span><span class="telegram-star" aria-hidden="true"></span></span>
         </div>
     </header>
 
@@ -1435,7 +1453,7 @@
     <div id="page-balance" class="page">
         <div class="balance-page-inner">
             <div class="section-eyebrow">ВНУТРЕННИЙ БАЛАНС</div>
-            <div class="big-balance-card"><span class="star-coin telegram-star" aria-hidden="true"></span><strong id="big-balance">0</strong></div>
+            <div class="big-balance-card"><strong id="big-balance">0</strong><span class="star-coin telegram-star" aria-hidden="true"></span></div>
             <h2 class="balance-title">ПОПОЛНИТЬ БАЛАНС</h2>
             <p class="balance-subtitle">Выберите количество звёзд, затем способ оплаты</p>
             <div class="topup-grid">
@@ -1828,7 +1846,7 @@
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
             } catch(e) { console.error('Balance update failed', e); }
-            document.getElementById('header-balance').innerHTML = `${telegramStarMarkup()}<span>${formatStars(userBalance)}</span>`;
+            document.getElementById('header-balance').innerHTML = `<span>${formatStars(userBalance)}</span>${telegramStarMarkup()}`;
             document.getElementById('big-balance').innerText = formatStars(userBalance);
         }
 
@@ -2407,15 +2425,22 @@
 
         function parseColors(colorData) {
             if (Array.isArray(colorData)) {
-                if (colorData.length >= 2) return colorData;
-                if (colorData.length === 1) return [colorData[0], colorData[0]];
+                const colors = colorData.filter(color => /^#[0-9a-fA-F]{6}$/.test(String(color))).slice(0, 5);
+                if (colors.length >= 2) return colors;
+                if (colors.length === 1) return [colors[0], colors[0]];
             }
             if (typeof colorData === 'string') {
                 const hexes = colorData.match(/#[0-9a-fA-F]{6}/g);
-                if (hexes && hexes.length >= 2) return [hexes[0], hexes[1]];
+                if (hexes && hexes.length >= 2) return hexes.slice(0, 5);
                 if (hexes && hexes.length === 1) return [hexes[0], hexes[0]];
             }
-            return ["#D4AF37", "#AA8000"];
+            return ["#5538F2", "#B54DF4", "#FF4AA2", "#38A5F5"];
+        }
+
+        function addGradientStops(gradient, colors) {
+            const safeColors = colors.length >= 2 ? colors : ["#5538F2", "#38A5F5"];
+            const lastIndex = safeColors.length - 1;
+            safeColors.forEach((color, index) => gradient.addColorStop(index / lastIndex, color));
         }
 
         function resizeCanvas() {
@@ -2546,12 +2571,32 @@
             return Math.max(5, Math.min(defaultRadius, safeRadius));
         }
 
-        function drawGameFrame(ballPos = null, highlightPts = null) {
+        function smoothstep01(value) {
+            const t = Math.max(0, Math.min(1, value));
+            return t * t * (3 - 2 * t);
+        }
+
+        function applyBallCamera(context, width, height, camera) {
+            const zoom = Math.max(1, Number(camera?.zoom) || 1);
+            const halfVisible = .5 / zoom;
+            const cameraX = Math.max(halfVisible, Math.min(1 - halfVisible, Number(camera?.x) || .5));
+            const cameraY = Math.max(halfVisible, Math.min(1 - halfVisible, Number(camera?.y) || .5));
+            context.translate(width / 2, height / 2);
+            context.scale(zoom, zoom);
+            context.translate(-cameraX * width, -(1 - cameraY) * height);
+        }
+
+        function drawGameFrame(ballPos = null, highlightPts = null, camera = null) {
             if (!ctx) return;
             const cw = canvas.width, ch = canvas.height;
             ctx.clearRect(0, 0, cw, ch);
             if (animationFrameId && !isSpinning) cancelAnimationFrame(animationFrameId);
             const isWaitingMode = gState.players.length === 0 && gState.status !== 'spinning';
+            const cameraActive = !isWaitingMode && camera && Number(camera.zoom) > 1.0001;
+            if (cameraActive) {
+                ctx.save();
+                applyBallCamera(ctx, cw, ch, camera);
+            }
             if (isWaitingMode) drawWaitingState(ctx, canvas);
             else {
                 drawCoverImage(ctx, activeFieldImage, cw, ch);
@@ -2569,8 +2614,7 @@
                     }
                     const x1 = minX * cw, y1 = (1 - maxY) * ch, x2 = maxX * cw, y2 = (1 - minY) * ch;
                     const grad = ctx.createLinearGradient(x1, y1, x2, y2);
-                    grad.addColorStop(0, colors[0]);
-                    grad.addColorStop(1, colors[1]);
+                    addGradientStops(grad, colors);
                     ctx.fillStyle = grad;
                     ctx.beginPath();
                     ctx.moveTo(pts[0].x * cw, (1 - pts[0].y) * ch);
@@ -2582,6 +2626,9 @@
                     ctx.globalAlpha = 1;
                     ctx.strokeStyle = "rgba(3,1,10,.9)";
                     ctx.lineWidth = Math.max(3, cw * .0045);
+                    ctx.stroke();
+                    ctx.strokeStyle = "rgba(255,255,255,.2)";
+                    ctx.lineWidth = Math.max(1, cw * .0012);
                     ctx.stroke();
                     ctx.restore();
                 }
@@ -2632,8 +2679,7 @@
                 const singlePlayer = gState.players[0];
                 const colors = parseColors(singlePlayer.color);
                 const grad = ctx.createLinearGradient(0, 0, cw, ch);
-                grad.addColorStop(0, colors[0]);
-                grad.addColorStop(1, colors[1]);
+                addGradientStops(grad, colors);
                 ctx.save();
                 ctx.globalAlpha = .78;
                 ctx.fillStyle = grad;
@@ -2751,6 +2797,7 @@
                 ctx.closePath();
                 ctx.restore();
             }
+            if (cameraActive) ctx.restore();
             if (isWaitingMode && !isSpinning) animationFrameId = requestAnimationFrame(animateWaitingFrame);
         }
 
@@ -2779,7 +2826,30 @@
             if (animationFrameId) cancelAnimationFrame(animationFrameId);
             const startTime = performance.now();
             const { startPos, spinDuration, spinAngleStart, spinAngleSpeed, trajectory } = params;
+            const motionDuration = 10000;
+            const zoomStartAt = 7000;
+            const zoomOutDuration = 450;
+            const maxZoom = 1.65;
             let prevPos = null, pauseAngle = null;
+            let cameraCenter = { x: startPos.x, y: startPos.y };
+            let lastCameraTime = startTime;
+
+            function getFollowCamera(pos, motionElapsed, now) {
+                if (motionElapsed < zoomStartAt) {
+                    cameraCenter = { x: pos.x, y: pos.y };
+                    lastCameraTime = now;
+                    return null;
+                }
+                const delta = Math.max(0, Math.min(50, now - lastCameraTime));
+                const follow = 1 - Math.exp(-delta / 90);
+                cameraCenter.x += (pos.x - cameraCenter.x) * follow;
+                cameraCenter.y += (pos.y - cameraCenter.y) * follow;
+                lastCameraTime = now;
+                const progress = (motionElapsed - zoomStartAt) / (motionDuration - zoomStartAt);
+                const zoom = 1 + (maxZoom - 1) * smoothstep01(progress);
+                return { x: cameraCenter.x, y: cameraCenter.y, zoom };
+            }
+
             function animate(now) {
                 const elapsed = now - startTime;
                 if (elapsed < spinDuration) {
@@ -2798,24 +2868,25 @@
                     const ball = { x: startPos.x, y: startPos.y, angle: pauseAngle };
                     drawGameFrame(ball, highlightPolygon);
                     animationFrameId = requestAnimationFrame(animate);
-                } else if (elapsed < spinDuration + 1000 + 10000) {
+                } else if (elapsed < spinDuration + 1000 + motionDuration) {
                     const motionElapsed = elapsed - (spinDuration + 1000);
-                    const frameIndex = Math.floor(motionElapsed / 16);
-                    if (frameIndex >= trajectory.length) {
-                        const finalPos = trajectory[trajectory.length - 1];
-                        drawGameFrame(finalPos, highlightPolygon);
-                        animationFrameId = null;
-                        fetchWinnerNow();
-                        return;
-                    }
+                    const frameIndex = Math.min(trajectory.length - 1, Math.floor(motionElapsed / 16));
                     const pos = trajectory[frameIndex];
                     if (prevPos) pos.prev = prevPos; else pos.prev = startPos;
-                    drawGameFrame(pos, highlightPolygon);
+                    const camera = getFollowCamera(pos, motionElapsed, now);
+                    drawGameFrame(pos, highlightPolygon, camera);
                     prevPos = pos;
+                    animationFrameId = requestAnimationFrame(animate);
+                } else if (elapsed < spinDuration + 1000 + motionDuration + zoomOutDuration) {
+                    const finalPos = trajectory[trajectory.length - 1];
+                    const resetElapsed = elapsed - (spinDuration + 1000 + motionDuration);
+                    const resetProgress = smoothstep01(resetElapsed / zoomOutDuration);
+                    const zoom = maxZoom - (maxZoom - 1) * resetProgress;
+                    drawGameFrame(finalPos, null, { x: cameraCenter.x, y: cameraCenter.y, zoom });
                     animationFrameId = requestAnimationFrame(animate);
                 } else {
                     const finalPos = trajectory[trajectory.length - 1];
-                    drawGameFrame(finalPos, highlightPolygon);
+                    drawGameFrame(finalPos, null, null);
                     animationFrameId = null;
                     fetchWinnerNow();
                 }
@@ -2942,7 +3013,7 @@
                     if(animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
                     drawGameFrame(null, highlightPolygon);
                 }
-                if (willShowWinner && !isShowingWinner) {
+                if (willShowWinner && !isShowingWinner && !isSpinning) {
                     const pageGame = document.getElementById('page-game');
                     if (pageGame && pageGame.classList.contains('page-active')) showWinnerSequence(gState.winner, gState.round_id);
                 }
@@ -2974,7 +3045,7 @@
                 return `
                 <div class="bet-row">
                     <span style="display:flex; align-items:center; gap:12px;">
-                        <span style="width:16px;height:16px;border-radius:50%;background:${colors[0]};box-shadow:0 0 6px ${colors[0]};"></span>
+                        <span style="width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,${colors.join(',')});box-shadow:0 0 6px ${colors[0]};"></span>
                         <span style="font-weight:500;font-size:15px;">${escapeHtml(p.username)}</span>
                     </span>
                     <span style="display:flex;gap:15px;align-items:center;">

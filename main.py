@@ -6,6 +6,7 @@ import os
 import json
 import random
 import math
+import colorsys
 import time
 import secrets
 import uuid
@@ -726,28 +727,71 @@ def generate_spin_params(polygons: list) -> dict:
 # ------------------------------------------------------------
 # Игровая механика
 # ------------------------------------------------------------
-PLAYER_COLORS = [
-    ("#5B19FF", "#C85CFF"),
-    ("#FF174F", "#FF7A18"),
-    ("#006BFF", "#31D7FF"),
-    ("#00A86B", "#75FF9B"),
-    ("#FFD000", "#FFF27A"),
-    ("#E000C6", "#FF77E7"),
-    ("#00B8A9", "#69FFF1"),
-    ("#B94700", "#FFB067"),
-    ("#3957D7", "#9DB0FF"),
-    ("#8B0D2E", "#FF5A85"),
-    ("#087F23", "#B7FF45"),
-    ("#552A00", "#D98C26"),
-    ("#3D006B", "#9D4DFF"),
-    ("#00606B", "#4AE4F2"),
-    ("#A40000", "#FF6B5E"),
-    ("#514D00", "#D9EF45"),
-    ("#003D8F", "#59A7FF"),
-    ("#760067", "#E86BD9"),
-    ("#00513F", "#45E0B6"),
-    ("#6B2D74", "#F0A0FF")
-]
+def _hsl_hex(hue: float, saturation: float, lightness: float) -> str:
+    red, green, blue = colorsys.hls_to_rgb(
+        (hue % 360.0) / 360.0,
+        lightness / 100.0,
+        saturation / 100.0,
+    )
+    return f"#{round(red * 255):02X}{round(green * 255):02X}{round(blue * 255):02X}"
+
+
+def _build_player_palette(index: int) -> tuple[str, str, str, str]:
+    base_hue = (265.0 + index * 137.508) % 360.0
+    offsets = (0.0, 28.0, 78.0, 168.0)
+    saturations = (90.0, 92.0, 88.0, 94.0)
+    lightness = (46.0, 58.0, 52.0, 60.0)
+    return tuple(
+        _hsl_hex(base_hue + offset, saturation, level)
+        for offset, saturation, level in zip(offsets, saturations, lightness)
+    )
+
+
+PLAYER_COLORS = [_build_player_palette(index) for index in range(32)]
+PLAYER_PALETTE_HUES = {
+    palette: (265.0 + index * 137.508) % 360.0
+    for index, palette in enumerate(PLAYER_COLORS)
+}
+
+
+def _hex_hue(color: str) -> float:
+    value = color.lstrip("#")
+    red, green, blue = (int(value[pos:pos + 2], 16) / 255.0 for pos in (0, 2, 4))
+    hue, _, _ = colorsys.rgb_to_hsv(red, green, blue)
+    return hue * 360.0
+
+
+def _hue_distance(first: float, second: float) -> float:
+    direct = abs(first - second) % 360.0
+    return min(direct, 360.0 - direct)
+
+
+def choose_player_palette(occupied_colors: set[tuple[str, ...]]) -> tuple[str, ...]:
+    available = [palette for palette in PLAYER_COLORS if palette not in occupied_colors]
+    if not available:
+        seed = random.uniform(0.0, 360.0)
+        return tuple(
+            _hsl_hex(seed + offset, saturation, level)
+            for offset, saturation, level in zip(
+                (0.0, 28.0, 78.0, 168.0),
+                (90.0, 92.0, 88.0, 94.0),
+                (46.0, 58.0, 52.0, 60.0),
+            )
+        )
+    if not occupied_colors:
+        return random.choice(available)
+
+    occupied_hues = [
+        PLAYER_PALETTE_HUES.get(palette, _hex_hue(palette[0]))
+        for palette in occupied_colors
+    ]
+    scored = []
+    for palette in available:
+        hue = PLAYER_PALETTE_HUES[palette]
+        score = min(_hue_distance(hue, occupied) for occupied in occupied_hues)
+        scored.append((score, palette))
+    best_score = max(score for score, _ in scored)
+    return random.choice([palette for score, palette in scored if abs(score - best_score) < 1e-9])
 
 def point_in_polygon(point, polygon):
     x, y = point
@@ -1373,13 +1417,7 @@ async def handle_game_bet(request):
                 game_state["players"][user_id]["bets_count"] += 1
             else:
                 occupied_colors = {p["color"] for p in game_state["players"].values()}
-                available = [c for c in PLAYER_COLORS if c not in occupied_colors]
-                if not available:
-                    available = [(
-                        "#" + ''.join(random.choices('0123456789ABCDEF', k=6)),
-                        "#" + ''.join(random.choices('0123456789ABCDEF', k=6))
-                    )]
-                color = random.choice(available)
+                color = choose_player_palette(occupied_colors)
                 photo_url = user.get('photo_url', '')
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
