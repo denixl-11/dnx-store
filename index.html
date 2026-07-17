@@ -1671,6 +1671,119 @@
             .item-card, .case-card { padding: 8px; }
             .elite-subtitle { font-size: .52rem; letter-spacing: .08em; }
         }
+
+        /* ===== V6.3: seamless bottom dock, persistent NFT media, Android-safe effects ===== */
+        .tab-bar-underlay {
+            position: fixed;
+            z-index: 99;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: max(6px, var(--content-safe-bottom));
+            background: rgba(4, 3, 11, .985);
+            pointer-events: none;
+        }
+        .page {
+            min-height: max(320px, calc(var(--app-height) - var(--content-safe-top) - max(6px, var(--content-safe-bottom)) - 152px));
+        }
+        .tab-bar {
+            z-index: 100;
+            background-color: rgba(4, 3, 11, .97);
+        }
+        .tab-bar::after {
+            inset: 1px;
+            border-color: rgba(238,85,197,.27);
+        }
+        .tab-bar .tab-item::after {
+            left: 12%;
+            right: 12%;
+            bottom: -1px;
+            height: 34px;
+            background: radial-gradient(ellipse at 50% 100%, rgba(255,42,103,.30), rgba(215,43,205,.12) 45%, transparent 76%);
+            filter: blur(5px);
+        }
+        #catalog-filter-empty {
+            grid-column: 1 / -1;
+            width: 100%;
+        }
+        .nft-live-pattern {
+            inset: 0;
+            overflow: hidden;
+            background: none !important;
+            mix-blend-mode: normal;
+        }
+        .nft-live-pattern i {
+            position: absolute;
+            display: block;
+            aspect-ratio: 1;
+            opacity: .38;
+            background-position: center;
+            background-size: contain;
+            background-repeat: no-repeat;
+            mix-blend-mode: multiply;
+        }
+        .nft-live-media.is-live.has-live-frame .nft-live-pattern { opacity: .22; }
+
+        .case-modal-content .roulette-item,
+        .case-modal-content .drop-row {
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+            border-radius: 18px;
+            background:
+                radial-gradient(circle at 22% 18%, rgba(176, 103, 255, .38), transparent 34%),
+                radial-gradient(circle at 82% 78%, rgba(234, 58, 208, .25), transparent 42%),
+                linear-gradient(145deg, rgba(52, 25, 83, .94), rgba(17, 8, 30, .98) 62%, rgba(45, 13, 66, .96));
+            box-shadow: inset 0 0 24px rgba(221, 92, 255, .08), 0 9px 22px rgba(0,0,0,.28);
+        }
+        .case-modal-content .roulette-item:not(.case-loading-item)::after,
+        .case-modal-content .drop-row::after {
+            content: "";
+            position: absolute;
+            z-index: 1;
+            inset: -35%;
+            pointer-events: none;
+            background: linear-gradient(112deg, transparent 37%, rgba(227,153,255,.14) 48%, rgba(255,102,198,.12) 53%, transparent 64%);
+            transform: translate3d(-42%,0,0);
+            animation: caseItemShimmer 4.8s ease-in-out infinite;
+        }
+        .case-modal-content .roulette-item img,
+        .case-modal-content .drop-row img {
+            position: relative;
+            z-index: 2;
+            border-radius: 14px;
+            background: radial-gradient(circle, rgba(104,58,151,.20), rgba(18,8,31,.42));
+        }
+        .case-modal-content .drop-chance,
+        .case-modal-content .drop-name { z-index: 3; }
+        @keyframes caseItemShimmer {
+            0%, 42% { transform: translate3d(-42%,0,0); opacity: .3; }
+            68%, 100% { transform: translate3d(42%,0,0); opacity: .82; }
+        }
+
+        html.android-device,
+        html.android-device body { overflow-x: hidden; }
+        html.android-device header,
+        html.android-device .page,
+        html.android-device .tab-bar,
+        html.android-device .modal-overlay,
+        html.android-device .drop-row,
+        html.android-device .case-modal-content {
+            -webkit-backdrop-filter: none !important;
+            backdrop-filter: none !important;
+        }
+        html.android-device body::before,
+        html.android-device body::after { position: absolute; }
+        html.android-device .case-particle,
+        html.android-device .case-atmosphere::before,
+        html.android-device .case-card::before,
+        html.android-device .case-card::after,
+        html.android-device .case-modal-content .drop-row::after,
+        html.android-device .case-modal-content .roulette-item:not(.case-loading-item)::after {
+            animation: none !important;
+        }
+        html.android-device .nft-live-model { filter: drop-shadow(0 7px 8px rgba(0,0,0,.22)); }
+        html.android-device .tab-bar .tab-item::after { filter: blur(3px); }
     </style>
 </head>
 <body>
@@ -1957,6 +2070,7 @@
         </div>
     </div>
 
+    <div class="tab-bar-underlay" aria-hidden="true"></div>
     <div class="tab-bar">
         <div class="tab-item" id="tab-game" onclick="showPage('game')"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z"/></svg><span>ИГРА</span></div>
         <div class="tab-item active" id="tab-store" onclick="showPage('store')"><svg viewBox="0 0 24 24"><path d="M4 8h16v13H4zM8 8V5a4 4 0 0 1 8 0v3M8 12h.01M16 12h.01"/></svg><span>МАГАЗИН</span></div>
@@ -1968,12 +2082,14 @@
     <script src="tgsticker.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
+        const isAndroidPlatform = String(tg.platform || '').toLowerCase() === 'android' || /Android/i.test(navigator.userAgent);
+        document.documentElement.classList.toggle('android-device', isAndroidPlatform);
+        if (window.RLottie) window.RLottie.WORKERS_LIMIT = isAndroidPlatform ? 2 : 4;
         tg.ready();
         try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
         try {
             tg.expand();
-            const isAndroid = String(tg.platform || '').toLowerCase() === 'android';
-            if (!isAndroid && typeof tg.requestFullscreen === 'function' && tg.version && parseFloat(tg.version) >= 8.0) {
+            if (!isAndroidPlatform && typeof tg.requestFullscreen === 'function' && tg.version && parseFloat(tg.version) >= 8.0) {
                 tg.requestFullscreen();
             }
         } catch (e) { try { tg.expand(); } catch (_) {} }
@@ -1995,7 +2111,15 @@
             root.style.setProperty('--content-safe-right', readInset('right') + 'px');
             root.style.setProperty('--content-safe-bottom', readInset('bottom') + 'px');
             root.style.setProperty('--content-safe-left', readInset('left') + 'px');
-            const viewportHeight = Number(tg.viewportStableHeight || tg.viewportHeight || window.innerHeight);
+            const viewportCandidates = [
+                Number(window.visualViewport?.height || 0),
+                Number(window.innerHeight || 0),
+                Number(tg.viewportHeight || 0),
+                Number(tg.viewportStableHeight || 0)
+            ].filter(value => Number.isFinite(value) && value > 0);
+            const viewportHeight = isAndroidPlatform
+                ? Math.max(...viewportCandidates, 320)
+                : (Number(tg.viewportStableHeight || tg.viewportHeight || window.innerHeight) || 320);
             root.style.setProperty('--app-height', Math.max(320, viewportHeight) + 'px');
             requestAnimationFrame(() => { try { resizeCanvas(); drawGameFrame(); } catch (_) {} });
         }
@@ -2005,12 +2129,18 @@
         try { tg.onEvent('safeAreaChanged', applySafeAreaTop); } catch (_) {}
         try { tg.onEvent('contentSafeAreaChanged', applySafeAreaTop); } catch (_) {}
         try { tg.onEvent('fullscreenChanged', applySafeAreaTop); } catch (_) {}
+        window.addEventListener('resize', applySafeAreaTop, { passive: true });
+        window.visualViewport?.addEventListener('resize', applySafeAreaTop, { passive: true });
 
         // --- ГЕНЕРАТОР ЗВУКА ЩЕЛЧКА ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let audioCtx = null;
 
         function playTickSound() {
-            if (!audioCtx) return;
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextClass) return;
+                try { audioCtx = new AudioContextClass(); } catch (_) { return; }
+            }
             if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const osc = audioCtx.createOscillator();
@@ -2120,6 +2250,10 @@
         const nftMediaQueue = [];
         let nftMediaActiveLoads = 0;
         let nftMediaObserver = null;
+        const NFT_MEDIA_MAX_LOADS = isAndroidPlatform ? 2 : 3;
+        let catalogRenderedSignature = '';
+        let catalogLoadedAt = 0;
+        let catalogRequest = null;
 
         function safeTelegramMediaUrl(value) {
             try {
@@ -2141,6 +2275,64 @@
             }
         }
 
+        function pauseNftMedia(element) {
+            if (!element) return;
+            element.dataset.mediaWanted = 'false';
+            const picture = element.querySelector('.nft-live-model');
+            if (picture && window.RLottie?.pause) window.RLottie.pause(picture);
+        }
+
+        function resumeNftMedia(element) {
+            if (!element?.isConnected || element.hidden || element.closest('[hidden]')) return;
+            element.dataset.mediaWanted = 'true';
+            const picture = element.querySelector('.nft-live-model');
+            if (picture) {
+                element.dataset.mediaState = 'live';
+                element.classList.add('is-live');
+                if (!document.hidden && window.RLottie?.play) window.RLottie.play(picture);
+                return;
+            }
+            queueNftMedia(element);
+        }
+
+        function sparsePatternSeed(value) {
+            let hash = 2166136261;
+            for (const char of String(value || '0')) {
+                hash ^= char.charCodeAt(0);
+                hash = Math.imul(hash, 16777619);
+            }
+            return hash >>> 0;
+        }
+
+        function renderSparseNftPattern(container, patternUrl, itemId) {
+            if (!container) return;
+            container.replaceChildren();
+            if (!patternUrl) return;
+            let seed = sparsePatternSeed(itemId);
+            const random = () => {
+                seed += 0x6D2B79F5;
+                let value = seed;
+                value = Math.imul(value ^ (value >>> 15), value | 1);
+                value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+                return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+            };
+            const slots = [
+                [10, 12], [39, 9], [73, 14], [18, 39], [67, 40],
+                [8, 70], [39, 73], [74, 69], [43, 42], [25, 61], [61, 61]
+            ];
+            for (let index = slots.length - 1; index > 0; index--) {
+                const swapIndex = Math.floor(random() * (index + 1));
+                [slots[index], slots[swapIndex]] = [slots[swapIndex], slots[index]];
+            }
+            const count = 5 + Math.floor(random() * 4);
+            slots.slice(0, count).forEach(([left, top]) => {
+                const symbol = document.createElement('i');
+                const size = 10 + random() * 4;
+                symbol.style.cssText = `left:${left}%;top:${top}%;width:${size}%;transform:translate(-50%,-50%) rotate(${Math.round(random() * 46 - 23)}deg);background-image:url("${patternUrl}")`;
+                container.appendChild(symbol);
+            });
+        }
+
         function renderNftMedia(element, media, mediaToken) {
             const tgsUrl = safeTelegramMediaUrl(media?.tgsUrl);
             if (!element?.isConnected || element.dataset.mediaToken !== mediaToken || !tgsUrl || !window.RLottie?.isSupported) return false;
@@ -2149,7 +2341,7 @@
             element.style.setProperty('--nft-bg-b', colors[1] || '#160d27');
             const pattern = element.querySelector('.nft-live-pattern');
             const patternUrl = safeTelegramMediaUrl(media.patternUrl);
-            if (pattern) pattern.style.backgroundImage = patternUrl ? `url("${patternUrl}")` : 'none';
+            renderSparseNftPattern(pattern, patternUrl, element.dataset.itemId);
 
             const picture = document.createElement('picture');
             picture.className = 'nft-live-model';
@@ -2163,7 +2355,7 @@
                     element.classList.add('is-live');
                     if (picture.rlPlayer?.hasVisiblePixels) element.classList.add('has-live-frame');
                 }
-                else deactivateNftMedia(element);
+                else pauseNftMedia(element);
             }, { once: true });
             picture.addEventListener('tg:frame-visibility', (frameEvent) => {
                 if (!element.isConnected || element.dataset.mediaToken !== mediaToken || element.dataset.mediaWanted !== 'true') return;
@@ -2174,7 +2366,7 @@
             element.dataset.mediaState = 'live';
             const isModal = element.classList.contains('nft-live-media--modal');
             window.RLottie.init(picture, {
-                maxDeviceRatio: isModal ? 1.5 : 1.25,
+                maxDeviceRatio: isAndroidPlatform ? (isModal ? 1.2 : 1) : (isModal ? 1.5 : 1.25),
                 // 1 keeps only frame zero in JS memory; workers render the
                 // remaining frames. This avoids iOS WebView memory pressure.
                 cachingModulo: 1
@@ -2215,7 +2407,7 @@
         }
 
         function pumpNftMediaQueue() {
-            while (nftMediaActiveLoads < 3 && nftMediaQueue.length) {
+            while (nftMediaActiveLoads < NFT_MEDIA_MAX_LOADS && nftMediaQueue.length) {
                 const element = nftMediaQueue.shift();
                 if (!element?.isConnected || element.dataset.mediaWanted !== 'true' || element.dataset.mediaState !== 'queued') continue;
                 nftMediaActiveLoads++;
@@ -2227,7 +2419,14 @@
         }
 
         function queueNftMedia(element) {
-            if (!element?.isConnected || ['queued', 'loading', 'live'].includes(element.dataset.mediaState)) return;
+            if (!element?.isConnected || element.dataset.mediaWanted !== 'true') return;
+            const picture = element.querySelector('.nft-live-model');
+            if (picture) {
+                element.dataset.mediaState = 'live';
+                if (!document.hidden && window.RLottie?.play) window.RLottie.play(picture);
+                return;
+            }
+            if (['queued', 'loading'].includes(element.dataset.mediaState)) return;
             element.dataset.mediaState = 'queued';
             nftMediaQueue.push(element);
             pumpNftMediaQueue();
@@ -2243,9 +2442,10 @@
             }
             nftMediaObserver = new IntersectionObserver(entries => {
                 entries.forEach(entry => {
-                    entry.target.dataset.mediaWanted = entry.isIntersecting ? 'true' : 'false';
-                    if (entry.isIntersecting) queueNftMedia(entry.target);
-                    else if (entry.target.classList.contains('is-live')) deactivateNftMedia(entry.target);
+                    const catalogVisible = document.getElementById('page-store')?.classList.contains('page-active')
+                        && document.getElementById('catalog-container')?.style.display !== 'none';
+                    if (entry.isIntersecting && catalogVisible && !entry.target.closest('.item-card')?.hidden) resumeNftMedia(entry.target);
+                    else pauseNftMedia(entry.target);
                 });
             }, { rootMargin: '140px 0px', threshold: .01 });
             elements.forEach(element => nftMediaObserver.observe(element));
@@ -2263,12 +2463,27 @@
             }
         }
 
+        function pauseCatalogNftMedia() {
+            document.querySelectorAll('#catalog-container .nft-live-media').forEach(pauseNftMedia);
+        }
+
+        function resumeCatalogNftMedia() {
+            const store = document.getElementById('page-store');
+            const container = document.getElementById('catalog-container');
+            if (!store?.classList.contains('page-active') || container?.style.display === 'none') return;
+            observeCatalogNftMedia();
+            if (!('IntersectionObserver' in window)) {
+                container.querySelectorAll('.item-card:not([hidden]) .nft-live-media').forEach(resumeNftMedia);
+            }
+        }
+
         document.addEventListener('visibilitychange', () => {
             document.querySelectorAll('.nft-live-model').forEach(picture => {
                 if (!window.RLottie) return;
                 if (document.hidden) window.RLottie.pause?.(picture);
-                else window.RLottie.play?.(picture);
+                else if (picture.closest('.nft-live-media')?.dataset.mediaWanted === 'true') window.RLottie.play?.(picture);
             });
+            if (!document.hidden) resumeCatalogNftMedia();
         });
 
         function showAlert(msg) {
@@ -2284,6 +2499,7 @@
         function closeModal(id) { const el = document.getElementById(id); if(el) el.classList.remove('active'); }
 
         function showPage(id) {
+            if (id !== 'store') pauseCatalogNftMedia();
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.querySelectorAll('.tab-bar .tab-item').forEach(t => t.classList.remove('active'));
             const pageEl = document.getElementById('page-' + id);
@@ -2299,6 +2515,7 @@
             if(id === 'store') {
                 loadCatalog();
                 updateCartFab();
+                requestAnimationFrame(resumeCatalogNftMedia);
             }
             if(id === 'inventory') loadInventory();
             if(id === 'cart') renderCart();
@@ -2323,9 +2540,24 @@
             document.getElementById('big-balance').innerText = formatStars(userBalance);
         }
 
-        async function loadCatalog() {
+        async function loadCatalog(force = false) {
             try {
-                currentCatalog = await apiFetch(`${API_BASE}/items`);
+                const cacheIsFresh = currentCatalog.length && Date.now() - catalogLoadedAt < 30000;
+                if (!force && cacheIsFresh) {
+                    renderCatalogItems();
+                    resumeCatalogNftMedia();
+                    return;
+                }
+                if (!catalogRequest) {
+                    catalogRequest = apiFetch(`${API_BASE}/items`)
+                        .then(items => {
+                            currentCatalog = Array.isArray(items) ? items : [];
+                            catalogLoadedAt = Date.now();
+                            return currentCatalog;
+                        })
+                        .finally(() => { catalogRequest = null; });
+                }
+                await catalogRequest;
                 const collections = [...new Set(currentCatalog.map(item => String(item?.name || '').trim()).filter(Boolean))]
                     .sort((a, b) => a.localeCompare(b, 'ru'));
                 if (currentCollectionFilter && !collections.includes(currentCollectionFilter)) currentCollectionFilter = '';
@@ -2339,11 +2571,11 @@
         }
 
         function renderCatalogItems() {
-            const items = currentCollectionFilter
-                ? currentCatalog.filter(item => String(item?.name || '').trim() === currentCollectionFilter)
-                : currentCatalog;
-            destroyCatalogNftMedia();
-            document.getElementById('catalog-container').innerHTML = items.length ? items.map(item => {
+            const container = document.getElementById('catalog-container');
+            const signature = currentCatalog.map(item => [item.id, item.name, item.price, item.image_url, item.nft_link].join('|')).join('::');
+            if (signature !== catalogRenderedSignature || container.dataset.catalogRendered !== 'true') {
+                destroyCatalogNftMedia();
+                container.innerHTML = currentCatalog.length ? currentCatalog.map(item => {
                 const animatedPreview = safeTelegramUrl(item.nft_link) ? `
                         <button type="button" class="nft-live-media" data-item-id="${Number(item.id)}" data-media-state="idle" data-media-wanted="false" data-media-token="0" aria-label="Открыть ${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">
                             <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="nft-live-fallback" alt="">
@@ -2351,7 +2583,7 @@
                         </button>` : `
                         <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" alt="${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">`;
                 return `
-                    <div class="item-card">
+                    <div class="item-card" data-item-id="${Number(item.id)}" data-collection="${escapeHtml(String(item?.name || '').trim())}">
                         ${animatedPreview}
                         <div class="item-name">${escapeHtml(item.name)}</div>
                         <div class="card-buttons">
@@ -2361,15 +2593,39 @@
                             </button>
                         </div>
                     </div>`;
-            }).join('') : `<div class="empty-state"><h3>НЕТ ПРЕДМЕТОВ</h3><p>Для выбранного названия пока нет доступных NFT.</p></div>`;
-            requestAnimationFrame(observeCatalogNftMedia);
+                }).join('') : '';
+                const empty = document.createElement('div');
+                empty.id = 'catalog-filter-empty';
+                empty.className = 'empty-state';
+                empty.innerHTML = '<h3>НЕТ ПРЕДМЕТОВ</h3><p>Для выбранного названия пока нет доступных NFT.</p>';
+                empty.hidden = true;
+                container.appendChild(empty);
+                catalogRenderedSignature = signature;
+                container.dataset.catalogRendered = 'true';
+            }
+            applyCatalogFilterVisibility();
+        }
+
+        function applyCatalogFilterVisibility() {
+            const container = document.getElementById('catalog-container');
+            let visibleCount = 0;
+            container.querySelectorAll('.item-card').forEach(card => {
+                const visible = !currentCollectionFilter || card.dataset.collection === currentCollectionFilter;
+                card.hidden = !visible;
+                const media = card.querySelector('.nft-live-media');
+                if (!visible) pauseNftMedia(media);
+                else visibleCount++;
+            });
+            const empty = document.getElementById('catalog-filter-empty');
+            if (empty) empty.hidden = visibleCount > 0;
+            requestAnimationFrame(resumeCatalogNftMedia);
         }
 
         function applyCollectionFilter(value) {
             const nextFilter = String(value || '');
             if (nextFilter === currentCollectionFilter) return;
             currentCollectionFilter = nextFilter;
-            renderCatalogItems();
+            applyCatalogFilterVisibility();
             updateCollectionFilterUi();
         }
 
@@ -2378,7 +2634,7 @@
             currentCollectionFilter = '';
             const select = document.getElementById('collection-filter-select');
             if (select) select.value = '';
-            renderCatalogItems();
+            applyCatalogFilterVisibility();
             updateCollectionFilterUi();
         }
 
@@ -3313,11 +3569,13 @@
                 ctx.restore();
             }
             if (cameraActive) ctx.restore();
-            if (isWaitingMode && !isSpinning) animationFrameId = requestAnimationFrame(animateWaitingFrame);
+            const gameVisible = document.getElementById('page-game')?.classList.contains('page-active');
+            if (isWaitingMode && !isSpinning && gameVisible && !document.hidden) animationFrameId = requestAnimationFrame(animateWaitingFrame);
         }
 
         function animateWaitingFrame(timestamp) {
-            if (isSpinning || gState.players.length !== 0 || gState.status === 'spinning') return;
+            const gameVisible = document.getElementById('page-game')?.classList.contains('page-active');
+            if (!gameVisible || document.hidden || isSpinning || gState.players.length !== 0 || gState.status === 'spinning') return;
             if (timestamp - lastWaitingAnimationTime >= 32) {
                 lastWaitingAnimationTime = timestamp;
                 drawGameFrame();
@@ -3533,7 +3791,8 @@
                     const pageGame = document.getElementById('page-game');
                     if (pageGame && pageGame.classList.contains('page-active')) showWinnerSequence(gState.winner, gState.round_id);
                 }
-                if (Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
+                const gamePageVisible = document.getElementById('page-game')?.classList.contains('page-active');
+                if (gamePageVisible && Date.now() - lastLeaderboardUpdate > 30000 && gState.status !== 'spinning') {
                     loadLeaderboardPreview();
                     lastLeaderboardUpdate = Date.now();
                 }
@@ -3542,7 +3801,9 @@
             } finally {
                 gamePollInFlight = false;
                 if (gamePollTimer) clearTimeout(gamePollTimer);
-                gamePollTimer = setTimeout(pollGame, 1000);
+                const gamePageVisible = document.getElementById('page-game')?.classList.contains('page-active');
+                const nextPollDelay = document.hidden ? 8000 : (gamePageVisible ? 1000 : 4000);
+                gamePollTimer = setTimeout(pollGame, nextPollDelay);
             }
         }
         pollGame();
@@ -3632,7 +3893,9 @@
                 document.getElementById('catalog-container').style.display = 'grid';
                 document.getElementById('collection-filter').style.display = 'flex';
                 document.getElementById('cases-container').style.display = 'none';
+                requestAnimationFrame(resumeCatalogNftMedia);
             } else {
+                pauseCatalogNftMedia();
                 document.getElementById('page-store').classList.add('cases-active');
                 document.querySelector('.store-tab:last-child').classList.add('active');
                 document.getElementById('catalog-container').style.display = 'none';
