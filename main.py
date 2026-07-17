@@ -7,12 +7,14 @@ import json
 import random
 import math
 import colorsys
+import re
 import time
 import secrets
 import uuid
 from collections import defaultdict, deque
 from decimal import Decimal, InvalidOperation, ROUND_CEILING
 from functools import wraps
+from html.parser import HTMLParser
 from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 from datetime import timezone
 
@@ -71,6 +73,8 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 db_pool: asyncpg.Pool | None = None
 ton_http_session: aiohttp.ClientSession | None = None
+nft_media_cache: dict[str, tuple[float, dict]] = {}
+nft_media_fetch_semaphore = asyncio.Semaphore(4)
 
 # ======================== ГЛОБАЛЬНЫЙ КЕШ КЕЙСОВ ========================
 # Загружается из переменной окружения CASES_JSON (хранится в Render).
@@ -359,6 +363,70 @@ def safe_https_url(value) -> str:
         return ""
     parsed = urlparse(value)
     return value if parsed.scheme == "https" and parsed.netloc else ""
+
+
+def canonical_telegram_nft_url(value) -> str:
+    if not isinstance(value, str) or len(value) > 512:
+        return ""
+    parsed = urlparse(value.strip())
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or hostname not in {"t.me", "telegram.me"}:
+        return ""
+    match = re.fullmatch(r"/nft/([A-Za-z0-9_-]{3,96})/?", parsed.path)
+    if not match:
+        return ""
+    return f"https://t.me/nft/{match.group(1)}"
+
+
+def safe_telegram_media_url(value) -> str:
+    if not isinstance(value, str) or len(value) > 4096:
+        return ""
+    parsed = urlparse(value)
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not (
+        hostname == "telesco.pe" or hostname.endswith(".telesco.pe")
+    ):
+        return ""
+    return value
+
+
+def normalize_hex_color(value, fallback="") -> str:
+    if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value.strip()):
+        return value.strip().upper()
+    return fallback
+
+
+class TelegramNftMediaParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.tgs_url = ""
+        self.pattern_url = ""
+        self.preview_url = ""
+        self.gradient_colors: list[str] = []
+        self.pattern_color = "#000000"
+        self._inside_gift_gradient = False
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "source" and attributes.get("type") == "application/x-tgsticker":
+            self.tgs_url = self.tgs_url or safe_telegram_media_url(attributes.get("srcset", ""))
+        elif tag == "image" and attributes.get("id") == "giftPattern":
+            raw_url = attributes.get("xlink:href") or attributes.get("href") or ""
+            self.pattern_url = self.pattern_url or safe_telegram_media_url(raw_url)
+        elif tag == "meta" and attributes.get("property") == "og:image":
+            self.preview_url = self.preview_url or safe_telegram_media_url(attributes.get("content", ""))
+        elif tag == "radialgradient" and attributes.get("id") == "giftGradient":
+            self._inside_gift_gradient = True
+        elif tag == "stop" and self._inside_gift_gradient:
+            color = normalize_hex_color(attributes.get("stop-color"))
+            if color and len(self.gradient_colors) < 4:
+                self.gradient_colors.append(color)
+        elif tag == "feflood" and attributes.get("id") == "giftGradienPatternColor":
+            self.pattern_color = normalize_hex_color(attributes.get("flood-color"), "#000000")
+
+    def handle_endtag(self, tag):
+        if tag == "radialgradient":
+            self._inside_gift_gradient = False
 
 
 def parse_positive_amount(value, *, minimum=Decimal("0.01"), maximum=Decimal("1000000")) -> Decimal | None:
@@ -727,38 +795,39 @@ def generate_spin_params(polygons: list) -> dict:
 # ------------------------------------------------------------
 # Игровая механика
 # ------------------------------------------------------------
-def _hsl_hex(hue: float, saturation: float, lightness: float) -> str:
-    red, green, blue = colorsys.hls_to_rgb(
-        (hue % 360.0) / 360.0,
-        lightness / 100.0,
-        saturation / 100.0,
-    )
-    return f"#{round(red * 255):02X}{round(green * 255):02X}{round(blue * 255):02X}"
-
-
-def _build_player_palette(index: int) -> tuple[str, str, str, str]:
-    base_hue = (265.0 + index * 137.508) % 360.0
-    offsets = (0.0, 28.0, 78.0, 168.0)
-    saturations = (90.0, 92.0, 88.0, 94.0)
-    lightness = (46.0, 58.0, 52.0, 60.0)
-    return tuple(
-        _hsl_hex(base_hue + offset, saturation, level)
-        for offset, saturation, level in zip(offsets, saturations, lightness)
-    )
-
-
-PLAYER_COLORS = [_build_player_palette(index) for index in range(32)]
-PLAYER_PALETTE_HUES = {
-    palette: (265.0 + index * 137.508) % 360.0
-    for index, palette in enumerate(PLAYER_COLORS)
-}
-
-
+# Три основных цвета в каждой палитре. Зелёный диапазон намеренно исключён:
+# остаются фиолетовый, розовый, красный, оранжевый, голубой и синий — тона,
+# которые поддерживают космический стиль и не теряются на фоне игрового поля.
+PLAYER_COLORS: list[tuple[str, str, str]] = [
+    ("#5024D6", "#8B5CFF", "#F149D8"),
+    ("#233BD4", "#4D8DFF", "#A855F7"),
+    ("#8F1CB8", "#E13FFF", "#FF5B9D"),
+    ("#A60D4E", "#FF356F", "#FF8A66"),
+    ("#0569C7", "#23C4FF", "#7C5CFF"),
+    ("#B83B0D", "#FF7A24", "#FF3D81"),
+    ("#3420A4", "#665DFF", "#FF4EB8"),
+    ("#8D123A", "#E22B69", "#9D4DFF"),
+    ("#0867B5", "#45B7FF", "#5B46E8"),
+    ("#A94C05", "#FFB224", "#DD3FE4"),
+    ("#B30F74", "#FF4D9D", "#5E64FF"),
+    ("#4B148C", "#A53DF2", "#FF6F61"),
+    ("#1438A6", "#4777FF", "#C16BFF"),
+    ("#70133F", "#E23578", "#FF9D42"),
+    ("#164FD4", "#22B5F4", "#F143C1"),
+    ("#5A146F", "#D02A8A", "#FFB43B"),
+    ("#2B2CB9", "#784BFF", "#FF45A5"),
+    ("#A5122E", "#FF4B57", "#B848F1"),
+    ("#0758D8", "#3C9CFF", "#D14EFF"),
+    ("#8A2B0A", "#F26A2E", "#B83DD8"),
+]
 def _hex_hue(color: str) -> float:
     value = color.lstrip("#")
     red, green, blue = (int(value[pos:pos + 2], 16) / 255.0 for pos in (0, 2, 4))
     hue, _, _ = colorsys.rgb_to_hsv(red, green, blue)
     return hue * 360.0
+
+
+PLAYER_PALETTE_HUES = {palette: _hex_hue(palette[0]) for palette in PLAYER_COLORS}
 
 
 def _hue_distance(first: float, second: float) -> float:
@@ -769,15 +838,7 @@ def _hue_distance(first: float, second: float) -> float:
 def choose_player_palette(occupied_colors: set[tuple[str, ...]]) -> tuple[str, ...]:
     available = [palette for palette in PLAYER_COLORS if palette not in occupied_colors]
     if not available:
-        seed = random.uniform(0.0, 360.0)
-        return tuple(
-            _hsl_hex(seed + offset, saturation, level)
-            for offset, saturation, level in zip(
-                (0.0, 28.0, 78.0, 168.0),
-                (90.0, 92.0, 88.0, 94.0),
-                (46.0, 58.0, 52.0, 60.0),
-            )
-        )
+        return random.choice(PLAYER_COLORS)
     if not occupied_colors:
         return random.choice(available)
 
@@ -1258,6 +1319,69 @@ async def handle_get_items(request):
         logging.error(f"Get items error: {e}")
         return web.json_response({"error": "database_unavailable"}, status=503,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+@rate_limit(90, 60)
+async def handle_nft_media(request):
+    try:
+        item_id = int(request.query.get("item_id", "0"))
+    except (TypeError, ValueError):
+        item_id = 0
+    if item_id <= 0:
+        return web.json_response({"animated": False, "error": "invalid_item_id"}, status=400)
+
+    nft_link = await get_pool().fetchval("SELECT nft_link FROM items WHERE id = $1", item_id)
+    source_url = canonical_telegram_nft_url(nft_link)
+    if not source_url:
+        return web.json_response({"animated": False})
+
+    now = time.monotonic()
+    cached = nft_media_cache.get(source_url)
+    if cached and cached[0] > now:
+        return web.json_response(cached[1])
+
+    async with nft_media_fetch_semaphore:
+        cached = nft_media_cache.get(source_url)
+        if cached and cached[0] > time.monotonic():
+            return web.json_response(cached[1])
+        try:
+            async with get_ton_session().get(
+                source_url,
+                allow_redirects=False,
+                headers={"User-Agent": "DNXStore/1.0 TelegramMiniApp"},
+            ) as response:
+                content_type = response.headers.get("Content-Type", "").lower()
+                if response.status != 200 or "text/html" not in content_type:
+                    raise ValueError(f"unexpected Telegram response: {response.status}")
+                html_bytes = await response.content.read(512 * 1024 + 1)
+                if len(html_bytes) > 512 * 1024:
+                    raise ValueError("Telegram NFT page is too large")
+
+            parser = TelegramNftMediaParser()
+            parser.feed(html_bytes.decode("utf-8", errors="replace"))
+            colors = parser.gradient_colors[:2]
+            result = {
+                "animated": bool(parser.tgs_url),
+                "tgsUrl": parser.tgs_url,
+                "patternUrl": parser.pattern_url,
+                "previewUrl": parser.preview_url,
+                "colors": colors if len(colors) == 2 else ["#3E245D", "#160D27"],
+                "patternColor": parser.pattern_color,
+            }
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+            logging.warning("Telegram NFT media unavailable for item %s: %s", item_id, exc)
+            result = {"animated": False}
+
+        if len(nft_media_cache) >= 512:
+            expired = [key for key, (expires, _) in nft_media_cache.items() if expires <= time.monotonic()]
+            for key in expired[:256]:
+                nft_media_cache.pop(key, None)
+            if len(nft_media_cache) >= 512:
+                nft_media_cache.pop(next(iter(nft_media_cache)), None)
+        cache_ttl = 600 if result.get("animated") else 60
+        nft_media_cache[source_url] = (time.monotonic() + cache_ttl, result)
+        return web.json_response(result)
 
 @require_auth
 async def handle_get_inventory(request):
@@ -1821,6 +1945,7 @@ app = web.Application(middlewares=[security_headers_middleware], client_max_size
 app.router.add_get('/health', handle_health)
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)
+app.router.add_get('/nft/media', handle_nft_media)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_post('/ton/deposit/create', handle_create_ton_deposit)
 app.router.add_get('/ton/deposit/status', handle_ton_deposit_status)
