@@ -213,7 +213,11 @@ var RLottie = (function () {
       return false;
     }
     if (!rlPlayer.forceRender) {
-      var focused = window.isFocused ? isFocused() : document.hasFocus();
+      // Telegram's iOS/Android WebView may report document.hasFocus() === false
+      // while the mini app is still fully visible. Pausing on that value can
+      // leave an NFT animation on one of its transparent transition frames.
+      // Visibility is the reliable lifecycle signal inside a mini app.
+      var focused = !document.hidden;
       if (!focused ||
           rlPlayer.paused ||
           !rlPlayer.isVisible ||
@@ -274,6 +278,21 @@ var RLottie = (function () {
     rlPlayer.forceRender = false;
     rlPlayer.imageData.data.set(frame.frame);
     rlPlayer.context.putImageData(rlPlayer.imageData, 0, 0);
+    var hasVisiblePixels = false;
+    // Sample every 16th pixel. This is cheap enough to run per frame and lets
+    // the UI keep its static fallback visible during transparent TGS frames.
+    for (var alphaIndex = 3; alphaIndex < frame.frame.length; alphaIndex += 64) {
+      if (frame.frame[alphaIndex] > 12) {
+        hasVisiblePixels = true;
+        break;
+      }
+    }
+    if (rlPlayer.hasVisiblePixels !== hasVisiblePixels) {
+      rlPlayer.hasVisiblePixels = hasVisiblePixels;
+      triggerEvent(rlPlayer.el, 'tg:frame-visibility', {
+        detail: { hasVisiblePixels: hasVisiblePixels }
+      });
+    }
     rlPlayer.frameNo = frame.no;
     var now = +(new Date());
     if (rlPlayer.frameThen) {
@@ -384,7 +403,7 @@ var RLottie = (function () {
       return false;
     }
     initApi(function() {
-      el && initPlayer(el, options);
+      el && el.isConnected && initPlayer(el, options);
     });
   }
 
