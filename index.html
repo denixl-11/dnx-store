@@ -1922,6 +1922,49 @@
         }
         html.android-device .case-modal-content .roulette-item:not(.case-loading-item)::before,
         html.android-device .case-modal-content .drop-row::before { opacity: .34; }
+
+        /* ===== V6.5: strict filtering and exact inner case geometry ===== */
+        #catalog-container > .item-card.filter-hidden,
+        #catalog-container > .item-card[hidden] {
+            display: none !important;
+        }
+        .case-card .case-price {
+            width: auto;
+            margin: 1px auto 0;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            color: #ffe3f3;
+            background: none !important;
+            box-shadow: none !important;
+            -webkit-text-fill-color: currentColor;
+            text-shadow: 0 0 13px rgba(231, 80, 255, .24);
+        }
+        .case-card .case-price .telegram-star { filter: none; }
+        .case-modal-content .roulette-item img {
+            width: 100% !important;
+            height: auto !important;
+            max-width: 100% !important;
+            max-height: none !important;
+            aspect-ratio: 1 / 1;
+            object-fit: cover !important;
+            border-radius: 20px !important;
+            clip-path: inset(0 round 20px) !important;
+            -webkit-clip-path: inset(0 round 20px) !important;
+            -webkit-mask-image: -webkit-radial-gradient(white, black);
+        }
+        .case-modal-content .roulette-item {
+            border-radius: 24px !important;
+            clip-path: inset(0 round 24px) !important;
+            -webkit-clip-path: inset(0 round 24px) !important;
+        }
+        .case-modal-content .roulette-item:not(.case-loading-item)::before {
+            top: 50%;
+            bottom: auto;
+            height: calc(100% - 36px);
+            transform: translateY(-50%);
+            border-radius: 20px;
+        }
     </style>
 </head>
 <body>
@@ -2860,7 +2903,11 @@
             let visibleCount = 0;
             container.querySelectorAll('.item-card').forEach(card => {
                 const visible = !currentCollectionFilter || card.dataset.collection === currentCollectionFilter;
-                card.hidden = !visible;
+                card.classList.toggle('filter-hidden', !visible);
+                card.toggleAttribute('hidden', !visible);
+                card.setAttribute('aria-hidden', visible ? 'false' : 'true');
+                if (visible) card.removeAttribute('inert');
+                else card.setAttribute('inert', '');
                 const media = card.querySelector('.nft-live-media');
                 if (!visible) pauseNftMedia(media);
                 else visibleCount++;
