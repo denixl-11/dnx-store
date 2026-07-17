@@ -75,6 +75,7 @@ db_pool: asyncpg.Pool | None = None
 ton_http_session: aiohttp.ClientSession | None = None
 nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_media_fetch_semaphore = asyncio.Semaphore(4)
+star_reconcile_attempts: dict[str, float] = {}
 
 # ======================== ГЛОБАЛЬНЫЙ КЕШ КЕЙСОВ ========================
 # Загружается из переменной окружения CASES_JSON (хранится в Render).
@@ -322,6 +323,7 @@ async def init_db():
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_game_history_number ON game_history(game_number DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_ton_deposits_pending ON ton_deposits(status, expires_at)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_star_payments_user_status ON star_payments(user_id, status, expires_at)")
+                await conn.execute("ALTER TABLE star_payments ADD COLUMN IF NOT EXISTS telegram_star_transaction_id TEXT UNIQUE")
                 logging.info(f"DB initialized. Game number: {last_num}")
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
@@ -1055,7 +1057,7 @@ async def scan_ton_deposits() -> int:
                 int(row["user_id"]),
                 "✨ ПОПОЛНЕНИЕ УСПЕШНО\n\n"
                 f"⭐ Ваш баланс успешно пополнен на {row['credit_stars']} Stars.\n"
-                "💎 Способ оплаты: Toncoin\n\n"
+                "Способ оплаты: Toncoin (TON)\n\n"
                 "Спасибо, что выбираете DNX Store!"
             )
         except Exception as exc:
@@ -1288,6 +1290,139 @@ async def handle_create_star_invoice(request):
         return web.json_response({"success": False, "error": "stars_invoice_error"}, status=500)
 
 
+async def reconcile_star_payment(payment_id: uuid.UUID, user_id: str) -> bool:
+    """Recover a paid invoice if Telegram's successful_payment update was missed."""
+    payment_key = str(payment_id)
+    now = time.monotonic()
+    if now - star_reconcile_attempts.get(payment_key, 0) < 4:
+        return False
+    star_reconcile_attempts[payment_key] = now
+    if len(star_reconcile_attempts) > 1024:
+        cutoff = now - 900
+        for key, attempted_at in list(star_reconcile_attempts.items()):
+            if attempted_at < cutoff:
+                star_reconcile_attempts.pop(key, None)
+
+    payment_row = await get_pool().fetchrow("""
+        SELECT id, user_id, stars, invoice_payload, status, created_at
+        FROM star_payments WHERE id = $1 AND user_id = $2
+    """, payment_id, user_id)
+    if not payment_row or payment_row["status"] != "pending":
+        return False
+    if payment_row["created_at"].timestamp() > time.time() - 2:
+        return False
+
+    transactions = await bot.get_star_transactions(offset=0, limit=100)
+    matched_transaction = None
+    for transaction in transactions.transactions:
+        source = transaction.source
+        source_user = getattr(source, "user", None)
+        if (
+            getattr(source, "invoice_payload", None) == payment_row["invoice_payload"]
+            and int(transaction.amount) == int(payment_row["stars"])
+            and source_user is not None
+            and str(source_user.id) == str(payment_row["user_id"])
+        ):
+            matched_transaction = transaction
+            break
+    if matched_transaction is None:
+        return False
+
+    credited = False
+    async with get_pool().acquire() as conn:
+        async with conn.transaction():
+            updated = await conn.fetchrow("""
+                UPDATE star_payments
+                SET status = 'paid', telegram_star_transaction_id = $1, paid_at = NOW()
+                WHERE id = $2 AND user_id = $3 AND status = 'pending'
+                RETURNING user_id, stars
+            """, matched_transaction.id, payment_id, user_id)
+            if updated:
+                result = await conn.execute(
+                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
+                    updated["stars"], updated["user_id"])
+                if result != "UPDATE 1":
+                    raise RuntimeError("Stars reconciliation user does not exist")
+                credited = True
+    if credited:
+        try:
+            await bot.send_message(
+                int(user_id),
+                "✨ ПОПОЛНЕНИЕ ВОССТАНОВЛЕНО\n\n"
+                f"⭐ На внутренний баланс начислено {payment_row['stars']} Stars.\n"
+                "Платёж найден в официальной истории транзакций Telegram."
+            )
+        except Exception:
+            pass
+        logging.info("Reconciled Telegram Stars payment %s for user %s", payment_id, user_id)
+    return credited
+
+
+async def reconcile_recent_star_transactions(limit: int = 100) -> int:
+    """Credit authoritative incoming Telegram Stars transactions missed by polling."""
+    history = await bot.get_star_transactions(offset=0, limit=max(1, min(limit, 100)))
+    credited_count = 0
+    for transaction in history.transactions:
+        source = transaction.source
+        invoice_payload = getattr(source, "invoice_payload", None)
+        source_user = getattr(source, "user", None)
+        if not invoice_payload or source_user is None or int(transaction.amount) <= 0:
+            continue
+        just_credited = False
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow("""
+                    SELECT id, user_id, stars, status
+                    FROM star_payments WHERE invoice_payload = $1 FOR UPDATE
+                """, invoice_payload)
+                if (
+                    not row
+                    or row["status"] == "paid"
+                    or row["user_id"] != str(source_user.id)
+                    or int(row["stars"]) != int(transaction.amount)
+                ):
+                    continue
+                updated = await conn.fetchrow("""
+                    UPDATE star_payments
+                    SET status = 'paid', telegram_star_transaction_id = $1, paid_at = NOW()
+                    WHERE id = $2 AND status <> 'paid'
+                    RETURNING user_id, stars
+                """, transaction.id, row["id"])
+                if not updated:
+                    continue
+                result = await conn.execute(
+                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
+                    updated["stars"], updated["user_id"])
+                if result != "UPDATE 1":
+                    raise RuntimeError("Stars recovery user does not exist")
+                credited_count += 1
+                just_credited = True
+        if just_credited:
+            try:
+                await bot.send_message(
+                    int(source_user.id),
+                    "✨ ПОПОЛНЕНИЕ ВОССТАНОВЛЕНО\n\n"
+                    f"⭐ На внутренний баланс начислено {int(transaction.amount)} Stars.\n"
+                    "Платёж подтверждён официальной историей Telegram."
+                )
+            except Exception:
+                pass
+    return credited_count
+
+
+async def star_reconciliation_worker():
+    while True:
+        try:
+            recovered = await reconcile_recent_star_transactions()
+            if recovered:
+                logging.info("Recovered %s missed Telegram Stars payment(s)", recovered)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logging.warning("Telegram Stars reconciliation worker error: %s", exc)
+        await asyncio.sleep(60)
+
+
 @require_auth
 async def handle_star_payment_status(request):
     try:
@@ -1301,6 +1436,15 @@ async def handle_star_payment_status(request):
     if not row:
         return web.json_response({"error": "payment_not_found"}, status=404)
     status = row["status"]
+    if status == "pending":
+        try:
+            if await reconcile_star_payment(payment_id, request["telegram_user"]["id"]):
+                row = await get_pool().fetchrow(
+                    "SELECT status, stars, expires_at FROM star_payments WHERE id = $1 AND user_id = $2",
+                    payment_id, request["telegram_user"]["id"])
+                status = row["status"]
+        except Exception as exc:
+            logging.warning("Stars payment reconciliation failed for %s: %s", payment_id, exc)
     if status == "pending" and row["expires_at"].timestamp() < time.time():
         await get_pool().execute(
             "UPDATE star_payments SET status = 'expired' WHERE id = $1 AND status = 'pending'",
@@ -1314,6 +1458,12 @@ async def handle_get_items(request):
         rows = await get_pool().fetch(
             "SELECT id, name, price, status, image_url, nft_link, traits, number, model FROM items WHERE status = 'Доступен'")
         items = normalize_records(rows)
+        now = time.monotonic()
+        for item in items:
+            source_url = canonical_telegram_nft_url(item.get("nft_link"))
+            cached = nft_media_cache.get(source_url) if source_url else None
+            if cached and cached[0] > now and cached[1].get("animated"):
+                item["nft_media"] = cached[1]
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get items error: {e}")
@@ -1321,30 +1471,16 @@ async def handle_get_items(request):
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 
-@require_auth
-@rate_limit(90, 60)
-async def handle_nft_media(request):
-    try:
-        item_id = int(request.query.get("item_id", "0"))
-    except (TypeError, ValueError):
-        item_id = 0
-    if item_id <= 0:
-        return web.json_response({"animated": False, "error": "invalid_item_id"}, status=400)
-
-    nft_link = await get_pool().fetchval("SELECT nft_link FROM items WHERE id = $1", item_id)
-    source_url = canonical_telegram_nft_url(nft_link)
-    if not source_url:
-        return web.json_response({"animated": False})
-
+async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
     now = time.monotonic()
     cached = nft_media_cache.get(source_url)
     if cached and cached[0] > now:
-        return web.json_response(cached[1])
+        return cached[1]
 
     async with nft_media_fetch_semaphore:
         cached = nft_media_cache.get(source_url)
         if cached and cached[0] > time.monotonic():
-            return web.json_response(cached[1])
+            return cached[1]
         try:
             async with get_ton_session().get(
                 source_url,
@@ -1381,7 +1517,43 @@ async def handle_nft_media(request):
                 nft_media_cache.pop(next(iter(nft_media_cache)), None)
         cache_ttl = 600 if result.get("animated") else 60
         nft_media_cache[source_url] = (time.monotonic() + cache_ttl, result)
-        return web.json_response(result)
+        return result
+
+
+async def warm_nft_media_cache(max_items: int = 12):
+    rows = await get_pool().fetch("""
+        SELECT id, nft_link FROM items
+        WHERE COALESCE(nft_link, '') <> ''
+        ORDER BY CASE WHEN status = 'Доступен' THEN 0 ELSE 1 END, id
+        LIMIT $1
+    """, max_items)
+    jobs = []
+    seen_sources = set()
+    for row in rows:
+        source_url = canonical_telegram_nft_url(row["nft_link"])
+        if not source_url or source_url in seen_sources:
+            continue
+        seen_sources.add(source_url)
+        jobs.append(fetch_telegram_nft_media(source_url, int(row["id"])))
+    if jobs:
+        await asyncio.gather(*jobs, return_exceptions=True)
+
+
+@require_auth
+@rate_limit(90, 60)
+async def handle_nft_media(request):
+    try:
+        item_id = int(request.query.get("item_id", "0"))
+    except (TypeError, ValueError):
+        item_id = 0
+    if item_id <= 0:
+        return web.json_response({"animated": False, "error": "invalid_item_id"}, status=400)
+
+    nft_link = await get_pool().fetchval("SELECT nft_link FROM items WHERE id = $1", item_id)
+    source_url = canonical_telegram_nft_url(nft_link)
+    if not source_url:
+        return web.json_response({"animated": False})
+    return web.json_response(await fetch_telegram_nft_media(source_url, item_id))
 
 @require_auth
 async def handle_get_inventory(request):
@@ -1894,7 +2066,11 @@ async def process_successful_star_payment(message: types.Message):
                 if not row:
                     raise ValueError("unknown Stars invoice payload")
                 if row["status"] == "paid":
-                    if row["telegram_payment_charge_id"] != payment.telegram_payment_charge_id:
+                    if row["telegram_payment_charge_id"] is None:
+                        await conn.execute(
+                            "UPDATE star_payments SET telegram_payment_charge_id = $1 WHERE id = $2",
+                            payment.telegram_payment_charge_id, row["id"])
+                    elif row["telegram_payment_charge_id"] != payment.telegram_payment_charge_id:
                         raise ValueError("invoice already paid with another charge")
                     return
                 if (
@@ -1934,6 +2110,66 @@ async def cmd_paysupport(message: types.Message):
         "Поддержка платежей DNX Store. Пришлите описание проблемы, сумму, время и идентификатор платежа из чека Telegram. Никому не отправляйте seed-фразу или приватный ключ."
     )
 
+
+@dp.message(Command("stars_balance"))
+async def cmd_stars_balance(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        logging.warning("Unauthorized /stars_balance request from Telegram user %s", message.from_user.id)
+        return
+    try:
+        balance = await bot.get_my_star_balance()
+        history = await bot.get_star_transactions(offset=0, limit=10)
+        counts = await get_pool().fetchrow("""
+            SELECT
+                COUNT(*) FILTER (WHERE status = 'pending') AS pending_count,
+                COUNT(*) FILTER (WHERE status = 'paid') AS paid_count
+            FROM star_payments
+        """)
+        lines = [
+            "⭐ БАЛАНС TELEGRAM-БОТА",
+            "",
+            f"Доступно боту: {balance.amount} Stars",
+            f"Ожидают обработки в DNX: {counts['pending_count']}",
+            f"Успешно записано в DNX: {counts['paid_count']}",
+            "",
+            "Последние операции Telegram:"
+        ]
+        for transaction in history.transactions[:10]:
+            source_user = getattr(transaction.source, "user", None)
+            source_label = f"user {source_user.id}" if source_user else type(transaction.source).__name__.replace("TransactionPartner", "")
+            invoice_payload = getattr(transaction.source, "invoice_payload", None)
+            payload_label = f" · {invoice_payload}" if invoice_payload else ""
+            lines.append(
+                f"{transaction.date:%d.%m %H:%M} · {transaction.amount:+d} ⭐ · {source_label}{payload_label}"
+            )
+        if not history.transactions:
+            lines.append("Операций пока нет")
+        lines.extend([
+            "",
+            "Это доходный баланс бота, а не ваш личный пользовательский баланс Stars."
+        ])
+        await message.answer("\n".join(lines))
+    except Exception as exc:
+        logging.error("Admin Stars balance command error: %s", exc)
+        await message.answer("Не удалось получить баланс Stars. Проверьте логи Render и актуальность BOT_TOKEN.")
+
+
+@dp.message(Command("stars_reconcile"))
+async def cmd_stars_reconcile(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        logging.warning("Unauthorized /stars_reconcile request from Telegram user %s", message.from_user.id)
+        return
+    try:
+        recovered = await reconcile_recent_star_transactions()
+        await message.answer(
+            "✅ Проверка завершена.\n"
+            f"Восстановлено пропущенных пополнений: {recovered}.\n\n"
+            "Команда сверяет последние операции с базой и не может начислить один платёж дважды."
+        )
+    except Exception as exc:
+        logging.error("Admin Stars reconciliation command error: %s", exc)
+        await message.answer("Не удалось выполнить сверку. Проверьте логи Render.")
+
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     kb = InlineKeyboardMarkup(
@@ -1972,19 +2208,33 @@ async def main():
     runner = None
     game_task = None
     ton_task = None
+    star_task = None
     try:
         db_pool = await create_db_pool()
         ton_http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
         await init_db()
+        try:
+            await asyncio.wait_for(warm_nft_media_cache(), timeout=6)
+        except asyncio.TimeoutError:
+            logging.info("NFT media warm-up continues on demand")
+        except Exception as exc:
+            logging.warning("NFT media warm-up failed: %s", exc)
+        try:
+            recovered = await reconcile_recent_star_transactions()
+            if recovered:
+                logging.info("Recovered %s missed Telegram Stars payment(s) on startup", recovered)
+        except Exception as exc:
+            logging.warning("Initial Telegram Stars reconciliation failed: %s", exc)
         game_task = asyncio.create_task(game_worker())
         ton_task = asyncio.create_task(ton_payment_worker())
+        star_task = asyncio.create_task(star_reconciliation_worker())
         port = int(os.environ.get("PORT", 8080))
         runner = web.AppRunner(app)
         await runner.setup()
         await web.TCPSite(runner, '0.0.0.0', port).start()
         await dp.start_polling(bot)
     finally:
-        tasks = [task for task in (game_task, ton_task) if task is not None]
+        tasks = [task for task in (game_task, ton_task, star_task) if task is not None]
         for task in tasks:
             task.cancel()
         if tasks:
