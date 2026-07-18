@@ -1965,6 +1965,102 @@
             transform: translateY(-50%);
             border-radius: 20px;
         }
+
+        /* ===== V7: two balances, premium leaderboard and cases ===== */
+        .telegram-star,
+        .main-star {
+            background: url('main-star.png') center / auto 190% no-repeat !important;
+            mix-blend-mode: screen;
+            filter: none !important;
+        }
+        .bonus-star {
+            display: inline-block;
+            flex: 0 0 auto;
+            width: 1.08em;
+            height: 1.08em;
+            margin: 0 .08em;
+            vertical-align: -.15em;
+            background: url('main-star.png') center / auto 190% no-repeat;
+            mix-blend-mode: screen;
+            filter: hue-rotate(228deg) saturate(1.8) brightness(1.2);
+        }
+        .header-balances { display: grid; gap: 1px; min-width: 70px; }
+        .header-balances .balance-text { justify-content: flex-end; line-height: 1.05; }
+        .header-balances .bonus-balance-text { color: #dca8ff; font-size: .66rem; }
+        .balance-cards { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .balance-card-v7 {
+            position: relative; min-width: 0; min-height: 105px; padding: 15px 10px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+            overflow: hidden; border: 1px solid rgba(255,183,54,.46); border-radius: 18px;
+            background: radial-gradient(circle at 50% 0, rgba(255,181,38,.15), transparent 47%), #08040f;
+            box-shadow: inset 0 0 24px rgba(255,178,35,.035);
+        }
+        .balance-card-v7.bonus { border-color: rgba(197,74,255,.5); background: radial-gradient(circle at 50% 0, rgba(203,61,255,.17), transparent 50%), #08040f; }
+        .balance-card-v7 small { color: #b6a5b6; font-size: .58rem; letter-spacing: .13em; text-transform: uppercase; }
+        .balance-card-v7 strong { font-size: clamp(1.2rem, 5vw, 1.75rem); }
+        .referral-card {
+            width: 100%; margin-top: 16px; padding: 17px; border: 1px solid rgba(202,70,255,.42); border-radius: 18px;
+            background: linear-gradient(135deg, rgba(67,22,103,.42), rgba(20,7,35,.88) 55%, rgba(91,14,55,.31));
+            box-shadow: inset 0 1px rgba(255,255,255,.06), 0 12px 30px rgba(0,0,0,.25);
+        }
+        .referral-card h3 { margin: 0 0 6px; font-size: .9rem; color: #fff3fb; }
+        .referral-card p { margin: 0 0 13px; color: #b9aabb; font-size: .68rem; line-height: 1.45; }
+        .referral-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .referral-stat { padding: 9px; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: rgba(0,0,0,.24); }
+        .referral-stat b { display: block; color: #fff; font-size: .85rem; }
+        .referral-stat span { color: #9f8da2; font-size: .55rem; }
+        .referral-copy { width: 100%; min-height: 42px; border: 1px solid rgba(226,93,255,.52); border-radius: 12px; color: #ffd9f7; background: rgba(43,12,65,.7); font-weight: 700; }
+        .balance-choice { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 0 0 14px; padding: 5px; border: 1px solid rgba(187,62,228,.27); border-radius: 14px; background: rgba(4,2,9,.6); }
+        .balance-choice button { min-width: 0; min-height: 44px; border: 1px solid transparent; border-radius: 10px; color: #918391; background: transparent; font-size: .7rem; font-weight: 700; }
+        .balance-choice button.active[data-balance="main"] { color: #fff4d8; border-color: rgba(255,190,55,.55); background: linear-gradient(120deg, rgba(112,61,11,.58), rgba(92,25,70,.5)); box-shadow: 0 0 15px rgba(255,178,42,.11); }
+        .balance-choice button.active[data-balance="bonus"] { color: #f3dcff; border-color: rgba(206,75,255,.6); background: linear-gradient(120deg, rgba(74,24,128,.66), rgba(147,28,103,.48)); box-shadow: 0 0 15px rgba(205,64,255,.13); }
+        .balance-choice button:disabled { opacity: .35; }
+        .balance-choice[hidden] { display: none !important; }
+
+        .leaderboard-fullscreen {
+            background:
+                radial-gradient(circle at 50% 0, rgba(123,37,211,.24), transparent 31%),
+                radial-gradient(circle at 92% 48%, rgba(255,42,107,.12), transparent 34%),
+                #04020a !important;
+        }
+        .leaderboard-top { position: relative; padding: 13px 14px; border: 1px solid rgba(213,69,255,.38); border-radius: 18px; background: rgba(13,5,23,.8); box-shadow: 0 14px 35px rgba(0,0,0,.34), inset 0 1px rgba(255,255,255,.06); }
+        .leaderboard-title { margin: 0; font-size: clamp(1.25rem, 6vw, 1.7rem); letter-spacing: .02em; background: linear-gradient(90deg,#ffe8a3,#ff78bd 48%,#b989ff); -webkit-background-clip:text; color:transparent; }
+        .leaderboard-close { width: 42px; height: 42px; border: 1px solid rgba(215,77,255,.34) !important; border-radius: 50%; color: #efccea !important; background: rgba(30,10,45,.76) !important; }
+        .season-timer { margin: 14px 0 18px !important; padding: 14px !important; border: 1px solid rgba(255,73,134,.5) !important; border-radius: 15px !important; color: #ffd7e8 !important; background: linear-gradient(110deg, rgba(68,21,75,.56), rgba(74,21,35,.44)) !important; }
+        .leaderboard-list { gap: 12px; }
+        .leaderboard-row {
+            position: relative; min-height: 82px; padding: 13px 14px !important; border-radius: 18px !important;
+            border: 1px solid rgba(166,52,215,.31) !important;
+            background: linear-gradient(120deg, rgba(25,9,42,.91), rgba(7,4,14,.96) 61%, rgba(43,8,29,.74)) !important;
+            box-shadow: 0 12px 28px rgba(0,0,0,.3), inset 0 1px rgba(255,255,255,.04);
+            overflow: hidden;
+        }
+        .leaderboard-row::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:linear-gradient(#ba58ff,#ff447f); }
+        .leaderboard-row.rank-1 { border-color: rgba(255,207,74,.56) !important; background: radial-gradient(circle at 10% 30%,rgba(255,200,64,.15),transparent 36%),linear-gradient(120deg,rgba(49,27,42,.95),rgba(13,6,19,.98)) !important; }
+        .leaderboard-row.rank-1::before { background: linear-gradient(#fff0a5,#f8ae21); }
+        .leaderboard-row.rank-2::before { background: linear-gradient(#e8eeff,#8ea5c9); }
+        .leaderboard-row.rank-3::before { background: linear-gradient(#ffc08d,#b75b35); }
+        .leaderboard-rank { width: 42px !important; font-size: 1rem; }
+        .leaderboard-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+        .leaderboard-wins { color: #d7c4d8 !important; }
+        .leaderboard-nft { width: 48px !important; height: 48px !important; border-radius: 13px !important; box-shadow: 0 0 18px rgba(220,68,255,.18); }
+        .leaderboard-row.you-row { border-color: rgba(255,65,132,.62) !important; }
+
+        .case-card { border-radius: 20px !important; padding: 10px !important; }
+        .case-card .item-image { border-radius: 16px !important; }
+        .case-card .item-name { margin-top: 7px; font-weight: 750; }
+        .case-card .case-price { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px !important; border: 1px solid rgba(243,97,204,.34) !important; border-radius: 14px !important; background: linear-gradient(115deg,rgba(78,29,128,.66),rgba(136,28,87,.54)) !important; }
+        .case-bonus-badge { margin: 5px auto 0; width: max-content; max-width: 100%; padding: 4px 8px; border: 1px solid rgba(198,83,255,.42); border-radius: 999px; color: #e7c6ff; background: rgba(70,24,103,.42); font-size: .52rem; letter-spacing: .05em; }
+        #case-actions { flex-direction: column; align-items: center; }
+        #case-balance-choice { max-width: 330px; }
+        .nft-live-pattern i { opacity: .32; }
+        @media (max-width: 360px) {
+            .header-balances { min-width: 61px; }
+            .header-balances .balance-text { font-size: .64rem; }
+            .header-balances .bonus-balance-text { font-size: .56rem; }
+            .balance-card-v7 { min-height: 94px; }
+            .leaderboard-row { padding-inline: 11px !important; }
+        }
     </style>
 </head>
 <body>
@@ -1975,7 +2071,10 @@
             <div class="username" id="username-display">User</div>
         </div>
         <div class="header-right" onclick="showPage('balance')">
-            <span class="balance-text star-amount" id="header-balance"><span>0</span><span class="telegram-star" aria-hidden="true"></span></span>
+            <span class="header-balances">
+                <span class="balance-text star-amount" id="header-balance"><span>0</span><span class="telegram-star" aria-hidden="true"></span></span>
+                <span class="balance-text bonus-balance-text star-amount" id="header-bonus-balance"><span>0</span><span class="bonus-star" aria-hidden="true"></span></span>
+            </span>
         </div>
     </header>
 
@@ -2049,8 +2148,17 @@
 
     <div id="page-balance" class="page">
         <div class="balance-page-inner">
-            <div class="section-eyebrow">ВНУТРЕННИЙ БАЛАНС</div>
-            <div class="big-balance-card"><strong id="big-balance">0</strong><span class="star-coin telegram-star" aria-hidden="true"></span></div>
+            <div class="section-eyebrow">ВАШИ БАЛАНСЫ</div>
+            <div class="balance-cards">
+                <div class="balance-card-v7">
+                    <small>Основной</small>
+                    <span class="star-amount"><strong id="big-balance">0</strong><span class="telegram-star" aria-hidden="true"></span></span>
+                </div>
+                <div class="balance-card-v7 bonus">
+                    <small>Бонусный</small>
+                    <span class="star-amount"><strong id="big-bonus-balance">0</strong><span class="bonus-star" aria-hidden="true"></span></span>
+                </div>
+            </div>
             <h2 class="balance-title">ПОПОЛНИТЬ БАЛАНС</h2>
             <p class="balance-subtitle">Выберите количество звёзд, затем способ оплаты</p>
             <div class="topup-grid">
@@ -2061,6 +2169,15 @@
                 <button class="topup-btn" onclick="initTopup(1700)"><span class="star-amount"><b>1 700</b><span class="telegram-star" aria-hidden="true"></span></span></button>
                 <button class="topup-btn" onclick="initTopup(4250)"><span class="star-amount"><b>4 250</b><span class="telegram-star" aria-hidden="true"></span></span></button>
                 <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
+            </div>
+            <div class="referral-card">
+                <h3>РЕФЕРАЛЬНАЯ ПРОГРАММА · 5%</h3>
+                <p>Приглашайте новых пользователей и получайте 5% каждого их пополнения на бонусный баланс.</p>
+                <div class="referral-stats">
+                    <div class="referral-stat"><b id="referrals-count">0</b><span>РЕФЕРАЛОВ</span></div>
+                    <div class="referral-stat"><b class="star-amount"><span id="referral-earned">0</span><span class="bonus-star" aria-hidden="true"></span></b><span>НАЧИСЛЕНО</span></div>
+                </div>
+                <button class="referral-copy" id="copy-referral-btn" onclick="copyReferralLink()">СКОПИРОВАТЬ ССЫЛКУ</button>
             </div>
         </div>
     </div>
@@ -2158,7 +2275,7 @@
     </div>
 
     <div id="confirm-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 20px;">Сделать ставку <span class="star-amount"><span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span><span class="telegram-star" aria-hidden="true"></span></span>?</p><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 14px;">Сделать ставку <span class="star-amount"><span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span><span class="telegram-star" aria-hidden="true"></span></span>?</p><div class="balance-choice" id="game-balance-choice"><button type="button" class="active" data-balance="main" onclick="selectBalanceType('game','main')">Основной <span class="telegram-star"></span></button><button type="button" data-balance="bonus" onclick="selectBalanceType('game','bonus')">Бонусный <span class="bonus-star"></span></button></div><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
     </div>
 
     <div id="payment-method-modal" class="modal-overlay">
@@ -2186,8 +2303,8 @@
 
     <div id="leaderboard-modal" class="leaderboard-fullscreen">
         <div class="leaderboard-top">
-            <h2 style="color:var(--accent-gold); font-size:1.5rem;">🏆 Лидеры сезона</h2>
-            <button style="background:none; border:none; color:var(--text-muted); font-size:1.5rem; cursor:pointer;" onclick="closeLeaderboardModal()">✕</button>
+            <h2 class="leaderboard-title">🏆 Лидеры сезона</h2>
+            <button class="leaderboard-close" onclick="closeLeaderboardModal()">✕</button>
         </div>
         <div class="season-timer" id="season-timer-display">Загрузка...</div>
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
@@ -2241,6 +2358,7 @@
             </div>
 
             <div id="case-actions" style="margin-top: 25px; display: flex; justify-content: center; width: 100%;">
+                <div class="balance-choice" id="case-balance-choice" hidden><button type="button" class="active" data-balance="main" onclick="selectBalanceType('case','main')">Основной <span class="telegram-star"></span></button><button type="button" data-balance="bonus" onclick="selectBalanceType('case','bonus')">Бонусный <span class="bonus-star"></span></button></div>
                 <button id="case-open-btn" onclick="openCase()">ОТКРЫТЬ ЗА <span class="star-amount"><span id="case-price"></span><span class="telegram-star" aria-hidden="true"></span></span></button>
             </div>
 
@@ -2393,7 +2511,10 @@
                 });
                 if (!response.ok) {
                     const err = await response.json().catch(() => ({}));
-                    throw new Error(err.error || `HTTP ${response.status}`);
+                    const apiError = new Error(err.error || `HTTP ${response.status}`);
+                    apiError.code = err.error || 'http_error';
+                    apiError.status = response.status;
+                    throw apiError;
                 }
                 return response.json();
             } finally {
@@ -2402,6 +2523,10 @@
         }
 
         let userBalance = 0.0;
+        let userBonusBalance = 0.0;
+        let referralLink = '';
+        let selectedGameBalance = 'main';
+        let selectedCaseBalance = 'main';
         let cart = [];
         try {
             const storedCart = JSON.parse(localStorage.getItem('dnx_cart') || '[]');
@@ -2526,18 +2651,12 @@
                 value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
                 return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
             };
-            const slots = [
-                [10, 12], [39, 9], [73, 14], [18, 39], [67, 40],
-                [8, 70], [39, 73], [74, 69], [43, 42], [25, 61], [61, 61]
-            ];
-            for (let index = slots.length - 1; index > 0; index--) {
-                const swapIndex = Math.floor(random() * (index + 1));
-                [slots[index], slots[swapIndex]] = [slots[swapIndex], slots[index]];
-            }
-            const count = 5 + Math.floor(random() * 4);
-            slots.slice(0, count).forEach(([left, top]) => {
+            const slots = [[13,14],[48,10],[82,18],[25,42],[72,40],[10,74],[46,73],[83,75]];
+            slots.forEach(([baseLeft, baseTop]) => {
                 const symbol = document.createElement('i');
-                const size = 10 + random() * 4;
+                const left = baseLeft + (random() * 4 - 2);
+                const top = baseTop + (random() * 4 - 2);
+                const size = 10.5 + random() * 2;
                 symbol.style.cssText = `left:${left}%;top:${top}%;width:${size}%;transform:translate(-50%,-50%) rotate(${Math.round(random() * 46 - 23)}deg);background-image:url("${patternUrl}")`;
                 container.appendChild(symbol);
             });
@@ -2785,9 +2904,31 @@
             try {
                 const data = await apiFetch(`${API_BASE}/user`);
                 userBalance = data.balance || 0;
+                userBonusBalance = data.bonusBalance || 0;
+                referralLink = data.referralLink || '';
+                document.getElementById('referrals-count').innerText = Number(data.referralsCount || 0).toLocaleString('ru-RU');
+                document.getElementById('referral-earned').innerText = formatStars(data.referralEarned || 0);
             } catch(e) { console.error('Balance update failed', e); }
             document.getElementById('header-balance').innerHTML = `<span>${formatStars(userBalance)}</span>${telegramStarMarkup()}`;
+            document.getElementById('header-bonus-balance').innerHTML = `<span>${formatStars(userBonusBalance)}</span>${bonusStarMarkup()}`;
             document.getElementById('big-balance').innerText = formatStars(userBalance);
+            document.getElementById('big-bonus-balance').innerText = formatStars(userBonusBalance);
+            document.querySelectorAll('.balance-choice').forEach(choice => {
+                const main = choice.querySelector('[data-balance="main"]');
+                const bonus = choice.querySelector('[data-balance="bonus"]');
+                if (main) main.innerHTML = `Основной · ${formatStars(userBalance)} ${telegramStarMarkup()}`;
+                if (bonus) bonus.innerHTML = `Бонусный · ${formatStars(userBonusBalance)} ${bonusStarMarkup()}`;
+            });
+        }
+
+        async function copyReferralLink() {
+            if (!referralLink) { showAlert('Ссылка ещё создаётся. Откройте эту страницу снова через несколько секунд.'); return; }
+            try {
+                await navigator.clipboard.writeText(referralLink);
+                showAlert('Реферальная ссылка скопирована');
+            } catch (_) {
+                try { tg.openLink(referralLink); } catch (error) { showAlert(referralLink); }
+            }
         }
 
         function restoreCatalogSnapshot() {
@@ -2958,13 +3099,20 @@
         function formatStars(value) {
             const amount = Number(value || 0);
             if (!Number.isFinite(amount)) return '0';
-            return Math.trunc(amount).toLocaleString('ru-RU');
+            const fractional = Math.abs(amount - Math.round(amount)) > 0.0001;
+            return amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: fractional ? 2 : 0 });
         }
         function telegramStarMarkup() {
             return '<span class="telegram-star" aria-hidden="true"></span>';
         }
+        function bonusStarMarkup() {
+            return '<span class="bonus-star" aria-hidden="true"></span>';
+        }
         function starAmountMarkup(value) {
             return `<span class="star-amount"><span>${formatStars(value)}</span>${telegramStarMarkup()}</span>`;
+        }
+        function balanceAmountMarkup(value, type = 'main') {
+            return `<span class="star-amount"><span>${formatStars(value)}</span>${type === 'bonus' ? bonusStarMarkup() : telegramStarMarkup()}</span>`;
         }
         function safeImageUrl(value) {
             try {
@@ -3134,14 +3282,23 @@
                     showAlert("Успешная покупка! NFT добавлен в инвентарь.");
                     closeModal('confirm-buy-modal');
                     await updateBalance();
-                    loadCatalog();
-                    loadInventory();
+                    await loadCatalog(true);
+                    await loadInventory();
                 } else {
                     showAlert(data.error === 'insufficient_funds' ? "Недостаточно средств!" : "Товар уже недоступен.");
                     closeModal('confirm-buy-modal');
                     loadCatalog();
                 }
-            } catch(e) { showAlert("Ошибка сети"); closeModal('confirm-buy-modal'); }
+            } catch(e) {
+                const messages = {
+                    insufficient_funds: 'Недостаточно средств!',
+                    items_unavailable: 'Этот NFT уже недоступен.',
+                    invalid_item_price: 'У товара временно некорректная цена.'
+                };
+                showAlert(messages[e.code] || 'Покупка не завершена. Повторите попытку через несколько секунд.');
+                closeModal('confirm-buy-modal');
+                loadCatalog(true);
+            }
             pendingBuyItem = null;
         }
 
@@ -3158,12 +3315,16 @@
                     localStorage.removeItem('dnx_cart');
                     renderCart();
                     await updateBalance();
-                    loadCatalog();
-                    loadInventory();
+                    await loadCatalog(true);
+                    await loadInventory();
                 } else {
                     showAlert(data.error === 'insufficient_funds' ? 'Недостаточно средств' : 'Товары недоступны');
                 }
-            } catch(e) { showAlert('Ошибка сети'); }
+            } catch(e) {
+                const messages = { insufficient_funds: 'Недостаточно средств', items_unavailable: 'Один из товаров уже куплен другим пользователем' };
+                showAlert(messages[e.code] || 'Корзина не оплачена. Повторите попытку через несколько секунд.');
+                loadCatalog(true);
+            }
         }
 
         function initTopup(stars) {
@@ -3424,21 +3585,22 @@
                 let html = '';
                 if (data.top && data.top.length > 0) {
                     data.top.forEach((p, idx) => {
+                        const prizeItem = currentPrizeItems[idx] || null;
                         html += `
-                            <div class="leaderboard-row">
+                            <div class="leaderboard-row rank-${idx + 1}${p.isYou ? ' you-row' : ''}">
                                 <div class="leaderboard-rank">#${idx+1}</div>
                                 <div class="leaderboard-name">${escapeHtml(p.username)}</div>
                                 <div class="leaderboard-wins">${p.wins} поб.</div>
-                                ${currentPrizeItem ? `<img class="leaderboard-nft" src="${escapeHtml(safeImageUrl(currentPrizeItem.image_url))}" onclick="event.stopPropagation(); openPrizeModal()" />` : ''}
+                                ${prizeItem ? `<img class="leaderboard-nft" src="${escapeHtml(safeImageUrl(prizeItem.image_url))}" onclick="event.stopPropagation(); currentPrizeItem=currentPrizeItems[${idx}]; openPrizeModal()" />` : ''}
                             </div>`;
                     });
                 }
-                if (data.user) {
-                    html += `<div class="leaderboard-row" style="border: 1px solid var(--accent-gold);">
-                        <div class="leaderboard-rank">Вы</div>
+                if (data.user && !data.top?.some(player => player.isYou)) {
+                    html += `<div class="leaderboard-row you-row">
+                        <div class="leaderboard-rank">#${Number(data.user.rank || 0)}</div>
                         <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
                         <div class="leaderboard-wins">${data.user.wins} поб.</div>
-                        ${currentPrizeItem ? `<img class="leaderboard-nft" src="${escapeHtml(safeImageUrl(currentPrizeItem.image_url))}" onclick="event.stopPropagation(); openPrizeModal()" />` : ''}
+                        <span style="color:#ff79b9;font-size:.62rem;font-weight:800;">ВЫ</span>
                     </div>`;
                 }
                 listEl.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Нет данных</div>';
@@ -3628,6 +3790,25 @@
             drawCoverImage(ctx, waitingFieldImage, width, height);
             const pulse = (Math.sin(Date.now() * 0.003) + 1) / 2;
             drawWaitingEnergy(ctx, width, height, Date.now());
+            const crownPulse = (Math.sin(Date.now() * .00225) + 1) / 2;
+            const crownX = width * .5, crownY = height * .52;
+            const crownRadius = width * (.128 + crownPulse * .006);
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            ctx.beginPath();
+            for (let side = 0; side < 6; side++) {
+                const angle = -Math.PI / 2 + side * Math.PI / 3;
+                const px = crownX + Math.cos(angle) * crownRadius;
+                const py = crownY + Math.sin(angle) * crownRadius;
+                if (side === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.strokeStyle = `rgba(231,104,255,${.08 + crownPulse * .14})`;
+            ctx.lineWidth = Math.max(1, width * .002);
+            ctx.shadowColor = 'rgba(225,65,255,.72)';
+            ctx.shadowBlur = width * (.008 + crownPulse * .012);
+            ctx.stroke();
+            ctx.restore();
             ctx.save();
             ctx.fillStyle = `rgba(255, 220, 185, ${0.68 + pulse * .2})`;
             ctx.shadowColor = 'rgba(224, 66, 255, .75)';
@@ -4147,7 +4328,7 @@
                     </span>
                     <span style="display:flex;gap:15px;align-items:center;">
                         <span style="color:rgba(255,255,255,0.6);font-size:14px;">${winPercent}%</span>
-                        <span style="color:#ffd274;font-weight:600;font-size:15px;min-width:70px;text-align:right;">${starAmountMarkup(p.amount)}</span>
+                        <span style="color:#ffd274;font-weight:600;font-size:15px;min-width:70px;text-align:right;">${balanceAmountMarkup(p.amount, p.balance_type)}</span>
                     </span>
                 </div>`;
             }).join('');
@@ -4155,8 +4336,26 @@
 
         function openBetConfirm(amt) {
             betAmountTemp = amt;
+            const myId = String(tg.initDataUnsafe?.user?.id || '');
+            const existingBet = gState.players.find(player => String(player.id) === myId);
+            if (existingBet?.balance_type) selectedGameBalance = existingBet.balance_type;
+            selectBalanceType('game', selectedGameBalance);
             document.getElementById('confirm-bet-amount').innerText = amt;
             document.getElementById('confirm-bet-modal').classList.add('active');
+        }
+        function selectBalanceType(context, type) {
+            if (!['main', 'bonus'].includes(type)) return;
+            if (context === 'case') selectedCaseBalance = type;
+            else selectedGameBalance = type;
+            const root = document.getElementById(context === 'case' ? 'case-balance-choice' : 'game-balance-choice');
+            root?.querySelectorAll('button[data-balance]').forEach(button => button.classList.toggle('active', button.dataset.balance === type));
+            if (context === 'game') {
+                const amount = document.getElementById('confirm-bet-amount');
+                const star = amount?.parentElement?.querySelector('.telegram-star, .bonus-star');
+                if (star) star.className = type === 'bonus' ? 'bonus-star' : 'telegram-star';
+            } else {
+                refreshCaseOpenButton();
+            }
         }
         function openCustomBet() {
             document.getElementById('custom-bet-input').value = '';
@@ -4176,7 +4375,7 @@
             try {
                 const data = await apiFetch(`${API_BASE}/game/bet`, {
                     method: 'POST',
-                    body: JSON.stringify({ amount: betAmountTemp, photo_url: tg.initDataUnsafe?.user?.photo_url || '' })
+                    body: JSON.stringify({ amount: betAmountTemp, balanceType: selectedGameBalance })
                 });
                 closeModal('confirm-bet-modal');
                 if (data.success) {
@@ -4189,9 +4388,13 @@
                     else if (data.error === 'room_full') msg = "Слишком много игроков!";
                     else if (data.error === 'min_bet') msg = "Минимальная ставка — 10 звёзд";
                     else if (data.error === 'invalid_amount') msg = "Ставка должна быть кратна 10 звёздам";
+                    else if (data.error === 'balance_type_locked') msg = "В этом раунде продолжайте ставить с ранее выбранного баланса";
                     showAlert(msg);
                 }
-            } catch(e) { closeModal('confirm-bet-modal'); showAlert("Ошибка сети"); }
+            } catch(e) {
+                closeModal('confirm-bet-modal');
+                showAlert(e.code === 'balance_type_locked' ? "В этом раунде продолжайте ставить с ранее выбранного баланса" : "Не удалось принять ставку. Попробуйте ещё раз.");
+            }
             if (btn) { btn.disabled = false; btn.innerText = 'Подтвердить'; }
         }
         function cancelGameBet() {
@@ -4233,6 +4436,7 @@
                     <img src="${escapeHtml(safeImageUrl(c.image_url))}" class="item-image" alt="${escapeHtml(c.name)}" loading="eager" decoding="async">
                     <div class="item-name">${escapeHtml(c.name)}</div>
                     <div class="case-price">${starAmountMarkup(c.price)}</div>
+                    ${c.bonus_enabled ? '<div class="case-bonus-badge">ДОСТУПНО ЗА БОНУСЫ</div>' : ''}
                 </div>
             `).join('');
         }
@@ -4326,7 +4530,10 @@
                 if (openToken !== caseDetailOpenToken || !overlay.classList.contains('active')) return;
                 modal.classList.remove('is-loading');
                 document.getElementById('case-detail-title').innerText = currentCase.name;
-                document.getElementById('case-price').innerText = formatStars(currentCase.price);
+                selectedCaseBalance = 'main';
+                const caseBalanceChoice = document.getElementById('case-balance-choice');
+                caseBalanceChoice.hidden = !currentCase.bonus_enabled;
+                selectBalanceType('case', 'main');
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
                 document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
@@ -4351,7 +4558,7 @@
                 const caseOpenButton = document.getElementById('case-open-btn');
                 caseOpenButton.disabled = false;
                 caseOpenButton.style.opacity = '1';
-                caseOpenButton.innerHTML = `ОТКРЫТЬ ЗА <span class="star-amount"><span id="case-price">${formatStars(currentCase.price)}</span>${telegramStarMarkup()}</span>`;
+                refreshCaseOpenButton();
                 document.getElementById('case-back-btn').style.opacity = '1';
                 document.getElementById('case-back-btn').style.pointerEvents = 'auto';
 
@@ -4520,7 +4727,7 @@
             const openButton = document.getElementById('case-open-btn');
             openButton.disabled = false;
             openButton.style.opacity = '1';
-            openButton.innerHTML = `ОТКРЫТЬ ЗА <span class="star-amount"><span id="case-price">${formatStars(currentCase?.price || 0)}</span>${telegramStarMarkup()}</span>`;
+            refreshCaseOpenButton();
             document.getElementById('case-back-btn').style.opacity = '1';
             document.getElementById('case-back-btn').style.pointerEvents = 'auto';
 
@@ -4582,7 +4789,9 @@
 
         async function openCase() {
             if (!currentCase) return;
-            if (userBalance < currentCase.price) { showAlert('Недостаточно средств'); return; }
+            const selectedBalance = selectedCaseBalance === 'bonus' ? userBonusBalance : userBalance;
+            if (selectedBalance < currentCase.price) { showAlert('Недостаточно средств на выбранном балансе'); return; }
+            if (selectedCaseBalance === 'bonus' && !currentCase.bonus_enabled) { showAlert('Этот кейс нельзя открыть за бонусы'); return; }
 
             const btn = document.getElementById('case-open-btn');
             if (btn.disabled || caseOpeningRequestActive) return;
@@ -4602,7 +4811,7 @@
             try {
                 const result = await apiFetch(`${API_BASE}/open-case`, {
                     method: 'POST',
-                    body: JSON.stringify({ caseId: currentCase.id })
+                    body: JSON.stringify({ caseId: currentCase.id, balanceType: selectedCaseBalance })
                 });
                 if (result && result.success) {
                     caseOpeningRequestActive = false;
@@ -4614,9 +4823,17 @@
                     resetOpenBtn(btn, originalText);
                 }
             } catch(e) {
-                showAlert('Ошибка сети');
+                const messages = { bonus_not_allowed: 'Этот кейс нельзя открыть за бонусы', insufficient_funds: 'Недостаточно средств на выбранном балансе' };
+                showAlert(messages[e.code] || 'Не удалось открыть кейс. Повторите попытку.');
                 resetOpenBtn(btn, originalText);
             }
+        }
+
+        function refreshCaseOpenButton() {
+            const button = document.getElementById('case-open-btn');
+            if (!button) return;
+            const star = selectedCaseBalance === 'bonus' ? bonusStarMarkup() : telegramStarMarkup();
+            button.innerHTML = `ОТКРЫТЬ ЗА <span class="star-amount"><span id="case-price">${formatStars(currentCase?.price || 0)}</span>${star}</span>`;
         }
 
         function resetOpenBtn(btn, text) {

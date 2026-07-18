@@ -46,6 +46,10 @@ STAR_MIN_TOPUP = int(os.getenv("STAR_MIN_TOPUP", "10"))
 STAR_MAX_TOPUP = int(os.getenv("STAR_MAX_TOPUP", "10000"))
 STAR_MIN_BET = Decimal(os.getenv("STAR_MIN_BET", "10"))
 STAR_BET_STEP = Decimal(os.getenv("STAR_BET_STEP", "10"))
+REFERRAL_RATE = Decimal("0.05")
+REFERRAL_CODE_LENGTH = 25
+REFERRAL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+BOT_USERNAME = os.getenv("BOT_USERNAME", "").strip().lstrip("@")
 
 if TON_STAR_RATE <= 0:
     raise RuntimeError("TON_STAR_RATE must be positive")
@@ -76,6 +80,97 @@ ton_http_session: aiohttp.ClientSession | None = None
 nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_media_fetch_semaphore = asyncio.Semaphore(4)
 star_reconcile_attempts: dict[str, float] = {}
+
+
+def new_referral_code() -> str:
+    return "".join(secrets.choice(REFERRAL_ALPHABET) for _ in range(REFERRAL_CODE_LENGTH))
+
+
+async def ensure_user(conn, user_id: str, username: str, referral_code: str | None = None):
+    """Create a user once and bind a referrer only during that first insert."""
+    existing = await conn.fetchrow(
+        "SELECT id, balance, bonus_balance, referral_code, referred_by FROM users WHERE id = $1",
+        user_id,
+    )
+    if existing:
+        await conn.execute("UPDATE users SET username = $1 WHERE id = $2", username[:255], user_id)
+        return existing
+
+    referrer_id = None
+    if referral_code and re.fullmatch(r"[A-Za-z0-9]{25}", referral_code):
+        referrer_id = await conn.fetchval(
+            "SELECT id FROM users WHERE referral_code = $1 AND id <> $2",
+            referral_code,
+            user_id,
+        )
+
+    for _ in range(12):
+        code = new_referral_code()
+        try:
+            async with conn.transaction():
+                return await conn.fetchrow(
+                    """
+                    INSERT INTO users (id, username, balance, bonus_balance, referral_code, referred_by)
+                    VALUES ($1, $2, 0, 0, $3, $4)
+                    ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
+                    RETURNING id, balance, bonus_balance, referral_code, referred_by
+                    """,
+                    user_id,
+                    username[:255],
+                    code,
+                    referrer_id,
+                )
+        except asyncpg.UniqueViolationError:
+            continue
+    raise RuntimeError("Could not allocate a unique referral code")
+
+
+async def credit_main_deposit(
+    conn,
+    user_id: str,
+    amount,
+    source_type: str,
+    source_id: str,
+) -> Decimal:
+    """Credit a real deposit and award its one-time 5% referral bonus."""
+    deposit_amount = Decimal(str(amount))
+    result = await conn.execute(
+        "UPDATE users SET balance = balance + $1 WHERE id = $2",
+        deposit_amount,
+        user_id,
+    )
+    if result != "UPDATE 1":
+        raise RuntimeError("Deposit user does not exist")
+
+    referrer_id = await conn.fetchval("SELECT referred_by FROM users WHERE id = $1", user_id)
+    if not referrer_id:
+        return Decimal("0")
+    reward = (deposit_amount * REFERRAL_RATE).quantize(Decimal("0.01"))
+    if reward <= 0:
+        return Decimal("0")
+    inserted = await conn.fetchval(
+        """
+        INSERT INTO referral_rewards
+            (referrer_id, referral_id, source_type, source_id, deposit_amount, reward_amount)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (source_type, source_id) DO NOTHING
+        RETURNING reward_amount
+        """,
+        referrer_id,
+        user_id,
+        source_type,
+        source_id,
+        deposit_amount,
+        reward,
+    )
+    if inserted is not None:
+        await conn.execute(
+            "UPDATE users SET bonus_balance = bonus_balance + $1 WHERE id = $2",
+            inserted,
+            referrer_id,
+        )
+        return Decimal(str(inserted))
+    return Decimal("0")
 
 # ======================== ГЛОБАЛЬНЫЙ КЕШ КЕЙСОВ ========================
 # Загружается из переменной окружения CASES_JSON (хранится в Render).
@@ -117,6 +212,11 @@ def load_cases_from_env():
         }
 
 load_cases_from_env()   # заполнили CASES_CACHE
+
+
+def case_allows_bonus(case: dict) -> bool:
+    value = case.get("bonus_enabled", False)
+    return value is True or value == 1 or (isinstance(value, str) and value.strip().lower() in {"true", "yes", "1"})
 
 async def create_db_pool() -> asyncpg.Pool:
     if DATABASE_URL:
@@ -201,9 +301,30 @@ async def init_db():
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
                         username VARCHAR(255),
-                        balance NUMERIC DEFAULT 0.0
+                        balance NUMERIC DEFAULT 0.0,
+                        bonus_balance NUMERIC(20, 2) NOT NULL DEFAULT 0,
+                        referral_code VARCHAR(25),
+                        referred_by VARCHAR(255)
                     )
                 """)
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_balance NUMERIC(20, 2) DEFAULT 0")
+                await conn.execute("UPDATE users SET bonus_balance = 0 WHERE bonus_balance IS NULL")
+                await conn.execute("ALTER TABLE users ALTER COLUMN bonus_balance SET NOT NULL")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(25)")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by VARCHAR(255)")
+                users_without_codes = await conn.fetch("SELECT id FROM users WHERE referral_code IS NULL")
+                for missing_user in users_without_codes:
+                    for _ in range(12):
+                        code = new_referral_code()
+                        if not await conn.fetchval("SELECT 1 FROM users WHERE referral_code = $1", code):
+                            await conn.execute(
+                                "UPDATE users SET referral_code = $1 WHERE id = $2 AND referral_code IS NULL",
+                                code,
+                                missing_user["id"],
+                            )
+                            break
+                await conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users(referred_by)")
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS items (
                         id SERIAL PRIMARY KEY,
@@ -219,6 +340,11 @@ async def init_db():
                     )
                 """)
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS model VARCHAR(255) DEFAULT ''")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS buyer_id VARCHAR(255)")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS nft_link TEXT DEFAULT ''")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS traits JSONB DEFAULT '[]'::jsonb")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -324,6 +450,20 @@ async def init_db():
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_ton_deposits_pending ON ton_deposits(status, expires_at)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_star_payments_user_status ON star_payments(user_id, status, expires_at)")
                 await conn.execute("ALTER TABLE star_payments ADD COLUMN IF NOT EXISTS telegram_star_transaction_id TEXT UNIQUE")
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS referral_rewards (
+                        id BIGSERIAL PRIMARY KEY,
+                        referrer_id VARCHAR(255) NOT NULL,
+                        referral_id VARCHAR(255) NOT NULL,
+                        source_type VARCHAR(20) NOT NULL,
+                        source_id VARCHAR(128) NOT NULL,
+                        deposit_amount NUMERIC(20, 2) NOT NULL,
+                        reward_amount NUMERIC(20, 2) NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        UNIQUE (source_type, source_id)
+                    )
+                """)
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_referral_rewards_owner ON referral_rewards(referrer_id, created_at DESC)")
                 logging.info(f"DB initialized. Game number: {last_num}")
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
@@ -896,7 +1036,9 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
 
     winner_bet = players[winner_id]["amount"]
     others_bets = pool - winner_bet
-    profit = winner_bet + (others_bets * 0.7)
+    winner_balance_type = players[winner_id].get("balance_type", "main")
+    profit_share = 0.4 if winner_balance_type == "bonus" else 0.7
+    profit = winner_bet + (others_bets * profit_share)
 
     if pool > 0:
         win_percent = round((winner_bet / pool) * 100, 1)
@@ -931,7 +1073,8 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
             "win_amount": profit,
             "photo_url": photo_url,
             "round_id": game_state["round_id"],
-            "polygon": winner_polygon
+            "polygon": winner_polygon,
+            "balance_type": winner_balance_type,
         }
     except Exception as e:
         logging.error(f"DB error finish_round: {e}")
@@ -1047,11 +1190,13 @@ async def scan_ton_deposits() -> int:
                 """, tx_hash, deposit["id"])
                 if not row:
                     continue
-                result = await conn.execute(
-                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
-                    row["credit_stars"], row["user_id"])
-                if result != "UPDATE 1":
-                    raise RuntimeError("TON deposit user does not exist")
+                await credit_main_deposit(
+                    conn,
+                    row["user_id"],
+                    row["credit_stars"],
+                    "ton",
+                    str(deposit["id"]),
+                )
         try:
             await bot.send_message(
                 int(row["user_id"]),
@@ -1117,18 +1262,36 @@ async def handle_get_user(request):
     user_id = user['id']
     username = user['username']
     try:
-        balance_value = await get_pool().fetchval(
-            """INSERT INTO users (id, username) VALUES ($1, $2)
-               ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username
-               RETURNING balance""",
-            user_id, username,
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                await ensure_user(conn, user_id, username)
+                row = await conn.fetchrow(
+                    """
+                    SELECT balance, bonus_balance, referral_code,
+                           (SELECT COUNT(*) FROM users referred WHERE referred.referred_by = users.id) AS referrals_count,
+                           (SELECT COALESCE(SUM(reward_amount), 0) FROM referral_rewards WHERE referrer_id = users.id) AS referral_earned
+                    FROM users WHERE id = $1
+                    """,
+                    user_id,
+                )
+        balance = float(row["balance"] or 0)
+        bonus_balance = float(row["bonus_balance"] or 0)
+        referral_link = (
+            f"https://t.me/{BOT_USERNAME}?start=ref_{row['referral_code']}"
+            if BOT_USERNAME and row["referral_code"]
+            else ""
         )
-        balance = float(balance_value or 0)
     except Exception as e:
         logging.error(f"Get user error: {e}")
         return web.json_response({"error": "database_unavailable"}, status=503,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-    return web.json_response({"balance": balance}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    return web.json_response({
+        "balance": balance,
+        "bonusBalance": bonus_balance,
+        "referralLink": referral_link,
+        "referralsCount": int(row["referrals_count"] or 0),
+        "referralEarned": float(row["referral_earned"] or 0),
+    }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
 @rate_limit(10, 60)
@@ -1155,9 +1318,7 @@ async def handle_create_ton_deposit(request):
 
         async with get_pool().acquire() as conn:
             async with conn.transaction():
-                await conn.execute(
-                    "INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
-                    user_id, username)
+                await ensure_user(conn, user_id, username)
                 existing = await conn.fetchrow("""
                     SELECT id, amount_nano, amount_ton, credit_stars, expires_at
                     FROM ton_deposits
@@ -1249,9 +1410,7 @@ async def handle_create_star_invoice(request):
         payload = f"dnx-stars:{payment_id}"
         async with get_pool().acquire() as conn:
             async with conn.transaction():
-                await conn.execute(
-                    "INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username",
-                    user["id"], user["username"])
+                await ensure_user(conn, user["id"], user["username"])
                 await conn.execute("""
                     UPDATE star_payments SET status = 'expired'
                     WHERE user_id = $1 AND status = 'pending' AND expires_at < NOW()
@@ -1338,11 +1497,13 @@ async def reconcile_star_payment(payment_id: uuid.UUID, user_id: str) -> bool:
                 RETURNING user_id, stars
             """, matched_transaction.id, payment_id, user_id)
             if updated:
-                result = await conn.execute(
-                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
-                    updated["stars"], updated["user_id"])
-                if result != "UPDATE 1":
-                    raise RuntimeError("Stars reconciliation user does not exist")
+                await credit_main_deposit(
+                    conn,
+                    updated["user_id"],
+                    updated["stars"],
+                    "stars",
+                    str(payment_id),
+                )
                 credited = True
     if credited:
         try:
@@ -1390,11 +1551,13 @@ async def reconcile_recent_star_transactions(limit: int = 100) -> int:
                 """, transaction.id, row["id"])
                 if not updated:
                     continue
-                result = await conn.execute(
-                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
-                    updated["stars"], updated["user_id"])
-                if result != "UPDATE 1":
-                    raise RuntimeError("Stars recovery user does not exist")
+                await credit_main_deposit(
+                    conn,
+                    updated["user_id"],
+                    updated["stars"],
+                    "stars",
+                    str(row["id"]),
+                )
                 credited_count += 1
                 just_credited = True
         if just_credited:
@@ -1592,6 +1755,7 @@ async def handle_buy(request):
             return web.json_response({"success": False, "error": "invalid_items"}, status=400)
         async with get_pool().acquire() as conn:
             async with conn.transaction():
+                await ensure_user(conn, user_id, user['username'])
                 items = await conn.fetch(
                     "SELECT id, price FROM items WHERE id = ANY($1::int[]) AND status = 'Доступен' FOR UPDATE",
                     item_ids)
@@ -1611,10 +1775,17 @@ async def handle_buy(request):
                 await conn.execute(
                     "UPDATE items SET status = 'Продан', buyer_id = $1, last_event = 'approved' WHERE id = ANY($2::int[])",
                     user_id, item_ids)
-        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        return web.json_response(
+            {"success": True, "balance": float(new_balance)},
+            headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
+        )
     except Exception as e:
-        logging.error(f"Buy error: {e}")
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        logging.exception("Buy transaction failed: %s", e)
+        return web.json_response(
+            {"success": False, "error": "purchase_failed"},
+            status=500,
+            headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
+        )
 
 @require_auth
 @rate_limit(10, 60)
@@ -1687,6 +1858,9 @@ async def handle_game_bet(request):
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
+        balance_type = str(data.get("balanceType") or "main")
+        if balance_type not in {"main", "bonus"}:
+            return web.json_response({"success": False, "error": "invalid_balance_type"}, status=400)
         parsed_amount = parse_positive_amount(data.get('amount'), minimum=STAR_MIN_BET)
         if parsed_amount is None:
             return web.json_response({"success": False, "error": "min_bet"},
@@ -1702,8 +1876,14 @@ async def handle_game_bet(request):
             if len(game_state["players"]) >= 20 and user_id not in game_state["players"]:
                 return web.json_response({"success": False, "error": "room_full"},
                                          headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+            if (
+                user_id in game_state["players"]
+                and game_state["players"][user_id].get("balance_type", "main") != balance_type
+            ):
+                return web.json_response({"success": False, "error": "balance_type_locked"}, status=409)
+            balance_column = "bonus_balance" if balance_type == "bonus" else "balance"
             new_balance = await get_pool().fetchval(
-                "UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance",
+                f"UPDATE users SET {balance_column} = {balance_column} - $1 WHERE id = $2 AND {balance_column} >= $1 RETURNING {balance_column}",
                 parsed_amount, user_id)
             if new_balance is None:
                 return web.json_response({"success": False, "error": "insufficient_funds"},
@@ -1718,6 +1898,7 @@ async def handle_game_bet(request):
                 game_state["players"][user_id] = {
                     "id": user_id, "username": username,
                     "amount": amount, "color": color,
+                    "balance_type": balance_type,
                     "bets_count": 1,
                     "photo_url": photo_url
                 }
@@ -1750,8 +1931,13 @@ async def handle_game_cancel(request):
         async with game_lock:
             if len(game_state["players"]) == 1 and user_id in game_state["players"]:
                 refund = game_state["players"][user_id]["amount"]
+                balance_column = (
+                    "bonus_balance"
+                    if game_state["players"][user_id].get("balance_type") == "bonus"
+                    else "balance"
+                )
                 await get_pool().execute(
-                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
+                    f"UPDATE users SET {balance_column} = {balance_column} + $1 WHERE id = $2",
                     Decimal(str(refund)), user_id)
                 game_state["players"] = {}
                 game_state["pool"] = 0.0
@@ -1793,13 +1979,27 @@ async def handle_leaderboard(request):
     user_id = request['telegram_user']['id']
     try:
         async with get_pool().acquire() as conn:
-            top_rows = await conn.fetch("SELECT username, wins FROM leaderboard ORDER BY wins DESC LIMIT 5")
-            user_row = await conn.fetchrow("SELECT username, wins FROM leaderboard WHERE user_id = $1", user_id)
+            top_rows = await conn.fetch("SELECT user_id, username, wins FROM leaderboard ORDER BY wins DESC, username LIMIT 3")
+            user_row = await conn.fetchrow("""
+                SELECT username, wins, rank FROM (
+                    SELECT user_id, username, wins,
+                           ROW_NUMBER() OVER (ORDER BY wins DESC, username) AS rank
+                    FROM leaderboard
+                ) ranked WHERE user_id = $1
+            """, user_id)
         result = {"top": [], "user": None}
         for r in top_rows:
-            result["top"].append({"username": r["username"], "wins": r["wins"]})
+            result["top"].append({
+                "username": r["username"],
+                "wins": r["wins"],
+                "isYou": r["user_id"] == user_id,
+            })
         if user_row:
-            result["user"] = {"username": user_row["username"], "wins": user_row["wins"]}
+            result["user"] = {
+                "username": user_row["username"],
+                "wins": user_row["wins"],
+                "rank": int(user_row["rank"]),
+            }
         return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Leaderboard error: {e}")
@@ -1841,7 +2041,8 @@ async def handle_get_cases(request):
             "id": case_data["id"],
             "name": case_data["name"],
             "price": case_data["price"],
-            "image_url": case_data["image_url"]
+            "image_url": case_data["image_url"],
+            "bonus_enabled": case_allows_bonus(case_data),
         })
     return web.json_response(cases_list, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -1868,6 +2069,7 @@ async def handle_get_case_details(request):
         "name": case["name"],
         "price": case["price"],
         "image_url": case["image_url"],
+        "bonus_enabled": case_allows_bonus(case),
         "drops": [
             {key: value for key, value in drop.items() if key != "real_chance"}
             for drop in case["drops"]
@@ -1882,6 +2084,9 @@ async def handle_open_case(request):
     try:
         data = await request.json()
         user_id = request['telegram_user']['id']
+        balance_type = str(data.get("balanceType") or "main")
+        if balance_type not in {"main", "bonus"}:
+            return web.json_response({"success": False, "error": "invalid_balance_type"}, status=400)
         try:
             case_id = int(data.get('caseId'))
         except (TypeError, ValueError):
@@ -1890,6 +2095,8 @@ async def handle_open_case(request):
         if not case:
             return web.json_response({"success": False, "error": "case_not_found"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        if balance_type == "bonus" and not case_allows_bonus(case):
+            return web.json_response({"success": False, "error": "bonus_not_allowed"}, status=409)
 
         drops = case.get('drops')
         if not isinstance(drops, list) or not drops:
@@ -1901,12 +2108,13 @@ async def handle_open_case(request):
             return web.json_response({"success": False, "error": "invalid_case_config"}, status=500)
         async with get_pool().acquire() as conn:
             async with conn.transaction():
+                balance_column = "bonus_balance" if balance_type == "bonus" else "balance"
                 new_balance = await conn.fetchval("""
                     UPDATE users
-                    SET balance = balance - $1
-                    WHERE id = $2 AND balance >= $1
-                    RETURNING balance
-                """, case_price, user_id)
+                    SET {column} = {column} - $1
+                    WHERE id = $2 AND {column} >= $1
+                    RETURNING {column}
+                """.format(column=balance_column), case_price, user_id)
                 if new_balance is None:
                     return web.json_response({"success": False, "error": "insufficient_funds"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -2087,11 +2295,13 @@ async def process_successful_star_payment(message: types.Message):
                 """, payment.telegram_payment_charge_id, row["id"])
                 if not updated:
                     return
-                result = await conn.execute(
-                    "UPDATE users SET balance = balance + $1 WHERE id = $2",
-                    updated["stars"], updated["user_id"])
-                if result != "UPDATE 1":
-                    raise RuntimeError("Stars payment user does not exist")
+                await credit_main_deposit(
+                    conn,
+                    updated["user_id"],
+                    updated["stars"],
+                    "stars",
+                    str(row["id"]),
+                )
                 credited = True
         if credited:
             await message.answer(
@@ -2172,6 +2382,19 @@ async def cmd_stars_reconcile(message: types.Message):
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    start_arg = ""
+    if message.text:
+        parts = message.text.split(maxsplit=1)
+        start_arg = parts[1].strip() if len(parts) == 2 else ""
+    referral_code = start_arg[4:] if re.fullmatch(r"ref_[A-Za-z0-9]{25}", start_arg) else None
+    if message.from_user:
+        username = message.from_user.username or message.from_user.first_name or "Unknown"
+        try:
+            async with get_pool().acquire() as conn:
+                async with conn.transaction():
+                    await ensure_user(conn, str(message.from_user.id), username, referral_code)
+        except Exception as exc:
+            logging.error("Could not create user from /start: %s", exc)
     kb = InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]])
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
@@ -2204,7 +2427,7 @@ app.router.add_post('/sell-drop', handle_sell_drop)
 app.router.add_options('/{tail:.*}', handle_options)
 
 async def main():
-    global db_pool, ton_http_session
+    global db_pool, ton_http_session, BOT_USERNAME
     runner = None
     game_task = None
     ton_task = None
@@ -2213,6 +2436,9 @@ async def main():
         db_pool = await create_db_pool()
         ton_http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
         await init_db()
+        if not BOT_USERNAME:
+            me = await bot.get_me()
+            BOT_USERNAME = me.username or ""
         try:
             await asyncio.wait_for(warm_nft_media_cache(), timeout=6)
         except asyncio.TimeoutError:
