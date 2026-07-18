@@ -50,6 +50,7 @@ REFERRAL_RATE = Decimal("0.05")
 REFERRAL_CODE_LENGTH = 25
 REFERRAL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 BOT_USERNAME = os.getenv("BOT_USERNAME", "").strip().lstrip("@")
+WITHDRAW_WINDOW_SECONDS = 2 * 60 * 60
 
 if TON_STAR_RATE <= 0:
     raise RuntimeError("TON_STAR_RATE must be positive")
@@ -345,6 +346,37 @@ async def init_db():
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS traits JSONB DEFAULT '[]'::jsonb")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS acquisition_source VARCHAR(20) DEFAULT 'catalog'")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS withdraw_requested_at TIMESTAMPTZ")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS withdraw_expires_at TIMESTAMPTZ")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS disposed_at TIMESTAMPTZ")
+                await conn.execute("UPDATE items SET acquisition_source = 'catalog' WHERE acquisition_source IS NULL")
+                await conn.execute("""
+                    UPDATE items SET acquisition_source = 'case'
+                    WHERE last_event IN ('case_drop', 'case_drop_sold')
+                """)
+                await conn.execute("ALTER TABLE items ALTER COLUMN acquisition_source SET NOT NULL")
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS purchase_records (
+                        id UUID PRIMARY KEY,
+                        user_id VARCHAR(255) NOT NULL,
+                        item_ids INTEGER[] NOT NULL,
+                        total_price NUMERIC(20, 2) NOT NULL,
+                        status VARCHAR(32) NOT NULL DEFAULT 'completed',
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """)
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS item_events (
+                        id BIGSERIAL PRIMARY KEY,
+                        item_id INTEGER NOT NULL,
+                        user_id VARCHAR(255),
+                        event_type VARCHAR(50) NOT NULL,
+                        amount NUMERIC(20, 2),
+                        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """)
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -446,6 +478,10 @@ async def init_db():
                 """)
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_items_status ON items(status)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_items_buyer_status ON items(buyer_id, status)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_items_withdraw_expiry ON items(status, withdraw_expires_at)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_item_events_item ON item_events(item_id, created_at DESC)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_item_events_user ON item_events(user_id, created_at DESC)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_purchase_records_user ON purchase_records(user_id, created_at DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_game_history_number ON game_history(game_number DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_ton_deposits_pending ON ton_deposits(status, expires_at)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_star_payments_user_status ON star_payments(user_id, status, expires_at)")
@@ -1723,13 +1759,36 @@ async def handle_get_inventory(request):
     user = request['telegram_user']
     user_id = user['id']
     try:
-        rows = await get_pool().fetch(
-            "SELECT id, name, image_url, nft_link, model, status, traits, number FROM items WHERE buyer_id = $1 AND status IN ('Продан','withdrawn','Выведен','pending_withdraw')",
-            user_id)
+        async with get_pool().acquire() as conn:
+            await conn.execute(
+                """UPDATE items
+                   SET status = 'Продан', last_event = 'withdraw_expired'
+                   WHERE buyer_id = $1 AND status = 'pending_withdraw'
+                     AND withdraw_expires_at IS NOT NULL AND withdraw_expires_at <= NOW()""",
+                user_id,
+            )
+            rows = await conn.fetch(
+                """SELECT id, name, price, image_url, nft_link, model, status, traits, number,
+                          acquisition_source, last_event, withdraw_requested_at, withdraw_expires_at,
+                          disposed_at,
+                          GREATEST(0, EXTRACT(EPOCH FROM (withdraw_expires_at - NOW())))::BIGINT
+                              AS withdraw_remaining_seconds
+                   FROM items
+                   WHERE buyer_id = $1
+                     AND status IN ('Продан','withdrawn','Выведен','pending_withdraw','disposed')
+                   ORDER BY id DESC""",
+                user_id,
+            )
         items = normalize_records(rows)
         for item in items:
             if item['status'] in ('Выведен', 'withdrawn'):
                 item['status'] = 'withdrawn'
+            item['can_sell'] = (
+                item.get('acquisition_source') == 'case'
+                and item.get('status') == 'Продан'
+            )
+            item['sell_value'] = item.get('price', 0)
+            item['withdraw_remaining_seconds'] = int(item.get('withdraw_remaining_seconds') or 0)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get inventory error: {e}")
@@ -1739,8 +1798,14 @@ async def handle_get_inventory(request):
 @require_auth
 @rate_limit(30, 60)
 async def handle_buy(request):
+    purchase_id = uuid.uuid4()
     try:
         data = await request.json()
+        try:
+            if data.get("requestId"):
+                purchase_id = uuid.UUID(str(data["requestId"]))
+        except (ValueError, TypeError, AttributeError):
+            return web.json_response({"success": False, "error": "invalid_request_id"}, status=400)
         user = request['telegram_user']
         user_id = user['id']
         raw_item_ids = data.get('items', [])
@@ -1756,33 +1821,85 @@ async def handle_buy(request):
         async with get_pool().acquire() as conn:
             async with conn.transaction():
                 await ensure_user(conn, user_id, user['username'])
+                locked_user = await conn.fetchrow(
+                    "SELECT COALESCE(balance, 0) AS balance FROM users WHERE id = $1 FOR UPDATE",
+                    user_id,
+                )
+                if not locked_user:
+                    raise RuntimeError("purchase user was not created")
+                # Блокировка пользователя сериализует два одновременных запроса
+                # с одним requestId. После ожидания второй запрос увидит запись
+                # первого и безопасно вернёт уже завершённый результат.
+                completed_purchase = await conn.fetchrow(
+                    "SELECT total_price FROM purchase_records WHERE id = $1 AND user_id = $2",
+                    purchase_id,
+                    user_id,
+                )
+                if completed_purchase:
+                    return web.json_response({
+                        "success": True,
+                        "balance": float(locked_user['balance'] or 0),
+                        "purchaseId": str(purchase_id),
+                        "replayed": True,
+                    }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
                 items = await conn.fetch(
                     "SELECT id, price FROM items WHERE id = ANY($1::int[]) AND status = 'Доступен' FOR UPDATE",
                     item_ids)
                 if len(items) != len(item_ids):
                     return web.json_response({"success": False, "error": "items_unavailable"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                if any(item['price'] != item['price'].to_integral_value() or item['price'] <= 0 for item in items):
+                prices = [Decimal(str(item['price'])) for item in items]
+                if any(not price.is_finite() or price != price.to_integral_value() or price <= 0 for price in prices):
                     logging.error("Catalog contains a non-integer or non-positive Stars price")
                     return web.json_response({"success": False, "error": "invalid_item_price"}, status=500)
-                total_price = sum(i['price'] for i in items)
-                new_balance = await conn.fetchval(
-                    "UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance",
-                    total_price, user_id)
-                if new_balance is None:
+                total_price = sum(prices, Decimal("0"))
+                current_balance = Decimal(str(locked_user['balance']))
+                if current_balance < total_price:
                     return web.json_response({"success": False, "error": "insufficient_funds"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                await conn.execute(
-                    "UPDATE items SET status = 'Продан', buyer_id = $1, last_event = 'approved' WHERE id = ANY($2::int[])",
+                updated_items = await conn.fetch(
+                    """UPDATE items
+                       SET status = 'Продан', buyer_id = $1,
+                           acquisition_source = 'catalog', last_event = 'catalog_purchase'
+                       WHERE id = ANY($2::int[]) AND status = 'Доступен'
+                       RETURNING id""",
                     user_id, item_ids)
+                if len(updated_items) != len(item_ids):
+                    raise RuntimeError("catalog item state changed during purchase")
+                new_balance = await conn.fetchval(
+                    "UPDATE users SET balance = balance - $1 WHERE id = $2 RETURNING balance",
+                    total_price,
+                    user_id,
+                )
+                await conn.execute(
+                    """INSERT INTO purchase_records (id, user_id, item_ids, total_price)
+                       VALUES ($1, $2, $3::int[], $4)""",
+                    purchase_id,
+                    user_id,
+                    item_ids,
+                    total_price,
+                )
+                await conn.executemany(
+                    """INSERT INTO item_events (item_id, user_id, event_type, amount, metadata)
+                       VALUES ($1, $2, 'catalog_purchase', $3, $4::jsonb)""",
+                    [
+                        (
+                            int(item['id']),
+                            user_id,
+                            Decimal(str(item['price'])),
+                            json.dumps({"purchase_id": str(purchase_id)}),
+                        )
+                        for item in items
+                    ],
+                )
         return web.json_response(
-            {"success": True, "balance": float(new_balance)},
+            {"success": True, "balance": float(new_balance), "purchaseId": str(purchase_id)},
             headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
         )
     except Exception as e:
-        logging.exception("Buy transaction failed: %s", e)
+        logging.exception("Buy transaction %s failed: %s", purchase_id, e)
         return web.json_response(
-            {"success": False, "error": "purchase_failed"},
+            {"success": False, "error": "purchase_failed", "requestId": str(purchase_id)},
             status=500,
             headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
         )
@@ -1802,13 +1919,34 @@ async def handle_request_withdraw(request):
         async with get_pool().acquire() as conn:
             async with conn.transaction():
                 item = await conn.fetchrow(
-                    """UPDATE items SET status = 'pending_withdraw', last_event = 'withdraw_requested'
+                    """UPDATE items
+                       SET status = 'pending_withdraw', last_event = 'withdraw_requested',
+                           withdraw_requested_at = NOW(),
+                           withdraw_expires_at = NOW() + make_interval(secs => $3::int)
                        WHERE id = $1 AND buyer_id = $2 AND status = 'Продан'
-                       RETURNING id, name, nft_link""",
-                    item_id, user_id)
+                         AND (withdraw_expires_at IS NULL OR withdraw_expires_at <= NOW())
+                       RETURNING id, name, nft_link, withdraw_expires_at""",
+                    item_id, user_id, WITHDRAW_WINDOW_SECONDS)
                 if not item:
-                    return web.json_response({"success": False, "error": "not_found"},
+                    remaining = await conn.fetchval(
+                        """SELECT GREATEST(0, EXTRACT(EPOCH FROM (withdraw_expires_at - NOW())))::BIGINT
+                           FROM items WHERE id = $1 AND buyer_id = $2""",
+                        item_id,
+                        user_id,
+                    )
+                    return web.json_response({
+                        "success": False,
+                        "error": "withdraw_locked" if remaining else "not_found",
+                        "remainingSeconds": int(remaining or 0),
+                    },
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+                await conn.execute(
+                    """INSERT INTO item_events (item_id, user_id, event_type, metadata)
+                       VALUES ($1, $2, 'withdraw_requested', $3::jsonb)""",
+                    item_id,
+                    user_id,
+                    json.dumps({"expires_at": item['withdraw_expires_at'].isoformat()}),
+                )
         admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"with_no_{user_id}_{item_id}"),
             InlineKeyboardButton(text="✅ Вывести", callback_data=f"with_yes_{user_id}_{item_id}")
@@ -1820,15 +1958,22 @@ async def handle_request_withdraw(request):
                 reply_markup=admin_kb,
                 disable_web_page_preview=True,
             )
-        except Exception:
+        except Exception as notify_error:
+            logging.exception("Withdraw notification failed for item %s: %s", item_id, notify_error)
             await get_pool().execute(
-                """UPDATE items SET status = 'Продан', last_event = 'withdraw_notification_failed'
+                """UPDATE items SET last_event = 'withdraw_notification_failed'
                    WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'""",
-                item_id, user_id)
-            raise
-        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+                item_id,
+                user_id,
+            )
+        return web.json_response({
+            "success": True,
+            "remainingSeconds": WITHDRAW_WINDOW_SECONDS,
+            "expiresAt": item['withdraw_expires_at'].isoformat(),
+        }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        logging.exception("Withdraw request failed: %s", e)
+        return web.json_response({"success": False, "error": "withdraw_failed"}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
 async def handle_game_state(request):
@@ -1960,14 +2105,15 @@ async def handle_game_finish(request):
 async def handle_game_history(request):
     try:
         rows = await get_pool().fetch(
-            "SELECT game_number, winner_name, win_amount, win_percent FROM game_history ORDER BY game_number DESC LIMIT 100")
+            "SELECT game_number, winner_name, win_amount, win_percent, created_at FROM game_history ORDER BY game_number DESC LIMIT 100")
         result = []
         for row in rows:
             result.append({
                 "game_number": row["game_number"],
                 "winner_name": row["winner_name"],
                 "win_amount": float(row["win_amount"]),
-                "win_percent": float(row.get("win_percent", 0))
+                "win_percent": float(row.get("win_percent", 0)),
+                "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
             })
         return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
@@ -2108,6 +2254,7 @@ async def handle_open_case(request):
             return web.json_response({"success": False, "error": "invalid_case_config"}, status=500)
         async with get_pool().acquire() as conn:
             async with conn.transaction():
+                await ensure_user(conn, user_id, request['telegram_user']['username'])
                 balance_column = "bonus_balance" if balance_type == "bonus" else "balance"
                 new_balance = await conn.fetchval("""
                     UPDATE users
@@ -2140,10 +2287,25 @@ async def handle_open_case(request):
                     raise ValueError("invalid drop value in CASES_JSON")
 
                 new_item_id = await conn.fetchval("""
-                    INSERT INTO items (name, price, status, image_url, model, buyer_id, last_event)
-                    VALUES ($1, $2, 'Продан', $3, $4, $5, 'case_drop') RETURNING id
+                    INSERT INTO items (
+                        name, price, status, image_url, model, buyer_id, nft_link, traits, number,
+                        acquisition_source, last_event
+                    )
+                    VALUES ($1, $2, 'Продан', $3, $4, $5, $6, $7::jsonb, $8, 'case', 'case_drop') RETURNING id
                 """, str(won_drop['name'])[:255], drop_value,
-                      safe_https_url(won_drop.get('image_url')), str(won_drop.get('model', ''))[:255], user_id)
+                      safe_https_url(won_drop.get('image_url')), str(won_drop.get('model', ''))[:255], user_id,
+                      canonical_telegram_nft_url(won_drop.get('nft_link')),
+                      json.dumps(won_drop.get('traits') if isinstance(won_drop.get('traits'), list) else []),
+                      str(won_drop.get('number') or '')[:20])
+
+                await conn.execute(
+                    """INSERT INTO item_events (item_id, user_id, event_type, amount, metadata)
+                       VALUES ($1, $2, 'case_drop', $3, $4::jsonb)""",
+                    new_item_id,
+                    user_id,
+                    drop_value,
+                    json.dumps({"case_id": case_id, "balance_type": balance_type}),
+                )
 
                 won_item_dict = dict(won_drop)
                 won_item_dict.pop('real_chance', None)
@@ -2160,7 +2322,7 @@ async def handle_open_case(request):
 @require_auth
 @rate_limit(30, 60)
 async def handle_sell_drop(request):
-    """Продажа предмета (работает с таблицей items)"""
+    """Продажа кейсового предмета с сохранением строки и аудита."""
     try:
         data = await request.json()
         user_id = request['telegram_user']['id']
@@ -2172,15 +2334,25 @@ async def handle_sell_drop(request):
         async with get_pool().acquire() as conn:
             async with conn.transaction():
                 item = await conn.fetchrow(
-                    """DELETE FROM items
-                       WHERE id = $1 AND buyer_id = $2 AND status = 'Продан' AND last_event = 'case_drop'
+                    """UPDATE items
+                       SET status = 'disposed', last_event = 'case_drop_sold', disposed_at = NOW()
+                       WHERE id = $1 AND buyer_id = $2 AND status = 'Продан'
+                         AND acquisition_source = 'case'
+                         AND (withdraw_expires_at IS NULL OR withdraw_expires_at <= NOW())
                        RETURNING id, price""",
                     item_id, user_id)
                 if not item:
                     return web.json_response({"success": False, "error": "item_not_found"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
                 await conn.execute("UPDATE users SET balance = balance + $1 WHERE id = $2", item['price'], user_id)
-        return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+                await conn.execute(
+                    """INSERT INTO item_events (item_id, user_id, event_type, amount)
+                       VALUES ($1, $2, 'case_drop_sold', $3)""",
+                    item_id,
+                    user_id,
+                    item['price'],
+                )
+        return web.json_response({"success": True, "credited": float(item['price'])}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Sell drop error: {e}")
         return web.json_response({"success": False, "error": "server_error"}, status=500,
@@ -2203,11 +2375,25 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
     _, _, uid, item_id = parts
     result = await get_pool().execute(
         """UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved'
-           WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'""",
+           WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
+             AND withdraw_expires_at > NOW()""",
         int(item_id), uid)
     if result != "UPDATE 1":
-        await callback.answer("Запрос уже обработан", show_alert=True)
+        await get_pool().execute(
+            """UPDATE items SET status = 'Продан', last_event = 'withdraw_expired'
+               WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
+                 AND withdraw_expires_at <= NOW()""",
+            int(item_id),
+            uid,
+        )
+        await callback.answer("Запрос уже обработан или двухчасовое окно истекло", show_alert=True)
         return
+    await get_pool().execute(
+        """INSERT INTO item_events (item_id, user_id, event_type)
+           VALUES ($1, $2, 'withdraw_approved')""",
+        int(item_id),
+        uid,
+    )
     await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
     try:
         await bot.send_message(int(uid), f"🎉 NFT (ID: {item_id}) выведен!")
@@ -2227,6 +2413,12 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
     if result != "UPDATE 1":
         await callback.answer("Запрос уже обработан", show_alert=True)
         return
+    await get_pool().execute(
+        """INSERT INTO item_events (item_id, user_id, event_type)
+           VALUES ($1, $2, 'withdraw_rejected')""",
+        int(item_id),
+        uid,
+    )
     await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
     try:
         await bot.send_message(int(uid), f"❌ Вывод NFT (ID: {item_id}) отклонён.")
