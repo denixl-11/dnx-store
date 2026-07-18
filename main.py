@@ -16,7 +16,7 @@ from decimal import Decimal, InvalidOperation, ROUND_CEILING
 from functools import wraps
 from html.parser import HTMLParser
 from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
-from datetime import timezone
+from datetime import date, datetime, timezone
 
 import asyncpg
 import aiohttp
@@ -637,6 +637,8 @@ def normalize_records(rows) -> list[dict]:
         for key, value in list(item.items()):
             if isinstance(value, Decimal):
                 item[key] = float(value)
+            elif isinstance(value, (datetime, date)):
+                item[key] = value.isoformat()
         if isinstance(item.get("traits"), str):
             try:
                 item["traits"] = json.loads(item["traits"])

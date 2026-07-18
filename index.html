@@ -2199,6 +2199,45 @@
             .history-modal-row { grid-template-columns: 39px minmax(0,1fr) auto; padding-inline: 8px; }
             .history-result { min-width: 82px; }
         }
+
+        /* ===== V8.1: currency glyphs match their adjacent digits ===== */
+        .star-amount > .telegram-star,
+        .star-amount > .main-star,
+        .star-amount > .bonus-star {
+            width: 1em !important;
+            height: 1em !important;
+            margin: 0 !important;
+            align-self: center;
+            font-size: 1em !important;
+            vertical-align: 0;
+        }
+        .star-amount > .bonus-star {
+            background-size: 220% 220% !important;
+        }
+        .balance-card-v7:not(.bonus) > .star-amount {
+            font-size: clamp(1.5rem, 7.1vw, 2.25rem);
+            line-height: 1;
+        }
+        .balance-card-v7.bonus > .star-amount {
+            font-size: clamp(1rem, 4.5vw, 1.38rem);
+            line-height: 1;
+        }
+        .balance-card-v7 > .star-amount > strong {
+            font-size: 1em !important;
+            line-height: 1;
+        }
+        .topup-btn > .star-amount {
+            font-size: .86rem !important;
+        }
+        .referral-stat b.star-amount > span:first-child {
+            font-size: 1em !important;
+        }
+        .inventory-card-actions.is-processing button,
+        #nft-modal-actions.inventory-actions.is-processing button {
+            pointer-events: none;
+            opacity: .48;
+            filter: grayscale(.45);
+        }
     </style>
 </head>
 <body>
@@ -2612,7 +2651,9 @@
             osc.stop(audioCtx.currentTime + 0.03);
         }
 
-        const API_BASE = 'https://dnx-shop.onrender.com';
+        const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
+            ? location.origin
+            : 'https://dnx-shop.onrender.com';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -2692,6 +2733,7 @@
         let currentCollectionFilter = '';
         let catalogCollectionNames = [];
         let inventoryData = [];
+        const inventoryActionsInFlight = new Set();
         let pendingTopupStars = 0;
         let pendingBuyItem = null;
         let currentCase = null;
@@ -3744,7 +3786,7 @@
                         const remaining = Math.max(0, Number(i.withdraw_remaining_seconds || 0));
                         const withdrawDisabled = remaining > 0 || i.status === 'pending_withdraw';
                         return `
-                        <div class="item-card">
+                        <div class="item-card" data-inventory-item-id="${Number(i.id)}">
                             ${auxiliaryNftMediaMarkup(i, 'inventory', !simpleNft)}
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <div class="inventory-card-actions">
@@ -3762,7 +3804,7 @@
                     : `<div class="empty-state"><div class="empty-state-icon">◇</div><h3>ИНВЕНТАРЬ ПУСТ</h3><p>Купленные и выигранные NFT появятся здесь.</p></div>`;
                 document.getElementById('inventory-history-container').innerHTML = withdrawn.length
                     ? withdrawn.map(i => `
-                        <div class="item-card" style="opacity:0.5">
+                        <div class="item-card" data-inventory-item-id="${Number(i.id)}" style="opacity:0.5">
                             <img src="${escapeHtml(safeImageUrl(i.image_url))}" class="item-image" style="filter:grayscale(100%)">
                             <div class="item-name">${escapeHtml(i.name)}</div>
                             <div class="inventory-status-pill">${i.status === 'disposed' ? 'ПРОДАНО' : 'ВЫВЕДЕНО'}</div>
@@ -3814,14 +3856,62 @@
                 withdrawCountdownTimer = setInterval(tick, 1000);
             }
         }
+        function setInventoryActionState(itemId, processing) {
+            const numericId = Number(itemId);
+            if (!Number.isInteger(numericId) || numericId <= 0) return;
+            document.querySelectorAll(`[data-inventory-item-id="${numericId}"] .inventory-card-actions`).forEach(actions => {
+                actions.classList.toggle('is-processing', processing);
+            });
+            if (String(currentNftItem?.id) === String(numericId)) {
+                document.getElementById('nft-modal-actions')?.classList.toggle('is-processing', processing);
+            }
+        }
+        function applyWithdrawCountdown(itemId, result) {
+            const numericId = Number(itemId);
+            const seconds = Math.max(1, Number(result?.remainingSeconds || 7200));
+            const parsedExpiry = Date.parse(String(result?.expiresAt || ''));
+            const expiresAt = Number.isFinite(parsedExpiry) ? parsedExpiry : Date.now() + seconds * 1000;
+            const inventoryItem = inventoryData.find(item => Number(item.id) === numericId);
+            if (inventoryItem) {
+                inventoryItem.status = 'pending_withdraw';
+                inventoryItem.withdraw_remaining_seconds = seconds;
+                inventoryItem.withdraw_expires_at = new Date(expiresAt).toISOString();
+            }
+            document.querySelectorAll(`[data-withdraw-item-id="${numericId}"]`).forEach(button => {
+                button.dataset.withdrawExpires = String(expiresAt);
+                button.disabled = true;
+                button.textContent = formatWithdrawCountdown(seconds);
+                const actions = button.closest('.inventory-card-actions, .inventory-actions');
+                const sellButton = actions?.querySelector('.inventory-sell-btn, #nft-modal-btn-sell');
+                if (sellButton) sellButton.disabled = true;
+            });
+            startWithdrawCountdowns();
+        }
+        function removeSoldInventoryItem(itemId) {
+            const numericId = Number(itemId);
+            const inventoryItem = inventoryData.find(item => Number(item.id) === numericId);
+            if (inventoryItem) {
+                inventoryItem.status = 'disposed';
+                inventoryItem.can_sell = false;
+            }
+            document.querySelectorAll(`[data-inventory-item-id="${numericId}"]`).forEach(card => card.remove());
+        }
         async function withdraw(id) {
+            const actionKey = String(id);
+            if (inventoryActionsInFlight.has(actionKey)) return;
+            inventoryActionsInFlight.add(actionKey);
+            setInventoryActionState(id, true);
             try {
-                await apiFetch(`${API_BASE}/request-withdraw`, { method: 'POST', body: JSON.stringify({itemId: id}) });
+                const result = await apiFetch(`${API_BASE}/request-withdraw`, { method: 'POST', body: JSON.stringify({itemId: id}) });
+                applyWithdrawCountdown(id, result);
                 showAlert("Запрос отправлен. У продавца есть 2 часа для вывода NFT.");
                 await loadInventory();
             } catch (error) {
                 showAlert(error.code === 'withdraw_locked' ? 'Запрос уже активен. Дождитесь окончания таймера.' : 'Не удалось отправить запрос на вывод. Попробуйте ещё раз.');
                 await loadInventory();
+            } finally {
+                inventoryActionsInFlight.delete(actionKey);
+                setInventoryActionState(id, false);
             }
         }
         function openCatalogResaleInfo() {
@@ -3836,16 +3926,24 @@
             await sellInventoryItem(item.id);
         }
         async function sellInventoryItem(itemId) {
+            const actionKey = String(itemId);
+            if (inventoryActionsInFlight.has(actionKey)) return;
+            inventoryActionsInFlight.add(actionKey);
+            setInventoryActionState(itemId, true);
             try {
                 const result = await apiFetch(`${API_BASE}/sell-drop`, {
                     method: 'POST', body: JSON.stringify({ itemId })
                 });
+                removeSoldInventoryItem(itemId);
                 closeNftModal(true);
                 showAlert(`NFT продан. На основной баланс зачислено ${formatStars(result.credited || 0)} звёзд.`);
-                await Promise.all([updateBalance(), loadInventory()]);
+                await Promise.allSettled([updateBalance(), loadInventory()]);
             } catch (error) {
                 showAlert(error.code === 'item_not_found' ? 'Этот NFT уже недоступен для продажи.' : 'Не удалось продать NFT. Повторите попытку.');
                 await loadInventory();
+            } finally {
+                inventoryActionsInFlight.delete(actionKey);
+                setInventoryActionState(itemId, false);
             }
         }
 
@@ -4543,7 +4641,7 @@
             if (winnerData.polygon && winnerData.polygon.length >= 3) {
                 highlightPolygon = winnerData.polygon;
                 drawGameFrame(null, highlightPolygon);
-                await new Promise(r => setTimeout(r, 1500));
+                await new Promise(r => setTimeout(r, 2000));
             }
             gState.status = 'waiting';
             gState.polygons = [];
