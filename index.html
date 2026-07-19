@@ -2312,7 +2312,8 @@
         .leaderboard-crown { width:42px; height:42px; flex:0 0 auto; filter:drop-shadow(0 0 8px rgba(210,78,255,.4)); }
         .leaderboard-crown path { fill:none; stroke:url(#leaderCrownGradient); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
         .leaderboard-title { font-size:clamp(1.08rem,3vw,1.48rem) !important; font-weight:900; }
-        .leaderboard-close { flex:0 0 auto; }
+        .leaderboard-close { flex:0 0 auto; display:grid; place-items:center; padding:0; }
+        .leaderboard-close svg { width:17px; height:17px; fill:none; stroke:#efccea; stroke-width:1.7; stroke-linecap:round; }
         .season-timer {
             min-height:52px;
             display:flex;
@@ -2325,21 +2326,27 @@
             font-size:clamp(.68rem,2vw,.86rem) !important;
             font-weight:750;
         }
-        .season-timer::before { content:"⌛"; color:#dd72ff; filter:drop-shadow(0 0 5px rgba(221,91,255,.65)); }
+        .season-timer::before { content:none !important; }
+        .season-timer-icon { width:18px; height:18px; flex:0 0 18px; filter:drop-shadow(0 0 5px rgba(221,91,255,.55)); }
+        .season-timer-icon path { fill:none; stroke:url(#seasonHourglassGradient); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+        .season-timer-text { display:block; min-width:0; text-align:center; }
         .leaderboard-list { gap:13px !important; }
         .leaderboard-row {
             min-height:84px !important;
             display:grid !important;
-            grid-template-columns:48px minmax(0,1fr) auto auto;
+            grid-template-columns:48px minmax(0,1fr) minmax(70px,auto) 54px;
             gap:12px !important;
             padding:11px 14px 11px 17px !important;
             border-radius:17px !important;
+            align-items:center !important;
         }
-        .leaderboard-rank { width:auto !important; color:#ff4f87 !important; font-size:.96rem !important; }
-        .leaderboard-name { font-size:clamp(.78rem,2.2vw,.96rem); }
-        .leaderboard-wins { margin:0 !important; font-size:.72rem !important; white-space:nowrap; }
-        .leaderboard-nft { width:53px !important; height:53px !important; }
-        .leaderboard-you { margin-left:8px; color:#ff73aa; font-size:.62rem; font-weight:900; letter-spacing:.04em; }
+        .leaderboard-rank { grid-column:1; width:auto !important; color:#ff4f87 !important; font-size:.96rem !important; font-weight:900; align-self:center; }
+        .leaderboard-name { grid-column:2; min-width:0; font-size:clamp(.78rem,2.2vw,.96rem); line-height:1.2; }
+        .leaderboard-wins { grid-column:3; justify-self:end; margin:0 !important; font-size:.72rem !important; white-space:nowrap; }
+        .leaderboard-nft { grid-column:4; justify-self:end; width:53px !important; height:53px !important; }
+        .leaderboard-you { margin-left:8px; color:#ff73aa; font-size:.62rem; font-weight:900; letter-spacing:.04em; white-space:nowrap; }
+        .leaderboard-row.user-summary-row .leaderboard-you { grid-column:4; justify-self:end; margin-left:0; }
+        .case-modal-content #case-back-btn { top:12px !important; left:10px !important; }
         @media (min-width: 700px) {
             .leaderboard-fullscreen { padding-inline:16px !important; }
             .leaderboard-row { min-height:84px !important; }
@@ -2347,8 +2354,12 @@
         }
         @media (max-width: 430px) {
             .leaderboard-fullscreen { padding-inline:calc(12px + var(--content-safe-left)) calc(12px + var(--content-safe-right)) !important; }
-            .leaderboard-row { grid-template-columns:38px minmax(0,1fr) auto auto; gap:7px !important; padding-inline:12px !important; }
+            .leaderboard-top { margin-bottom:18px !important; }
+            .leaderboard-heading { gap:9px; }
+            .leaderboard-crown { width:37px; height:37px; }
+            .leaderboard-row { grid-template-columns:38px minmax(0,1fr) minmax(49px,auto) 45px; gap:7px !important; padding-inline:12px !important; }
             .leaderboard-nft { width:45px !important; height:45px !important; }
+            .leaderboard-you { margin-left:5px; }
         }
 
         .account-restriction-modal { z-index: 10000 !important; background:rgba(2,1,7,.97) !important; }
@@ -2624,9 +2635,17 @@
                 </svg>
                 <h2 class="leaderboard-title">Лидеры сезона</h2>
             </div>
-            <button class="leaderboard-close" onclick="closeLeaderboardModal()">✕</button>
+            <button class="leaderboard-close" onclick="closeLeaderboardModal()" aria-label="Закрыть таблицу лидеров">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
         </div>
-        <div class="season-timer" id="season-timer-display">Загрузка...</div>
+        <div class="season-timer" id="season-timer-display">
+            <svg class="season-timer-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <defs><linearGradient id="seasonHourglassGradient" x1="5" y1="3" x2="19" y2="21"><stop stop-color="#ef88ff"/><stop offset="1" stop-color="#bc4cff"/></linearGradient></defs>
+                <path d="M7 3h10M7 21h10M8 4c0 4 1.7 5.3 4 7 2.3-1.7 4-3 4-7M8 20c0-4 1.7-5.3 4-7 2.3 1.7 4 3 4 7"/>
+            </svg>
+            <span class="season-timer-text" id="season-timer-text">Загрузка...</span>
+        </div>
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
     </div>
 
@@ -3668,7 +3687,7 @@
                 sellBtn.style.display = item.status === 'withdrawn' || item.status === 'disposed' ? 'none' : 'block';
                 sellBtn.disabled = remaining > 0 || item.status === 'pending_withdraw';
                 sellBtn.classList.toggle('catalog-locked', !item.can_sell);
-                sellBtn.textContent = item.can_sell ? `ПРОДАТЬ · ${formatStars(item.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ';
+                sellBtn.textContent = item.can_sell ? `ПРОДАТЬ ЗА ${formatStars(item.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ';
                 sellBtn.onclick = () => handleInventorySell(item);
                 startWithdrawCountdowns();
             }
@@ -4001,7 +4020,7 @@
                                         onclick="event.stopPropagation(); withdraw('${i.id}')">${remaining > 0 ? formatWithdrawCountdown(remaining) : 'ВЫВЕСТИ'}</button>
                                 <button class="inventory-sell-btn ${i.can_sell ? '' : 'catalog-locked'}" ${withdrawDisabled ? 'disabled' : ''}
                                         onclick="event.stopPropagation(); handleInventorySell(inventoryData.find(item => String(item.id) === '${String(i.id)}'))">
-                                    ${i.can_sell ? `ПРОДАТЬ · ${formatStars(i.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ'}
+                                    ${i.can_sell ? `ПРОДАТЬ ЗА ${formatStars(i.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ'}
                                 </button>
                             </div>
                         </div>`;
@@ -4289,7 +4308,7 @@
                     });
                 }
                 if (data.user && !data.top?.some(player => player.isYou)) {
-                    html += `<div class="leaderboard-row you-row">
+                    html += `<div class="leaderboard-row you-row user-summary-row">
                         <div class="leaderboard-rank">#${Number(data.user.rank || 0)}</div>
                         <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
                         <div class="leaderboard-wins">${data.user.wins} поб.</div>
@@ -4299,7 +4318,7 @@
                 listEl.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Нет данных</div>';
                 const season = await apiFetch(`${API_BASE}/season/state`);
                 if (season && season.end_time) startSeasonTimer(season.end_time);
-                else document.getElementById('season-timer-display').innerText = 'Сезон не задан';
+                else document.getElementById('season-timer-text').textContent = 'Сезон не задан';
             } catch(e) { document.getElementById('leaderboard-list').innerHTML = 'Ошибка загрузки'; }
         }
         function closeLeaderboardModal() {
@@ -4311,13 +4330,13 @@
             const update = () => {
                 const now = Date.now();
                 const diff = endTimeMs - now;
-                const displayEl = document.getElementById('season-timer-display');
-                if (diff <= 0) { displayEl.innerText = 'Сезон завершён'; clearInterval(seasonTimerInterval); seasonTimerInterval = null; return; }
+                const displayEl = document.getElementById('season-timer-text');
+                if (diff <= 0) { displayEl.textContent = 'Сезон завершён'; clearInterval(seasonTimerInterval); seasonTimerInterval = null; return; }
                 const days = Math.floor(diff / 86400000);
                 const hours = Math.floor((diff % 86400000) / 3600000);
                 const minutes = Math.floor((diff % 3600000) / 60000);
                 const seconds = Math.floor((diff % 60000) / 1000);
-                displayEl.innerText = `⏳ До конца сезона: ${days}д ${hours}ч ${minutes}м ${seconds}с`;
+                displayEl.textContent = `До конца сезона: ${days}д ${hours}ч ${minutes}м ${seconds}с`;
             };
             update();
             seasonTimerInterval = setInterval(update, 1000);
