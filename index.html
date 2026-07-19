@@ -2308,16 +2308,18 @@
             border-radius: 18px !important;
             background: linear-gradient(105deg,rgba(22,8,37,.94),rgba(10,4,18,.98) 58%,rgba(38,8,30,.75)) !important;
         }
-        .leaderboard-heading { display:flex; align-items:center; gap:12px; min-width:0; }
-        .leaderboard-crown { width:42px; height:42px; flex:0 0 auto; filter:drop-shadow(0 0 8px rgba(210,78,255,.4)); }
-        .leaderboard-crown path { fill:none; stroke:url(#leaderCrownGradient); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
-        .leaderboard-title { font-size:clamp(1.08rem,3vw,1.48rem) !important; font-weight:900; }
+        .leaderboard-heading { display:flex; align-items:flex-end; gap:12px; min-width:0; }
+        .leaderboard-crown { width:42px; height:42px; flex:0 0 auto; overflow:visible; transform:none; filter:drop-shadow(0 0 9px rgba(210,78,255,.42)); }
+        .leaderboard-crown .crown-fill { fill:url(#leaderCrownGradient); stroke:none; opacity:.12; }
+        .leaderboard-crown .crown-stroke { fill:none; stroke:url(#leaderCrownGradient); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+        .leaderboard-crown .crown-gem { fill:#f3a5ff; stroke:#9d48ff; stroke-width:1; }
+        .leaderboard-title { font-size:clamp(1.08rem,3vw,1.48rem) !important; font-weight:900; line-height:1.08; padding-bottom:2px; }
         .leaderboard-close { flex:0 0 auto; display:grid; place-items:center; padding:0; }
         .leaderboard-close svg { width:17px; height:17px; fill:none; stroke:#efccea; stroke-width:1.7; stroke-linecap:round; }
         .season-timer {
             min-height:52px;
             display:flex;
-            align-items:center;
+            align-items:flex-end;
             justify-content:center;
             gap:9px;
             margin:0 0 18px !important;
@@ -2327,9 +2329,10 @@
             font-weight:750;
         }
         .season-timer::before { content:none !important; }
-        .season-timer-icon { width:18px; height:18px; flex:0 0 18px; filter:drop-shadow(0 0 5px rgba(221,91,255,.55)); }
-        .season-timer-icon path { fill:none; stroke:url(#seasonHourglassGradient); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-        .season-timer-text { display:block; min-width:0; text-align:center; }
+        .season-timer-icon { width:18px; height:18px; flex:0 0 18px; overflow:visible; transform:none; filter:drop-shadow(0 0 5px rgba(221,91,255,.55)); }
+        .season-timer-icon .hourglass-frame { fill:none; stroke:url(#seasonHourglassGradient); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+        .season-timer-icon .hourglass-sand { fill:url(#seasonSandGradient); stroke:none; }
+        .season-timer-text { display:block; min-width:0; text-align:center; line-height:18px; }
         .leaderboard-list { gap:13px !important; }
         .leaderboard-row {
             min-height:84px !important;
@@ -2341,11 +2344,12 @@
             align-items:center !important;
         }
         .leaderboard-rank { grid-column:1; width:auto !important; color:#ff4f87 !important; font-size:.96rem !important; font-weight:900; align-self:center; }
-        .leaderboard-name { grid-column:2; min-width:0; font-size:clamp(.78rem,2.2vw,.96rem); line-height:1.2; }
+        .leaderboard-person { grid-column:2; min-width:0; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:5px; }
+        .leaderboard-name { grid-column:auto; min-width:0; max-width:100%; font-size:clamp(.78rem,2.2vw,.96rem); line-height:1.15; }
         .leaderboard-wins { grid-column:3; justify-self:end; margin:0 !important; font-size:.72rem !important; white-space:nowrap; }
         .leaderboard-nft { grid-column:4; justify-self:end; width:53px !important; height:53px !important; }
-        .leaderboard-you { margin-left:8px; color:#ff73aa; font-size:.62rem; font-weight:900; letter-spacing:.04em; white-space:nowrap; }
-        .leaderboard-row.user-summary-row .leaderboard-you { grid-column:4; justify-self:end; margin-left:0; }
+        .leaderboard-you { display:inline-flex; align-items:center; justify-content:center; min-height:18px; margin:0; padding:2px 8px 1px; border:1px solid rgba(255,92,157,.5); border-radius:999px; color:#ffd5e7; background:linear-gradient(105deg,rgba(159,35,105,.46),rgba(92,29,127,.48)); box-shadow:0 0 11px rgba(255,65,137,.13),inset 0 1px rgba(255,255,255,.08); font-size:.52rem; line-height:1; font-weight:900; letter-spacing:.09em; white-space:nowrap; }
+        .leaderboard-row.user-summary-row .leaderboard-you { margin:0; }
         .case-modal-content #case-back-btn { top:12px !important; left:10px !important; }
         @media (min-width: 700px) {
             .leaderboard-fullscreen { padding-inline:16px !important; }
@@ -2359,7 +2363,7 @@
             .leaderboard-crown { width:37px; height:37px; }
             .leaderboard-row { grid-template-columns:38px minmax(0,1fr) minmax(49px,auto) 45px; gap:7px !important; padding-inline:12px !important; }
             .leaderboard-nft { width:45px !important; height:45px !important; }
-            .leaderboard-you { margin-left:5px; }
+            .leaderboard-you { margin-left:0; }
         }
 
         .account-restriction-modal { z-index: 10000 !important; background:rgba(2,1,7,.97) !important; }
@@ -2630,8 +2634,9 @@
             <div class="leaderboard-heading">
                 <svg class="leaderboard-crown" viewBox="0 0 48 48" aria-hidden="true">
                     <defs><linearGradient id="leaderCrownGradient" x1="4" y1="7" x2="43" y2="41"><stop stop-color="#ef80ff"/><stop offset=".5" stop-color="#c24dff"/><stop offset="1" stop-color="#ff7aa8"/></linearGradient></defs>
-                    <path d="M7 17.5 13.5 29h21L41 17.5 31 23l-7-13-7 13-10-5.5ZM14 34h20M16 39h16"/>
-                    <circle cx="7" cy="15" r="2.2"/><circle cx="24" cy="7" r="2.2"/><circle cx="41" cy="15" r="2.2"/>
+                    <path class="crown-fill" d="M7 17.5 13.5 29h21L41 17.5 31 23l-7-13-7 13-10-5.5Z"/>
+                    <path class="crown-stroke" d="M7 17.5 13.5 29h21L41 17.5 31 23l-7-13-7 13-10-5.5ZM14 34h20M16 39h16"/>
+                    <circle class="crown-gem" cx="7" cy="15" r="2.2"/><circle class="crown-gem" cx="24" cy="7" r="2.2"/><circle class="crown-gem" cx="41" cy="15" r="2.2"/>
                 </svg>
                 <h2 class="leaderboard-title">Лидеры сезона</h2>
             </div>
@@ -2641,8 +2646,12 @@
         </div>
         <div class="season-timer" id="season-timer-display">
             <svg class="season-timer-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <defs><linearGradient id="seasonHourglassGradient" x1="5" y1="3" x2="19" y2="21"><stop stop-color="#ef88ff"/><stop offset="1" stop-color="#bc4cff"/></linearGradient></defs>
-                <path d="M7 3h10M7 21h10M8 4c0 4 1.7 5.3 4 7 2.3-1.7 4-3 4-7M8 20c0-4 1.7-5.3 4-7 2.3 1.7 4 3 4 7"/>
+                <defs>
+                    <linearGradient id="seasonHourglassGradient" x1="5" y1="3" x2="19" y2="21"><stop stop-color="#f3a2ff"/><stop offset="1" stop-color="#b94bff"/></linearGradient>
+                    <linearGradient id="seasonSandGradient" x1="9" y1="7" x2="15" y2="18"><stop stop-color="#ffb2df"/><stop offset="1" stop-color="#c85cff"/></linearGradient>
+                </defs>
+                <path class="hourglass-frame" d="M7 3h10M7 21h10M8 4c0 4 1.7 5.3 4 7 2.3-1.7 4-3 4-7M8 20c0-4 1.7-5.3 4-7 2.3 1.7 4 3 4 7"/>
+                <path class="hourglass-sand" d="M9.5 7h5c-.45 1.25-1.28 2.07-2.5 3-1.22-.93-2.05-1.75-2.5-3Zm2.5 8.05c1.32.97 2.18 1.83 2.58 3.15H9.42c.4-1.32 1.26-2.18 2.58-3.15Z"/>
             </svg>
             <span class="season-timer-text" id="season-timer-text">Загрузка...</span>
         </div>
@@ -4301,7 +4310,10 @@
                         html += `
                             <div class="leaderboard-row rank-${idx + 1}${p.isYou ? ' you-row' : ''}">
                                 <div class="leaderboard-rank">#${idx+1}</div>
-                                <div class="leaderboard-name">${escapeHtml(p.username)}${p.isYou ? '<span class="leaderboard-you">ВЫ</span>' : ''}</div>
+                                <div class="leaderboard-person">
+                                    <div class="leaderboard-name">${escapeHtml(p.username)}</div>
+                                    ${p.isYou ? '<span class="leaderboard-you">ВЫ</span>' : ''}
+                                </div>
                                 <div class="leaderboard-wins">${p.wins} поб.</div>
                                 ${prizeItem ? `<img class="leaderboard-nft" src="${escapeHtml(safeImageUrl(prizeItem.image_url))}" onclick="event.stopPropagation(); currentPrizeItem=currentPrizeItems[${idx}]; openPrizeModal()" />` : ''}
                             </div>`;
@@ -4310,9 +4322,11 @@
                 if (data.user && !data.top?.some(player => player.isYou)) {
                     html += `<div class="leaderboard-row you-row user-summary-row">
                         <div class="leaderboard-rank">#${Number(data.user.rank || 0)}</div>
-                        <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
+                        <div class="leaderboard-person">
+                            <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
+                            <span class="leaderboard-you">ВЫ</span>
+                        </div>
                         <div class="leaderboard-wins">${data.user.wins} поб.</div>
-                        <span class="leaderboard-you">ВЫ</span>
                     </div>`;
                 }
                 listEl.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Нет данных</div>';
