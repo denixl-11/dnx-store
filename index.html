@@ -2238,6 +2238,127 @@
             opacity: .48;
             filter: grayscale(.45);
         }
+
+        /* ===== V8.2: moderation, complete activity history and reference leaderboard ===== */
+        .inventory-card-actions,
+        #nft-modal-actions.inventory-actions {
+            grid-template-columns: minmax(0, 1fr) !important;
+            grid-auto-flow: row;
+        }
+        .inventory-card-actions { gap: 7px; }
+        .inventory-card-actions button { width: 100%; }
+
+        #inventory-history-container.activity-history-list {
+            display: none;
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 8px;
+            padding: 4px 8px 18px;
+        }
+        #page-inventory.history-active #inventory-history-container.activity-history-list { display: grid !important; }
+        .activity-strip {
+            --event-color: #d355ff;
+            position: relative;
+            display: grid;
+            grid-template-columns: 38px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 10px;
+            min-height: 61px;
+            padding: 9px 12px 9px 13px;
+            overflow: hidden;
+            border: 1px solid rgba(211, 85, 255, .34);
+            border: 1px solid color-mix(in srgb, var(--event-color) 38%, transparent);
+            border-radius: 14px;
+            background: #0e0715;
+            background:
+                radial-gradient(circle at 100% 50%, color-mix(in srgb, var(--event-color) 13%, transparent), transparent 42%),
+                linear-gradient(105deg, rgba(28,11,43,.96), rgba(7,4,13,.98) 58%, rgba(34,8,24,.78));
+            box-shadow: inset 0 1px rgba(255,255,255,.035), 0 8px 20px rgba(0,0,0,.2);
+        }
+        .activity-strip::before { content:""; position:absolute; inset:8px auto 8px 0; width:3px; border-radius:0 3px 3px 0; background:var(--event-color); box-shadow:0 0 12px var(--event-color); }
+        .activity-strip.positive { --event-color:#ffbf3f; }
+        .activity-strip.negative { --event-color:#ff4f87; }
+        .activity-strip.bonus { --event-color:#c34dff; }
+        .activity-strip.neutral { --event-color:#6e8eff; }
+        .activity-icon { width: 34px; height: 34px; display:grid; place-items:center; border:1px solid rgba(211,85,255,.42); border:1px solid color-mix(in srgb,var(--event-color) 48%,transparent); border-radius:11px; color:#fff0f7; background:rgba(40,12,54,.88); background:color-mix(in srgb,var(--event-color) 15%,rgba(8,4,14,.88)); font-size:1rem; box-shadow:inset 0 1px rgba(255,255,255,.06); }
+        .activity-copy { min-width:0; }
+        .activity-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#fff7fb; font-size:.72rem; font-weight:800; }
+        .activity-meta { margin-top:3px; color:#938897; font-size:.56rem; line-height:1.25; }
+        .activity-value { display:flex; flex-direction:column; align-items:flex-end; gap:4px; min-width:74px; }
+        .activity-amount { color:var(--event-color); font-size:.7rem; font-weight:900; white-space:nowrap; }
+        .activity-time { color:#8f8492; font-size:.51rem; white-space:nowrap; }
+        .activity-load-more { width:100%; min-height:42px; border:1px solid rgba(211,75,255,.43); border-radius:13px; color:#f4dcff; background:linear-gradient(110deg,rgba(73,21,107,.64),rgba(81,16,58,.48)); font-weight:800; }
+
+        .leaderboard-fullscreen {
+            inset: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
+            min-height: var(--app-height);
+            height: var(--app-height) !important;
+            padding: calc(18px + var(--content-safe-top)) calc(16px + var(--content-safe-right)) calc(24px + var(--content-safe-bottom)) calc(16px + var(--content-safe-left)) !important;
+            background:
+                radial-gradient(circle at 70% 38%, rgba(124,24,88,.12), transparent 37%),
+                radial-gradient(circle at 18% 12%, rgba(88,25,131,.10), transparent 31%),
+                #030108 !important;
+        }
+        .leaderboard-top {
+            min-height: 69px;
+            margin: 0 0 23px !important;
+            padding: 12px 14px !important;
+            border: 1px solid rgba(188,61,223,.40) !important;
+            border-radius: 18px !important;
+            background: linear-gradient(105deg,rgba(22,8,37,.94),rgba(10,4,18,.98) 58%,rgba(38,8,30,.75)) !important;
+        }
+        .leaderboard-heading { display:flex; align-items:center; gap:12px; min-width:0; }
+        .leaderboard-crown { width:42px; height:42px; flex:0 0 auto; filter:drop-shadow(0 0 8px rgba(210,78,255,.4)); }
+        .leaderboard-crown path { fill:none; stroke:url(#leaderCrownGradient); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+        .leaderboard-title { font-size:clamp(1.08rem,3vw,1.48rem) !important; font-weight:900; }
+        .leaderboard-close { flex:0 0 auto; }
+        .season-timer {
+            min-height:52px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:9px;
+            margin:0 0 18px !important;
+            padding:10px 14px !important;
+            border-radius:15px !important;
+            font-size:clamp(.68rem,2vw,.86rem) !important;
+            font-weight:750;
+        }
+        .season-timer::before { content:"⌛"; color:#dd72ff; filter:drop-shadow(0 0 5px rgba(221,91,255,.65)); }
+        .leaderboard-list { gap:13px !important; }
+        .leaderboard-row {
+            min-height:84px !important;
+            display:grid !important;
+            grid-template-columns:48px minmax(0,1fr) auto auto;
+            gap:12px !important;
+            padding:11px 14px 11px 17px !important;
+            border-radius:17px !important;
+        }
+        .leaderboard-rank { width:auto !important; color:#ff4f87 !important; font-size:.96rem !important; }
+        .leaderboard-name { font-size:clamp(.78rem,2.2vw,.96rem); }
+        .leaderboard-wins { margin:0 !important; font-size:.72rem !important; white-space:nowrap; }
+        .leaderboard-nft { width:53px !important; height:53px !important; }
+        .leaderboard-you { margin-left:8px; color:#ff73aa; font-size:.62rem; font-weight:900; letter-spacing:.04em; }
+        @media (min-width: 700px) {
+            .leaderboard-fullscreen { padding-inline:16px !important; }
+            .leaderboard-row { min-height:84px !important; }
+            .leaderboard-nft { width:54px !important; height:54px !important; }
+        }
+        @media (max-width: 430px) {
+            .leaderboard-fullscreen { padding-inline:calc(12px + var(--content-safe-left)) calc(12px + var(--content-safe-right)) !important; }
+            .leaderboard-row { grid-template-columns:38px minmax(0,1fr) auto auto; gap:7px !important; padding-inline:12px !important; }
+            .leaderboard-nft { width:45px !important; height:45px !important; }
+        }
+
+        .account-restriction-modal { z-index: 10000 !important; background:rgba(2,1,7,.97) !important; }
+        .account-restriction-card { width:min(92vw,480px); padding:32px 24px 25px; border:1px solid rgba(225,69,150,.58); border-radius:25px; text-align:center; background:radial-gradient(circle at 50% 0,rgba(143,38,212,.22),transparent 36%),linear-gradient(155deg,#13071f,#07030d 62%,#1c0714); box-shadow:0 28px 80px rgba(0,0,0,.72),0 0 42px rgba(210,45,152,.13),inset 0 1px rgba(255,255,255,.07); }
+        .restriction-icon { width:70px; height:70px; margin:0 auto 18px; display:grid; place-items:center; border:1px solid rgba(235,89,170,.55); border-radius:50%; color:#ff8dbb; background:radial-gradient(circle,rgba(196,43,139,.26),rgba(41,10,60,.82)); font-size:1.8rem; box-shadow:0 0 28px rgba(223,62,171,.18); }
+        .account-restriction-card h2 { margin:0 0 10px; color:#fff4f9; font-size:1.18rem; }
+        .restriction-timer { margin:11px 0 16px; color:#ffd175; font-size:1.35rem; font-weight:900; letter-spacing:.05em; }
+        .account-restriction-card p { margin:0; color:#b9aaba; font-size:.76rem; line-height:1.6; }
+        .restriction-support { display:inline-flex; margin-top:20px; padding:12px 18px; border:1px solid rgba(202,75,255,.55); border-radius:13px; color:#f3d9ff; background:rgba(70,18,100,.52); font-size:.75rem; font-weight:850; text-decoration:none; }
+        body.account-locked .tab-bar, body.account-locked header, body.account-locked .page { pointer-events:none !important; }
     </style>
 </head>
 <body>
@@ -2370,7 +2491,7 @@
             <div class="tab-item" style="padding:16px 0;" onclick="switchInv(this, 'history')">История</div>
         </div>
         <div id="inventory-active-container" class="catalog-grid"></div>
-        <div id="inventory-history-container" class="catalog-grid" style="display: none;"></div>
+        <div id="inventory-history-container" class="catalog-grid activity-history-list" style="display: none;"></div>
     </div>
 
     <!-- ================= МОДАЛЬНЫЕ ОКНА ================= -->
@@ -2495,11 +2616,28 @@
 
     <div id="leaderboard-modal" class="leaderboard-fullscreen">
         <div class="leaderboard-top">
-            <h2 class="leaderboard-title">🏆 Лидеры сезона</h2>
+            <div class="leaderboard-heading">
+                <svg class="leaderboard-crown" viewBox="0 0 48 48" aria-hidden="true">
+                    <defs><linearGradient id="leaderCrownGradient" x1="4" y1="7" x2="43" y2="41"><stop stop-color="#ef80ff"/><stop offset=".5" stop-color="#c24dff"/><stop offset="1" stop-color="#ff7aa8"/></linearGradient></defs>
+                    <path d="M7 17.5 13.5 29h21L41 17.5 31 23l-7-13-7 13-10-5.5ZM14 34h20M16 39h16"/>
+                    <circle cx="7" cy="15" r="2.2"/><circle cx="24" cy="7" r="2.2"/><circle cx="41" cy="15" r="2.2"/>
+                </svg>
+                <h2 class="leaderboard-title">Лидеры сезона</h2>
+            </div>
             <button class="leaderboard-close" onclick="closeLeaderboardModal()">✕</button>
         </div>
         <div class="season-timer" id="season-timer-display">Загрузка...</div>
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
+    </div>
+
+    <div id="account-restriction-modal" class="modal-overlay account-restriction-modal" role="alertdialog" aria-modal="true" aria-labelledby="restriction-title">
+        <div class="account-restriction-card">
+            <div class="restriction-icon" id="restriction-icon">⛔</div>
+            <h2 id="restriction-title">Доступ к аккаунту ограничен</h2>
+            <div class="restriction-timer" id="restriction-timer" hidden></div>
+            <p id="restriction-message"></p>
+            <a class="restriction-support" href="https://t.me/DnxStoreSupport" onclick="event.preventDefault(); tg.openTelegramLink('https://t.me/DnxStoreSupport')">НАПИСАТЬ В ПОДДЕРЖКУ</a>
+        </div>
     </div>
 
     <div id="prize-detail-overlay" class="modal-overlay" onclick="closePrizeModal(event)">
@@ -2687,6 +2825,63 @@
             tonConnectUI.connectionRestored.finally(() => updateTonWalletUI());
         }
 
+        let accountRestriction = null;
+        let accountRestrictionTimer = null;
+
+        function restrictionCountdown(seconds) {
+            const value = Math.max(0, Math.ceil(Number(seconds) || 0));
+            const days = Math.floor(value / 86400);
+            const hours = Math.floor((value % 86400) / 3600);
+            const minutes = Math.floor((value % 3600) / 60);
+            const secs = value % 60;
+            return `${days ? `${days}д ` : ''}${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        }
+
+        function clearAccountRestriction() {
+            accountRestriction = null;
+            if (accountRestrictionTimer) clearInterval(accountRestrictionTimer);
+            accountRestrictionTimer = null;
+            document.body.classList.remove('account-locked');
+            document.getElementById('account-restriction-modal')?.classList.remove('active');
+        }
+
+        function activateAccountRestriction(restriction) {
+            if (!restriction?.type) return;
+            accountRestriction = restriction;
+            document.body.classList.add('account-locked');
+            const modal = document.getElementById('account-restriction-modal');
+            const title = document.getElementById('restriction-title');
+            const message = document.getElementById('restriction-message');
+            const timer = document.getElementById('restriction-timer');
+            const icon = document.getElementById('restriction-icon');
+            modal?.classList.add('active');
+            if (restriction.type === 'ban') {
+                icon.innerText = '⛔';
+                title.innerText = 'Ваш аккаунт заблокирован';
+                timer.hidden = true;
+                message.innerHTML = 'Ваш аккаунт был заблокирован за нарушения правил сообщества.<br><br>Если вы считаете блокировку ошибочной, обратитесь в поддержку <b>@DnxStoreSupport</b>';
+                if (accountRestrictionTimer) clearInterval(accountRestrictionTimer);
+                accountRestrictionTimer = null;
+                return;
+            }
+            icon.innerText = '◷';
+            title.innerText = 'Ваш аккаунт ограничен';
+            timer.hidden = false;
+            message.innerHTML = 'Баланс, NFT и все действия временно заморожены.<br><br>Если вы считаете блокировку ошибочной, обратитесь в поддержку <b>@DnxStoreSupport</b>';
+            const expires = restriction.expiresAt ? new Date(restriction.expiresAt).getTime() : Date.now() + Number(restriction.remainingSeconds || 0) * 1000;
+            const tick = () => {
+                const remaining = Math.ceil((expires - Date.now()) / 1000);
+                timer.innerText = restrictionCountdown(remaining);
+                if (remaining <= 0) {
+                    clearAccountRestriction();
+                    updateBalance().then(() => { if (!accountRestriction) showPage('store'); });
+                }
+            };
+            if (accountRestrictionTimer) clearInterval(accountRestrictionTimer);
+            tick();
+            accountRestrictionTimer = setInterval(tick, 1000);
+        }
+
         async function apiFetch(url, options = {}) {
             const { timeoutMs, ...fetchOptions } = options;
             const headers = {
@@ -2710,6 +2905,8 @@
                     const apiError = new Error(err.error || `HTTP ${response.status}`);
                     apiError.code = err.error || 'http_error';
                     apiError.status = response.status;
+                    apiError.restriction = err.restriction || null;
+                    if (response.status === 423 && err.restriction) activateAccountRestriction(err.restriction);
                     throw apiError;
                 }
                 return response.json();
@@ -2733,6 +2930,8 @@
         let currentCollectionFilter = '';
         let catalogCollectionNames = [];
         let inventoryData = [];
+        let activityNextBefore = null;
+        let activityLoading = false;
         const inventoryActionsInFlight = new Set();
         let pendingTopupStars = 0;
         let pendingBuyItem = null;
@@ -3065,6 +3264,10 @@
         function closeModal(id) { const el = document.getElementById(id); if(el) el.classList.remove('active'); }
 
         function showPage(id) {
+            if (accountRestriction) {
+                activateAccountRestriction(accountRestriction);
+                return;
+            }
             if (id !== 'store') pauseCatalogNftMedia();
             pauseAuxNftMedia();
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
@@ -3107,6 +3310,8 @@
                 referralLink = data.referralLink || '';
                 document.getElementById('referrals-count').innerText = Number(data.referralsCount || 0).toLocaleString('ru-RU');
                 document.getElementById('referral-earned').innerText = formatStars(data.referralEarned || 0);
+                if (data.restriction) activateAccountRestriction(data.restriction);
+                else if (accountRestriction) clearAccountRestriction();
             } catch(e) { console.error('Balance update failed', e); }
             document.getElementById('header-balance').innerHTML = `<span>${formatStars(userBalance)}</span>${telegramStarMarkup()}`;
             document.getElementById('header-bonus-balance').innerHTML = `<span>${formatStars(userBonusBalance)}</span>${bonusStarMarkup()}`;
@@ -3769,6 +3974,7 @@
             document.getElementById('inventory-active-container').style.display = type === 'active' ? 'grid' : 'none';
             document.getElementById('inventory-history-container').style.display = type === 'history' ? 'grid' : 'none';
             document.getElementById('page-inventory').classList.toggle('history-active', type === 'history');
+            if (type === 'history') loadActivityHistory(true);
             requestAnimationFrame(resumeAuxNftMedia);
         }
         function isSimpleInventoryNft(item) {
@@ -3779,7 +3985,6 @@
                 const data = await apiFetch(`${API_BASE}/inventory`);
                 inventoryData = data;
                 const active = inventoryData.filter(i => !['withdrawn', 'disposed'].includes(i.status));
-                const withdrawn = inventoryData.filter(i => ['withdrawn', 'disposed'].includes(i.status));
                 document.getElementById('inventory-active-container').innerHTML = active.length
                     ? active.map(i => {
                         const simpleNft = isSimpleInventoryNft(i);
@@ -3802,17 +4007,75 @@
                         </div>`;
                     }).join('')
                     : `<div class="empty-state"><div class="empty-state-icon">◇</div><h3>ИНВЕНТАРЬ ПУСТ</h3><p>Купленные и выигранные NFT появятся здесь.</p></div>`;
-                document.getElementById('inventory-history-container').innerHTML = withdrawn.length
-                    ? withdrawn.map(i => `
-                        <div class="item-card" data-inventory-item-id="${Number(i.id)}" style="opacity:0.5">
-                            <img src="${escapeHtml(safeImageUrl(i.image_url))}" class="item-image" style="filter:grayscale(100%)">
-                            <div class="item-name">${escapeHtml(i.name)}</div>
-                            <div class="inventory-status-pill">${i.status === 'disposed' ? 'ПРОДАНО' : 'ВЫВЕДЕНО'}</div>
-                        </div>`).join('')
-                    : `<div class="empty-state history-empty-state"><div class="empty-state-copy"><h3>ИСТОРИЯ ПУСТА</h3><p>Здесь пока нет событий.<br>Начните играть, участвуйте в активностях — и ваши действия появятся здесь.</p><button class="btn-main-action" style="max-width:250px;margin-top:18px" onclick="switchInv(document.querySelector('#page-inventory .inventory-tabs .tab-item:first-child'),'active')">ПЕРЕЙТИ К МОИМ NFT</button></div></div>`;
+                const historyContainer = document.getElementById('inventory-history-container');
+                if (!historyContainer.dataset.loaded) historyContainer.innerHTML = '<div class="empty-state"><p>Загружаем историю…</p></div>';
                 requestAnimationFrame(resumeAuxNftMedia);
                 startWithdrawCountdowns();
             } catch(e) { console.error(e); }
+        }
+
+        const activityVisuals = {
+            deposit: ['＋', 'Пополнение баланса'],
+            referral_bonus: ['↗', 'Реферальное начисление'],
+            catalog_purchase: ['◆', 'Покупка NFT'],
+            game_bet: ['−', 'Ставка в игре'],
+            game_win: ['♛', 'Выигрыш в игре'],
+            game_loss: ['·', 'Раунд без выигрыша'],
+            game_refund: ['↩', 'Возврат ставки'],
+            case_open: ['◇', 'Открытие кейса'],
+            case_prize: ['✦', 'Приз из кейса'],
+            case_sale: ['＋', 'Продажа приза'],
+            withdraw_request: ['↑', 'Запрос на вывод'],
+            withdraw_approved: ['✓', 'NFT выведен'],
+            withdraw_rejected: ['×', 'Вывод отклонён']
+        };
+        function activityTimestamp(value) {
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return '';
+            return date.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+        }
+        function activityMeta(event) {
+            const meta = event.metadata || {};
+            if (event.event_type.startsWith('game_') && meta.game_number != null) return `Игра #${Number(meta.game_number)}`;
+            if (event.event_type === 'case_prize' && meta.item_value != null) return `Оценка приза: ${formatStars(meta.item_value)}`;
+            if (event.event_type === 'deposit') return meta.source === 'ton' ? 'Пополнение через TON' : 'Telegram Stars';
+            if (event.event_type === 'withdraw_request') return 'Окно подтверждения: 2 часа';
+            return event.balance_type === 'bonus' ? 'Бонусный баланс' : (event.balance_type === 'main' ? 'Основной баланс' : 'Событие аккаунта');
+        }
+        function activityEventMarkup(event) {
+            const amount = event.amount == null ? null : Number(event.amount);
+            const [icon, fallback] = activityVisuals[event.event_type] || ['•', 'Событие'];
+            const tone = event.balance_type === 'bonus' ? 'bonus' : (amount > 0 ? 'positive' : (amount < 0 ? 'negative' : 'neutral'));
+            const amountMarkup = amount == null ? '' : `<span class="activity-amount star-amount"><span>${amount > 0 ? '+' : '−'}${formatStars(Math.abs(amount))}</span>${event.balance_type === 'bonus' ? bonusStarMarkup() : telegramStarMarkup()}</span>`;
+            return `<article class="activity-strip ${tone}">
+                <div class="activity-icon">${icon}</div>
+                <div class="activity-copy"><div class="activity-title">${escapeHtml(event.title || fallback)}</div><div class="activity-meta">${escapeHtml(activityMeta(event))}</div></div>
+                <div class="activity-value">${amountMarkup}<time class="activity-time">${escapeHtml(activityTimestamp(event.created_at))}</time></div>
+            </article>`;
+        }
+        async function loadActivityHistory(reset = false) {
+            if (activityLoading) return;
+            const container = document.getElementById('inventory-history-container');
+            if (reset) { activityNextBefore = null; container.innerHTML = '<div class="empty-state"><p>Загружаем историю…</p></div>'; }
+            activityLoading = true;
+            try {
+                const query = activityNextBefore ? `?limit=80&before=${encodeURIComponent(activityNextBefore)}` : '?limit=80';
+                const data = await apiFetch(`${API_BASE}/activity/history${query}`);
+                const events = Array.isArray(data.events) ? data.events : [];
+                const chunk = events.map(activityEventMarkup).join('');
+                if (reset) {
+                    container.innerHTML = chunk;
+                } else {
+                    container.querySelector('.activity-load-more')?.remove();
+                    container.insertAdjacentHTML('beforeend', chunk);
+                }
+                activityNextBefore = data.nextBefore || null;
+                if (data.hasMore && activityNextBefore) container.insertAdjacentHTML('beforeend', '<button class="activity-load-more" onclick="loadActivityHistory(false)">ПОКАЗАТЬ ЕЩЁ</button>');
+                if (!container.innerHTML.trim()) container.innerHTML = '<div class="empty-state history-empty-state"><div class="empty-state-copy"><h3>ИСТОРИЯ ПУСТА</h3><p>Пополнения, покупки, ставки и кейсы появятся здесь.</p></div></div>';
+                container.dataset.loaded = 'true';
+            } catch (error) {
+                if (reset) container.innerHTML = '<div class="empty-state"><h3>НЕ УДАЛОСЬ ЗАГРУЗИТЬ</h3><button class="activity-load-more" onclick="loadActivityHistory(true)">ПОВТОРИТЬ</button></div>';
+            } finally { activityLoading = false; }
         }
         let withdrawCountdownTimer = null;
         function formatWithdrawCountdown(seconds) {
@@ -4019,7 +4282,7 @@
                         html += `
                             <div class="leaderboard-row rank-${idx + 1}${p.isYou ? ' you-row' : ''}">
                                 <div class="leaderboard-rank">#${idx+1}</div>
-                                <div class="leaderboard-name">${escapeHtml(p.username)}</div>
+                                <div class="leaderboard-name">${escapeHtml(p.username)}${p.isYou ? '<span class="leaderboard-you">ВЫ</span>' : ''}</div>
                                 <div class="leaderboard-wins">${p.wins} поб.</div>
                                 ${prizeItem ? `<img class="leaderboard-nft" src="${escapeHtml(safeImageUrl(prizeItem.image_url))}" onclick="event.stopPropagation(); currentPrizeItem=currentPrizeItems[${idx}]; openPrizeModal()" />` : ''}
                             </div>`;
@@ -4030,7 +4293,7 @@
                         <div class="leaderboard-rank">#${Number(data.user.rank || 0)}</div>
                         <div class="leaderboard-name">${escapeHtml(data.user.username)}</div>
                         <div class="leaderboard-wins">${data.user.wins} поб.</div>
-                        <span style="color:#ff79b9;font-size:.62rem;font-weight:800;">ВЫ</span>
+                        <span class="leaderboard-you">ВЫ</span>
                     </div>`;
                 }
                 listEl.innerHTML = html || '<div style="text-align:center; color:var(--text-muted);">Нет данных</div>';
@@ -4683,6 +4946,11 @@
         }
 
         async function pollGame() {
+            if (accountRestriction) {
+                if (gamePollTimer) clearTimeout(gamePollTimer);
+                gamePollTimer = setTimeout(pollGame, 5000);
+                return;
+            }
             if (gamePollInFlight) return;
             gamePollInFlight = true;
             try {
