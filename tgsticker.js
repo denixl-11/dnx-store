@@ -187,6 +187,12 @@ var RLottie = (function () {
     rlPlayer.waitForFirstFrame = false;
     rlPlayer.stopOnFirstFrame = false;
     rlPlayer.stopOnLastFrame = false;
+    // Some Telegram NFT animations use a fully transparent frame zero. Keep
+    // the first visible frame as a lightweight poster so a paused animation
+    // never turns into an empty coloured square.
+    rlPlayer.posterFrame = null;
+    rlPlayer.posterFrameNo = 0;
+    rlPlayer.findPosterFrame = !!options.findPosterFrame;
     rlPlayer.forcePlayFrames = 0;
     rlPlayer.times = [];
     rlPlayer.imageData = new ImageData(rlPlayer.width, rlPlayer.height);
@@ -259,6 +265,9 @@ var RLottie = (function () {
           rlPlayer.waitForFirstFrame = false;
         } else {
           rlPlayer.stopOnFirstFrame = false;
+          if (!rlPlayer.hasVisiblePixels && rlPlayer.posterFrame) {
+            renderPosterFrame(rlPlayer);
+          }
           if (!rlPlayer.paused) {
             rlPlayer.paused = true;
             triggerEvent(rlPlayer.el, 'tg:pause');
@@ -287,6 +296,20 @@ var RLottie = (function () {
         break;
       }
     }
+    if (hasVisiblePixels && !rlPlayer.posterFrame) {
+      rlPlayer.posterFrame = new Uint8ClampedArray(frame.frame);
+      rlPlayer.posterFrameNo = frame.no;
+    }
+    // While paused after initialisation, walk only until the first visible
+    // frame. This produces a stable zero-state without downloading a second
+    // image or keeping the whole animation in memory.
+    if (rlPlayer.findPosterFrame) {
+      if (hasVisiblePixels || frame.no >= rlPlayer.frameCount - 1) {
+        rlPlayer.findPosterFrame = false;
+      } else {
+        rlPlayer.forceRender = true;
+      }
+    }
     if (rlPlayer.hasVisiblePixels !== hasVisiblePixels) {
       rlPlayer.hasVisiblePixels = hasVisiblePixels;
       triggerEvent(rlPlayer.el, 'tg:frame-visibility', {
@@ -304,6 +327,19 @@ var RLottie = (function () {
       delete rlPlayer.thumb;
     }
     // console.log(dT(), '['+rlPlayer.reqId+']', 'render frame#'+frame.no);
+  }
+
+  function renderPosterFrame(rlPlayer) {
+    if (!rlPlayer.posterFrame || !rlPlayer.imageData || !rlPlayer.context) return;
+    rlPlayer.imageData.data.set(rlPlayer.posterFrame);
+    rlPlayer.context.putImageData(rlPlayer.imageData, 0, 0);
+    rlPlayer.frameNo = rlPlayer.posterFrameNo;
+    if (rlPlayer.hasVisiblePixels !== true) {
+      rlPlayer.hasVisiblePixels = true;
+      triggerEvent(rlPlayer.el, 'tg:frame-visibility', {
+        detail: { hasVisiblePixels: true }
+      });
+    }
   }
 
   function requestFrame(reqId, frameNo) {

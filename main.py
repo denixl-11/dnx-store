@@ -1890,6 +1890,59 @@ async def handle_get_items(request):
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 
+@require_auth
+@rate_limit(90, 60)
+async def handle_get_item(request):
+    """Return one authoritative item row for a catalogue/inventory modal.
+
+    The modal intentionally does not trust the catalogue snapshot: model,
+    pattern and background are always read from the current `items` row by id.
+    """
+    try:
+        item_id = int(request.query.get("id", "0"))
+    except (TypeError, ValueError):
+        item_id = 0
+    if item_id <= 0:
+        return web.json_response({"error": "invalid_item_id"}, status=400)
+
+    user_id = request["telegram_user"]["id"]
+    try:
+        row = await get_pool().fetchrow(
+            """
+            SELECT id, name, price, status, image_url, nft_link, number,
+                   model, pattern, background, acquisition_source, last_event,
+                   withdraw_requested_at, withdraw_expires_at, disposed_at,
+                   GREATEST(0, EXTRACT(EPOCH FROM (withdraw_expires_at - NOW())))::BIGINT
+                       AS withdraw_remaining_seconds
+            FROM items
+            WHERE id = $1
+              AND (status = 'Доступен' OR buyer_id = $2)
+            """,
+            item_id,
+            user_id,
+        )
+        if not row:
+            return web.json_response({"error": "item_not_found"}, status=404)
+
+        item = normalize_records([row])[0]
+        raw_status = item.get("status")
+        item["is_shop_item"] = raw_status == "Доступен"
+        if raw_status in ("Выведен", "withdrawn"):
+            item["status"] = "withdrawn"
+        item["can_sell"] = (
+            item.get("acquisition_source") == "case"
+            and item.get("status") == "Продан"
+        )
+        item["sell_value"] = item.get("price", 0)
+        item["withdraw_remaining_seconds"] = int(item.get("withdraw_remaining_seconds") or 0)
+        item["traits_source"] = "items.model/items.pattern/items.background"
+        return web.json_response(item, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+    except Exception as exc:
+        logging.error("Get item %s error: %s", item_id, exc)
+        return web.json_response({"error": "database_unavailable"}, status=503,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
 async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
     now = time.monotonic()
     cached = nft_media_cache.get(source_url)
@@ -3006,6 +3059,7 @@ app = web.Application(middlewares=[security_headers_middleware], client_max_size
 app.router.add_get('/health', handle_health)
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)
+app.router.add_get('/item', handle_get_item)
 app.router.add_get('/nft/media', handle_nft_media)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_get('/activity/history', handle_activity_history)

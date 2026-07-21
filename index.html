@@ -2488,7 +2488,6 @@
             box-sizing: border-box !important;
             -webkit-appearance: none;
             appearance: none;
-            display: flex !important;
             align-items: center;
             justify-content: center;
             border: 1px solid rgba(255, 76, 139, .58) !important;
@@ -2503,6 +2502,53 @@
         }
         .inventory-card-actions .inventory-sell-btn { width: 100%; min-height: 42px; padding: 8px 10px; }
         #nft-modal-btn-sell.btn-inventory-sell { width: 100%; min-height: 54px; padding: 9px 16px; }
+        #sell-drop-btn,
+        .inventory-card-actions .inventory-sell-btn { display: flex !important; }
+        #nft-modal-btn-sell { display: none !important; }
+        #nft-modal-actions.inventory-actions #nft-modal-btn-sell { display: flex !important; }
+        #nft-modal-actions:not(.inventory-actions) {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) 58px !important;
+            align-items: stretch;
+            gap: 10px;
+            min-width: 0;
+        }
+        #nft-modal-actions:not(.inventory-actions) #nft-modal-btn-withdraw,
+        #nft-modal-actions:not(.inventory-actions) #nft-modal-btn-sell {
+            display: none !important;
+        }
+        #nft-modal-actions:not(.inventory-actions) #nft-modal-btn-buy {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-width: 0;
+            height: 58px;
+            padding: 8px clamp(10px, 3vw, 18px);
+            overflow: hidden;
+            white-space: nowrap;
+            font-size: clamp(.76rem, 3.7vw, 1rem);
+            line-height: 1;
+        }
+        #nft-modal-actions:not(.inventory-actions) #nft-modal-btn-buy .star-amount {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: .18em;
+            margin-left: .3em;
+        }
+        #nft-modal-actions:not(.inventory-actions) #nft-modal-btn-cart {
+            display: flex !important;
+            box-sizing: border-box;
+            width: 58px;
+            min-width: 58px;
+            height: 58px;
+        }
+        .nft-live-model canvas {
+            image-rendering: auto;
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
         #sell-drop-btn {
             width: min(100%, 320px) !important;
             max-width: 320px !important;
@@ -2897,8 +2943,18 @@
     <script>
         const tg = window.Telegram.WebApp;
         const isAndroidPlatform = String(tg.platform || '').toLowerCase() === 'android' || /Android/i.test(navigator.userAgent);
+        const deviceMemoryGb = Number(navigator.deviceMemory || 0);
+        const logicalCores = Number(navigator.hardwareConcurrency || 0);
+        const lowPowerNftDevice = isAndroidPlatform && (
+            (deviceMemoryGb > 0 && deviceMemoryGb <= 4) ||
+            (logicalCores > 0 && logicalCores <= 4)
+        );
+        const nftCardRenderRatio = lowPowerNftDevice ? 1.05 : (isAndroidPlatform ? 1.25 : 1.4);
+        const nftModalRenderRatio = lowPowerNftDevice ? 1.2 : (isAndroidPlatform ? 1.45 : 1.7);
         document.documentElement.classList.toggle('android-device', isAndroidPlatform);
-        if (window.RLottie) window.RLottie.WORKERS_LIMIT = isAndroidPlatform ? 2 : 4;
+        if (window.RLottie) {
+            window.RLottie.WORKERS_LIMIT = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : Math.min(4, logicalCores || 4));
+        }
         tg.ready();
         try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
         try {
@@ -3130,6 +3186,7 @@
         const caseDetailsRequests = new Map();
         const warmedCaseImages = new Set();
         let currentNftItem = null;
+        let nftModalOpenToken = 0;
         let currentWonItem = null;
         let tonDepositPollTimer = null;
         let starPaymentPollTimer = null;
@@ -3140,7 +3197,7 @@
         let nftMediaActiveLoads = 0;
         let nftMediaObserver = null;
         let nftAuxMediaObserver = null;
-        const NFT_MEDIA_MAX_LOADS = isAndroidPlatform ? 2 : 3;
+        const NFT_MEDIA_MAX_LOADS = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : 3);
         const NFT_MEDIA_HOVER_MODE = window.matchMedia?.('(hover: hover) and (pointer: fine)').matches === true;
         let catalogRenderedSignature = '';
         let catalogLoadedAt = 0;
@@ -3315,8 +3372,9 @@
             element.dataset.mediaState = 'live';
             const isModal = element.classList.contains('nft-live-media--modal');
             window.RLottie.init(picture, {
-                maxDeviceRatio: isAndroidPlatform ? (isModal ? 1.2 : 1) : (isModal ? 1.5 : 1.25),
+                maxDeviceRatio: isModal ? nftModalRenderRatio : nftCardRenderRatio,
                 noAutoPlay: true,
+                findPosterFrame: true,
                 // 1 keeps only frame zero in JS memory; workers render the
                 // remaining frames. This avoids iOS WebView memory pressure.
                 cachingModulo: 1
@@ -3638,17 +3696,14 @@
             }
         }
 
-        function restoreCatalogSnapshot() {
+        function clearLegacyCatalogSnapshots() {
+            // Catalogue rows are mutable in Neon. Never render a persisted
+            // snapshot because it can expose obsolete prices and traits while
+            // the fresh request is still in flight.
             try {
-                const snapshot = JSON.parse(localStorage.getItem('dnx_catalog_v3') || 'null');
-                if (!snapshot || !Array.isArray(snapshot.items) || Date.now() - Number(snapshot.savedAt || 0) > 6 * 60 * 60 * 1000) return;
-                currentCatalog = snapshot.items;
-                catalogLoadedAt = Number(snapshot.savedAt || 0);
-                syncCatalogUi();
-                renderCatalogItems();
-            } catch (_) {
                 localStorage.removeItem('dnx_catalog_v3');
-            }
+                localStorage.removeItem('dnx_catalog_v2');
+            } catch (_) {}
         }
 
         function syncCatalogUi() {
@@ -3748,10 +3803,6 @@
                             });
                             try { localStorage.setItem('dnx_cart', JSON.stringify(cart)); } catch (_) {}
                             catalogLoadedAt = Date.now();
-                            try {
-                                const snapshotItems = currentCatalog.map(({ nft_media, ...item }) => item);
-                                localStorage.setItem('dnx_catalog_v3', JSON.stringify({ items: snapshotItems, savedAt: catalogLoadedAt }));
-                            } catch (_) {}
                             return currentCatalog;
                         })
                         .finally(() => { catalogRequest = null; });
@@ -3901,10 +3952,32 @@
             if (item) addToCart(item);
         }
 
-        function openNftModal(id) {
-            const item = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
-            if(!item) return;
-            const isShopItem = currentCatalog.some(i => String(i.id) === String(id));
+        async function openNftModal(id) {
+            const openToken = ++nftModalOpenToken;
+            const localItem = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
+            if (!localItem) return;
+            let item;
+            try {
+                const authoritativeItem = await apiFetch(`${API_BASE}/item?id=${encodeURIComponent(id)}&_=${Date.now()}`);
+                if (openToken !== nftModalOpenToken) return;
+                if (String(localItem.nft_link || '') !== String(authoritativeItem.nft_link || '')) {
+                    nftMediaCache.delete(Number(id));
+                    persistNftMediaCache();
+                }
+                item = { ...localItem, ...authoritativeItem };
+                const catalogIndex = currentCatalog.findIndex(entry => String(entry.id) === String(id));
+                const inventoryIndex = inventoryData.findIndex(entry => String(entry.id) === String(id));
+                if (catalogIndex >= 0 && item.is_shop_item) currentCatalog[catalogIndex] = item;
+                if (inventoryIndex >= 0 && !item.is_shop_item) inventoryData[inventoryIndex] = item;
+                const cartIndex = cart.findIndex(entry => String(entry.id) === String(id));
+                if (cartIndex >= 0) cart[cartIndex] = { ...cart[cartIndex], ...item };
+            } catch (error) {
+                if (openToken !== nftModalOpenToken) return;
+                console.error('Fresh item read failed', error);
+                showAlert('Не удалось получить актуальные данные NFT. Проверьте соединение и попробуйте ещё раз.');
+                return;
+            }
+            const isShopItem = item.is_shop_item === true;
             if (!isShopItem && isSimpleInventoryNft(item)) return;
             currentNftItem = item;
             const modalMedia = document.getElementById('nft-modal-media');
@@ -3962,7 +4035,7 @@
                 sellBtn.style.display = item.status === 'withdrawn' || item.status === 'disposed' ? 'none' : 'block';
                 sellBtn.disabled = remaining > 0 || item.status === 'pending_withdraw';
                 sellBtn.classList.toggle('catalog-locked', !item.can_sell);
-                sellBtn.textContent = item.can_sell ? `ПРОДАТЬ ЗА ${formatStars(item.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ';
+                sellBtn.innerHTML = item.can_sell ? `ПРОДАТЬ ЗА ${starAmountMarkup(item.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ';
                 sellBtn.onclick = () => handleInventorySell(item);
                 startWithdrawCountdowns();
             }
@@ -3975,6 +4048,7 @@
         function closeNftModal(forceOrEvent = false) {
             const shouldClose = forceOrEvent === true || forceOrEvent?.target?.id === 'nft-detail-overlay';
             if (!shouldClose) return;
+            nftModalOpenToken++;
             document.getElementById('nft-detail-overlay').classList.remove('active');
             const modalMedia = document.getElementById('nft-modal-media');
             modalMedia.dataset.mediaWanted = 'false';
@@ -4296,7 +4370,7 @@
                                         onclick="event.stopPropagation(); withdraw('${i.id}')">${remaining > 0 ? formatWithdrawCountdown(remaining) : 'ВЫВЕСТИ'}</button>
                                 <button class="inventory-sell-btn ${i.can_sell ? '' : 'catalog-locked'}" ${withdrawDisabled ? 'disabled' : ''}
                                         onclick="event.stopPropagation(); handleInventorySell(inventoryData.find(item => String(item.id) === '${String(i.id)}'))">
-                                    ${i.can_sell ? `ПРОДАТЬ ЗА ${formatStars(i.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ'}
+                                    ${i.can_sell ? `ПРОДАТЬ ЗА ${starAmountMarkup(i.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ'}
                                 </button>
                             </div>
                         </div>`;
@@ -5910,7 +5984,7 @@
 
         updateCartFab();
         updateBalance();
-        restoreCatalogSnapshot();
+        clearLegacyCatalogSnapshots();
         loadCatalog(true);
         loadPrizeItems();
         loadLeaderboardPreview();
