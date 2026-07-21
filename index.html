@@ -1430,6 +1430,14 @@
             margin: 0; object-fit: cover;
         }
         .nft-live-media--modal .nft-live-model { inset: 6%; }
+        #catalog-container .nft-live-model { inset: 17.5%; }
+        .nft-live-media--case {
+            width: 100%; height: 100%; margin: 0; border-radius: inherit;
+            background: #242424;
+            box-shadow: inset 0 0 18px rgba(255,255,255,.035);
+        }
+        .nft-live-media--case .nft-live-pattern { display: none; }
+        .nft-live-media--case .nft-live-model { inset: 17.5%; }
         .nft-live-media:focus-visible { outline: 2px solid #e64dff; outline-offset: 2px; }
         .tab-bar {
             isolation: isolate;
@@ -1571,6 +1579,12 @@
             color: #fff4fb;
             letter-spacing: .045em;
             text-shadow: 0 0 17px rgba(225,76,255,.45), 0 0 28px rgba(255,49,103,.23);
+            min-height: 40px;
+            margin: -42px 48px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.15;
         }
         .case-modal-content .premium-back-btn {
             border-color: rgba(218,85,255,.52);
@@ -1958,6 +1972,14 @@
             clip-path: inset(0 round 24px) !important;
             -webkit-clip-path: inset(0 round 24px) !important;
         }
+        .case-modal-content .roulette-item > .nft-live-media--case {
+            width:100% !important; height:100% !important; min-width:100%; margin:0;
+            border-radius:20px !important; clip-path:inset(0 round 20px);
+        }
+        .case-modal-content .drop-row > .nft-live-media--case {
+            width:88px; height:88px; flex:0 0 88px; margin:0;
+            border-radius:14px; clip-path:inset(0 round 14px);
+        }
         .case-modal-content .roulette-item:not(.case-loading-item)::before {
             top: 50%;
             bottom: auto;
@@ -2279,7 +2301,8 @@
         .activity-strip.negative { --event-color:#ff4f87; }
         .activity-strip.bonus { --event-color:#c34dff; }
         .activity-strip.neutral { --event-color:#6e8eff; }
-        .activity-icon { width: 34px; height: 34px; display:grid; place-items:center; border:1px solid rgba(211,85,255,.42); border:1px solid color-mix(in srgb,var(--event-color) 48%,transparent); border-radius:11px; color:#fff0f7; background:rgba(40,12,54,.88); background:color-mix(in srgb,var(--event-color) 15%,rgba(8,4,14,.88)); font-size:1rem; box-shadow:inset 0 1px rgba(255,255,255,.06); }
+        .activity-icon { width: 38px; height: 38px; display:grid; place-items:center; border:1px solid rgba(211,85,255,.42); border:1px solid color-mix(in srgb,var(--event-color) 48%,transparent); border-radius:12px; color:#fff0f7; background:rgba(40,12,54,.88); background:linear-gradient(145deg,color-mix(in srgb,var(--event-color) 24%,rgba(24,8,38,.94)),rgba(7,3,14,.96)); box-shadow:inset 0 1px rgba(255,255,255,.11),0 7px 18px color-mix(in srgb,var(--event-color) 13%,transparent); }
+        .activity-icon svg { width:21px; height:21px; display:block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; filter:drop-shadow(0 0 5px color-mix(in srgb,var(--event-color) 58%,transparent)); }
         .activity-copy { min-width:0; }
         .activity-title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#fff7fb; font-size:.72rem; font-weight:800; }
         .activity-meta { margin-top:3px; color:#938897; font-size:.56rem; line-height:1.25; }
@@ -2489,8 +2512,8 @@
                 <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
             </div>
             <div class="referral-card">
-                <h3>РЕФЕРАЛЬНАЯ ПРОГРАММА · 5%</h3>
-                <p>Приглашайте новых пользователей и получайте 5% каждого их пополнения на бонусный баланс.</p>
+                <h3>РЕФЕРАЛЬНАЯ ПРОГРАММА · 10%</h3>
+                <p>Приглашайте новых пользователей и получайте 10% каждого их пополнения на бонусный баланс.</p>
                 <div class="referral-stats">
                     <div class="referral-stat"><b id="referrals-count">0</b><span>РЕФЕРАЛОВ</span></div>
                     <div class="referral-stat"><b class="star-amount"><span id="referral-earned">0</span><span class="bonus-star" aria-hidden="true"></span></b><span>НАЧИСЛЕНО</span></div>
@@ -3033,6 +3056,7 @@
                 element.dataset.mediaToken = String((Number(element.dataset.mediaToken) || 0) + 1);
                 element.classList.remove('is-live', 'has-live-frame');
                 element.dataset.mediaState = 'idle';
+                element.dataset.mediaPlayed = 'false';
             }
         }
 
@@ -3050,7 +3074,7 @@
             if (picture) {
                 element.dataset.mediaState = 'live';
                 element.classList.add('is-live');
-                if (!document.hidden && window.RLottie?.play) window.RLottie.play(picture);
+                if (!document.hidden && element.dataset.mediaPlayed !== 'true') window.RLottie?.playOnce?.(picture);
                 return;
             }
             queueNftMedia(element);
@@ -3091,12 +3115,13 @@
         function renderNftMedia(element, media, mediaToken) {
             const tgsUrl = safeTelegramMediaUrl(media?.tgsUrl);
             if (!element?.isConnected || element.dataset.mediaToken !== mediaToken || !tgsUrl || !window.RLottie?.isSupported) return false;
-            const colors = Array.isArray(media.colors) ? media.colors.filter(color => /^#[0-9a-fA-F]{6}$/.test(color)).slice(0, 2) : [];
+            const caseMode = media?.caseMode === true || element.dataset.mediaKind === 'case';
+            const colors = caseMode ? ['#242424', '#242424'] : (Array.isArray(media.colors) ? media.colors.filter(color => /^#[0-9a-fA-F]{6}$/.test(color)).slice(0, 2) : []);
             element.style.setProperty('--nft-bg-a', colors[0] || '#3e245d');
             element.style.setProperty('--nft-bg-b', colors[1] || '#160d27');
             const pattern = element.querySelector('.nft-live-pattern');
-            const patternUrl = safeTelegramMediaUrl(media.patternUrl);
-            renderSparseNftPattern(pattern, patternUrl, element.dataset.itemId);
+            const patternUrl = caseMode ? '' : safeTelegramMediaUrl(media.patternUrl);
+            renderSparseNftPattern(pattern, patternUrl, element.dataset.itemId || `${element.dataset.caseId}:${element.dataset.dropIndex}`);
 
             const picture = document.createElement('picture');
             picture.className = 'nft-live-model';
@@ -3109,9 +3134,15 @@
                 if (element.dataset.mediaWanted === 'true') {
                     element.classList.add('is-live');
                     if (picture.rlPlayer?.hasVisiblePixels) element.classList.add('has-live-frame');
+                    if (element.dataset.mediaPlayed !== 'true') window.RLottie?.playOnce?.(picture);
                 }
                 else pauseNftMedia(element);
             }, { once: true });
+            picture.addEventListener('tg:pause', () => {
+                if (!element.isConnected || element.dataset.mediaToken !== mediaToken) return;
+                element.dataset.mediaPlayed = 'true';
+                element.dataset.mediaState = 'complete';
+            });
             picture.addEventListener('tg:frame-visibility', (frameEvent) => {
                 if (!element.isConnected || element.dataset.mediaToken !== mediaToken || element.dataset.mediaWanted !== 'true') return;
                 element.classList.add('is-live');
@@ -3122,6 +3153,7 @@
             const isModal = element.classList.contains('nft-live-media--modal');
             window.RLottie.init(picture, {
                 maxDeviceRatio: isAndroidPlatform ? (isModal ? 1.2 : 1) : (isModal ? 1.5 : 1.25),
+                noAutoPlay: true,
                 // 1 keeps only frame zero in JS memory; workers render the
                 // remaining frames. This avoids iOS WebView memory pressure.
                 cachingModulo: 1
@@ -3148,15 +3180,34 @@
             return request;
         }
 
+        async function getCaseNftMedia(caseId, dropIndex) {
+            const cacheKey = `case:${Number(caseId)}:${Number(dropIndex)}`;
+            const cached = nftMediaCache.get(cacheKey);
+            if (cached && cached.expires > Date.now()) return cached.data;
+            if (nftMediaRequests.has(cacheKey)) return nftMediaRequests.get(cacheKey);
+            const request = apiFetch(`${API_BASE}/case/nft-media?case_id=${encodeURIComponent(caseId)}&drop_index=${encodeURIComponent(dropIndex)}`)
+                .catch(() => ({ animated: false }))
+                .then(media => {
+                    nftMediaCache.set(cacheKey, { data: media, expires: Date.now() + (media?.animated ? 10 * 60 * 1000 : 45 * 1000) });
+                    return media;
+                })
+                .finally(() => nftMediaRequests.delete(cacheKey));
+            nftMediaRequests.set(cacheKey, request);
+            return request;
+        }
+
         async function loadNftMedia(element) {
             const itemId = Number(element?.dataset.itemId || 0);
-            if (!itemId || !element?.isConnected || element.dataset.mediaWanted !== 'true') {
+            const caseId = Number(element?.dataset.caseId || 0);
+            const dropIndex = Number(element?.dataset.dropIndex ?? -1);
+            const hasDescriptor = itemId > 0 || (caseId > 0 && dropIndex >= 0);
+            if (!hasDescriptor || !element?.isConnected || element.dataset.mediaWanted !== 'true') {
                 if (element?.isConnected) element.dataset.mediaState = 'idle';
                 return;
             }
             element.dataset.mediaState = 'loading';
             const mediaToken = element.dataset.mediaToken || '0';
-            const media = await getNftMedia(itemId);
+            const media = itemId > 0 ? await getNftMedia(itemId) : await getCaseNftMedia(caseId, dropIndex);
             if (element.isConnected && element.dataset.mediaToken === mediaToken && element.dataset.mediaWanted === 'true' && media?.animated) {
                 if (!renderNftMedia(element, media, mediaToken)) element.dataset.mediaState = 'idle';
             } else if (element.isConnected) element.dataset.mediaState = 'idle';
@@ -3179,7 +3230,7 @@
             const picture = element.querySelector('.nft-live-model');
             if (picture) {
                 element.dataset.mediaState = 'live';
-                if (!document.hidden && window.RLottie?.play) window.RLottie.play(picture);
+                if (!document.hidden && element.dataset.mediaPlayed !== 'true') window.RLottie?.playOnce?.(picture);
                 return;
             }
             if (['queued', 'loading'].includes(element.dataset.mediaState)) return;
@@ -3233,6 +3284,11 @@
             }
         }
 
+        document.addEventListener('pointerover', event => {
+            const media = event.target.closest?.('#catalog-container .nft-live-media');
+            if (media && !media.closest('.item-card')?.hidden && media.dataset.mediaPlayed !== 'true') resumeNftMedia(media);
+        }, { passive: true });
+
         function auxNftMediaIsVisible(element) {
             const page = element?.closest('.page');
             return Boolean(
@@ -3271,7 +3327,10 @@
             document.querySelectorAll('.nft-live-model').forEach(picture => {
                 if (!window.RLottie) return;
                 if (document.hidden) window.RLottie.pause?.(picture);
-                else if (picture.closest('.nft-live-media')?.dataset.mediaWanted === 'true') window.RLottie.play?.(picture);
+                else {
+                    const media = picture.closest('.nft-live-media');
+                    if (media?.dataset.mediaWanted === 'true' && media.dataset.mediaPlayed !== 'true') window.RLottie.playOnce?.(picture);
+                }
             });
             if (!document.hidden) {
                 resumeCatalogNftMedia();
@@ -3589,8 +3648,7 @@
         function formatStars(value) {
             const amount = Number(value || 0);
             if (!Number.isFinite(amount)) return '0';
-            const fractional = Math.abs(amount - Math.round(amount)) > 0.0001;
-            return amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: fractional ? 2 : 0 });
+            return Math.floor(amount).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
         }
         function telegramStarMarkup() {
             return '<span class="telegram-star" aria-hidden="true"></span>';
@@ -3649,20 +3707,11 @@
                 modalTgBtn.style.display = 'none';
             }
 
-            let traits = [];
-            if(item.traits) {
-                if(typeof item.traits === 'string') try { traits = JSON.parse(item.traits); } catch(e) {}
-                else if(Array.isArray(item.traits)) traits = item.traits;
-            }
-
-            if (!isShopItem) {
-                const withoutModel = traits.filter(t => !['модель', 'model'].includes(
-                    String(t?.label || t?.name || t?.trait_type || '').trim().toLowerCase()
-                ));
-                traits = item.model
-                    ? [{ label: 'Модель', value: item.model }, ...withoutModel]
-                    : withoutModel;
-            }
+            const traits = [
+                { label: 'Модель', value: item.model },
+                { label: 'Узор', value: item.pattern },
+                { label: 'Фон', value: item.background }
+            ].filter(trait => trait.value != null && String(trait.value).trim() !== '');
 
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
                 `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${escapeHtml(t.label || t.name || t.trait_type || '—')}</div><div class="trait-value">${escapeHtml(t.value || '—')}</div></div>`).join('')}</div>` :
@@ -4043,20 +4092,37 @@
         }
 
         const activityVisuals = {
-            deposit: ['＋', 'Пополнение баланса'],
-            referral_bonus: ['↗', 'Реферальное начисление'],
-            catalog_purchase: ['◆', 'Покупка NFT'],
-            game_bet: ['−', 'Ставка в игре'],
-            game_win: ['♛', 'Выигрыш в игре'],
-            game_loss: ['·', 'Раунд без выигрыша'],
-            game_refund: ['↩', 'Возврат ставки'],
-            case_open: ['◇', 'Открытие кейса'],
-            case_prize: ['✦', 'Приз из кейса'],
-            case_sale: ['＋', 'Продажа приза'],
-            withdraw_request: ['↑', 'Запрос на вывод'],
-            withdraw_approved: ['✓', 'NFT выведен'],
-            withdraw_rejected: ['×', 'Вывод отклонён']
+            deposit: ['wallet', 'Пополнение баланса'],
+            referral_bonus: ['referral', 'Реферальное начисление'],
+            catalog_purchase: ['bag', 'Покупка NFT'],
+            game_bet: ['target', 'Ставка в игре'],
+            game_win: ['crown', 'Выигрыш в игре'],
+            game_refund: ['refund', 'Возврат ставки'],
+            case_open: ['case', 'Открытие кейса'],
+            case_prize: ['gift', 'Приз из кейса'],
+            case_sale: ['coins', 'Продажа приза'],
+            withdraw_request: ['send', 'Запрос на вывод'],
+            withdraw_approved: ['verified', 'NFT выведен'],
+            withdraw_rejected: ['blocked', 'Вывод отклонён']
         };
+        const activityIconPaths = {
+            wallet: '<path d="M4 7.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/><path d="M15 12h5v4h-5a2 2 0 1 1 0-4Z"/><path d="M8 9v6M5 12h6"/>',
+            referral: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.2"/><path d="M3.5 19c.5-4 2.3-6 5.5-6s5 2 5.5 6M14.5 15c2.9-.4 5 .9 6 3.8"/><path d="m16 4 2-2 2 2M18 2v4"/>',
+            bag: '<path d="M5 8h14l-1 12H6L5 8Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/><path d="m9 14 2 2 4-4"/>',
+            target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="m12 12 7-7M16 5h3v3"/>',
+            crown: '<path d="m4 8 4 4 4-7 4 7 4-4-2 10H6L4 8Z"/><path d="M7 21h10"/><circle cx="4" cy="7" r="1"/><circle cx="12" cy="4" r="1"/><circle cx="20" cy="7" r="1"/>',
+            refund: '<path d="M5 8H2l3-3"/><path d="M3 8a9 9 0 1 1 2 9"/><path d="M8 12h8M8 12l3-3M8 12l3 3"/>',
+            case: '<path d="m4 8 8-4 8 4-8 4-8-4Z"/><path d="m4 8 1 10 7 3 7-3 1-10M12 12v9"/><path d="m9 6 8 4"/>',
+            gift: '<rect x="3" y="9" width="18" height="11" rx="2"/><path d="M12 9v11M3 13h18"/><path d="M12 9H7.5a2.5 2.5 0 1 1 2-4c1.6 1.2 2.5 4 2.5 4ZM12 9h4.5a2.5 2.5 0 1 0-2-4C12.9 6.2 12 9 12 9Z"/>',
+            coins: '<ellipse cx="9" cy="7" rx="5" ry="2.5"/><path d="M4 7v4c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5V7M4 11v4c0 1.4 2.2 2.5 5 2.5 1 0 2-.2 2.8-.5"/><path d="M14 12c3.3 0 6 1.1 6 2.5S17.3 17 14 17c-.8 0-1.5-.1-2.2-.2M20 14.5v4c0 1.4-2.7 2.5-6 2.5-1.2 0-2.3-.1-3.2-.4"/>',
+            send: '<path d="m4 12 16-8-6 16-3-6-7-2Z"/><path d="m11 14 4-5"/>',
+            verified: '<path d="m12 3 7 3v5c0 4.6-2.8 8.2-7 10-4.2-1.8-7-5.4-7-10V6l7-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/>',
+            blocked: '<circle cx="12" cy="12" r="9"/><path d="m8 8 8 8M16 8l-8 8"/>'
+        };
+        function activityIconMarkup(name) {
+            const paths = activityIconPaths[name] || '<circle cx="12" cy="12" r="8"/><path d="M12 8v5M12 17h.01"/>';
+            return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+        }
         function activityTimestamp(value) {
             const date = new Date(value);
             if (Number.isNaN(date.getTime())) return '';
@@ -4072,11 +4138,11 @@
         }
         function activityEventMarkup(event) {
             const amount = event.amount == null ? null : Number(event.amount);
-            const [icon, fallback] = activityVisuals[event.event_type] || ['•', 'Событие'];
+            const [icon, fallback] = activityVisuals[event.event_type] || ['event', 'Событие'];
             const tone = event.balance_type === 'bonus' ? 'bonus' : (amount > 0 ? 'positive' : (amount < 0 ? 'negative' : 'neutral'));
             const amountMarkup = amount == null ? '' : `<span class="activity-amount star-amount"><span>${amount > 0 ? '+' : '−'}${formatStars(Math.abs(amount))}</span>${event.balance_type === 'bonus' ? bonusStarMarkup() : telegramStarMarkup()}</span>`;
             return `<article class="activity-strip ${tone}">
-                <div class="activity-icon">${icon}</div>
+                <div class="activity-icon">${activityIconMarkup(icon)}</div>
                 <div class="activity-copy"><div class="activity-title">${escapeHtml(event.title || fallback)}</div><div class="activity-meta">${escapeHtml(activityMeta(event))}</div></div>
                 <div class="activity-value">${amountMarkup}<time class="activity-time">${escapeHtml(activityTimestamp(event.created_at))}</time></div>
             </article>`;
@@ -5260,6 +5326,20 @@
             }
         }
 
+        function caseDropMediaMarkup(drop) {
+            const fallback = escapeHtml(safeImageUrl(drop?.image_url));
+            const title = escapeHtml(drop?.model || drop?.name || 'NFT');
+            if (!drop?.has_live_nft) return `<img src="${fallback}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+            const generatedItemId = Number(drop?.generated_item_id || 0);
+            const sourceData = generatedItemId > 0
+                ? `data-media-kind="case" data-item-id="${generatedItemId}"`
+                : `data-media-kind="case" data-case-id="${Number(currentCase?.id || 0)}" data-drop-index="${Number(drop?.drop_index ?? -1)}"`;
+            return `<div class="nft-live-media nft-live-media--case" data-media-scope="aux" ${sourceData} data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-token="0" aria-label="${title}">
+                <img src="${fallback}" class="nft-live-fallback" alt="">
+                <span class="nft-live-pattern" aria-hidden="true"></span>
+            </div>`;
+        }
+
         async function openCaseDetail(caseId) {
             const openToken = ++caseDetailOpenToken;
             currentCase = null;
@@ -5297,7 +5377,7 @@
                 document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
                         <span class="drop-chance">${Number(d.chance)}%</span>
-                        <img src="${escapeHtml(safeImageUrl(d.image_url))}" loading="eager" decoding="async" fetchpriority="high">
+                        ${caseDropMediaMarkup(d)}
                         <span class="drop-name">${escapeHtml(d.model || d.name)}</span>
                     </div>
                 `).join('');
@@ -5327,6 +5407,7 @@
                 track.style.paddingLeft = '0px';
 
                 startIdleRoulette(sortedDrops);
+                requestAnimationFrame(resumeAuxNftMedia);
             } catch(e) {
                 if (openToken !== caseDetailOpenToken) return;
                 modal.classList.remove('is-loading');
@@ -5355,14 +5436,7 @@
                 items.forEach(drop => {
                     const div = document.createElement('div');
                     div.className = 'roulette-item';
-                    const img = document.createElement('img');
-                    img.src = safeImageUrl(drop.image_url);
-                    img.alt = '';
-                    img.loading = 'eager';
-                    img.fetchPriority = 'high';
-                    img.decoding = 'async';
-                    img.draggable = false;
-                    div.appendChild(img);
+                    div.innerHTML = caseDropMediaMarkup(drop);
                     wrapper.appendChild(div);
                 });
                 return wrapper;
@@ -5371,6 +5445,7 @@
             track.appendChild(createSet());
             void track.offsetWidth;
             track.classList.add('idle-scroll');
+            requestAnimationFrame(resumeAuxNftMedia);
         }
 
         function startActiveRoulette(drops, wonItem) {
@@ -5394,16 +5469,10 @@
             items.forEach(drop => {
                 const div = document.createElement('div');
                 div.className = 'roulette-item';
-                const img = document.createElement('img');
-                img.src = safeImageUrl(drop.image_url);
-                img.alt = '';
-                img.loading = 'eager';
-                img.fetchPriority = 'high';
-                img.decoding = 'async';
-                img.draggable = false;
-                div.appendChild(img);
+                div.innerHTML = caseDropMediaMarkup(drop);
                 track.appendChild(div);
             });
+            requestAnimationFrame(resumeAuxNftMedia);
 
             const itemWidth = 126;
             const gap = 15;

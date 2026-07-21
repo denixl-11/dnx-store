@@ -12,7 +12,7 @@ import time
 import secrets
 import uuid
 from collections import defaultdict, deque
-from decimal import Decimal, InvalidOperation, ROUND_CEILING
+from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR
 from functools import wraps
 from html.parser import HTMLParser
 from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
@@ -46,7 +46,7 @@ STAR_MIN_TOPUP = int(os.getenv("STAR_MIN_TOPUP", "10"))
 STAR_MAX_TOPUP = int(os.getenv("STAR_MAX_TOPUP", "10000"))
 STAR_MIN_BET = Decimal(os.getenv("STAR_MIN_BET", "10"))
 STAR_BET_STEP = Decimal(os.getenv("STAR_BET_STEP", "10"))
-REFERRAL_RATE = Decimal("0.05")
+REFERRAL_RATE = Decimal("0.10")
 REFERRAL_CODE_LENGTH = 25
 REFERRAL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 BOT_USERNAME = os.getenv("BOT_USERNAME", "").strip().lstrip("@")
@@ -81,6 +81,14 @@ ton_http_session: aiohttp.ClientSession | None = None
 nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_media_fetch_semaphore = asyncio.Semaphore(4)
 star_reconcile_attempts: dict[str, float] = {}
+
+
+def floor_stars(value) -> Decimal:
+    """Return a finite, non-negative Stars amount rounded down to an integer."""
+    amount = Decimal(str(value))
+    if not amount.is_finite() or amount < 0:
+        raise ValueError("Stars amount must be finite and non-negative")
+    return amount.to_integral_value(rounding=ROUND_FLOOR)
 
 
 async def record_user_event(
@@ -201,8 +209,8 @@ async def credit_main_deposit(
     source_type: str,
     source_id: str,
 ) -> Decimal:
-    """Credit a real deposit and award its one-time 5% referral bonus."""
-    deposit_amount = Decimal(str(amount))
+    """Credit a real deposit and award its one-time 10% referral bonus."""
+    deposit_amount = floor_stars(amount)
     result = await conn.execute(
         "UPDATE users SET balance = balance + $1 WHERE id = $2",
         deposit_amount,
@@ -223,7 +231,7 @@ async def credit_main_deposit(
     referrer_id = await conn.fetchval("SELECT referred_by FROM users WHERE id = $1", user_id)
     if not referrer_id:
         return Decimal("0")
-    reward = (deposit_amount * REFERRAL_RATE).quantize(Decimal("0.01"))
+    reward = floor_stars(deposit_amount * REFERRAL_RATE)
     if reward <= 0:
         return Decimal("0")
     inserted = await conn.fetchval(
@@ -299,6 +307,26 @@ def load_cases_from_env():
         }
 
 load_cases_from_env()   # заполнили CASES_CACHE
+
+
+def case_drop_attribute(drop: dict, attribute: str) -> str | None:
+    """Read a case-drop attribute from new fields or legacy CASES_JSON traits."""
+    direct = drop.get(attribute)
+    if direct in (None, ""):
+        direct = drop.get(attribute.capitalize())
+    if direct not in (None, ""):
+        return str(direct)[:255]
+    aliases = {
+        "model": {"model", "модель"},
+        "pattern": {"pattern", "узор"},
+        "background": {"background", "фон"},
+    }
+    legacy_traits = drop.get("traits") if isinstance(drop.get("traits"), list) else []
+    for trait in legacy_traits:
+        label = str(trait.get("label") or trait.get("name") or trait.get("trait_type") or "").strip().lower()
+        if label in aliases.get(attribute, set()) and trait.get("value") not in (None, ""):
+            return str(trait["value"])[:255]
+    return None
 
 
 def case_allows_bonus(case: dict) -> bool:
@@ -388,8 +416,8 @@ async def init_db():
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
                         username VARCHAR(255),
-                        balance NUMERIC DEFAULT 0.0,
-                        bonus_balance NUMERIC(20, 2) NOT NULL DEFAULT 0,
+                        balance NUMERIC(20, 0) DEFAULT 0,
+                        bonus_balance NUMERIC(20, 0) NOT NULL DEFAULT 0,
                         referral_code VARCHAR(25),
                         referred_by VARCHAR(255),
                         mut INTEGER,
@@ -397,8 +425,11 @@ async def init_db():
                         mut_until TIMESTAMPTZ
                     )
                 """)
-                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_balance NUMERIC(20, 2) DEFAULT 0")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_balance NUMERIC(20, 0) DEFAULT 0")
                 await conn.execute("UPDATE users SET bonus_balance = 0 WHERE bonus_balance IS NULL")
+                await conn.execute("UPDATE users SET balance = FLOOR(GREATEST(COALESCE(balance, 0), 0)), bonus_balance = FLOOR(GREATEST(COALESCE(bonus_balance, 0), 0))")
+                await conn.execute("ALTER TABLE users ALTER COLUMN balance TYPE NUMERIC(20, 0) USING FLOOR(GREATEST(COALESCE(balance, 0), 0))")
+                await conn.execute("ALTER TABLE users ALTER COLUMN bonus_balance TYPE NUMERIC(20, 0) USING FLOOR(GREATEST(COALESCE(bonus_balance, 0), 0))")
                 await conn.execute("ALTER TABLE users ALTER COLUMN bonus_balance SET NOT NULL")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(25)")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by VARCHAR(255)")
@@ -453,16 +484,49 @@ async def init_db():
                         status VARCHAR(50) DEFAULT 'Доступен',
                         image_url TEXT,
                         nft_link TEXT DEFAULT '',
-                        traits JSONB DEFAULT '[]'::jsonb,
+                        model VARCHAR(255),
+                        pattern VARCHAR(255),
+                        background VARCHAR(255),
                         buyer_id VARCHAR(255),
                         number VARCHAR(20),
                         last_event VARCHAR(50)
                     )
                 """)
-                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS model VARCHAR(255) DEFAULT ''")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS model VARCHAR(255)")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS pattern VARCHAR(255)")
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS background VARCHAR(255)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS buyer_id VARCHAR(255)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS nft_link TEXT DEFAULT ''")
-                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS traits JSONB DEFAULT '[]'::jsonb")
+                traits_column_exists = await conn.fetchval("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'items' AND column_name = 'traits')")
+                if traits_column_exists:
+                    await conn.execute("""
+                        UPDATE items
+                        SET model = COALESCE(NULLIF(model, ''), (
+                                SELECT elem->>'value' FROM jsonb_array_elements(
+                                    CASE WHEN jsonb_typeof(COALESCE(items.traits, '[]'::jsonb)) = 'array'
+                                         THEN COALESCE(items.traits, '[]'::jsonb) ELSE '[]'::jsonb END
+                                ) AS elem
+                                WHERE LOWER(COALESCE(elem->>'label', elem->>'name', elem->>'trait_type', '')) IN ('model', 'модель')
+                                LIMIT 1
+                            )),
+                            pattern = COALESCE(NULLIF(pattern, ''), (
+                                SELECT elem->>'value' FROM jsonb_array_elements(
+                                    CASE WHEN jsonb_typeof(COALESCE(items.traits, '[]'::jsonb)) = 'array'
+                                         THEN COALESCE(items.traits, '[]'::jsonb) ELSE '[]'::jsonb END
+                                ) AS elem
+                                WHERE LOWER(COALESCE(elem->>'label', elem->>'name', elem->>'trait_type', '')) IN ('pattern', 'узор')
+                                LIMIT 1
+                            )),
+                            background = COALESCE(NULLIF(background, ''), (
+                                SELECT elem->>'value' FROM jsonb_array_elements(
+                                    CASE WHEN jsonb_typeof(COALESCE(items.traits, '[]'::jsonb)) = 'array'
+                                         THEN COALESCE(items.traits, '[]'::jsonb) ELSE '[]'::jsonb END
+                                ) AS elem
+                                WHERE LOWER(COALESCE(elem->>'label', elem->>'name', elem->>'trait_type', '')) IN ('background', 'фон')
+                                LIMIT 1
+                            ))
+                    """)
+                    await conn.execute("ALTER TABLE items DROP COLUMN traits")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS acquisition_source VARCHAR(20) DEFAULT 'catalog'")
@@ -508,6 +572,7 @@ async def init_db():
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
                 """)
+                await conn.execute("DELETE FROM user_events WHERE event_type = 'game_loss'")
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS game_history (
                         id SERIAL PRIMARY KEY,
@@ -768,7 +833,7 @@ def normalize_records(rows) -> list[dict]:
         item = dict(row)
         for key, value in list(item.items()):
             if isinstance(value, Decimal):
-                item[key] = float(value)
+                item[key] = int(value) if value == value.to_integral_value() else float(value)
             elif isinstance(value, (datetime, date)):
                 item[key] = value.isoformat()
         if isinstance(item.get("traits"), str):
@@ -1224,7 +1289,7 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
     others_bets = pool - winner_bet
     winner_balance_type = players[winner_id].get("balance_type", "main")
     profit_share = 0.4 if winner_balance_type == "bonus" else 0.7
-    profit = winner_bet + (others_bets * profit_share)
+    profit = floor_stars(winner_bet + (others_bets * profit_share))
 
     if pool > 0:
         win_percent = round((winner_bet / pool) * 100, 1)
@@ -1238,7 +1303,7 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
                     return None
                 await conn.execute(
                     "UPDATE users SET balance = balance + $1 WHERE id = $2",
-                    Decimal(str(profit)), winner_id)
+                    profit, winner_id)
                 await conn.execute("""
                     INSERT INTO leaderboard (user_id, username, wins) VALUES ($1, $2, 1)
                     ON CONFLICT (user_id) DO UPDATE SET wins = leaderboard.wins + 1, username = EXCLUDED.username
@@ -1246,13 +1311,13 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
                 await conn.execute(
                     "INSERT INTO game_history (game_number, winner_name, win_amount, win_percent) VALUES ($1, $2, $3, $4)",
                     game_state["game_number"], winner_username,
-                    Decimal(str(profit)), Decimal(str(win_percent))
+                    profit, Decimal(str(win_percent))
                 )
                 await record_user_event(
                     conn,
                     winner_id,
                     "game_win",
-                    amount=Decimal(str(profit)),
+                    amount=profit,
                     balance_type="main",
                     title="Выигрыш в игре",
                     metadata={
@@ -1262,20 +1327,6 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
                         "win_percent": win_percent,
                     },
                 )
-                for player_id, player in players.items():
-                    if player_id == winner_id:
-                        continue
-                    await record_user_event(
-                        conn,
-                        player_id,
-                        "game_loss",
-                        title="Раунд завершён без выигрыша",
-                        metadata={
-                            "game_number": game_state["game_number"],
-                            "bet": player.get("amount", 0),
-                            "stake_balance_type": player.get("balance_type", "main"),
-                        },
-                    )
                 await conn.execute(
                     "DELETE FROM game_history WHERE id NOT IN (SELECT id FROM game_history ORDER BY game_number DESC LIMIT 100)")
                 new_num = await conn.fetchval(
@@ -1284,7 +1335,7 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
         return {
             "user_id": winner_id,
             "username": winner_username,
-            "win_amount": profit,
+            "win_amount": int(profit),
             "photo_url": photo_url,
             "round_id": game_state["round_id"],
             "polygon": winner_polygon,
@@ -1488,8 +1539,8 @@ async def handle_get_user(request):
                     """,
                     user_id,
                 )
-        balance = float(row["balance"] or 0)
-        bonus_balance = float(row["bonus_balance"] or 0)
+        balance = int(row["balance"] or 0)
+        bonus_balance = int(row["bonus_balance"] or 0)
         referral_link = (
             f"https://t.me/{BOT_USERNAME}?start=ref_{row['referral_code']}"
             if BOT_USERNAME and row["referral_code"]
@@ -1505,7 +1556,7 @@ async def handle_get_user(request):
         "bonusBalance": bonus_balance,
         "referralLink": referral_link,
         "referralsCount": int(row["referrals_count"] or 0),
-        "referralEarned": float(row["referral_earned"] or 0),
+        "referralEarned": int(Decimal(str(row["referral_earned"] or 0)).to_integral_value(rounding=ROUND_FLOOR)),
         "restriction": restriction,
     }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -1851,7 +1902,7 @@ async def handle_star_payment_status(request):
 async def handle_get_items(request):
     try:
         rows = await get_pool().fetch(
-            "SELECT id, name, price, status, image_url, nft_link, traits, number, model FROM items WHERE status = 'Доступен'")
+            "SELECT id, name, price, status, image_url, nft_link, number, model, pattern, background FROM items WHERE status = 'Доступен'")
         items = normalize_records(rows)
         now = time.monotonic()
         for item in items:
@@ -1964,7 +2015,7 @@ async def handle_get_inventory(request):
                 user_id,
             )
             rows = await conn.fetch(
-                """SELECT id, name, price, image_url, nft_link, model, status, traits, number,
+                """SELECT id, name, price, image_url, nft_link, model, pattern, background, status, number,
                           acquisition_source, last_event, withdraw_requested_at, withdraw_expires_at,
                           disposed_at,
                           GREATEST(0, EXTRACT(EPOCH FROM (withdraw_expires_at - NOW())))::BIGINT
@@ -2079,9 +2130,13 @@ async def handle_buy(request):
                 if len(items) != len(item_ids):
                     return web.json_response({"success": False, "error": "items_unavailable"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                prices = [Decimal(str(item['price'])) for item in items]
-                if any(not price.is_finite() or price != price.to_integral_value() or price <= 0 for price in prices):
-                    logging.error("Catalog contains a non-integer or non-positive Stars price")
+                raw_prices = [Decimal(str(item['price'])) for item in items]
+                if any(not price.is_finite() or price <= 0 for price in raw_prices):
+                    logging.error("Catalog contains an invalid Stars price")
+                    return web.json_response({"success": False, "error": "invalid_item_price"}, status=500)
+                prices = [floor_stars(price) for price in raw_prices]
+                if any(price <= 0 for price in prices):
+                    logging.error("Catalog price became zero after flooring")
                     return web.json_response({"success": False, "error": "invalid_item_price"}, status=500)
                 total_price = sum(prices, Decimal("0"))
                 current_balance = Decimal(str(locked_user['balance']))
@@ -2117,7 +2172,7 @@ async def handle_buy(request):
                         (
                             int(item['id']),
                             user_id,
-                            Decimal(str(item['price'])),
+                            floor_stars(item['price']),
                             json.dumps({"purchase_id": str(purchase_id)}),
                         )
                         for item in items
@@ -2133,7 +2188,7 @@ async def handle_buy(request):
                     metadata={"purchase_id": str(purchase_id), "item_ids": item_ids},
                 )
         return web.json_response(
-            {"success": True, "balance": float(new_balance), "purchaseId": str(purchase_id)},
+            {"success": True, "balance": int(new_balance), "purchaseId": str(purchase_id)},
             headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
         )
     except Exception as e:
@@ -2257,7 +2312,8 @@ async def handle_game_bet(request):
         if parsed_amount is None:
             return web.json_response({"success": False, "error": "min_bet"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-        if parsed_amount != parsed_amount.to_integral_value() or parsed_amount % STAR_BET_STEP != 0:
+        parsed_amount = floor_stars(parsed_amount)
+        if parsed_amount < STAR_MIN_BET or parsed_amount % STAR_BET_STEP != 0:
             return web.json_response({"success": False, "error": "invalid_amount"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         amount = float(parsed_amount)
@@ -2274,6 +2330,7 @@ async def handle_game_bet(request):
             ):
                 return web.json_response({"success": False, "error": "balance_type_locked"}, status=409)
             balance_column = "bonus_balance" if balance_type == "bonus" else "balance"
+            existing_player = game_state["players"].get(user_id)
             async with get_pool().acquire() as conn:
                 async with conn.transaction():
                     new_balance = await conn.fetchval(
@@ -2282,18 +2339,41 @@ async def handle_game_bet(request):
                     if new_balance is None:
                         return web.json_response({"success": False, "error": "insufficient_funds"},
                                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                    await record_user_event(
-                        conn,
-                        user_id,
-                        "game_bet",
-                        amount=-parsed_amount,
-                        balance_type=balance_type,
-                        title="Ставка в игре",
-                        metadata={"game_number": game_state.get("game_number", 0)},
-                    )
+                    history_event_id = existing_player.get("history_event_id") if existing_player else None
+                    if history_event_id:
+                        updated_event = await conn.fetchval(
+                            """
+                            UPDATE user_events
+                            SET amount = amount - $1,
+                                metadata = jsonb_set(metadata, '{total_bet}', to_jsonb((ABS(amount) + $1)::numeric), true)
+                            WHERE id = $2 AND user_id = $3 AND event_type = 'game_bet'
+                            RETURNING id
+                            """,
+                            parsed_amount,
+                            history_event_id,
+                            user_id,
+                        )
+                        if not updated_event:
+                            history_event_id = None
+                    if not history_event_id:
+                        history_event_id = await conn.fetchval(
+                            """
+                            INSERT INTO user_events (user_id, event_type, amount, balance_type, title, metadata)
+                            VALUES ($1, 'game_bet', $2, $3, 'Ставка в игре', $4::jsonb)
+                            RETURNING id
+                            """,
+                            user_id,
+                            -parsed_amount,
+                            balance_type,
+                            json.dumps({
+                                "game_number": game_state.get("game_number", 0),
+                                "total_bet": int(parsed_amount),
+                            }),
+                        )
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
                 game_state["players"][user_id]["bets_count"] += 1
+                game_state["players"][user_id]["history_event_id"] = history_event_id
             else:
                 occupied_colors = {p["color"] for p in game_state["players"].values()}
                 color = choose_player_palette(occupied_colors)
@@ -2303,6 +2383,7 @@ async def handle_game_bet(request):
                     "amount": amount, "color": color,
                     "balance_type": balance_type,
                     "bets_count": 1,
+                    "history_event_id": history_event_id,
                     "photo_url": photo_url
                 }
             game_state["pool"] += amount
@@ -2486,11 +2567,44 @@ async def handle_get_case_details(request):
         "image_url": case["image_url"],
         "bonus_enabled": case_allows_bonus(case),
         "drops": [
-            {key: value for key, value in drop.items() if key != "real_chance"}
-            for drop in case["drops"]
+            {
+                **{key: value for key, value in drop.items() if key not in {"real_chance", "nft_link", "traits"}},
+                "drop_index": index,
+                "has_live_nft": bool(canonical_telegram_nft_url(drop.get("nft_link"))),
+                "model": case_drop_attribute(drop, "model"),
+                "pattern": case_drop_attribute(drop, "pattern"),
+                "background": case_drop_attribute(drop, "background"),
+            }
+            for index, drop in enumerate(case["drops"])
         ],
     }
     return web.json_response(result, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+@rate_limit(90, 60)
+async def handle_case_nft_media(request):
+    """Serve case animation metadata while keeping its Telegram NFT link private."""
+    try:
+        case_id = int(request.query.get("case_id", "0"))
+        drop_index = int(request.query.get("drop_index", "-1"))
+    except (TypeError, ValueError):
+        return web.json_response({"animated": False, "error": "invalid_drop"}, status=400)
+    case = CASES_CACHE.get(case_id)
+    drops = case.get("drops") if isinstance(case, dict) else None
+    if not isinstance(drops, list) or not 0 <= drop_index < len(drops):
+        return web.json_response({"animated": False, "error": "drop_not_found"}, status=404)
+    source_url = canonical_telegram_nft_url(drops[drop_index].get("nft_link"))
+    if not source_url:
+        return web.json_response({"animated": False})
+    media = dict(await fetch_telegram_nft_media(source_url, -(case_id * 1000 + drop_index + 1)))
+    media.update({
+        "patternUrl": None,
+        "patternColor": "#242424",
+        "colors": ["#242424", "#242424"],
+        "caseMode": True,
+    })
+    return web.json_response(media)
 
 @require_auth
 @rate_limit(30, 60)
@@ -2518,8 +2632,12 @@ async def handle_open_case(request):
             return web.json_response({"success": False, "error": "empty_case"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
         case_price = parse_positive_amount(case.get('price'))
-        if case_price is None or case_price != case_price.to_integral_value():
+        if case_price is None:
             logging.error("Invalid price in CASES_JSON for case %s", case_id)
+            return web.json_response({"success": False, "error": "invalid_case_config"}, status=500)
+        case_price = floor_stars(case_price)
+        if case_price <= 0:
+            logging.error("Case price became zero after flooring for case %s", case_id)
             return web.json_response({"success": False, "error": "invalid_case_config"}, status=500)
         async with get_pool().acquire() as conn:
             async with conn.transaction():
@@ -2553,27 +2671,29 @@ async def handle_open_case(request):
                 rand_val = random.uniform(0, total_chance)
                 current_sum = 0
                 won_drop = drops[-1]
-                for drop, real_chance in zip(drops, real_chances):
+                won_drop_index = len(drops) - 1
+                for drop_index, (drop, real_chance) in enumerate(zip(drops, real_chances)):
                     current_sum += real_chance
                     if rand_val <= current_sum:
                         won_drop = drop
+                        won_drop_index = drop_index
                         break
 
                 drop_value = Decimal(str(won_drop['value']))
-                if (not drop_value.is_finite() or drop_value < 0 or drop_value > Decimal("1000000")
-                        or drop_value != drop_value.to_integral_value()):
+                if not drop_value.is_finite() or drop_value < 0 or drop_value > Decimal("1000000"):
                     raise ValueError("invalid drop value in CASES_JSON")
+                drop_value = floor_stars(drop_value)
 
                 new_item_id = await conn.fetchval("""
                     INSERT INTO items (
-                        name, price, status, image_url, model, buyer_id, nft_link, traits, number,
+                        name, price, status, image_url, model, pattern, background, buyer_id, nft_link, number,
                         acquisition_source, last_event
                     )
-                    VALUES ($1, $2, 'Продан', $3, $4, $5, $6, $7::jsonb, $8, 'case', 'case_drop') RETURNING id
+                    VALUES ($1, $2, 'Продан', $3, $4, $5, $6, $7, $8, $9, 'case', 'case_drop') RETURNING id
                 """, str(won_drop['name'])[:255], drop_value,
-                      safe_https_url(won_drop.get('image_url')), str(won_drop.get('model', ''))[:255], user_id,
+                      safe_https_url(won_drop.get('image_url')), case_drop_attribute(won_drop, "model"),
+                      case_drop_attribute(won_drop, "pattern"), case_drop_attribute(won_drop, "background"), user_id,
                       canonical_telegram_nft_url(won_drop.get('nft_link')),
-                      json.dumps(won_drop.get('traits') if isinstance(won_drop.get('traits'), list) else []),
                       str(won_drop.get('number') or '')[:20])
 
                 await conn.execute(
@@ -2594,7 +2714,11 @@ async def handle_open_case(request):
 
                 won_item_dict = dict(won_drop)
                 won_item_dict.pop('real_chance', None)
+                won_item_dict.pop('nft_link', None)
+                won_item_dict.pop('traits', None)
                 won_item_dict['generated_item_id'] = new_item_id
+                won_item_dict['drop_index'] = won_drop_index
+                won_item_dict['has_live_nft'] = bool(canonical_telegram_nft_url(won_drop.get('nft_link')))
 
         return web.json_response({"success": True, "won_item": won_item_dict},
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -2629,24 +2753,25 @@ async def handle_sell_drop(request):
                 if not item:
                     return web.json_response({"success": False, "error": "item_not_found"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-                await conn.execute("UPDATE users SET balance = balance + $1 WHERE id = $2", item['price'], user_id)
+                sale_price = floor_stars(item['price'])
+                await conn.execute("UPDATE users SET balance = balance + $1 WHERE id = $2", sale_price, user_id)
                 await conn.execute(
                     """INSERT INTO item_events (item_id, user_id, event_type, amount)
                        VALUES ($1, $2, 'case_drop_sold', $3)""",
                     item_id,
                     user_id,
-                    item['price'],
+                    sale_price,
                 )
                 await record_user_event(
                     conn,
                     user_id,
                     "case_sale",
-                    amount=item['price'],
+                    amount=sale_price,
                     balance_type="main",
                     title=f"Продажа приза · {item['name']}",
                     metadata={"item_id": item_id},
                 )
-        return web.json_response({"success": True, "credited": float(item['price'])}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        return web.json_response({"success": True, "credited": int(sale_price)}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Sell drop error: {e}")
         return web.json_response({"success": False, "error": "server_error"}, status=500,
@@ -2927,6 +3052,7 @@ app.router.add_get('/season/state', handle_season_state)
 app.router.add_get('/prize/items', handle_get_prize_items)
 app.router.add_get('/cases', handle_get_cases)
 app.router.add_get('/case-details', handle_get_case_details)
+app.router.add_get('/case/nft-media', handle_case_nft_media)
 app.router.add_post('/open-case', handle_open_case)
 app.router.add_post('/sell-drop', handle_sell_drop)
 app.router.add_options('/{tail:.*}', handle_options)
