@@ -2390,6 +2390,140 @@
             .leaderboard-you { margin-left:0; }
         }
 
+        /* ===== V8.7: 70/30 live NFT media and precise case controls ===== */
+        .nft-live-media--modal .nft-live-model,
+        #catalog-container .nft-live-model,
+        .nft-live-media--cart .nft-live-model,
+        .nft-live-media--inventory .nft-live-model,
+        .nft-live-media--case .nft-live-model {
+            inset: 15% !important;
+        }
+        .nft-live-media .nft-live-fallback { display: none !important; }
+        .nft-live-media {
+            background:
+                radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--nft-bg-a) 88%, #fff 12%), var(--nft-bg-b) 83%);
+        }
+        .nft-live-media--case {
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .case-win-media-host {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 10px;
+            border-radius: 19px;
+            overflow: hidden;
+            filter: drop-shadow(0 8px 19px rgba(179, 54, 255, .24));
+        }
+        .case-win-media-host > .nft-live-media--case,
+        .case-win-media-host > img {
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            border-radius: inherit !important;
+            object-fit: contain;
+        }
+
+        .case-modal-content .drop-list {
+            align-items: stretch;
+            gap: 14px;
+            padding: 7px 3px 18px;
+        }
+        .case-modal-content .drop-row {
+            min-height: 172px;
+            padding: 43px 12px 15px !important;
+            border: 1px solid rgba(202, 79, 255, .36) !important;
+            border-radius: 21px !important;
+            background:
+                radial-gradient(circle at 50% 23%, rgba(151, 73, 222, .27), transparent 42%),
+                linear-gradient(150deg, rgba(50, 18, 80, .96), rgba(13, 6, 23, .98) 67%, rgba(75, 13, 52, .82)) !important;
+            box-shadow: inset 0 1px rgba(255,255,255,.08), 0 11px 26px rgba(0,0,0,.34) !important;
+        }
+        .case-modal-content .drop-row .drop-chance {
+            position: absolute !important;
+            z-index: 8;
+            top: 10px !important;
+            left: 50% !important;
+            right: auto !important;
+            min-width: 58px;
+            min-height: 25px;
+            margin: 0 !important;
+            padding: 4px 12px !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transform: translateX(-50%);
+            border: 1px solid rgba(255, 210, 105, .58) !important;
+            border-radius: 999px !important;
+            color: #ffe29a !important;
+            background: linear-gradient(115deg, rgba(102, 55, 29, .9), rgba(69, 31, 91, .93)) !important;
+            box-shadow: 0 7px 17px rgba(0,0,0,.34), inset 0 1px rgba(255,255,255,.16), 0 0 15px rgba(246, 177, 67, .1) !important;
+            font-size: .66rem !important;
+            font-weight: 900 !important;
+            line-height: 1 !important;
+            letter-spacing: .02em;
+            white-space: nowrap;
+        }
+        .case-modal-content .drop-row > .nft-live-media--case,
+        .case-modal-content .drop-row > img {
+            margin: 0 auto 10px !important;
+        }
+        .case-modal-content .drop-row .drop-name {
+            width: 100%;
+            min-height: 30px;
+            margin: auto 0 0 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #f5eaf8;
+            font-size: .72rem;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+
+        #sell-drop-btn,
+        .inventory-card-actions .inventory-sell-btn,
+        #nft-modal-btn-sell.btn-inventory-sell {
+            box-sizing: border-box !important;
+            -webkit-appearance: none;
+            appearance: none;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 76, 139, .58) !important;
+            border-radius: 14px !important;
+            color: #ffe8f2;
+            background: linear-gradient(115deg, rgba(126, 18, 69, .74), rgba(71, 20, 103, .68)) !important;
+            box-shadow: inset 0 1px rgba(255,255,255,.09), 0 8px 20px rgba(70,8,47,.2);
+            font-family: inherit;
+            font-weight: 850;
+            line-height: 1.1;
+            text-align: center;
+        }
+        .inventory-card-actions .inventory-sell-btn { width: 100%; min-height: 42px; padding: 8px 10px; }
+        #nft-modal-btn-sell.btn-inventory-sell { width: 100%; min-height: 54px; padding: 9px 16px; }
+        #sell-drop-btn {
+            width: min(100%, 320px) !important;
+            max-width: 320px !important;
+            min-height: 56px;
+            margin: 14px auto 0;
+            padding: 10px 20px !important;
+            gap: 7px;
+            border-radius: 18px !important;
+            font-size: .82rem !important;
+            letter-spacing: .055em;
+        }
+        #sell-drop-btn .star-amount { display: inline-flex; align-items: center; gap: 4px; }
+        #sell-drop-btn:disabled,
+        .inventory-sell-btn:disabled,
+        #nft-modal-btn-sell:disabled {
+            color: #918792 !important;
+            border-color: rgba(139, 119, 144, .26) !important;
+            background: rgba(30, 22, 34, .76) !important;
+            box-shadow: none !important;
+        }
+
         .account-restriction-modal { z-index: 10000 !important; background:rgba(2,1,7,.97) !important; }
         .account-restriction-card { width:min(92vw,480px); padding:32px 24px 25px; border:1px solid rgba(225,69,150,.58); border-radius:25px; text-align:center; background:radial-gradient(circle at 50% 0,rgba(143,38,212,.22),transparent 36%),linear-gradient(155deg,#13071f,#07030d 62%,#1c0714); box-shadow:0 28px 80px rgba(0,0,0,.72),0 0 42px rgba(210,45,152,.13),inset 0 1px rgba(255,255,255,.07); }
         .restriction-icon { width:70px; height:70px; margin:0 auto 18px; display:grid; place-items:center; border:1px solid rgba(235,89,170,.55); border-radius:50%; color:#ff8dbb; background:radial-gradient(circle,rgba(196,43,139,.26),rgba(41,10,60,.82)); font-size:1.8rem; box-shadow:0 0 28px rgba(223,62,171,.18); }
@@ -2544,7 +2678,6 @@
             </div>
             <div class="nft-modal-header-rocket">
                 <div id="nft-modal-media" class="nft-live-media nft-live-media--modal" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="Анимированный NFT">
-                    <img src="" id="nft-modal-img" class="nft-live-fallback" alt="">
                     <span class="nft-live-pattern" aria-hidden="true"></span>
                 </div>
                 <div class="nft-modal-title-wrap">
@@ -2727,7 +2860,7 @@
                     <div id="roulette-track"></div>
                 </div>
                 <div id="win-display" style="display: none; text-align: center; margin-top: 15px;">
-                    <img id="win-image" src="" alt="Выигранный предмет" style="width: 120px; height: 120px; object-fit: contain; filter: drop-shadow(0 5px 15px rgba(212, 175, 55, 0.4));">
+                    <div id="win-media-host" class="case-win-media-host"></div>
                     <div id="win-name" style="color: #e5c07b; font-size: 1.2rem; font-weight: bold; margin: 10px 0;"></div>
 
                     <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 15px;">
@@ -3091,6 +3224,20 @@
             queueNftMedia(element);
         }
 
+        function primeNftMedia(element) {
+            if (!element?.isConnected || element.hidden || element.closest('[hidden]')) return;
+            if (element.dataset.mediaPlayed === 'playing' || element.dataset.mediaPlayed === 'true') return;
+            element.dataset.mediaWanted = 'true';
+            const picture = element.querySelector('.nft-live-model');
+            if (picture) {
+                element.dataset.mediaState = 'ready';
+                element.classList.add('is-live');
+                window.RLottie?.pause?.(picture);
+                return;
+            }
+            queueNftMedia(element);
+        }
+
         function sparsePatternSeed(value) {
             let hash = 2166136261;
             for (const char of String(value || '0')) {
@@ -3262,12 +3409,11 @@
             if (nftMediaObserver) nftMediaObserver.disconnect();
             const elements = [...document.querySelectorAll('#catalog-container .nft-live-media')];
             if (!elements.length) return;
-            if (NFT_MEDIA_HOVER_MODE) return;
             if (!('IntersectionObserver' in window)) {
                 elements.filter(element => !element.closest('.item-card')?.hidden).forEach(element => {
                     element.dataset.mediaInView = 'true';
                     element.dataset.mediaPlayed = 'false';
-                    resumeNftMedia(element);
+                    (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(element);
                 });
                 return;
             }
@@ -3280,7 +3426,7 @@
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
                         entry.target.dataset.mediaPlayed = 'false';
-                        resumeNftMedia(entry.target);
+                        (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(entry.target);
                     } else if (!visible && entry.target.dataset.mediaInView === 'true') {
                         entry.target.dataset.mediaInView = 'false';
                         pauseNftMedia(entry.target, true);
@@ -3314,9 +3460,6 @@
             const container = document.getElementById('catalog-container');
             if (!store?.classList.contains('page-active') || container?.style.display === 'none') return;
             observeCatalogNftMedia();
-            if (!NFT_MEDIA_HOVER_MODE && !('IntersectionObserver' in window)) {
-                container.querySelectorAll('.item-card:not([hidden]) .nft-live-media').forEach(resumeNftMedia);
-            }
         }
 
         document.addEventListener('pointerover', event => {
@@ -3334,6 +3477,17 @@
             if (!media || media.contains(event.relatedTarget)) return;
             media.dataset.mediaHovered = 'false';
             pauseNftMedia(media, true);
+        }, { passive: true });
+
+        document.addEventListener('click', event => {
+            const media = event.target.closest?.('.nft-live-media--case');
+            if (!media || !auxNftMediaIsVisible(media)) return;
+            // A tap/click is an explicit replay request even when the card is
+            // already visible or its previous single cycle has completed.
+            pauseNftMedia(media, true);
+            media.dataset.mediaInView = 'true';
+            media.dataset.mediaPlayed = 'false';
+            resumeNftMedia(media);
         }, { passive: true });
 
         function auxNftMediaIsVisible(element) {
@@ -3359,12 +3513,11 @@
             const elements = [...document.querySelectorAll('.nft-live-media[data-media-scope="aux"]')]
                 .filter(auxNftMediaIsVisible);
             if (!elements.length) return;
-            if (NFT_MEDIA_HOVER_MODE) return;
             if (!('IntersectionObserver' in window)) {
                 elements.forEach(element => {
                     element.dataset.mediaInView = 'true';
                     element.dataset.mediaPlayed = 'false';
-                    resumeNftMedia(element);
+                    (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(element);
                 });
                 return;
             }
@@ -3374,7 +3527,7 @@
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
                         entry.target.dataset.mediaPlayed = 'false';
-                        resumeNftMedia(entry.target);
+                        (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(entry.target);
                     } else if (!visible && entry.target.dataset.mediaInView === 'true') {
                         entry.target.dataset.mediaInView = 'false';
                         pauseNftMedia(entry.target, true);
@@ -3433,7 +3586,7 @@
                 loadLeaderboardPreview();
             }
             if(id === 'store') {
-                loadCatalog();
+                loadCatalog(true);
                 updateCartFab();
                 requestAnimationFrame(resumeCatalogNftMedia);
             }
@@ -3487,14 +3640,14 @@
 
         function restoreCatalogSnapshot() {
             try {
-                const snapshot = JSON.parse(localStorage.getItem('dnx_catalog_v2') || 'null');
+                const snapshot = JSON.parse(localStorage.getItem('dnx_catalog_v3') || 'null');
                 if (!snapshot || !Array.isArray(snapshot.items) || Date.now() - Number(snapshot.savedAt || 0) > 6 * 60 * 60 * 1000) return;
                 currentCatalog = snapshot.items;
                 catalogLoadedAt = Number(snapshot.savedAt || 0);
                 syncCatalogUi();
                 renderCatalogItems();
             } catch (_) {
-                localStorage.removeItem('dnx_catalog_v2');
+                localStorage.removeItem('dnx_catalog_v3');
             }
         }
 
@@ -3597,7 +3750,7 @@
                             catalogLoadedAt = Date.now();
                             try {
                                 const snapshotItems = currentCatalog.map(({ nft_media, ...item }) => item);
-                                localStorage.setItem('dnx_catalog_v2', JSON.stringify({ items: snapshotItems, savedAt: catalogLoadedAt }));
+                                localStorage.setItem('dnx_catalog_v3', JSON.stringify({ items: snapshotItems, savedAt: catalogLoadedAt }));
                             } catch (_) {}
                             return currentCatalog;
                         })
@@ -3613,13 +3766,15 @@
 
         function renderCatalogItems() {
             const container = document.getElementById('catalog-container');
-            const signature = currentCatalog.map(item => [item.id, item.name, item.price, item.image_url, item.nft_link].join('|')).join('::');
+            const signature = currentCatalog.map(item => [
+                item.id, item.name, item.price, item.image_url, item.nft_link,
+                item.model, item.pattern, item.background
+            ].join('|')).join('::');
             if (signature !== catalogRenderedSignature || container.dataset.catalogRendered !== 'true') {
                 destroyCatalogNftMedia();
                 container.innerHTML = currentCatalog.length ? currentCatalog.map(item => {
                 const animatedPreview = safeTelegramUrl(item.nft_link) ? `
                         <button type="button" class="nft-live-media" data-item-id="${Number(item.id)}" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="Открыть ${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">
-                            <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="nft-live-fallback" alt="">
                             <span class="nft-live-pattern" aria-hidden="true"></span>
                         </button>` : `
                         <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" alt="${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">`;
@@ -3754,7 +3909,6 @@
             currentNftItem = item;
             const modalMedia = document.getElementById('nft-modal-media');
             deactivateNftMedia(modalMedia);
-            document.getElementById('nft-modal-img').src = safeImageUrl(item.image_url);
             modalMedia.dataset.itemId = String(Number(item.id) || '');
             modalMedia.dataset.mediaWanted = 'false';
             document.getElementById('nft-modal-title').innerText = item.name;
@@ -3771,10 +3925,10 @@
             }
 
             const traits = [
-                { label: 'Модель', value: item.model },
-                { label: 'Узор', value: item.pattern },
-                { label: 'Фон', value: item.background }
-            ].filter(trait => trait.value != null && String(trait.value).trim() !== '');
+                { label: 'Модель', value: item.model == null || String(item.model).trim() === '' ? 'None' : item.model },
+                { label: 'Узор', value: item.pattern == null || String(item.pattern).trim() === '' ? 'None' : item.pattern },
+                { label: 'Фон', value: item.background == null || String(item.background).trim() === '' ? 'None' : item.background }
+            ];
 
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
                 `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${escapeHtml(t.label || t.name || t.trait_type || '—')}</div><div class="trait-value">${escapeHtml(t.value || '—')}</div></div>`).join('')}</div>` :
@@ -3839,7 +3993,6 @@
             const click = allowOpen ? ` onclick="openNftModal(${itemId})"` : '';
             return `
                 <${tag}${buttonType} class="nft-live-media nft-live-media--${variant}" data-media-scope="aux" data-item-id="${itemId}" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="${allowOpen ? `Открыть ${title}` : title}"${click}>
-                    <img src="${fallbackUrl}" class="nft-live-fallback" alt="">
                     <span class="nft-live-pattern" aria-hidden="true"></span>
                 </${tag}>`;
         }
@@ -3887,14 +4040,16 @@
         }
 
         function confirmBuyItem(id, price, name, image_url) {
-            pendingBuyItem = { id, price: Number(price), name, image_url, requestId: createRequestId() };
+            const catalogItem = currentCatalog.find(item => Number(item.id) === Number(id));
+            pendingBuyItem = { ...(catalogItem || {}), id, price: Number(price), name, image_url, requestId: createRequestId() };
             document.getElementById('confirm-buy-item-info').innerHTML = `
-                <img src="${escapeHtml(safeImageUrl(image_url))}" />
+                ${auxiliaryNftMediaMarkup(pendingBuyItem, 'cart', false)}
                 <div style="text-align:left;">
                     <div style="font-weight:600;">${escapeHtml(name)}</div>
                     <div style="color:#ffd274;">${starAmountMarkup(price)}</div>
                 </div>`;
             document.getElementById('confirm-buy-modal').classList.add('active');
+            requestAnimationFrame(resumeAuxNftMedia);
         }
 
         async function confirmBuy() {
@@ -5356,7 +5511,12 @@
         }
 
         function warmCaseImages(drops) {
-            [...new Set((drops || []).map(drop => safeImageUrl(drop.image_url)).filter(Boolean))].forEach(url => {
+            // Animated Telegram NFT must never flash the legacy PNG while its
+            // TGS is loading. Preload raster art only for non-animated drops.
+            [...new Set((drops || [])
+                .filter(drop => !drop?.has_live_nft)
+                .map(drop => safeImageUrl(drop.image_url))
+                .filter(Boolean))].forEach(url => {
                 if (warmedCaseImages.has(url)) return;
                 warmedCaseImages.add(url);
                 const image = new Image();
@@ -5398,7 +5558,6 @@
                 ? `data-media-kind="case" data-item-id="${generatedItemId}"`
                 : `data-media-kind="case" data-case-id="${Number(currentCase?.id || 0)}" data-drop-index="${Number(drop?.drop_index ?? -1)}"`;
             return `<div class="nft-live-media nft-live-media--case" data-media-scope="aux" ${sourceData} data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-token="0" aria-label="${title}">
-                <img src="${fallback}" class="nft-live-fallback" alt="">
                 <span class="nft-live-pattern" aria-hidden="true"></span>
             </div>`;
         }
@@ -5588,7 +5747,9 @@
             const rouletteContainer = document.getElementById('roulette-container');
             rouletteContainer.classList.remove('is-charging', 'is-spinning');
             rouletteContainer.style.display = 'none';
-            document.getElementById('win-image').src = safeImageUrl(wonItem.image_url);
+            const winMediaHost = document.getElementById('win-media-host');
+            winMediaHost.querySelectorAll('.nft-live-media').forEach(element => deactivateNftMedia(element));
+            winMediaHost.innerHTML = caseDropMediaMarkup(wonItem);
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
 
             document.getElementById('win-value').innerText = formatStars(wonItem.value);
@@ -5602,6 +5763,7 @@
             winDisplay.style.display = 'block';
             void winDisplay.offsetWidth;
             winDisplay.classList.add('is-revealed');
+            requestAnimationFrame(resumeAuxNftMedia);
         }
 
         function claimItem() {
@@ -5749,7 +5911,7 @@
         updateCartFab();
         updateBalance();
         restoreCatalogSnapshot();
-        loadCatalog();
+        loadCatalog(true);
         loadPrizeItems();
         loadLeaderboardPreview();
         const pendingTonDeposit = localStorage.getItem('dnx_ton_deposit');

@@ -497,36 +497,9 @@ async def init_db():
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS background VARCHAR(255)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS buyer_id VARCHAR(255)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS nft_link TEXT DEFAULT ''")
-                traits_column_exists = await conn.fetchval("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'items' AND column_name = 'traits')")
-                if traits_column_exists:
-                    await conn.execute("""
-                        UPDATE items
-                        SET model = COALESCE(NULLIF(model, ''), (
-                                SELECT elem->>'value' FROM jsonb_array_elements(
-                                    CASE WHEN jsonb_typeof(COALESCE(items.traits, '[]'::jsonb)) = 'array'
-                                         THEN COALESCE(items.traits, '[]'::jsonb) ELSE '[]'::jsonb END
-                                ) AS elem
-                                WHERE LOWER(COALESCE(elem->>'label', elem->>'name', elem->>'trait_type', '')) IN ('model', 'модель')
-                                LIMIT 1
-                            )),
-                            pattern = COALESCE(NULLIF(pattern, ''), (
-                                SELECT elem->>'value' FROM jsonb_array_elements(
-                                    CASE WHEN jsonb_typeof(COALESCE(items.traits, '[]'::jsonb)) = 'array'
-                                         THEN COALESCE(items.traits, '[]'::jsonb) ELSE '[]'::jsonb END
-                                ) AS elem
-                                WHERE LOWER(COALESCE(elem->>'label', elem->>'name', elem->>'trait_type', '')) IN ('pattern', 'узор')
-                                LIMIT 1
-                            )),
-                            background = COALESCE(NULLIF(background, ''), (
-                                SELECT elem->>'value' FROM jsonb_array_elements(
-                                    CASE WHEN jsonb_typeof(COALESCE(items.traits, '[]'::jsonb)) = 'array'
-                                         THEN COALESCE(items.traits, '[]'::jsonb) ELSE '[]'::jsonb END
-                                ) AS elem
-                                WHERE LOWER(COALESCE(elem->>'label', elem->>'name', elem->>'trait_type', '')) IN ('background', 'фон')
-                                LIMIT 1
-                            ))
-                    """)
-                    await conn.execute("ALTER TABLE items DROP COLUMN traits")
+                # Catalog traits are authoritative only in these three columns.
+                # Do not silently repopulate them from the removed legacy JSON
+                # field: that made edited values appear to "come back".
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS number VARCHAR(20)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS last_event VARCHAR(50)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS acquisition_source VARCHAR(20) DEFAULT 'catalog'")
