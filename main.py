@@ -33,7 +33,11 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://denixl-11.github.io/dnx-store/")
 CORS_ORIGIN = os.getenv("CORS_ORIGIN", "https://denixl-11.github.io")
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+DB_HOST = os.getenv("DB_HOST", "").strip()
+DB_NAME = os.getenv("DB_NAME", "").strip()
+DB_USER = os.getenv("DB_USER", "").strip()
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
 INIT_DATA_MAX_AGE = int(os.getenv("INIT_DATA_MAX_AGE", "86400"))
 DB_POOL_MIN_SIZE = int(os.getenv("DB_POOL_MIN_SIZE", "1"))
 DB_POOL_MAX_SIZE = int(os.getenv("DB_POOL_MAX_SIZE", "10"))
@@ -61,17 +65,12 @@ if STAR_MIN_BET <= 0 or STAR_BET_STEP <= 0:
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is required")
-if not DATABASE_URL and not DB_PASSWORD:
-    raise RuntimeError("DATABASE_URL or DB_PASSWORD is required")
-
-DB_CONFIG = {
-    "database": "neondb",
-    "user": "neondb_owner",
-    "password": DB_PASSWORD,
-    "host": "ep-shy-sun-an8be4el.c-6.us-east-1.aws.neon.tech",
-    "port": 5432,
-    "ssl": "require"
-}
+if not DATABASE_URL and not all((DB_HOST, DB_NAME, DB_USER, DB_PASSWORD)):
+    raise RuntimeError(
+        "DATABASE_URL is required (recommended), or set DB_HOST, DB_NAME, "
+        "DB_USER and DB_PASSWORD together. The removed hard-coded Neon host "
+        "could silently connect Render to an obsolete database."
+    )
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -81,6 +80,7 @@ ton_http_session: aiohttp.ClientSession | None = None
 nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_media_fetch_semaphore = asyncio.Semaphore(4)
 star_reconcile_attempts: dict[str, float] = {}
+API_RELEASE = "8.9"
 
 
 def floor_stars(value) -> Decimal:
@@ -344,7 +344,12 @@ async def create_db_pool() -> asyncpg.Pool:
             max_inactive_connection_lifetime=300,
         )
     return await asyncpg.create_pool(
-        **DB_CONFIG,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+        ssl="require",
         min_size=DB_POOL_MIN_SIZE,
         max_size=DB_POOL_MAX_SIZE,
         command_timeout=15,
@@ -364,6 +369,51 @@ def get_pool() -> asyncpg.Pool:
     if db_pool is None:
         raise RuntimeError("Database pool is not initialized")
     return db_pool
+
+
+async def database_identity(conn) -> dict[str, str]:
+    """Return a non-secret fingerprint of the database Render is using."""
+    row = await conn.fetchrow(
+        """SELECT current_database() AS database_name,
+                  current_schema() AS schema_name,
+                  COALESCE(inet_server_addr()::TEXT, 'local') AS server_address"""
+    )
+    raw = f"{row['server_address']}|{row['database_name']}|{row['schema_name']}"
+    return {
+        "database": row["database_name"],
+        "schema": row["schema_name"],
+        "fingerprint": hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12],
+    }
+
+
+async def log_database_audit(pool: asyncpg.Pool) -> None:
+    """Make wrong Neon branch/schema connections obvious in Render logs."""
+    async with pool.acquire() as conn:
+        identity = await database_identity(conn)
+        columns = await conn.fetch(
+            """SELECT column_name
+               FROM information_schema.columns
+               WHERE table_schema = current_schema() AND table_name = 'items'
+               ORDER BY ordinal_position"""
+        )
+    names = [row["column_name"] for row in columns]
+    logging.info(
+        "DNX database audit: release=%s database=%s schema=%s fingerprint=%s items_columns=%s",
+        API_RELEASE,
+        identity["database"],
+        identity["schema"],
+        identity["fingerprint"],
+        ",".join(names),
+    )
+    required = {"id", "name", "model", "pattern", "background"}
+    missing = sorted(required.difference(names))
+    if missing:
+        raise RuntimeError(f"items table is missing required columns: {', '.join(missing)}")
+    if "traits" in names:
+        logging.warning(
+            "Legacy items.traits still exists in the connected database, but release %s never reads it",
+            API_RELEASE,
+        )
 
 
 def get_ton_session() -> aiohttp.ClientSession:
@@ -1490,9 +1540,9 @@ async def security_headers_middleware(request, handler):
 async def handle_health(request):
     try:
         await asyncio.wait_for(get_pool().fetchval("SELECT 1"), timeout=3)
-        return web.json_response({"status": "ok"})
+        return web.json_response({"status": "ok", "release": API_RELEASE})
     except Exception:
-        return web.json_response({"status": "unavailable"}, status=503)
+        return web.json_response({"status": "unavailable", "release": API_RELEASE}, status=503)
 
 @require_auth
 async def handle_get_user(request):
@@ -1936,11 +1986,67 @@ async def handle_get_item(request):
         item["sell_value"] = item.get("price", 0)
         item["withdraw_remaining_seconds"] = int(item.get("withdraw_remaining_seconds") or 0)
         item["traits_source"] = "items.model/items.pattern/items.background"
-        return web.json_response(item, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        item["api_release"] = API_RELEASE
+        item["row_digest"] = hashlib.sha256(
+            "|".join(
+                str(item.get(key) if item.get(key) is not None else "NULL")
+                for key in ("id", "model", "pattern", "background")
+            ).encode("utf-8")
+        ).hexdigest()[:12]
+        return web.json_response(
+            item,
+            headers={
+                "Access-Control-Allow-Origin": CORS_ORIGIN,
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "X-DNX-Release": API_RELEASE,
+            },
+        )
     except Exception as exc:
         logging.error("Get item %s error: %s", item_id, exc)
         return web.json_response({"error": "database_unavailable"}, status=503,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+@rate_limit(30, 60)
+async def handle_admin_db_audit(request):
+    """Admin-only proof of the exact Neon database and exact item row in use."""
+    if str(request["telegram_user"]["id"]) != str(ADMIN_ID):
+        return web.json_response({"error": "forbidden"}, status=403)
+    try:
+        item_id = int(request.query.get("item_id", "0"))
+    except (TypeError, ValueError):
+        item_id = 0
+    async with get_pool().acquire() as conn:
+        identity = await database_identity(conn)
+        columns = [
+            row["column_name"]
+            for row in await conn.fetch(
+                """SELECT column_name
+                   FROM information_schema.columns
+                   WHERE table_schema = current_schema() AND table_name = 'items'
+                   ORDER BY ordinal_position"""
+            )
+        ]
+        item = None
+        if item_id > 0:
+            row = await conn.fetchrow(
+                """SELECT id, name, model, pattern, background, status, buyer_id,
+                          acquisition_source, last_event
+                   FROM items WHERE id = $1""",
+                item_id,
+            )
+            item = dict(row) if row else None
+    return web.json_response(
+        {
+            "api_release": API_RELEASE,
+            "database": identity,
+            "items_columns": columns,
+            "legacy_traits_present": "traits" in columns,
+            "item": item,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
@@ -3035,6 +3141,59 @@ async def cmd_stars_reconcile(message: types.Message):
         logging.error("Admin Stars reconciliation command error: %s", exc)
         await message.answer("Не удалось выполнить сверку. Проверьте логи Render.")
 
+
+@dp.message(Command("db_audit"))
+async def cmd_db_audit(message: types.Message):
+    """Show the admin which database and item row the deployed bot reads."""
+    if message.from_user.id != ADMIN_ID:
+        logging.warning("Unauthorized /db_audit request from Telegram user %s", message.from_user.id)
+        return
+    item_id = 0
+    if message.text:
+        parts = message.text.split(maxsplit=1)
+        if len(parts) == 2 and parts[1].strip().isdigit():
+            item_id = int(parts[1].strip())
+    async with get_pool().acquire() as conn:
+        identity = await database_identity(conn)
+        columns = [
+            row["column_name"]
+            for row in await conn.fetch(
+                """SELECT column_name FROM information_schema.columns
+                   WHERE table_schema = current_schema() AND table_name = 'items'
+                   ORDER BY ordinal_position"""
+            )
+        ]
+        row = None
+        if item_id > 0:
+            row = await conn.fetchrow(
+                """SELECT id, name, model, pattern, background, status, buyer_id
+                   FROM items WHERE id = $1""",
+                item_id,
+            )
+    lines = [
+        f"DNX DB AUDIT · V{API_RELEASE}",
+        f"База: {identity['database']}",
+        f"Схема: {identity['schema']}",
+        f"Fingerprint: {identity['fingerprint']}",
+        f"traits column: {'ЕСТЬ (не читается)' if 'traits' in columns else 'НЕТ'}",
+        "Источник: items.model / items.pattern / items.background",
+    ]
+    if item_id > 0:
+        if row:
+            lines.extend([
+                "",
+                f"ID: {row['id']} · {row['name']}",
+                f"model = {row['model']!r}",
+                f"pattern = {row['pattern']!r}",
+                f"background = {row['background']!r}",
+                f"status = {row['status']!r}",
+            ])
+        else:
+            lines.extend(["", f"Строка items.id={item_id} не найдена"])
+    else:
+        lines.extend(["", "Для проверки строки: /db_audit ID"])
+    await message.answer("\n".join(lines))
+
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     start_arg = ""
@@ -3060,6 +3219,7 @@ app.router.add_get('/health', handle_health)
 app.router.add_get('/user', handle_get_user)
 app.router.add_get('/items', handle_get_items)
 app.router.add_get('/item', handle_get_item)
+app.router.add_get('/admin/db-audit', handle_admin_db_audit)
 app.router.add_get('/nft/media', handle_nft_media)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_get('/activity/history', handle_activity_history)
@@ -3095,6 +3255,7 @@ async def main():
         db_pool = await create_db_pool()
         ton_http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
         await init_db()
+        await log_database_audit(db_pool)
         if not BOT_USERNAME:
             me = await bot.get_me()
             BOT_USERNAME = me.username or ""

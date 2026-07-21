@@ -306,6 +306,13 @@ var RLottie = (function () {
     if (rlPlayer.findPosterFrame) {
       if (hasVisiblePixels || frame.no >= rlPlayer.frameCount - 1) {
         rlPlayer.findPosterFrame = false;
+        // The visible poster is already painted on the canvas. Keeping a
+        // second full RGBA copy for every paused card multiplies WebView
+        // memory use and caused long-list stutters. A new one-cycle replay
+        // captures its own poster when needed.
+        if (rlPlayer.paused) {
+          rlPlayer.posterFrame = null;
+        }
       } else {
         rlPlayer.forceRender = true;
       }
@@ -334,6 +341,8 @@ var RLottie = (function () {
     rlPlayer.imageData.data.set(rlPlayer.posterFrame);
     rlPlayer.context.putImageData(rlPlayer.imageData, 0, 0);
     rlPlayer.frameNo = rlPlayer.posterFrameNo;
+    // Canvas now owns the displayed pixels; release the duplicate buffer.
+    rlPlayer.posterFrame = null;
     if (rlPlayer.hasVisiblePixels !== true) {
       rlPlayer.hasVisiblePixels = true;
       triggerEvent(rlPlayer.el, 'tg:frame-visibility', {

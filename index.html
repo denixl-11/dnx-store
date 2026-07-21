@@ -2578,6 +2578,105 @@
         .account-restriction-card p { margin:0; color:#b9aaba; font-size:.76rem; line-height:1.6; }
         .restriction-support { display:inline-flex; margin-top:20px; padding:12px 18px; border:1px solid rgba(202,75,255,.55); border-radius:13px; color:#f3d9ff; background:rgba(70,18,100,.52); font-size:.75rem; font-weight:850; text-decoration:none; }
         body.account-locked .tab-bar, body.account-locked header, body.account-locked .page { pointer-events:none !important; }
+
+        /* ===== V8.9: authoritative traits and exact controls ===== */
+        .inventory-card-actions {
+            display: grid !important;
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 7px !important;
+        }
+        .inventory-card-actions > button {
+            box-sizing: border-box;
+            width: 100% !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            margin: 0 !important;
+            padding: 0 10px !important;
+            border-radius: 13px !important;
+            font-size: clamp(.56rem, 2.25vw, .68rem) !important;
+            line-height: 1 !important;
+            letter-spacing: .015em !important;
+        }
+        .inventory-sell-btn,
+        #nft-modal-btn-sell.btn-inventory-sell {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-wrap: nowrap !important;
+            gap: .42em !important;
+            white-space: nowrap !important;
+        }
+        .inventory-sell-label { flex: 0 1 auto; white-space: nowrap; }
+        .inventory-sell-btn .star-amount,
+        #nft-modal-btn-sell .star-amount { flex: 0 0 auto; gap: .16em; }
+        .inventory-sell-btn.catalog-locked,
+        .inventory-sell-btn.catalog-locked:disabled,
+        #nft-modal-btn-sell.catalog-locked,
+        #nft-modal-btn-sell.catalog-locked:disabled {
+            color: #918b94 !important;
+            border-color: rgba(139, 128, 145, .25) !important;
+            background: linear-gradient(145deg, rgba(38, 33, 40, .86), rgba(22, 19, 25, .9)) !important;
+            box-shadow: inset 0 1px rgba(255,255,255,.025) !important;
+            filter: grayscale(.25) !important;
+        }
+        #nft-modal-actions.inventory-actions {
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 10px !important;
+        }
+        #nft-modal-actions.inventory-actions > button {
+            box-sizing: border-box;
+            width: 100% !important;
+            height: 54px !important;
+            min-height: 54px !important;
+            margin: 0 !important;
+            border-radius: 15px !important;
+        }
+
+        .case-modal-content { padding-top: 24px !important; }
+        .case-heading-row {
+            position: relative;
+            z-index: 3;
+            display: grid;
+            grid-template-columns: 46px minmax(0, 1fr) 46px;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            margin: 0 0 18px;
+        }
+        .case-modal-content .case-heading-row #case-back-btn {
+            position: relative !important;
+            inset: auto !important;
+            top: auto !important;
+            left: auto !important;
+            width: 46px !important;
+            height: 46px !important;
+            margin: 0 !important;
+        }
+        .case-modal-content .case-heading-row .modal-title {
+            min-width: 0;
+            min-height: 46px;
+            margin: 0 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            line-height: 1.08;
+            font-size: clamp(1rem, 5.1vw, 1.42rem) !important;
+            letter-spacing: .01em;
+        }
+        .case-heading-spacer { width: 46px; height: 46px; }
+        .case-bonus-badge {
+            padding: 3px 6px !important;
+            font-size: clamp(.4rem, 1.75vw, .48rem) !important;
+            letter-spacing: .025em !important;
+            line-height: 1.1 !important;
+        }
+
+        .nft-live-media { contain: layout paint style; }
+        .nft-live-model canvas {
+            transform: none !important;
+            backface-visibility: visible !important;
+        }
     </style>
 </head>
 <body>
@@ -2706,7 +2805,7 @@
 
     <div id="page-inventory" class="page">
         <div class="inventory-tabs">
-            <div class="tab-item active" style="padding:16px 0; border-bottom: 2px solid var(--accent-gold);" onclick="switchInv(this, 'active')">Мои NFT</div>
+            <div class="tab-item active" style="padding:16px 0; border-bottom: 2px solid var(--accent-gold);" onclick="switchInv(this, 'active')">Инвентарь</div>
             <div class="tab-item" style="padding:16px 0;" onclick="switchInv(this, 'history')">История</div>
         </div>
         <div id="inventory-active-container" class="catalog-grid"></div>
@@ -2891,12 +2990,15 @@
                 <i class="case-particle"></i><i class="case-particle"></i><i class="case-particle"></i>
                 <i class="case-particle"></i><i class="case-particle"></i><i class="case-particle"></i>
             </div>
-            <button class="premium-back-btn" id="case-back-btn" onclick="closeCaseDetail(event)" aria-label="Назад" type="button">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M15 18l-6-6 6-6"/>
-                </svg>
-            </button>
-            <h3 class="modal-title" id="case-detail-title"></h3>
+            <div class="case-heading-row">
+                <button class="premium-back-btn" id="case-back-btn" onclick="closeCaseDetail(event)" aria-label="Назад" type="button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                </button>
+                <h3 class="modal-title" id="case-detail-title"></h3>
+                <span class="case-heading-spacer" aria-hidden="true"></span>
+            </div>
 
             <div id="roulette-inline-container" class="transition-element">
                 <div id="roulette-container" class="premium-roulette">
@@ -2934,7 +3036,7 @@
     <div class="tab-bar">
         <div class="tab-item" id="tab-game" onclick="showPage('game')"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z"/></svg><span>ИГРА</span></div>
         <div class="tab-item active" id="tab-store" onclick="showPage('store')"><svg viewBox="0 0 24 24"><path d="M4 8h16v13H4zM8 8V5a4 4 0 0 1 8 0v3M8 12h.01M16 12h.01"/></svg><span>МАГАЗИН</span></div>
-        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')"><svg viewBox="0 0 24 24"><path d="M4 8h16v13H4zM7 8V5h10v3M9 4h6M8 12h8M12 12v5"/></svg><span>ИНВЕНТАРЬ</span></div>
+        <div class="tab-item" id="tab-inventory" onclick="showPage('inventory')"><svg viewBox="0 0 24 24"><path d="M4 8h16v13H4zM7 8V5h10v3M9 4h6M8 12h8M12 12v5"/></svg><span>ПРОФИЛЬ</span></div>
     </div>
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -3033,6 +3135,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
+        const EXPECTED_API_RELEASE = '8.9';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -3208,7 +3311,7 @@
                 const entries = JSON.parse(localStorage.getItem('dnx_nft_media_v2') || '[]');
                 if (!Array.isArray(entries)) return;
                 const now = Date.now();
-                entries.slice(0, 48).forEach(entry => {
+                entries.slice(0, 24).forEach(entry => {
                     const itemId = Number(entry?.itemId || 0);
                     if (itemId > 0 && entry?.expires > now && entry?.data?.animated) {
                         nftMediaCache.set(itemId, { data: entry.data, expires: entry.expires });
@@ -3223,7 +3326,7 @@
             try {
                 const entries = [...nftMediaCache.entries()]
                     .filter(([, entry]) => entry?.data?.animated && entry.expires > Date.now())
-                    .slice(-48)
+                    .slice(-24)
                     .map(([itemId, entry]) => ({ itemId, data: entry.data, expires: entry.expires }));
                 localStorage.setItem('dnx_nft_media_v2', JSON.stringify(entries));
             } catch (_) {}
@@ -3928,6 +4031,9 @@
         function starAmountMarkup(value) {
             return `<span class="star-amount"><span>${formatStars(value)}</span>${telegramStarMarkup()}</span>`;
         }
+        function inventorySellMarkup(value) {
+            return `<span class="inventory-sell-label">ПРОДАТЬ ЗА</span>${starAmountMarkup(value)}`;
+        }
         function balanceAmountMarkup(value, type = 'main') {
             return `<span class="star-amount"><span>${formatStars(value)}</span>${type === 'bonus' ? bonusStarMarkup() : telegramStarMarkup()}</span>`;
         }
@@ -3960,11 +4066,32 @@
             try {
                 const authoritativeItem = await apiFetch(`${API_BASE}/item?id=${encodeURIComponent(id)}&_=${Date.now()}`);
                 if (openToken !== nftModalOpenToken) return;
+                if (String(authoritativeItem.api_release || '') !== EXPECTED_API_RELEASE) {
+                    throw new Error(`api_release_mismatch:${authoritativeItem.api_release || 'missing'}`);
+                }
                 if (String(localItem.nft_link || '') !== String(authoritativeItem.nft_link || '')) {
                     nftMediaCache.delete(Number(id));
                     persistNftMediaCache();
                 }
-                item = { ...localItem, ...authoritativeItem };
+                item = {
+                    ...localItem,
+                    ...authoritativeItem,
+                    // Never inherit traits from a catalogue, cart or inventory
+                    // snapshot. These values are the exact columns returned by
+                    // the current items row on the current Render database.
+                    model: authoritativeItem.model,
+                    pattern: authoritativeItem.pattern,
+                    background: authoritativeItem.background
+                };
+                console.info('DNX authoritative NFT row', {
+                    release: authoritativeItem.api_release,
+                    id: authoritativeItem.id,
+                    digest: authoritativeItem.row_digest,
+                    source: authoritativeItem.traits_source,
+                    model: authoritativeItem.model,
+                    pattern: authoritativeItem.pattern,
+                    background: authoritativeItem.background
+                });
                 const catalogIndex = currentCatalog.findIndex(entry => String(entry.id) === String(id));
                 const inventoryIndex = inventoryData.findIndex(entry => String(entry.id) === String(id));
                 if (catalogIndex >= 0 && item.is_shop_item) currentCatalog[catalogIndex] = item;
@@ -3974,7 +4101,10 @@
             } catch (error) {
                 if (openToken !== nftModalOpenToken) return;
                 console.error('Fresh item read failed', error);
-                showAlert('Не удалось получить актуальные данные NFT. Проверьте соединение и попробуйте ещё раз.');
+                const mismatch = String(error?.message || '').startsWith('api_release_mismatch:');
+                showAlert(mismatch
+                    ? 'Фронтенд и сервер имеют разные версии. Дождитесь завершения деплоя Render и откройте мини-приложение заново.'
+                    : 'Не удалось получить актуальные данные NFT. Проверьте соединение и попробуйте ещё раз.');
                 return;
             }
             const isShopItem = item.is_shop_item === true;
@@ -4035,7 +4165,7 @@
                 sellBtn.style.display = item.status === 'withdrawn' || item.status === 'disposed' ? 'none' : 'block';
                 sellBtn.disabled = remaining > 0 || item.status === 'pending_withdraw';
                 sellBtn.classList.toggle('catalog-locked', !item.can_sell);
-                sellBtn.innerHTML = item.can_sell ? `ПРОДАТЬ ЗА ${starAmountMarkup(item.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ';
+                sellBtn.innerHTML = item.can_sell ? inventorySellMarkup(item.sell_value || 0) : 'НЕЛЬЗЯ ПРОДАТЬ';
                 sellBtn.onclick = () => handleInventorySell(item);
                 startWithdrawCountdowns();
             }
@@ -4370,7 +4500,7 @@
                                         onclick="event.stopPropagation(); withdraw('${i.id}')">${remaining > 0 ? formatWithdrawCountdown(remaining) : 'ВЫВЕСТИ'}</button>
                                 <button class="inventory-sell-btn ${i.can_sell ? '' : 'catalog-locked'}" ${withdrawDisabled ? 'disabled' : ''}
                                         onclick="event.stopPropagation(); handleInventorySell(inventoryData.find(item => String(item.id) === '${String(i.id)}'))">
-                                    ${i.can_sell ? `ПРОДАТЬ ЗА ${starAmountMarkup(i.sell_value || 0)}` : 'НЕЛЬЗЯ ПРОДАТЬ'}
+                                    ${i.can_sell ? inventorySellMarkup(i.sell_value || 0) : 'НЕЛЬЗЯ ПРОДАТЬ'}
                                 </button>
                             </div>
                         </div>`;
