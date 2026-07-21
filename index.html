@@ -1429,15 +1429,17 @@
             width: 100%; height: 100%; border: 0; border-radius: inherit;
             margin: 0; object-fit: cover;
         }
-        .nft-live-media--modal .nft-live-model { inset: 6%; }
-        #catalog-container .nft-live-model { inset: 17.5%; }
+        .nft-live-media--modal .nft-live-model,
+        #catalog-container .nft-live-model,
+        .nft-live-media--cart .nft-live-model,
+        .nft-live-media--inventory .nft-live-model,
+        .nft-live-media--case .nft-live-model { inset: 17.5%; }
         .nft-live-media--case {
             width: 100%; height: 100%; margin: 0; border-radius: inherit;
             background: #242424;
             box-shadow: inset 0 0 18px rgba(255,255,255,.035);
         }
         .nft-live-media--case .nft-live-pattern { display: none; }
-        .nft-live-media--case .nft-live-model { inset: 17.5%; }
         .nft-live-media:focus-visible { outline: 2px solid #e64dff; outline-offset: 2px; }
         .tab-bar {
             isolation: isolate;
@@ -1812,7 +1814,6 @@
             border-radius: 11px;
             cursor: pointer;
         }
-        .nft-live-media--cart .nft-live-model { inset: 5%; }
         .cart-item > .item-image,
         .cart-item > .nft-static-cart { flex: 0 0 58px; width: 58px; height: 58px; margin: 0; border-radius: 11px; object-fit: cover; }
         .cart-item .nft-live-media--cart img { width: 100%; height: 100%; border-radius: inherit; }
@@ -2542,7 +2543,7 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </div>
             <div class="nft-modal-header-rocket">
-                <div id="nft-modal-media" class="nft-live-media nft-live-media--modal" data-media-state="idle" data-media-wanted="false" aria-label="Анимированный NFT">
+                <div id="nft-modal-media" class="nft-live-media nft-live-media--modal" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="Анимированный NFT">
                     <img src="" id="nft-modal-img" class="nft-live-fallback" alt="">
                     <span class="nft-live-pattern" aria-hidden="true"></span>
                 </div>
@@ -3007,6 +3008,7 @@
         let nftMediaObserver = null;
         let nftAuxMediaObserver = null;
         const NFT_MEDIA_MAX_LOADS = isAndroidPlatform ? 2 : 3;
+        const NFT_MEDIA_HOVER_MODE = window.matchMedia?.('(hover: hover) and (pointer: fine)').matches === true;
         let catalogRenderedSignature = '';
         let catalogLoadedAt = 0;
         let catalogRequest = null;
@@ -3057,24 +3059,33 @@
                 element.classList.remove('is-live', 'has-live-frame');
                 element.dataset.mediaState = 'idle';
                 element.dataset.mediaPlayed = 'false';
+                element.dataset.mediaInView = 'false';
             }
         }
 
-        function pauseNftMedia(element) {
+        function pauseNftMedia(element, rearm = false) {
             if (!element) return;
             element.dataset.mediaWanted = 'false';
             const picture = element.querySelector('.nft-live-model');
-            if (picture && window.RLottie?.pause) window.RLottie.pause(picture);
+            if (picture && window.RLottie?.pause) {
+                window.RLottie.pause(picture);
+            }
+            if (rearm) {
+                element.dataset.mediaPlayed = 'false';
+                element.dataset.mediaState = picture ? 'ready' : 'idle';
+            }
         }
 
         function resumeNftMedia(element) {
             if (!element?.isConnected || element.hidden || element.closest('[hidden]')) return;
+            if (element.dataset.mediaPlayed === 'true' || element.dataset.mediaPlayed === 'playing') return;
             element.dataset.mediaWanted = 'true';
+            element.dataset.mediaPlayed = 'playing';
             const picture = element.querySelector('.nft-live-model');
             if (picture) {
                 element.dataset.mediaState = 'live';
                 element.classList.add('is-live');
-                if (!document.hidden && element.dataset.mediaPlayed !== 'true') window.RLottie?.playOnce?.(picture);
+                if (!document.hidden) window.RLottie?.playOnce?.(picture, true);
                 return;
             }
             queueNftMedia(element);
@@ -3134,7 +3145,12 @@
                 if (element.dataset.mediaWanted === 'true') {
                     element.classList.add('is-live');
                     if (picture.rlPlayer?.hasVisiblePixels) element.classList.add('has-live-frame');
-                    if (element.dataset.mediaPlayed !== 'true') window.RLottie?.playOnce?.(picture);
+                    requestAnimationFrame(() => {
+                        if (!document.hidden && element.isConnected && element.dataset.mediaToken === mediaToken
+                            && element.dataset.mediaWanted === 'true' && element.dataset.mediaPlayed === 'playing') {
+                            window.RLottie?.playOnce?.(picture);
+                        }
+                    });
                 }
                 else pauseNftMedia(element);
             }, { once: true });
@@ -3210,7 +3226,10 @@
             const media = itemId > 0 ? await getNftMedia(itemId) : await getCaseNftMedia(caseId, dropIndex);
             if (element.isConnected && element.dataset.mediaToken === mediaToken && element.dataset.mediaWanted === 'true' && media?.animated) {
                 if (!renderNftMedia(element, media, mediaToken)) element.dataset.mediaState = 'idle';
-            } else if (element.isConnected) element.dataset.mediaState = 'idle';
+            } else if (element.isConnected) {
+                element.dataset.mediaState = 'idle';
+                element.dataset.mediaPlayed = 'false';
+            }
         }
 
         function pumpNftMediaQueue() {
@@ -3230,7 +3249,7 @@
             const picture = element.querySelector('.nft-live-model');
             if (picture) {
                 element.dataset.mediaState = 'live';
-                if (!document.hidden && element.dataset.mediaPlayed !== 'true') window.RLottie?.playOnce?.(picture);
+                if (!document.hidden && element.dataset.mediaPlayed === 'playing') window.RLottie?.playOnce?.(picture, true);
                 return;
             }
             if (['queued', 'loading'].includes(element.dataset.mediaState)) return;
@@ -3243,18 +3262,31 @@
             if (nftMediaObserver) nftMediaObserver.disconnect();
             const elements = [...document.querySelectorAll('#catalog-container .nft-live-media')];
             if (!elements.length) return;
+            if (NFT_MEDIA_HOVER_MODE) return;
             if (!('IntersectionObserver' in window)) {
-                elements.forEach(element => { element.dataset.mediaWanted = 'true'; queueNftMedia(element); });
+                elements.filter(element => !element.closest('.item-card')?.hidden).forEach(element => {
+                    element.dataset.mediaInView = 'true';
+                    element.dataset.mediaPlayed = 'false';
+                    resumeNftMedia(element);
+                });
                 return;
             }
             nftMediaObserver = new IntersectionObserver(entries => {
                 entries.forEach(entry => {
                     const catalogVisible = document.getElementById('page-store')?.classList.contains('page-active')
                         && document.getElementById('catalog-container')?.style.display !== 'none';
-                    if (entry.isIntersecting && catalogVisible && !entry.target.closest('.item-card')?.hidden) resumeNftMedia(entry.target);
-                    else pauseNftMedia(entry.target);
+                    const visible = entry.isIntersecting && entry.intersectionRatio >= .12
+                        && catalogVisible && !entry.target.closest('.item-card')?.hidden;
+                    if (visible && entry.target.dataset.mediaInView !== 'true') {
+                        entry.target.dataset.mediaInView = 'true';
+                        entry.target.dataset.mediaPlayed = 'false';
+                        resumeNftMedia(entry.target);
+                    } else if (!visible && entry.target.dataset.mediaInView === 'true') {
+                        entry.target.dataset.mediaInView = 'false';
+                        pauseNftMedia(entry.target, true);
+                    }
                 });
-            }, { rootMargin: '140px 0px', threshold: .01 });
+            }, { rootMargin: '0px', threshold: [0, .12, .5] });
             elements.forEach(element => nftMediaObserver.observe(element));
         }
 
@@ -3271,7 +3303,10 @@
         }
 
         function pauseCatalogNftMedia() {
-            document.querySelectorAll('#catalog-container .nft-live-media').forEach(pauseNftMedia);
+            document.querySelectorAll('#catalog-container .nft-live-media').forEach(element => {
+                element.dataset.mediaInView = 'false';
+                pauseNftMedia(element, true);
+            });
         }
 
         function resumeCatalogNftMedia() {
@@ -3279,14 +3314,26 @@
             const container = document.getElementById('catalog-container');
             if (!store?.classList.contains('page-active') || container?.style.display === 'none') return;
             observeCatalogNftMedia();
-            if (!('IntersectionObserver' in window)) {
+            if (!NFT_MEDIA_HOVER_MODE && !('IntersectionObserver' in window)) {
                 container.querySelectorAll('.item-card:not([hidden]) .nft-live-media').forEach(resumeNftMedia);
             }
         }
 
         document.addEventListener('pointerover', event => {
-            const media = event.target.closest?.('#catalog-container .nft-live-media');
-            if (media && !media.closest('.item-card')?.hidden && media.dataset.mediaPlayed !== 'true') resumeNftMedia(media);
+            if (!NFT_MEDIA_HOVER_MODE) return;
+            const media = event.target.closest?.('.nft-live-media');
+            if (!media || media.contains(event.relatedTarget) || media.closest('.item-card')?.hidden || !auxNftMediaIsVisible(media)) return;
+            media.dataset.mediaHovered = 'true';
+            media.dataset.mediaPlayed = 'false';
+            resumeNftMedia(media);
+        }, { passive: true });
+
+        document.addEventListener('pointerout', event => {
+            if (!NFT_MEDIA_HOVER_MODE) return;
+            const media = event.target.closest?.('.nft-live-media');
+            if (!media || media.contains(event.relatedTarget)) return;
+            media.dataset.mediaHovered = 'false';
+            pauseNftMedia(media, true);
         }, { passive: true });
 
         function auxNftMediaIsVisible(element) {
@@ -3301,7 +3348,10 @@
         }
 
         function pauseAuxNftMedia() {
-            document.querySelectorAll('.nft-live-media[data-media-scope="aux"]').forEach(pauseNftMedia);
+            document.querySelectorAll('.nft-live-media[data-media-scope="aux"]').forEach(element => {
+                element.dataset.mediaInView = 'false';
+                pauseNftMedia(element, true);
+            });
         }
 
         function resumeAuxNftMedia() {
@@ -3309,27 +3359,40 @@
             const elements = [...document.querySelectorAll('.nft-live-media[data-media-scope="aux"]')]
                 .filter(auxNftMediaIsVisible);
             if (!elements.length) return;
-            elements.slice(0, isAndroidPlatform ? 2 : 4).forEach(resumeNftMedia);
+            if (NFT_MEDIA_HOVER_MODE) return;
             if (!('IntersectionObserver' in window)) {
-                elements.forEach(resumeNftMedia);
+                elements.forEach(element => {
+                    element.dataset.mediaInView = 'true';
+                    element.dataset.mediaPlayed = 'false';
+                    resumeNftMedia(element);
+                });
                 return;
             }
             nftAuxMediaObserver = new IntersectionObserver(entries => {
                 entries.forEach(entry => {
-                    if (entry.isIntersecting && auxNftMediaIsVisible(entry.target)) resumeNftMedia(entry.target);
-                    else pauseNftMedia(entry.target);
+                    const visible = entry.isIntersecting && entry.intersectionRatio >= .12 && auxNftMediaIsVisible(entry.target);
+                    if (visible && entry.target.dataset.mediaInView !== 'true') {
+                        entry.target.dataset.mediaInView = 'true';
+                        entry.target.dataset.mediaPlayed = 'false';
+                        resumeNftMedia(entry.target);
+                    } else if (!visible && entry.target.dataset.mediaInView === 'true') {
+                        entry.target.dataset.mediaInView = 'false';
+                        pauseNftMedia(entry.target, true);
+                    }
                 });
-            }, { rootMargin: '100px 0px', threshold: .01 });
+            }, { rootMargin: '0px', threshold: [0, .12, .5] });
             elements.forEach(element => nftAuxMediaObserver.observe(element));
         }
 
         document.addEventListener('visibilitychange', () => {
             document.querySelectorAll('.nft-live-model').forEach(picture => {
                 if (!window.RLottie) return;
-                if (document.hidden) window.RLottie.pause?.(picture);
-                else {
+                if (document.hidden) {
                     const media = picture.closest('.nft-live-media');
-                    if (media?.dataset.mediaWanted === 'true' && media.dataset.mediaPlayed !== 'true') window.RLottie.playOnce?.(picture);
+                    if (media) {
+                        media.dataset.mediaInView = 'false';
+                        pauseNftMedia(media, true);
+                    } else window.RLottie.pause?.(picture);
                 }
             });
             if (!document.hidden) {
@@ -3555,7 +3618,7 @@
                 destroyCatalogNftMedia();
                 container.innerHTML = currentCatalog.length ? currentCatalog.map(item => {
                 const animatedPreview = safeTelegramUrl(item.nft_link) ? `
-                        <button type="button" class="nft-live-media" data-item-id="${Number(item.id)}" data-media-state="idle" data-media-wanted="false" data-media-token="0" aria-label="Открыть ${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">
+                        <button type="button" class="nft-live-media" data-item-id="${Number(item.id)}" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="Открыть ${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">
                             <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="nft-live-fallback" alt="">
                             <span class="nft-live-pattern" aria-hidden="true"></span>
                         </button>` : `
@@ -3596,14 +3659,14 @@
                 if (visible) card.removeAttribute('inert');
                 else card.setAttribute('inert', '');
                 const media = card.querySelector('.nft-live-media');
-                if (!visible) pauseNftMedia(media);
+                if (!visible) {
+                    if (media) media.dataset.mediaInView = 'false';
+                    pauseNftMedia(media, true);
+                }
                 else visibleCount++;
             });
             const empty = document.getElementById('catalog-filter-empty');
             if (empty) empty.hidden = visibleCount > 0;
-            [...container.querySelectorAll('.item-card:not([hidden]) .nft-live-media')]
-                .slice(0, isAndroidPlatform ? 2 : 4)
-                .forEach(resumeNftMedia);
             requestAnimationFrame(resumeCatalogNftMedia);
         }
 
@@ -3751,8 +3814,8 @@
             }
             document.getElementById('nft-detail-overlay').classList.add('active');
             if (telegramLink && Number(item.id) > 0) {
-                modalMedia.dataset.mediaWanted = 'true';
-                requestAnimationFrame(() => queueNftMedia(modalMedia));
+                modalMedia.dataset.mediaPlayed = 'false';
+                requestAnimationFrame(() => resumeNftMedia(modalMedia));
             }
         }
         function closeNftModal(forceOrEvent = false) {
@@ -3775,7 +3838,7 @@
             const buttonType = allowOpen ? ' type="button"' : '';
             const click = allowOpen ? ` onclick="openNftModal(${itemId})"` : '';
             return `
-                <${tag}${buttonType} class="nft-live-media nft-live-media--${variant}" data-media-scope="aux" data-item-id="${itemId}" data-media-state="idle" data-media-wanted="false" data-media-token="0" aria-label="${allowOpen ? `Открыть ${title}` : title}"${click}>
+                <${tag}${buttonType} class="nft-live-media nft-live-media--${variant}" data-media-scope="aux" data-item-id="${itemId}" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="${allowOpen ? `Открыть ${title}` : title}"${click}>
                     <img src="${fallbackUrl}" class="nft-live-fallback" alt="">
                     <span class="nft-live-pattern" aria-hidden="true"></span>
                 </${tag}>`;
@@ -5542,6 +5605,7 @@
         }
 
         function claimItem() {
+            document.querySelectorAll('#case-detail-overlay .nft-live-media').forEach(element => pauseNftMedia(element, true));
             document.getElementById('case-detail-overlay').classList.remove('active');
 
             const rouletteContainer = document.getElementById('roulette-container');
@@ -5674,6 +5738,7 @@
         function closeCaseDetail(event) {
             if (rouletteActive || caseOpeningRequestActive) return;
             caseDetailOpenToken++;
+            document.querySelectorAll('#case-detail-overlay .nft-live-media').forEach(element => pauseNftMedia(element, true));
             document.getElementById('case-detail-overlay').classList.remove('active');
             document.querySelector('.case-modal-content')?.classList.remove('is-loading');
             document.getElementById('roulette-container').classList.remove('is-charging', 'is-spinning');

@@ -411,15 +411,25 @@ var RLottie = (function () {
     destroyPlayer(el);
   }
 
-  rlottie.playOnce = function(el) {
+  rlottie.playOnce = function(el, restart) {
     if (el && el.rlPlayer) {
       var rlPlayer = el.rlPlayer;
       if (rlPlayer.frameCount > 0) {
+        if (restart) {
+          rlPlayer.paused = true;
+          rlPlayer.frameQueue.clear();
+          rlPlayer.nextFrameNo = false;
+          rlPlayer.forceRender = true;
+          rlPlayer.frameNo = false;
+          requestFrame(rlPlayer.reqId, 0);
+          setupMainLoop();
+        }
         rlPlayer.stopOnFirstFrame = true;
         rlPlayer.stopOnLastFrame = false;
-        if (rlPlayer.frameNo > 0) {
-          rlPlayer.waitForFirstFrame = true;
-        }
+        // A freshly loaded player has frameNo === false. It must pass the
+        // initial frame zero before that same frame may stop the next cycle.
+        // A player already frozen on frame zero can start the cycle directly.
+        rlPlayer.waitForFirstFrame = rlPlayer.frameNo === false || rlPlayer.frameNo > 0;
         if (rlPlayer.paused) {
           rlPlayer.paused = false;
           triggerEvent(el, 'tg:play');
