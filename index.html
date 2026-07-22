@@ -1804,6 +1804,30 @@
         html.android-device .nft-live-model { filter: drop-shadow(0 7px 8px rgba(0,0,0,.22)); }
         html.android-device .tab-bar .tab-item::after { filter: blur(3px); }
 
+        /* Preserve functional animation, but avoid permanent GPU layers on
+           constrained devices.  This is deliberately scoped to decoration:
+           the NFT player, roulette movement and game canvas keep running. */
+        html.low-power-device .case-card::before,
+        html.low-power-device .case-card::after,
+        html.low-power-device .case-atmosphere::before,
+        html.low-power-device .case-particle,
+        html.low-power-device .case-modal-content .drop-row::after,
+        html.low-power-device .case-modal-content .roulette-item:not(.case-loading-item)::after {
+            animation: none !important;
+            will-change: auto !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .case-card::before,
+            .case-card::after,
+            .case-atmosphere::before,
+            .case-particle,
+            .case-modal-content .drop-row::after,
+            .case-modal-content .roulette-item:not(.case-loading-item)::after {
+                animation: none !important;
+                will-change: auto !important;
+            }
+        }
+
         /* ===== V6.4: instant media surfaces, TON identity and case clipping ===== */
         .nft-live-fallback { transition-duration: .08s; }
         .nft-live-media--cart {
@@ -2672,7 +2696,115 @@
             line-height: 1.1 !important;
         }
 
+        /* Keep the probability attached to the artwork on every viewport. */
+        .case-modal-content .drop-row {
+            padding: 13px 10px 14px !important;
+        }
+        .case-modal-content .drop-media-shell {
+            position: relative;
+            z-index: 5;
+            width: clamp(76px, 24vw, 92px);
+            max-width: 100%;
+            aspect-ratio: 1;
+            margin: 0 auto 9px;
+            flex: 0 0 auto;
+            border-radius: 15px;
+            overflow: hidden;
+            isolation: isolate;
+            background: radial-gradient(circle at 48% 42%, rgba(105, 67, 133, .38), rgba(36, 36, 36, .96) 74%);
+            box-shadow: inset 0 1px rgba(255,255,255,.08), 0 8px 18px rgba(0,0,0,.25);
+        }
+        .case-modal-content .drop-media-shell > img,
+        .case-modal-content .drop-media-shell > .nft-live-media--case {
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            border-radius: inherit !important;
+            object-fit: contain;
+        }
+        .case-modal-content .drop-media-shell .drop-chance {
+            position: absolute !important;
+            z-index: 12;
+            top: 4px !important;
+            right: 4px !important;
+            left: auto !important;
+            min-width: 0;
+            min-height: 17px;
+            margin: 0 !important;
+            padding: 2px 5px !important;
+            transform: none !important;
+            border: 1px solid rgba(255, 218, 123, .66) !important;
+            border-radius: 999px !important;
+            color: #ffe6a2 !important;
+            background: linear-gradient(125deg, rgba(38, 20, 33, .92), rgba(91, 37, 99, .93)) !important;
+            box-shadow: 0 3px 9px rgba(0,0,0,.38), inset 0 1px rgba(255,255,255,.14) !important;
+            font-size: clamp(.44rem, 1.75vw, .52rem) !important;
+            font-weight: 900 !important;
+            line-height: 1 !important;
+            letter-spacing: 0 !important;
+        }
+        .case-modal-content .drop-row .drop-name {
+            min-height: 28px;
+            margin-top: auto !important;
+        }
+
+        .case-result-actions {
+            width: 100%;
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: minmax(0, 320px);
+            justify-content: center;
+            gap: 10px;
+        }
+        #case-claim-btn,
+        #sell-drop-btn {
+            box-sizing: border-box !important;
+            width: 100% !important;
+            max-width: 320px !important;
+            min-height: 56px !important;
+            height: 56px !important;
+            margin: 0 auto !important;
+            padding: 9px 16px !important;
+            border-radius: 18px !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            font-size: clamp(.7rem, 3.2vw, .82rem) !important;
+            line-height: 1.05 !important;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        button {
+            max-width: 100%;
+            min-width: 0;
+        }
+        button .star-amount { vertical-align: middle; }
+
+        /* Off-screen cards do not need their expensive effects painted. */
+        #catalog-container .item-card,
+        .case-modal-content .drop-row {
+            content-visibility: auto;
+        }
+        #catalog-container .item-card { contain-intrinsic-size: 310px; }
+        .case-modal-content .drop-row { contain-intrinsic-size: 156px; }
+
+        @media (max-width: 600px) {
+            .case-modal-content .drop-row::after,
+            .case-modal-content .roulette-item:not(.case-loading-item)::after {
+                animation: none !important;
+                opacity: .28;
+            }
+            .case-modal-content .drop-row,
+            #catalog-container .item-card {
+                -webkit-backdrop-filter: none !important;
+                backdrop-filter: none !important;
+            }
+        }
+
         .nft-live-media { contain: layout paint style; }
+        .nft-live-model { filter: none !important; }
         .nft-live-model canvas {
             transform: none !important;
             backface-visibility: visible !important;
@@ -3011,9 +3143,9 @@
                     <div id="win-media-host" class="case-win-media-host"></div>
                     <div id="win-name" style="color: #e5c07b; font-size: 1.2rem; font-weight: bold; margin: 10px 0;"></div>
 
-                    <div style="display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 15px;">
-                        <button class="btn-main-action" onclick="claimItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">ЗАБРАТЬ В ИНВЕНТАРЬ</button>
-                        <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()" style="width: 100%; max-width: 260px; padding: 14px 0; border-radius: 16px; font-size: 14px;">
+                    <div class="case-result-actions">
+                        <button class="btn-main-action" id="case-claim-btn" onclick="claimItem()">ЗАБРАТЬ В ИНВЕНТАРЬ</button>
+                        <button class="btn-secondary-action" id="sell-drop-btn" onclick="sellItem()">
                             <span id="sell-btn-text">ПРОДАТЬ ЗА </span><span class="star-amount"><span id="win-value">0</span><span id="win-currency" class="telegram-star" aria-hidden="true"></span></span>
                         </button>
                     </div>
@@ -3045,17 +3177,21 @@
     <script>
         const tg = window.Telegram.WebApp;
         const isAndroidPlatform = String(tg.platform || '').toLowerCase() === 'android' || /Android/i.test(navigator.userAgent);
+        const isMobileNftPlatform = isAndroidPlatform
+            || String(tg.platform || '').toLowerCase() === 'ios'
+            || window.matchMedia?.('(pointer: coarse)').matches === true;
         const deviceMemoryGb = Number(navigator.deviceMemory || 0);
         const logicalCores = Number(navigator.hardwareConcurrency || 0);
-        const lowPowerNftDevice = isAndroidPlatform && (
+        const lowPowerNftDevice = (
             (deviceMemoryGb > 0 && deviceMemoryGb <= 4) ||
             (logicalCores > 0 && logicalCores <= 4)
         );
-        const nftCardRenderRatio = lowPowerNftDevice ? 1.05 : (isAndroidPlatform ? 1.25 : 1.4);
-        const nftModalRenderRatio = lowPowerNftDevice ? 1.2 : (isAndroidPlatform ? 1.45 : 1.7);
+        const nftCardRenderRatio = lowPowerNftDevice ? 1 : (isMobileNftPlatform ? 1.15 : 1.35);
+        const nftModalRenderRatio = lowPowerNftDevice ? 1.15 : (isMobileNftPlatform ? 1.35 : 1.6);
         document.documentElement.classList.toggle('android-device', isAndroidPlatform);
+        document.documentElement.classList.toggle('low-power-device', lowPowerNftDevice);
         if (window.RLottie) {
-            window.RLottie.WORKERS_LIMIT = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : Math.min(4, logicalCores || 4));
+            window.RLottie.WORKERS_LIMIT = (lowPowerNftDevice || isMobileNftPlatform) ? 1 : 2;
         }
         tg.ready();
         try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
@@ -3135,7 +3271,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9';
+        const EXPECTED_API_RELEASE = '8.9-opt.2';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -3282,6 +3418,7 @@
         let currentCase = null;
         let rouletteActive = false;
         let caseOpeningRequestActive = false;
+        let currentCaseOpenRequestId = null;
         let caseDetailOpenToken = 0;
         let casesCache = null;
         let casesRequest = null;
@@ -3300,11 +3437,27 @@
         let nftMediaActiveLoads = 0;
         let nftMediaObserver = null;
         let nftAuxMediaObserver = null;
-        const NFT_MEDIA_MAX_LOADS = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : 3);
+        const NFT_MEDIA_MAX_LOADS = (lowPowerNftDevice || isMobileNftPlatform) ? 1 : 3;
+        const NFT_MEDIA_MAX_PLAYING = (lowPowerNftDevice || isMobileNftPlatform) ? 1 : 2;
+        const NFT_MEDIA_CACHE_LIMIT = 96;
+        const nftMediaPlaying = new Set();
+        const nftMediaPlaybackQueue = [];
+        let nftMediaPlaybackPumpScheduled = false;
+        let nftMediaPersistTimer = null;
         const NFT_MEDIA_HOVER_MODE = window.matchMedia?.('(hover: hover) and (pointer: fine)').matches === true;
         let catalogRenderedSignature = '';
         let catalogLoadedAt = 0;
         let catalogRequest = null;
+        let balanceRequest = null;
+        let inventoryRequest = null;
+
+        function setNftMediaCache(cacheKey, entry) {
+            nftMediaCache.delete(cacheKey);
+            nftMediaCache.set(cacheKey, entry);
+            while (nftMediaCache.size > NFT_MEDIA_CACHE_LIMIT) {
+                nftMediaCache.delete(nftMediaCache.keys().next().value);
+            }
+        }
 
         function restoreNftMediaCache() {
             try {
@@ -3314,7 +3467,7 @@
                 entries.slice(0, 24).forEach(entry => {
                     const itemId = Number(entry?.itemId || 0);
                     if (itemId > 0 && entry?.expires > now && entry?.data?.animated) {
-                        nftMediaCache.set(itemId, { data: entry.data, expires: entry.expires });
+                        setNftMediaCache(itemId, { data: entry.data, expires: entry.expires });
                     }
                 });
             } catch (_) {
@@ -3323,13 +3476,17 @@
         }
 
         function persistNftMediaCache() {
-            try {
-                const entries = [...nftMediaCache.entries()]
-                    .filter(([, entry]) => entry?.data?.animated && entry.expires > Date.now())
-                    .slice(-24)
-                    .map(([itemId, entry]) => ({ itemId, data: entry.data, expires: entry.expires }));
-                localStorage.setItem('dnx_nft_media_v2', JSON.stringify(entries));
-            } catch (_) {}
+            if (nftMediaPersistTimer) return;
+            nftMediaPersistTimer = setTimeout(() => {
+                nftMediaPersistTimer = null;
+                try {
+                    const entries = [...nftMediaCache.entries()]
+                        .filter(([itemId, entry]) => Number.isInteger(itemId) && entry?.data?.animated && entry.expires > Date.now())
+                        .slice(-24)
+                        .map(([itemId, entry]) => ({ itemId, data: entry.data, expires: entry.expires }));
+                    localStorage.setItem('dnx_nft_media_v2', JSON.stringify(entries));
+                } catch (_) {}
+            }, 280);
         }
 
         restoreNftMediaCache();
@@ -3343,11 +3500,28 @@
             } catch (_) { return ''; }
         }
 
+        function scheduleNftPlaybackPump() {
+            if (nftMediaPlaybackPumpScheduled) return;
+            nftMediaPlaybackPumpScheduled = true;
+            requestAnimationFrame(() => {
+                nftMediaPlaybackPumpScheduled = false;
+                pumpNftPlaybackQueue();
+            });
+        }
+
+        function releaseNftPlaybackSlot(element) {
+            if (!element) return;
+            nftMediaPlaying.delete(element);
+            element.dataset.mediaPlaybackQueued = 'false';
+            scheduleNftPlaybackPump();
+        }
+
         function deactivateNftMedia(element) {
             const picture = element?.querySelector('.nft-live-model');
             if (picture && window.RLottie?.destroy) window.RLottie.destroy(picture);
             if (picture) picture.remove();
             if (element) {
+                releaseNftPlaybackSlot(element);
                 element.dataset.mediaToken = String((Number(element.dataset.mediaToken) || 0) + 1);
                 element.classList.remove('is-live', 'has-live-frame');
                 element.dataset.mediaState = 'idle';
@@ -3359,6 +3533,7 @@
         function pauseNftMedia(element, rearm = false) {
             if (!element) return;
             element.dataset.mediaWanted = 'false';
+            releaseNftPlaybackSlot(element);
             const picture = element.querySelector('.nft-live-model');
             if (picture && window.RLottie?.pause) {
                 window.RLottie.pause(picture);
@@ -3369,33 +3544,51 @@
             }
         }
 
-        function resumeNftMedia(element) {
-            if (!element?.isConnected || element.hidden || element.closest('[hidden]')) return;
-            if (element.dataset.mediaPlayed === 'true' || element.dataset.mediaPlayed === 'playing') return;
+        function startNftMediaPlayback(element) {
+            if (!element?.isConnected || element.hidden || element.closest('[hidden]') || document.hidden) return;
+            if (nftMediaPlaying.size >= NFT_MEDIA_MAX_PLAYING) {
+                if (element.dataset.mediaPlaybackQueued !== 'true') {
+                    element.dataset.mediaPlaybackQueued = 'true';
+                    element.dataset.mediaPlayed = 'queued';
+                    nftMediaPlaybackQueue.push(element);
+                }
+                return;
+            }
+            element.dataset.mediaPlaybackQueued = 'false';
             element.dataset.mediaWanted = 'true';
             element.dataset.mediaPlayed = 'playing';
-            const picture = element.querySelector('.nft-live-model');
+            nftMediaPlaying.add(element);
+            let picture = element.querySelector('.nft-live-model');
+            if (picture?.classList.contains('nft-live-model--snapshot')) {
+                picture.remove();
+                picture = null;
+                element.classList.remove('is-live', 'has-live-frame');
+                element.dataset.mediaState = 'idle';
+            }
             if (picture) {
                 element.dataset.mediaState = 'live';
                 element.classList.add('is-live');
-                if (!document.hidden) window.RLottie?.playOnce?.(picture, true);
+                window.RLottie?.playOnce?.(picture, true);
                 return;
             }
             queueNftMedia(element);
         }
 
-        function primeNftMedia(element) {
-            if (!element?.isConnected || element.hidden || element.closest('[hidden]')) return;
-            if (element.dataset.mediaPlayed === 'playing' || element.dataset.mediaPlayed === 'true') return;
-            element.dataset.mediaWanted = 'true';
-            const picture = element.querySelector('.nft-live-model');
-            if (picture) {
-                element.dataset.mediaState = 'ready';
-                element.classList.add('is-live');
-                window.RLottie?.pause?.(picture);
-                return;
+        function pumpNftPlaybackQueue() {
+            if (document.hidden) return;
+            while (nftMediaPlaying.size < NFT_MEDIA_MAX_PLAYING && nftMediaPlaybackQueue.length) {
+                const element = nftMediaPlaybackQueue.shift();
+                if (!element?.isConnected || element.dataset.mediaPlaybackQueued !== 'true'
+                    || element.dataset.mediaWanted !== 'true' || element.hidden || element.closest('[hidden]')) continue;
+                startNftMediaPlayback(element);
             }
-            queueNftMedia(element);
+        }
+
+        function resumeNftMedia(element) {
+            if (!element?.isConnected || element.hidden || element.closest('[hidden]')) return;
+            if (element.dataset.mediaPlayed === 'true' || element.dataset.mediaPlayed === 'playing') return;
+            element.dataset.mediaWanted = 'true';
+            startNftMediaPlayback(element);
         }
 
         function sparsePatternSeed(value) {
@@ -3465,6 +3658,15 @@
                 if (!element.isConnected || element.dataset.mediaToken !== mediaToken) return;
                 element.dataset.mediaPlayed = 'true';
                 element.dataset.mediaState = 'complete';
+                releaseNftPlaybackSlot(element);
+                // Keep the already painted canvas as the zero-cost frozen frame,
+                // but release the worker, frame queue and RGBA buffers.
+                setTimeout(() => {
+                    if (!picture.isConnected || element.dataset.mediaToken !== mediaToken
+                        || element.dataset.mediaState !== 'complete' || !picture.rlPlayer) return;
+                    window.RLottie?.destroy?.(picture);
+                    picture.classList.add('nft-live-model--snapshot');
+                }, 0);
             });
             picture.addEventListener('tg:frame-visibility', (frameEvent) => {
                 if (!element.isConnected || element.dataset.mediaToken !== mediaToken || element.dataset.mediaWanted !== 'true') return;
@@ -3492,7 +3694,7 @@
             const request = apiFetch(`${API_BASE}/nft/media?item_id=${encodeURIComponent(itemId)}`)
                 .catch(() => ({ animated: false }))
                 .then(media => {
-                    nftMediaCache.set(itemId, {
+                    setNftMediaCache(itemId, {
                         data: media,
                         expires: Date.now() + (media?.animated ? 10 * 60 * 1000 : 45 * 1000)
                     });
@@ -3512,7 +3714,7 @@
             const request = apiFetch(`${API_BASE}/case/nft-media?case_id=${encodeURIComponent(caseId)}&drop_index=${encodeURIComponent(dropIndex)}`)
                 .catch(() => ({ animated: false }))
                 .then(media => {
-                    nftMediaCache.set(cacheKey, { data: media, expires: Date.now() + (media?.animated ? 10 * 60 * 1000 : 45 * 1000) });
+                    setNftMediaCache(cacheKey, { data: media, expires: Date.now() + (media?.animated ? 10 * 60 * 1000 : 45 * 1000) });
                     return media;
                 })
                 .finally(() => nftMediaRequests.delete(cacheKey));
@@ -3537,6 +3739,7 @@
             } else if (element.isConnected) {
                 element.dataset.mediaState = 'idle';
                 element.dataset.mediaPlayed = 'false';
+                releaseNftPlaybackSlot(element);
             }
         }
 
@@ -3554,7 +3757,12 @@
 
         function queueNftMedia(element) {
             if (!element?.isConnected || element.dataset.mediaWanted !== 'true') return;
-            const picture = element.querySelector('.nft-live-model');
+            let picture = element.querySelector('.nft-live-model');
+            if (picture?.classList.contains('nft-live-model--snapshot')) {
+                picture.remove();
+                picture = null;
+                element.classList.remove('is-live', 'has-live-frame');
+            }
             if (picture) {
                 element.dataset.mediaState = 'live';
                 if (!document.hidden && element.dataset.mediaPlayed === 'playing') window.RLottie?.playOnce?.(picture, true);
@@ -3574,7 +3782,7 @@
                 elements.filter(element => !element.closest('.item-card')?.hidden).forEach(element => {
                     element.dataset.mediaInView = 'true';
                     element.dataset.mediaPlayed = 'false';
-                    (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(element);
+                    if (!NFT_MEDIA_HOVER_MODE) resumeNftMedia(element);
                 });
                 return;
             }
@@ -3587,7 +3795,7 @@
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
                         entry.target.dataset.mediaPlayed = 'false';
-                        (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(entry.target);
+                        if (!NFT_MEDIA_HOVER_MODE) resumeNftMedia(entry.target);
                     } else if (!visible && entry.target.dataset.mediaInView === 'true') {
                         entry.target.dataset.mediaInView = 'false';
                         pauseNftMedia(entry.target, true);
@@ -3669,6 +3877,20 @@
             });
         }
 
+        function destroyAuxNftMedia(root = document) {
+            if (nftAuxMediaObserver) nftAuxMediaObserver.disconnect();
+            root?.querySelectorAll?.('.nft-live-media[data-media-scope="aux"]').forEach(element => {
+                element.dataset.mediaWanted = 'false';
+                deactivateNftMedia(element);
+            });
+            for (let index = nftMediaQueue.length - 1; index >= 0; index--) {
+                const queued = nftMediaQueue[index];
+                if (!queued?.isConnected || (root === document ? queued.dataset.mediaScope === 'aux' : root?.contains(queued))) {
+                    nftMediaQueue.splice(index, 1);
+                }
+            }
+        }
+
         function resumeAuxNftMedia() {
             if (nftAuxMediaObserver) nftAuxMediaObserver.disconnect();
             const elements = [...document.querySelectorAll('.nft-live-media[data-media-scope="aux"]')]
@@ -3678,7 +3900,7 @@
                 elements.forEach(element => {
                     element.dataset.mediaInView = 'true';
                     element.dataset.mediaPlayed = 'false';
-                    (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(element);
+                    if (!NFT_MEDIA_HOVER_MODE) resumeNftMedia(element);
                 });
                 return;
             }
@@ -3688,10 +3910,11 @@
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
                         entry.target.dataset.mediaPlayed = 'false';
-                        (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(entry.target);
+                        if (!NFT_MEDIA_HOVER_MODE) resumeNftMedia(entry.target);
                     } else if (!visible && entry.target.dataset.mediaInView === 'true') {
                         entry.target.dataset.mediaInView = 'false';
-                        pauseNftMedia(entry.target, true);
+                        if (entry.target.closest('#roulette-track')) deactivateNftMedia(entry.target);
+                        else pauseNftMedia(entry.target, true);
                     }
                 });
             }, { rootMargin: '0px', threshold: [0, .12, .5] });
@@ -3699,16 +3922,15 @@
         }
 
         document.addEventListener('visibilitychange', () => {
-            document.querySelectorAll('.nft-live-model').forEach(picture => {
-                if (!window.RLottie) return;
-                if (document.hidden) {
-                    const media = picture.closest('.nft-live-media');
-                    if (media) {
-                        media.dataset.mediaInView = 'false';
-                        pauseNftMedia(media, true);
-                    } else window.RLottie.pause?.(picture);
-                }
-            });
+            if (document.hidden) {
+                document.querySelectorAll('.nft-live-media').forEach(media => {
+                    media.dataset.mediaInView = 'false';
+                    pauseNftMedia(media, true);
+                });
+                document.querySelectorAll('.nft-live-model').forEach(picture => {
+                    if (!picture.closest('.nft-live-media')) window.RLottie?.pause?.(picture);
+                });
+            }
             if (!document.hidden) {
                 resumeCatalogNftMedia();
                 resumeAuxNftMedia();
@@ -3732,8 +3954,8 @@
                 activateAccountRestriction(accountRestriction);
                 return;
             }
-            if (id !== 'store') pauseCatalogNftMedia();
-            pauseAuxNftMedia();
+            if (id !== 'store') destroyCatalogNftMedia();
+            destroyAuxNftMedia();
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.querySelectorAll('.tab-bar .tab-item').forEach(t => t.classList.remove('active'));
             const pageEl = document.getElementById('page-' + id);
@@ -3747,7 +3969,7 @@
                 loadLeaderboardPreview();
             }
             if(id === 'store') {
-                loadCatalog(true);
+                loadCatalog(false);
                 updateCartFab();
                 requestAnimationFrame(resumeCatalogNftMedia);
             }
@@ -3767,26 +3989,30 @@
         }
 
         async function updateBalance() {
-            try {
-                const data = await apiFetch(`${API_BASE}/user`);
-                userBalance = data.balance || 0;
-                userBonusBalance = data.bonusBalance || 0;
-                referralLink = data.referralLink || '';
-                document.getElementById('referrals-count').innerText = Number(data.referralsCount || 0).toLocaleString('ru-RU');
-                document.getElementById('referral-earned').innerText = formatStars(data.referralEarned || 0);
-                if (data.restriction) activateAccountRestriction(data.restriction);
-                else if (accountRestriction) clearAccountRestriction();
-            } catch(e) { console.error('Balance update failed', e); }
-            document.getElementById('header-balance').innerHTML = `<span>${formatStars(userBalance)}</span>${telegramStarMarkup()}`;
-            document.getElementById('header-bonus-balance').innerHTML = `<span>${formatStars(userBonusBalance)}</span>${bonusStarMarkup()}`;
-            document.getElementById('big-balance').innerText = formatStars(userBalance);
-            document.getElementById('big-bonus-balance').innerText = formatStars(userBonusBalance);
-            document.querySelectorAll('.balance-choice').forEach(choice => {
-                const main = choice.querySelector('[data-balance="main"]');
-                const bonus = choice.querySelector('[data-balance="bonus"]');
-                if (main) main.innerHTML = `Основной · ${formatStars(userBalance)} ${telegramStarMarkup()}`;
-                if (bonus) bonus.innerHTML = `Бонусный · ${formatStars(userBonusBalance)} ${bonusStarMarkup()}`;
-            });
+            if (balanceRequest) return balanceRequest;
+            balanceRequest = (async () => {
+                try {
+                    const data = await apiFetch(`${API_BASE}/user`);
+                    userBalance = data.balance || 0;
+                    userBonusBalance = data.bonusBalance || 0;
+                    referralLink = data.referralLink || '';
+                    document.getElementById('referrals-count').innerText = Number(data.referralsCount || 0).toLocaleString('ru-RU');
+                    document.getElementById('referral-earned').innerText = formatStars(data.referralEarned || 0);
+                    if (data.restriction) activateAccountRestriction(data.restriction);
+                    else if (accountRestriction) clearAccountRestriction();
+                } catch(e) { console.error('Balance update failed', e); }
+                document.getElementById('header-balance').innerHTML = `<span>${formatStars(userBalance)}</span>${telegramStarMarkup()}`;
+                document.getElementById('header-bonus-balance').innerHTML = `<span>${formatStars(userBonusBalance)}</span>${bonusStarMarkup()}`;
+                document.getElementById('big-balance').innerText = formatStars(userBalance);
+                document.getElementById('big-bonus-balance').innerText = formatStars(userBonusBalance);
+                document.querySelectorAll('.balance-choice').forEach(choice => {
+                    const main = choice.querySelector('[data-balance="main"]');
+                    const bonus = choice.querySelector('[data-balance="bonus"]');
+                    if (main) main.innerHTML = `Основной · ${formatStars(userBalance)} ${telegramStarMarkup()}`;
+                    if (bonus) bonus.innerHTML = `Бонусный · ${formatStars(userBonusBalance)} ${bonusStarMarkup()}`;
+                });
+            })().finally(() => { balanceRequest = null; });
+            return balanceRequest;
         }
 
         async function copyReferralLink() {
@@ -3880,7 +4106,7 @@
                 const itemId = Number(item?.id || 0);
                 const media = item?.nft_media;
                 if (!itemId || !media?.animated || !safeTelegramMediaUrl(media.tgsUrl)) return;
-                nftMediaCache.set(itemId, { data: media, expires: Date.now() + 10 * 60 * 1000 });
+                setNftMediaCache(itemId, { data: media, expires: Date.now() + 10 * 60 * 1000 });
                 changed = true;
             });
             if (changed) persistNftMediaCache();
@@ -3888,7 +4114,7 @@
 
         async function loadCatalog(force = false) {
             try {
-                const cacheIsFresh = currentCatalog.length && Date.now() - catalogLoadedAt < 30000;
+                const cacheIsFresh = currentCatalog.length && Date.now() - catalogLoadedAt < 60000;
                 if (!force && cacheIsFresh) {
                     syncCatalogUi();
                     renderCatalogItems();
@@ -4212,6 +4438,9 @@
         }
         function renderCart() {
             const list = document.getElementById('cart-items-list');
+            // Re-rendering a cart used to detach canvases while leaving their
+            // RLottie workers alive. Tear them down before replacing the DOM.
+            destroyAuxNftMedia(list);
             if(!cart.length) {
                 list.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Корзина пуста</div>';
                 document.getElementById('pay-footer').style.display = 'none';
@@ -4467,7 +4696,7 @@
         }
 
         function switchInv(el, type) {
-            pauseAuxNftMedia();
+            destroyAuxNftMedia(document.getElementById('page-inventory'));
             document.querySelectorAll('#page-inventory .tab-item').forEach(t => { t.classList.remove('active'); t.style.borderColor='transparent'; t.style.color='var(--text-muted)'; });
             el.classList.add('active'); el.style.borderColor='var(--accent-gold)'; el.style.color='var(--accent-gold)';
             document.getElementById('inventory-active-container').style.display = type === 'active' ? 'grid' : 'none';
@@ -4480,11 +4709,15 @@
             return ['ring', 'diamond', 'cup'].includes(String(item?.name || '').trim().toLowerCase());
         }
         async function loadInventory() {
-            try {
-                const data = await apiFetch(`${API_BASE}/inventory`);
-                inventoryData = data;
-                const active = inventoryData.filter(i => !['withdrawn', 'disposed'].includes(i.status));
-                document.getElementById('inventory-active-container').innerHTML = active.length
+            if (inventoryRequest) return inventoryRequest;
+            inventoryRequest = (async () => {
+                try {
+                    const data = await apiFetch(`${API_BASE}/inventory`);
+                    inventoryData = Array.isArray(data) ? data : [];
+                    const active = inventoryData.filter(i => !['withdrawn', 'disposed'].includes(i.status));
+                const activeContainer = document.getElementById('inventory-active-container');
+                destroyAuxNftMedia(activeContainer);
+                activeContainer.innerHTML = active.length
                     ? active.map(i => {
                         const simpleNft = isSimpleInventoryNft(i);
                         const remaining = Math.max(0, Number(i.withdraw_remaining_seconds || 0));
@@ -4510,7 +4743,9 @@
                 if (!historyContainer.dataset.loaded) historyContainer.innerHTML = '<div class="empty-state"><p>Загружаем историю…</p></div>';
                 requestAnimationFrame(resumeAuxNftMedia);
                 startWithdrawCountdowns();
-            } catch(e) { console.error(e); }
+                } catch(e) { console.error(e); }
+            })().finally(() => { inventoryRequest = null; });
+            return inventoryRequest;
         }
 
         const activityVisuals = {
@@ -4846,7 +5081,7 @@
 
         // ==================== ИГРОВАЯ ЛОГИКА (без изменений) ====================
         const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
         const imageCache = {};
         const waitingFieldImage = new Image();
         waitingFieldImage.src = 'game-waiting-bg.png';
@@ -5057,6 +5292,51 @@
             return Math.max(5, Math.min(defaultRadius, safeRadius));
         }
 
+        let polygonRenderCache = { source: null, width: 0, height: 0, layer: null };
+        function getPolygonLayer(polygons, width, height) {
+            if (polygonRenderCache.source === polygons
+                && polygonRenderCache.width === width
+                && polygonRenderCache.height === height) {
+                return polygonRenderCache.layer;
+            }
+            const layer = document.createElement('canvas');
+            layer.width = width; layer.height = height;
+            const layerCtx = layer.getContext('2d');
+            if (!layerCtx) return null;
+            for (const poly of polygons || []) {
+                const pts = Array.isArray(poly.polygon) ? poly.polygon : [];
+                if (pts.length < 3) continue;
+                let minX = pts[0].x, maxX = pts[0].x, minY = pts[0].y, maxY = pts[0].y;
+                layerCtx.beginPath();
+                layerCtx.moveTo(pts[0].x * width, (1 - pts[0].y) * height);
+                for (let i = 1; i < pts.length; i++) {
+                    minX = Math.min(minX, pts[i].x); maxX = Math.max(maxX, pts[i].x);
+                    minY = Math.min(minY, pts[i].y); maxY = Math.max(maxY, pts[i].y);
+                    layerCtx.lineTo(pts[i].x * width, (1 - pts[i].y) * height);
+                }
+                layerCtx.closePath();
+                const gradient = layerCtx.createLinearGradient(
+                    minX * width, (1 - maxY) * height,
+                    maxX * width, (1 - minY) * height
+                );
+                addGradientStops(gradient, parseColors(poly.color));
+                layerCtx.save();
+                layerCtx.globalAlpha = .78;
+                layerCtx.fillStyle = gradient;
+                layerCtx.fill();
+                layerCtx.globalAlpha = 1;
+                layerCtx.strokeStyle = "rgba(3,1,10,.9)";
+                layerCtx.lineWidth = Math.max(3, width * .0045);
+                layerCtx.stroke();
+                layerCtx.strokeStyle = "rgba(255,255,255,.2)";
+                layerCtx.lineWidth = Math.max(1, width * .0012);
+                layerCtx.stroke();
+                layerCtx.restore();
+            }
+            polygonRenderCache = { source: polygons, width, height, layer };
+            return layer;
+        }
+
         function smoothstep01(value) {
             const t = Math.max(0, Math.min(1, value));
             return t * t * (3 - 2 * t);
@@ -5080,6 +5360,9 @@
         function drawGameFrame(ballPos = null, highlightPts = null, camera = null) {
             if (!ctx) return;
             const cw = canvas.width, ch = canvas.height;
+            const polygonLayer = gState.polygons?.length
+                ? getPolygonLayer(gState.polygons, cw, ch)
+                : null;
             ctx.clearRect(0, 0, cw, ch);
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = isAndroidPlatform ? 'medium' : 'high';
@@ -5094,37 +5377,7 @@
             else {
                 drawCoverImage(ctx, activeFieldImage, cw, ch);
             if (gState.polygons && gState.polygons.length > 0) {
-                for (const poly of gState.polygons) {
-                    const pts = poly.polygon;
-                    if (pts.length < 3) continue;
-                    const colors = parseColors(poly.color);
-                    let minX = pts[0].x, maxX = pts[0].x, minY = pts[0].y, maxY = pts[0].y;
-                    for (let i = 1; i < pts.length; i++) {
-                        if (pts[i].x < minX) minX = pts[i].x;
-                        if (pts[i].x > maxX) maxX = pts[i].x;
-                        if (pts[i].y < minY) minY = pts[i].y;
-                        if (pts[i].y > maxY) maxY = pts[i].y;
-                    }
-                    const x1 = minX * cw, y1 = (1 - maxY) * ch, x2 = maxX * cw, y2 = (1 - minY) * ch;
-                    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
-                    addGradientStops(grad, colors);
-                    ctx.fillStyle = grad;
-                    ctx.beginPath();
-                    ctx.moveTo(pts[0].x * cw, (1 - pts[0].y) * ch);
-                    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x * cw, (1 - pts[i].y) * ch);
-                    ctx.closePath();
-                    ctx.save();
-                    ctx.globalAlpha = .78;
-                    ctx.fill();
-                    ctx.globalAlpha = 1;
-                    ctx.strokeStyle = "rgba(3,1,10,.9)";
-                    ctx.lineWidth = Math.max(3, cw * .0045);
-                    ctx.stroke();
-                    ctx.strokeStyle = "rgba(255,255,255,.2)";
-                    ctx.lineWidth = Math.max(1, cw * .0012);
-                    ctx.stroke();
-                    ctx.restore();
-                }
+                if (polygonLayer) ctx.drawImage(polygonLayer, 0, 0);
                 for (const poly of gState.polygons) {
                     let cx, cy, radius;
                     if (poly.center && poly.avatar_radius) {
@@ -5404,6 +5657,7 @@
                     const finalPos = trajectory[trajectory.length - 1];
                     drawGameFrame(finalPos, null, null);
                     animationFrameId = null;
+                    isSpinning = false;
                     fetchWinnerNow();
                 }
             }
@@ -5438,7 +5692,7 @@
 
         async function fetchWinnerNow() {
             try {
-                const state = await apiFetch(`${API_BASE}/game/state`);
+                const state = await apiFetch(`${API_BASE}/game/state?compact=1`);
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     await showWinnerSequence(state.winner, state.round_id);
                 }
@@ -5475,7 +5729,8 @@
             if (gamePollInFlight) return;
             gamePollInFlight = true;
             try {
-                const newState = await apiFetch(`${API_BASE}/game/state`);
+                const compactState = isSpinning ? '?compact=1' : '';
+                const newState = await apiFetch(`${API_BASE}/game/state${compactState}`);
                 if (!initialGameStateLoaded) {
                     initialGameStateLoaded = true;
                     if (newState.round_id) {
@@ -5504,16 +5759,16 @@
                     document.getElementById('game-timer-bg').innerText = '';
                 }
                 if (!isSpinning) {
-                    preloadAvatars(newState.polygons);
+                    preloadAvatars(newState.polygons || []);
                     if (!cancelInProgress) {
                         gState.players = newState.players;
                         gState.pool = newState.pool;
                     }
                     gState.status = newState.status;
-                    gState.polygons = newState.polygons;
+                    if (Array.isArray(newState.polygons)) gState.polygons = newState.polygons;
                     drawGameFrame(null, null);
                 }
-                gState.spin_params = newState.spin_params;
+                if (newState.spin_params) gState.spin_params = newState.spin_params;
                 gState.winner = newState.winner;
                 gState.last_winner_id = newState.last_winner_id;
                 gState.round_id = newState.round_id;
@@ -5664,7 +5919,7 @@
                 document.getElementById('cases-container').style.display = 'none';
                 requestAnimationFrame(resumeCatalogNftMedia);
             } else {
-                pauseCatalogNftMedia();
+                destroyCatalogNftMedia();
                 document.getElementById('page-store').classList.add('cases-active');
                 document.querySelector('.store-tab:last-child').classList.add('active');
                 document.getElementById('catalog-container').style.display = 'none';
@@ -5786,6 +6041,7 @@
             track.style.transition = 'none';
             track.style.transform = 'translateX(0)';
             track.style.paddingLeft = '0';
+            destroyAuxNftMedia(track);
             track.innerHTML = '<div class="roulette-item case-loading-item"></div><div class="roulette-item case-loading-item"></div><div class="roulette-item case-loading-item"></div><div class="roulette-item case-loading-item"></div>';
             modal.classList.add('is-loading');
             overlay.classList.add('active');
@@ -5800,10 +6056,14 @@
                 selectBalanceType('case', 'main');
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
-                document.getElementById('case-drop-list').innerHTML = sortedDrops.map(d => `
+                const dropList = document.getElementById('case-drop-list');
+                destroyAuxNftMedia(dropList);
+                dropList.innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
-                        <span class="drop-chance">${Number(d.chance)}%</span>
-                        ${caseDropMediaMarkup(d)}
+                        <span class="drop-media-shell">
+                            ${caseDropMediaMarkup(d)}
+                            <span class="drop-chance">${Number(d.chance)}%</span>
+                        </span>
                         <span class="drop-name">${escapeHtml(d.model || d.name)}</span>
                     </div>
                 `).join('');
@@ -5826,6 +6086,7 @@
                 document.getElementById('case-back-btn').style.opacity = '1';
                 document.getElementById('case-back-btn').style.pointerEvents = 'auto';
 
+                destroyAuxNftMedia(track);
                 track.innerHTML = '';
                 track.classList.remove('idle-scroll');
                 track.style.transition = 'none';
@@ -5844,6 +6105,7 @@
 
         function startIdleRoulette(drops) {
             const track = document.getElementById('roulette-track');
+            destroyAuxNftMedia(track);
             track.innerHTML = '';
             track.classList.remove('idle-scroll');
             track.style.transition = 'none';
@@ -5851,7 +6113,7 @@
             track.style.paddingLeft = '0px';
 
             const items = [];
-            for (let i = 0; i < 16; i++) items.push(drops[Math.floor(Math.random() * drops.length)]);
+            for (let i = 0; i < 8; i++) items.push(drops[Math.floor(Math.random() * drops.length)]);
 
             const createSet = () => {
                 const wrapper = document.createElement('div');
@@ -5884,12 +6146,13 @@
             rouletteContainer.classList.add('is-spinning');
             track.classList.remove('idle-scroll');
             track.style.animation = 'none';
+            destroyAuxNftMedia(track);
             track.innerHTML = '';
             track.style.paddingLeft = '50%';
 
-            const targetIndex = 32;
+            const targetIndex = 24;
             const items = [];
-            for (let i = 0; i < 39; i++) items.push(drops[Math.floor(Math.random() * drops.length)]);
+            for (let i = 0; i < 31; i++) items.push(drops[Math.floor(Math.random() * drops.length)]);
             items[targetIndex] = wonItem;
 
             items.forEach(drop => {
@@ -5911,19 +6174,26 @@
             track.style.transform = 'translateX(0)';
 
             let lastPassedItem = 0;
-            function checkTick() {
+            let lastTickCheckAt = 0;
+            function checkTick(frameTime = performance.now()) {
                 if (!rouletteActive) return;
-                const style = window.getComputedStyle(track);
-                const matrix = style.transform || style.webkitTransform || style.mozTransform;
-                if (matrix && matrix !== 'none') {
-                    const values = matrix.split('(')[1].split(')')[0].split(',');
-                    const tx = Math.abs(parseFloat(values[4]));
-                    const currentPassedItem = Math.floor(tx / fullWidth);
-                    if (currentPassedItem > lastPassedItem) {
-                        lastPassedItem = currentPassedItem;
-                        playTickSound();
-                        if (window.Telegram?.WebApp?.HapticFeedback) {
-                            window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                // Reading computed transform forces style calculation. 30 Hz is
+                // enough to catch every 141px item boundary while the visual CSS
+                // transition continues at the display refresh rate.
+                if (frameTime - lastTickCheckAt >= 32) {
+                    lastTickCheckAt = frameTime;
+                    const style = window.getComputedStyle(track);
+                    const matrix = style.transform || style.webkitTransform || style.mozTransform;
+                    if (matrix && matrix !== 'none') {
+                        const values = matrix.split('(')[1].split(')')[0].split(',');
+                        const tx = Math.abs(parseFloat(values[4]));
+                        const currentPassedItem = Math.floor(tx / fullWidth);
+                        if (currentPassedItem > lastPassedItem) {
+                            lastPassedItem = currentPassedItem;
+                            playTickSound();
+                            if (window.Telegram?.WebApp?.HapticFeedback) {
+                                window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                            }
                         }
                     }
                 }
@@ -5971,7 +6241,7 @@
         }
 
         function claimItem() {
-            document.querySelectorAll('#case-detail-overlay .nft-live-media').forEach(element => pauseNftMedia(element, true));
+            destroyAuxNftMedia(document.getElementById('case-detail-overlay'));
             document.getElementById('case-detail-overlay').classList.remove('active');
 
             const rouletteContainer = document.getElementById('roulette-container');
@@ -5994,6 +6264,7 @@
             document.getElementById('sell-drop-btn').disabled = false;
 
             const track = document.getElementById('roulette-track');
+            destroyAuxNftMedia(track);
             track.innerHTML = '';
             track.classList.remove('idle-scroll');
             track.style.transition = 'none';
@@ -6066,11 +6337,33 @@
             document.getElementById('case-back-btn').style.pointerEvents = 'none';
 
             try {
+                if (!currentCaseOpenRequestId) {
+                    try {
+                        const saved = JSON.parse(localStorage.getItem('dnx_case_open_request') || 'null');
+                        if (saved && saved.caseId === currentCase.id && saved.balanceType === selectedCaseBalance
+                            && Date.now() - Number(saved.createdAt || 0) < 86400000) {
+                            currentCaseOpenRequestId = saved.id;
+                        }
+                    } catch (_) {}
+                }
+                if (!currentCaseOpenRequestId) currentCaseOpenRequestId = createRequestId();
+                localStorage.setItem('dnx_case_open_request', JSON.stringify({
+                    id: currentCaseOpenRequestId,
+                    caseId: currentCase.id,
+                    balanceType: selectedCaseBalance,
+                    createdAt: Date.now()
+                }));
                 const result = await apiFetch(`${API_BASE}/open-case`, {
                     method: 'POST',
-                    body: JSON.stringify({ caseId: currentCase.id, balanceType: selectedCaseBalance })
+                    body: JSON.stringify({
+                        caseId: currentCase.id,
+                        balanceType: selectedCaseBalance,
+                        requestId: currentCaseOpenRequestId
+                    })
                 });
                 if (result && result.success) {
+                    localStorage.removeItem('dnx_case_open_request');
+                    currentCaseOpenRequestId = null;
                     caseOpeningRequestActive = false;
                     document.getElementById('case-actions').style.display = 'none';
                     startActiveRoulette(currentCase.drops, result.won_item);
@@ -6104,12 +6397,13 @@
         function closeCaseDetail(event) {
             if (rouletteActive || caseOpeningRequestActive) return;
             caseDetailOpenToken++;
-            document.querySelectorAll('#case-detail-overlay .nft-live-media').forEach(element => pauseNftMedia(element, true));
+            destroyAuxNftMedia(document.getElementById('case-detail-overlay'));
             document.getElementById('case-detail-overlay').classList.remove('active');
             document.querySelector('.case-modal-content')?.classList.remove('is-loading');
             document.getElementById('roulette-container').classList.remove('is-charging', 'is-spinning');
             document.getElementById('win-display').classList.remove('is-revealed');
             currentCase = null;
+            currentCaseOpenRequestId = null;
         }
 
         updateCartFab();

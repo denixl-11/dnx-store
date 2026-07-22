@@ -11,7 +11,7 @@ import re
 import time
 import secrets
 import uuid
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR
 from functools import wraps
 from html.parser import HTMLParser
@@ -32,7 +32,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://denixl-11.github.io/dnx-store/")
-CORS_ORIGIN = os.getenv("CORS_ORIGIN", "https://denixl-11.github.io")
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", "https://denixl-11.github.io").rstrip("/")
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 DB_HOST = os.getenv("DB_HOST", "").strip()
 DB_NAME = os.getenv("DB_NAME", "").strip()
@@ -40,7 +40,7 @@ DB_USER = os.getenv("DB_USER", "").strip()
 DB_PORT = int(os.getenv("DB_PORT", "5432"))
 INIT_DATA_MAX_AGE = int(os.getenv("INIT_DATA_MAX_AGE", "86400"))
 DB_POOL_MIN_SIZE = int(os.getenv("DB_POOL_MIN_SIZE", "1"))
-DB_POOL_MAX_SIZE = int(os.getenv("DB_POOL_MAX_SIZE", "10"))
+DB_POOL_MAX_SIZE = int(os.getenv("DB_POOL_MAX_SIZE", "6"))
 TON_RECEIVER_ADDRESS = os.getenv("TON_RECEIVER_ADDRESS", "").strip()
 TONCENTER_API_URL = os.getenv("TONCENTER_API_URL", "https://toncenter.com/api/v2").rstrip("/")
 TONCENTER_API_KEY = os.getenv("TONCENTER_API_KEY", "").strip()
@@ -63,6 +63,29 @@ if STAR_MIN_TOPUP <= 0 or STAR_MAX_TOPUP < STAR_MIN_TOPUP:
 if STAR_MIN_BET <= 0 or STAR_BET_STEP <= 0:
     raise RuntimeError("Invalid Stars bet limits")
 
+
+def _require_https_url(name: str, value: str, *, origin_only: bool = False) -> None:
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise RuntimeError(f"{name} must be a public HTTPS URL")
+    if origin_only and (parsed.path not in ("", "/") or parsed.params or parsed.query or parsed.fragment):
+        raise RuntimeError(f"{name} must contain only scheme and host")
+
+
+_require_https_url("WEBAPP_URL", WEBAPP_URL)
+_require_https_url("CORS_ORIGIN", CORS_ORIGIN, origin_only=True)
+_require_https_url("TONCENTER_API_URL", TONCENTER_API_URL)
+if DATABASE_URL and urlparse(DATABASE_URL).scheme not in {"postgres", "postgresql"}:
+    raise RuntimeError("DATABASE_URL must use the postgres or postgresql scheme")
+if ADMIN_ID <= 0:
+    raise RuntimeError("ADMIN_ID must be a positive Telegram user id")
+if not (1 <= DB_POOL_MIN_SIZE <= DB_POOL_MAX_SIZE <= 30):
+    raise RuntimeError("DB pool sizes must satisfy 1 <= MIN <= MAX <= 30")
+if not (60 <= INIT_DATA_MAX_AGE <= 7 * 24 * 60 * 60):
+    raise RuntimeError("INIT_DATA_MAX_AGE must be between 60 and 604800 seconds")
+if not (60 <= TON_DEPOSIT_TIMEOUT <= 24 * 60 * 60):
+    raise RuntimeError("TON_DEPOSIT_TIMEOUT must be between 60 and 86400 seconds")
+
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is required")
 if not DATABASE_URL and not all((DB_HOST, DB_NAME, DB_USER, DB_PASSWORD)):
@@ -80,7 +103,18 @@ ton_http_session: aiohttp.ClientSession | None = None
 nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_media_fetch_semaphore = asyncio.Semaphore(4)
 star_reconcile_attempts: dict[str, float] = {}
-API_RELEASE = "8.9"
+auth_cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
+restriction_cache: OrderedDict[str, tuple[float, dict | None]] = OrderedDict()
+item_nft_source_cache: OrderedDict[int, tuple[float, str]] = OrderedDict()
+AUTH_CACHE_TTL = 300
+AUTH_CACHE_MAX = 2048
+RESTRICTION_CACHE_TTL = 3
+RESTRICTION_CACHE_MAX = 4096
+ITEM_SOURCE_CACHE_TTL = 60
+ITEM_SOURCE_CACHE_MAX = 2048
+API_RELEASE = "8.9-opt.2"
+PROCESS_INSTANCE_ID = uuid.uuid4()
+secure_random = random.SystemRandom()
 
 
 def floor_stars(value) -> Decimal:
@@ -119,16 +153,31 @@ async def record_user_event(
 
 async def get_account_restriction(user_id: str) -> dict | None:
     """Return a current restriction and lazily clear an expired mute."""
+    user_id = str(user_id)
+    now_mono = time.monotonic()
+    cached = restriction_cache.get(user_id)
+    if cached and cached[0] > now_mono:
+        restriction_cache.move_to_end(user_id)
+        return dict(cached[1]) if cached[1] else None
+    if cached:
+        restriction_cache.pop(user_id, None)
+
     row = await get_pool().fetchrow(
         "SELECT ban, mut, mut_until FROM users WHERE id = $1",
         str(user_id),
     )
     if not row:
-        return None
+        result = None
+        _cache_restriction(user_id, result)
+        return result
     if row["ban"] is True:
-        return {"type": "ban"}
+        result = {"type": "ban"}
+        _cache_restriction(user_id, result)
+        return result
     if row["mut"] is None:
-        return None
+        result = None
+        _cache_restriction(user_id, result)
+        return result
 
     mut_until = row["mut_until"]
     if mut_until is None:
@@ -142,7 +191,9 @@ async def get_account_restriction(user_id: str) -> dict | None:
             str(user_id),
         )
     if not mut_until:
-        return None
+        result = None
+        _cache_restriction(user_id, result)
+        return result
     if mut_until.tzinfo is None:
         mut_until = mut_until.replace(tzinfo=timezone.utc)
     remaining = math.ceil((mut_until - datetime.now(timezone.utc)).total_seconds())
@@ -151,12 +202,26 @@ async def get_account_restriction(user_id: str) -> dict | None:
             "UPDATE users SET mut = NULL, mut_until = NULL WHERE id = $1 AND mut_until <= NOW()",
             str(user_id),
         )
-        return None
-    return {
+        result = None
+        _cache_restriction(user_id, result)
+        return result
+    result = {
         "type": "mut",
         "remainingSeconds": remaining,
         "expiresAt": mut_until.isoformat(),
     }
+    _cache_restriction(user_id, result)
+    return result
+
+
+def _cache_restriction(user_id: str, value: dict | None) -> None:
+    restriction_cache[str(user_id)] = (
+        time.monotonic() + RESTRICTION_CACHE_TTL,
+        dict(value) if value else None,
+    )
+    restriction_cache.move_to_end(str(user_id))
+    while len(restriction_cache) > RESTRICTION_CACHE_MAX:
+        restriction_cache.popitem(last=False)
 
 
 def new_referral_code() -> str:
@@ -170,7 +235,11 @@ async def ensure_user(conn, user_id: str, username: str, referral_code: str | No
         user_id,
     )
     if existing:
-        await conn.execute("UPDATE users SET username = $1 WHERE id = $2", username[:255], user_id)
+        await conn.execute(
+            "UPDATE users SET username = $1 WHERE id = $2 AND username IS DISTINCT FROM $1",
+            username[:255],
+            user_id,
+        )
         return existing
 
     referrer_id = None
@@ -275,13 +344,39 @@ def load_cases_from_env():
     raw = os.getenv("CASES_JSON")
     if raw:
         try:
-            CASES_CACHE = json.loads(raw)
+            parsed_cases = json.loads(raw)
+            if not isinstance(parsed_cases, dict) or not (1 <= len(parsed_cases) <= 100):
+                raise ValueError("CASES_JSON must contain 1 to 100 case objects")
             # Преобразуем ключи-строки в int (JSON всегда строковые ключи)
-            CASES_CACHE = {int(k): v for k, v in CASES_CACHE.items()}
+            CASES_CACHE = {int(k): v for k, v in parsed_cases.items()}
+            for case_id, case in CASES_CACHE.items():
+                if case_id <= 0 or not isinstance(case, dict):
+                    raise ValueError("Every case must have a positive integer id and an object value")
+                if str(case.get("name") or "").strip() == "":
+                    raise ValueError(f"Case {case_id} has no name")
+                price = Decimal(str(case.get("price")))
+                if not price.is_finite() or price <= 0 or price > Decimal("1000000"):
+                    raise ValueError(f"Case {case_id} has an invalid price")
+                drops = case.get("drops")
+                if not isinstance(drops, list) or not (1 <= len(drops) <= 500):
+                    raise ValueError(f"Case {case_id} must contain 1 to 500 drops")
+                total_chance = Decimal("0")
+                for drop_index, drop in enumerate(drops):
+                    if not isinstance(drop, dict) or str(drop.get("name") or "").strip() == "":
+                        raise ValueError(f"Case {case_id}, drop {drop_index} is invalid")
+                    chance = Decimal(str(drop.get("real_chance", drop.get("chance", 0))))
+                    value = Decimal(str(drop.get("value", 0)))
+                    if not chance.is_finite() or chance < 0:
+                        raise ValueError(f"Case {case_id}, drop {drop_index} has an invalid chance")
+                    if not value.is_finite() or value < 0 or value > Decimal("1000000"):
+                        raise ValueError(f"Case {case_id}, drop {drop_index} has an invalid value")
+                    total_chance += chance
+                if total_chance <= 0:
+                    raise ValueError(f"Case {case_id} has no positive drop chances")
             logging.info(f"✅ Загружено {len(CASES_CACHE)} кейсов из CASES_JSON")
         except Exception as e:
             logging.error(f"❌ Ошибка парсинга CASES_JSON: {e}")
-            CASES_CACHE = {}
+            raise RuntimeError("CASES_JSON is invalid; refusing to start with unsafe case data") from e
     else:
         logging.warning("⚠️ CASES_JSON не задан. Используется демо-кейс.")
         # Демо-кейс (замените на свои данные после заполнения переменной в Render)
@@ -463,6 +558,24 @@ async def init_db():
         async with get_pool().acquire() as conn:
             async with conn.transaction():
                 await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS dnx_schema_migrations (
+                        version VARCHAR(64) PRIMARY KEY,
+                        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """)
+                migration_version = "v8.9-opt.2"
+                if await conn.fetchval(
+                    "SELECT 1 FROM dnx_schema_migrations WHERE version = $1",
+                    migration_version,
+                ):
+                    game_state["game_number"] = int(
+                        await conn.fetchval(
+                            "SELECT last_game_number FROM game_counter WHERE id = 1"
+                        ) or 0
+                    )
+                    logging.info("DB schema already initialized. Game number: %s", game_state["game_number"])
+                    return
+                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id VARCHAR(255) PRIMARY KEY,
                         username VARCHAR(255),
@@ -477,7 +590,14 @@ async def init_db():
                 """)
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_balance NUMERIC(20, 0) DEFAULT 0")
                 await conn.execute("UPDATE users SET bonus_balance = 0 WHERE bonus_balance IS NULL")
-                await conn.execute("UPDATE users SET balance = FLOOR(GREATEST(COALESCE(balance, 0), 0)), bonus_balance = FLOOR(GREATEST(COALESCE(bonus_balance, 0), 0))")
+                await conn.execute("""
+                    UPDATE users
+                    SET balance = FLOOR(GREATEST(COALESCE(balance, 0), 0)),
+                        bonus_balance = FLOOR(GREATEST(COALESCE(bonus_balance, 0), 0))
+                    WHERE balance IS NULL OR balance < 0 OR balance <> FLOOR(balance)
+                       OR bonus_balance IS NULL OR bonus_balance < 0
+                       OR bonus_balance <> FLOOR(bonus_balance)
+                """)
                 await conn.execute("ALTER TABLE users ALTER COLUMN balance TYPE NUMERIC(20, 0) USING FLOOR(GREATEST(COALESCE(balance, 0), 0))")
                 await conn.execute("ALTER TABLE users ALTER COLUMN bonus_balance TYPE NUMERIC(20, 0) USING FLOOR(GREATEST(COALESCE(bonus_balance, 0), 0))")
                 await conn.execute("ALTER TABLE users ALTER COLUMN bonus_balance SET NOT NULL")
@@ -569,6 +689,18 @@ async def init_db():
                         item_ids INTEGER[] NOT NULL,
                         total_price NUMERIC(20, 2) NOT NULL,
                         status VARCHAR(32) NOT NULL DEFAULT 'completed',
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """)
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS case_open_records (
+                        id UUID PRIMARY KEY,
+                        user_id VARCHAR(255) NOT NULL,
+                        case_id INTEGER NOT NULL,
+                        balance_type VARCHAR(16) NOT NULL,
+                        price NUMERIC(20, 0) NOT NULL,
+                        generated_item_id INTEGER NOT NULL,
+                        winner_payload JSONB NOT NULL,
                         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
                 """)
@@ -701,11 +833,45 @@ async def init_db():
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_item_events_item ON item_events(item_id, created_at DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_item_events_user ON item_events(user_id, created_at DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_purchase_records_user ON purchase_records(user_id, created_at DESC)")
+                await conn.execute("CREATE INDEX IF NOT EXISTS idx_case_open_records_user ON case_open_records(user_id, created_at DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_events_owner ON user_events(user_id, id DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_game_history_number ON game_history(game_number DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_ton_deposits_pending ON ton_deposits(status, expires_at)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_star_payments_user_status ON star_payments(user_id, status, expires_at)")
                 await conn.execute("ALTER TABLE star_payments ADD COLUMN IF NOT EXISTS telegram_star_transaction_id TEXT UNIQUE")
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS active_game_bets (
+                        game_number INTEGER NOT NULL,
+                        user_id VARCHAR(255) NOT NULL,
+                        username VARCHAR(255) NOT NULL,
+                        amount NUMERIC(20, 0) NOT NULL CHECK (amount > 0),
+                        balance_type VARCHAR(16) NOT NULL CHECK (balance_type IN ('main', 'bonus')),
+                        history_event_id BIGINT,
+                        owner_token UUID,
+                        status VARCHAR(16) NOT NULL DEFAULT 'pending'
+                            CHECK (status IN ('pending', 'settled', 'refunded')),
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (game_number, user_id)
+                    )
+                """)
+                await conn.execute("ALTER TABLE active_game_bets ADD COLUMN IF NOT EXISTS owner_token UUID")
+                await conn.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_active_game_bets_recovery
+                    ON active_game_bets(status, updated_at)
+                """)
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS game_round_settlements (
+                        game_number INTEGER PRIMARY KEY,
+                        round_id BIGINT,
+                        winner_id VARCHAR(255) NOT NULL,
+                        winner_username VARCHAR(255) NOT NULL,
+                        payout NUMERIC(20, 0) NOT NULL,
+                        balance_type VARCHAR(16) NOT NULL,
+                        win_percent NUMERIC(6, 2) NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """)
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS referral_rewards (
                         id BIGSERIAL PRIMARY KEY,
@@ -720,14 +886,68 @@ async def init_db():
                     )
                 """)
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_referral_rewards_owner ON referral_rewards(referrer_id, created_at DESC)")
+                await conn.execute(
+                    "INSERT INTO dnx_schema_migrations(version) VALUES($1) ON CONFLICT DO NOTHING",
+                    migration_version,
+                )
                 logging.info(f"DB initialized. Game number: {last_num}")
     except Exception as e:
         logging.error(f"DB Init Error: {e}")
         raise
 
+
+async def recover_unfinished_game_bets() -> int:
+    """Refund bets left pending by a previous Render process.
+
+    The visual round lives in memory and cannot be resumed safely after a
+    process restart. The durable wager ledger makes the only safe recovery
+    deterministic: return the exact stake to the balance it came from.
+    """
+    refunded = 0
+    async with get_pool().acquire() as conn:
+        async with conn.transaction():
+            rows = await conn.fetch("""
+                UPDATE active_game_bets
+                SET status = 'refunded', updated_at = NOW()
+                WHERE status = 'pending'
+                  AND owner_token IS DISTINCT FROM $1
+                  AND updated_at <= NOW() - INTERVAL '2 minutes'
+                RETURNING game_number, user_id, amount, balance_type
+            """, PROCESS_INSTANCE_ID)
+            for row in rows:
+                balance_column = "bonus_balance" if row["balance_type"] == "bonus" else "balance"
+                updated = await conn.execute(
+                    f"UPDATE users SET {balance_column} = {balance_column} + $1 WHERE id = $2",
+                    row["amount"],
+                    row["user_id"],
+                )
+                if updated != "UPDATE 1":
+                    raise RuntimeError(f"Cannot refund missing game user {row['user_id']}")
+                await record_user_event(
+                    conn,
+                    row["user_id"],
+                    "game_refund",
+                    amount=row["amount"],
+                    balance_type=row["balance_type"],
+                    title="Возврат ставки после перезапуска",
+                    metadata={"game_number": row["game_number"], "reason": "server_restart"},
+                )
+                refunded += 1
+    if refunded:
+        logging.warning("Safely refunded %s unfinished game bet(s)", refunded)
+    return refunded
+
 def extract_user_from_initdata(init_data_str: str) -> dict | None:
     if not init_data_str:
         return None
+    cache_key = hashlib.sha256(init_data_str.encode("utf-8")).hexdigest()
+    now_mono = time.monotonic()
+    cached = auth_cache.get(cache_key)
+    if cached and cached[0] > now_mono:
+        auth_cache.move_to_end(cache_key)
+        return dict(cached[1])
+    if cached:
+        auth_cache.pop(cache_key, None)
     try:
         pairs = dict(parse_qsl(init_data_str, keep_blank_values=True))
         received_hash = pairs.pop("hash", None)
@@ -747,11 +967,20 @@ def extract_user_from_initdata(init_data_str: str) -> dict | None:
         if not isinstance(user_id, int) or user_id <= 0:
             return None
         username = user.get("username") or user.get("first_name") or "Unknown"
-        return {
+        result = {
             "id": str(user_id),
             "username": str(username)[:255],
             "photo_url": safe_https_url(user.get("photo_url")),
         }
+        remaining_validity = max(1, INIT_DATA_MAX_AGE - max(0, now - auth_date))
+        auth_cache[cache_key] = (
+            now_mono + min(AUTH_CACHE_TTL, remaining_validity),
+            result,
+        )
+        auth_cache.move_to_end(cache_key)
+        while len(auth_cache) > AUTH_CACHE_MAX:
+            auth_cache.popitem(last=False)
+        return dict(result)
     except (ValueError, TypeError, json.JSONDecodeError):
         return None
 
@@ -903,16 +1132,32 @@ def require_auth(handler):
 
 
 _rate_limit_events: dict[tuple[str, str], deque] = defaultdict(deque)
+_rate_limit_calls = 0
+
+
+def _prune_rate_limits(now: float) -> None:
+    """Keep the process-local limiter bounded when many users visit once."""
+    if len(_rate_limit_events) <= 2048:
+        return
+    for key, events in list(_rate_limit_events.items()):
+        if not events or now - events[-1] > 3600:
+            _rate_limit_events.pop(key, None)
+    while len(_rate_limit_events) > 4096:
+        _rate_limit_events.pop(next(iter(_rate_limit_events)), None)
 
 
 def rate_limit(limit: int, window_seconds: int):
     def decorator(handler):
         @wraps(handler)
         async def wrapper(request):
+            global _rate_limit_calls
             user = request.get('telegram_user')
             identity = user['id'] if user else (request.remote or 'unknown')
             key = (handler.__name__, identity)
             now = time.monotonic()
+            _rate_limit_calls += 1
+            if _rate_limit_calls % 256 == 0:
+                _prune_rate_limits(now)
             events = _rate_limit_events[key]
             while events and now - events[0] >= window_seconds:
                 events.popleft()
@@ -1084,10 +1329,10 @@ def recursive_bsp_split(poly, players, weights, depth=0):
         return res
 
     if depth == 0:
-        base_angle = random.choice([math.pi / 4, 3 * math.pi / 4])
-        angle = base_angle + random.uniform(-0.2, 0.2)
+        base_angle = secure_random.choice([math.pi / 4, 3 * math.pi / 4])
+        angle = base_angle + secure_random.uniform(-0.2, 0.2)
     else:
-        angle = random.uniform(0, math.pi)
+        angle = secure_random.uniform(0, math.pi)
 
     poly_left, poly_right = clip_polygon_exact_area(poly, ratio, angle)
 
@@ -1179,17 +1424,17 @@ def generate_motion_trajectory(start_x, start_y, angle, speed, duration_ms, dt=1
     return frames
 
 def generate_spin_params(polygons: list) -> dict:
-    start_x = random.uniform(0.1, 0.9) * 1000
-    start_y = random.uniform(0.1, 0.9) * 1000
+    start_x = secure_random.uniform(0.1, 0.9) * 1000
+    start_y = secure_random.uniform(0.1, 0.9) * 1000
 
     spin_duration = 3000
-    spin_angle_speed = random.uniform(4.5 * math.pi, 13.5 * math.pi)
-    spin_angle_start = random.uniform(0, 2 * math.pi)
+    spin_angle_speed = secure_random.uniform(4.5 * math.pi, 13.5 * math.pi)
+    spin_angle_start = secure_random.uniform(0, 2 * math.pi)
 
     angle_total = 0.5 * spin_angle_speed * (spin_duration / 1000)
     final_angle = spin_angle_start + angle_total
 
-    base_speed = random.uniform(4000, 4500)
+    base_speed = secure_random.uniform(4000, 4500)
     motion_speed = base_speed * (2.2 / 1.5)
 
     motion_trajectory = generate_motion_trajectory(
@@ -1254,9 +1499,9 @@ def _hue_distance(first: float, second: float) -> float:
 def choose_player_palette(occupied_colors: set[tuple[str, ...]]) -> tuple[str, ...]:
     available = [palette for palette in PLAYER_COLORS if palette not in occupied_colors]
     if not available:
-        return random.choice(PLAYER_COLORS)
+        return secure_random.choice(PLAYER_COLORS)
     if not occupied_colors:
-        return random.choice(available)
+        return secure_random.choice(available)
 
     occupied_hues = [
         PLAYER_PALETTE_HUES.get(palette, _hex_hue(palette[0]))
@@ -1268,7 +1513,7 @@ def choose_player_palette(occupied_colors: set[tuple[str, ...]]) -> tuple[str, .
         score = min(_hue_distance(hue, occupied) for occupied in occupied_hues)
         scored.append((score, palette))
     best_score = max(score for score, _ in scored)
-    return random.choice([palette for score, palette in scored if abs(score - best_score) < 1e-9])
+    return secure_random.choice([palette for score, palette in scored if abs(score - best_score) < 1e-9])
 
 def point_in_polygon(point, polygon):
     x, y = point
@@ -1289,7 +1534,7 @@ def point_in_polygon(point, polygon):
 
 async def finish_round(final_point: dict, pool: float, players: dict, polygons: list) -> dict | None:
     if not final_point or not polygons:
-        return None
+        raise RuntimeError("Round has no final point or polygons")
     x = final_point["x"]
     y = final_point["y"]
     winner_id = None
@@ -1306,7 +1551,7 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
             break
 
     if not winner_id:
-        return None
+        raise RuntimeError("Final point is outside every player polygon")
 
     winner_bet = players[winner_id]["amount"]
     others_bets = pool - winner_bet
@@ -1319,22 +1564,88 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
     else:
         win_percent = 100.0
 
-    try:
-        async with get_pool().acquire() as conn:
-            async with conn.transaction():
+    game_number = int(game_state["game_number"])
+    round_id = game_state["round_id"]
+    async with get_pool().acquire() as conn:
+        async with conn.transaction():
+            existing_settlement = await conn.fetchrow(
+                """
+                SELECT winner_id, winner_username, payout, balance_type, win_percent
+                FROM game_round_settlements WHERE game_number = $1
+                """,
+                game_number,
+            )
+            if existing_settlement:
+                # A connection may fail after PostgreSQL has committed. The
+                # unique settlement row proves the payout already happened.
+                winner_id = existing_settlement["winner_id"]
+                winner_username = existing_settlement["winner_username"]
+                profit = existing_settlement["payout"]
+                winner_balance_type = existing_settlement["balance_type"]
+                game_state["game_number"] = int(
+                    await conn.fetchval(
+                        "SELECT last_game_number FROM game_counter WHERE id = 1"
+                    ) or game_number
+                )
+            else:
+                ledger_rows = await conn.fetch(
+                    """
+                    SELECT user_id, amount, balance_type
+                    FROM active_game_bets
+                    WHERE game_number = $1 AND status = 'pending' AND owner_token = $2
+                    FOR UPDATE
+                    """,
+                    game_number,
+                    PROCESS_INSTANCE_ID,
+                )
+                ledger = {row["user_id"]: row for row in ledger_rows}
+                if set(ledger) != set(players):
+                    raise RuntimeError("Game wager ledger does not match active players")
+                ledger_total = sum((row["amount"] for row in ledger_rows), Decimal("0"))
+                if ledger_total != floor_stars(pool):
+                    raise RuntimeError("Game wager ledger total does not match pool")
+                for player_id, player in players.items():
+                    if ledger[player_id]["amount"] != floor_stars(player["amount"]):
+                        raise RuntimeError(f"Game wager mismatch for user {player_id}")
+                    if ledger[player_id]["balance_type"] != player.get("balance_type", "main"):
+                        raise RuntimeError(f"Game balance type mismatch for user {player_id}")
                 if not await conn.fetchval("SELECT id FROM users WHERE id = $1", winner_id):
-                    return None
-                await conn.execute(
+                    raise RuntimeError("Winner account does not exist")
+
+                inserted = await conn.fetchval(
+                    """
+                    INSERT INTO game_round_settlements
+                        (game_number, round_id, winner_id, winner_username, payout,
+                         balance_type, win_percent)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    ON CONFLICT (game_number) DO NOTHING
+                    RETURNING game_number
+                    """,
+                    game_number,
+                    round_id,
+                    winner_id,
+                    winner_username,
+                    profit,
+                    winner_balance_type,
+                    Decimal(str(win_percent)),
+                )
+                if inserted is None:
+                    raise RuntimeError("Concurrent game settlement detected")
+
+                updated = await conn.execute(
                     "UPDATE users SET balance = balance + $1 WHERE id = $2",
-                    profit, winner_id)
+                    profit,
+                    winner_id,
+                )
+                if updated != "UPDATE 1":
+                    raise RuntimeError("Winner credit failed")
                 await conn.execute("""
                     INSERT INTO leaderboard (user_id, username, wins) VALUES ($1, $2, 1)
                     ON CONFLICT (user_id) DO UPDATE SET wins = leaderboard.wins + 1, username = EXCLUDED.username
                 """, winner_id, winner_username)
                 await conn.execute(
                     "INSERT INTO game_history (game_number, winner_name, win_amount, win_percent) VALUES ($1, $2, $3, $4)",
-                    game_state["game_number"], winner_username,
-                    profit, Decimal(str(win_percent))
+                    game_number, winner_username, profit, Decimal(str(win_percent))
                 )
                 await record_user_event(
                     conn,
@@ -1344,29 +1655,37 @@ async def finish_round(final_point: dict, pool: float, players: dict, polygons: 
                     balance_type="main",
                     title="Выигрыш в игре",
                     metadata={
-                        "game_number": game_state["game_number"],
+                        "game_number": game_number,
                         "bet": winner_bet,
                         "stake_balance_type": winner_balance_type,
                         "win_percent": win_percent,
                     },
                 )
+                ledger_update = await conn.execute(
+                    """
+                    UPDATE active_game_bets
+                    SET status = 'settled', updated_at = NOW()
+                    WHERE game_number = $1 AND status = 'pending' AND owner_token = $2
+                    """,
+                    game_number,
+                    PROCESS_INSTANCE_ID,
+                )
+                if ledger_update != f"UPDATE {len(players)}":
+                    raise RuntimeError("Not every wager was marked settled")
                 await conn.execute(
                     "DELETE FROM game_history WHERE id NOT IN (SELECT id FROM game_history ORDER BY game_number DESC LIMIT 100)")
                 new_num = await conn.fetchval(
                     "UPDATE game_counter SET last_game_number = last_game_number + 1 WHERE id = 1 RETURNING last_game_number")
-                game_state["game_number"] = new_num
-        return {
-            "user_id": winner_id,
-            "username": winner_username,
-            "win_amount": int(profit),
-            "photo_url": photo_url,
-            "round_id": game_state["round_id"],
-            "polygon": winner_polygon,
-            "balance_type": winner_balance_type,
-        }
-    except Exception as e:
-        logging.error(f"DB error finish_round: {e}")
-        return None
+                game_state["game_number"] = int(new_num)
+    return {
+        "user_id": winner_id,
+        "username": winner_username,
+        "win_amount": int(profit),
+        "photo_url": photo_url,
+        "round_id": round_id,
+        "polygon": winner_polygon,
+        "balance_type": winner_balance_type,
+    }
 
 async def clear_last_polygons_after_delay(delay=0.3):
     await asyncio.sleep(delay)
@@ -1392,31 +1711,47 @@ async def game_worker():
                     spin_params = generate_spin_params(game_state["polygons"])
                     game_state["spin_params"] = spin_params
                     game_state["target_position"] = spin_params["target_position"]
-                    game_state["round_id"] = random.randint(1, 10 ** 9)
+                    game_state["round_id"] = secure_random.randint(1, 10 ** 9)
                     game_state["status"] = "spinning"
                     game_state["winner"] = None
                     game_state["last_winner_id"] = None
 
         if game_state["status"] == "spinning":
             await asyncio.sleep(3 + 1 + 10 + 1 + 0.5)
-            async with game_lock:
-                if game_state["status"] == "spinning":
-                    final_point = game_state["spin_params"]["trajectory"][-1]
-                    winner_data = await finish_round(
-                        final_point,
-                        game_state["pool"],
-                        game_state["players"],
-                        game_state["polygons"]
-                    )
-                    game_state["winner"] = winner_data
-                    game_state["last_winner_id"] = winner_data["user_id"] if winner_data else None
-                    game_state["last_polygons"] = game_state["polygons"]
-                    game_state["status"] = "waiting"
-                    game_state["players"] = {}
-                    game_state["pool"] = 0.0
-                    game_state["timer"] = 15
-                    game_state["polygons"] = None
-                    asyncio.create_task(clear_last_polygons_after_delay(0.3))
+            while True:
+                settlement_failed = False
+                async with game_lock:
+                    if game_state["status"] != "spinning":
+                        break
+                    try:
+                        final_point = game_state["spin_params"]["trajectory"][-1]
+                        winner_data = await finish_round(
+                            final_point,
+                            game_state["pool"],
+                            game_state["players"],
+                            game_state["polygons"]
+                        )
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        settlement_failed = True
+                        logging.exception(
+                            "Round %s settlement failed; keeping wagers locked and retrying",
+                            game_state.get("game_number"),
+                        )
+                    else:
+                        game_state["winner"] = winner_data
+                        game_state["last_winner_id"] = winner_data["user_id"]
+                        game_state["last_polygons"] = game_state["polygons"]
+                        game_state["status"] = "waiting"
+                        game_state["players"] = {}
+                        game_state["pool"] = 0.0
+                        game_state["timer"] = 15
+                        game_state["polygons"] = None
+                        asyncio.create_task(clear_last_polygons_after_delay(0.3))
+                        break
+                if settlement_failed:
+                    await asyncio.sleep(2)
 
 
 async def scan_ton_deposits() -> int:
@@ -1516,6 +1851,15 @@ async def ton_payment_worker():
         await asyncio.sleep(5)
 
 # ------------------- API -------------------
+async def read_json_object(request: web.Request) -> dict:
+    """Parse only JSON objects; malformed/list bodies become harmless input."""
+    try:
+        payload = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 async def handle_options(request):
     return web.Response(headers={
         "Access-Control-Allow-Origin": CORS_ORIGIN,
@@ -1526,7 +1870,19 @@ async def handle_options(request):
 
 @web.middleware
 async def security_headers_middleware(request, handler):
-    response = await handler(request)
+    request_origin = request.headers.get("Origin")
+    if request_origin and request_origin != CORS_ORIGIN:
+        response = web.json_response({"error": "origin_not_allowed"}, status=403)
+    else:
+        try:
+            response = await handler(request)
+        except web.HTTPException as exc:
+            response = exc
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logging.exception("Unhandled API error on %s %s", request.method, request.path)
+            response = web.json_response({"error": "internal_error"}, status=500)
     response.headers["Access-Control-Allow-Origin"] = CORS_ORIGIN
     response.headers["Vary"] = "Origin"
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -1534,6 +1890,12 @@ async def security_headers_middleware(request, handler):
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Cache-Control"] = "no-store"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if (
+        response.content_type == "application/json"
+        and response.body is not None
+        and len(response.body) >= 2048
+    ):
+        response.enable_compression()
     return response
 
 
@@ -1590,7 +1952,7 @@ async def handle_create_ton_deposit(request):
         return web.json_response({"error": "ton_deposits_disabled"}, status=503,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     try:
-        data = await request.json()
+        data = await read_json_object(request)
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
@@ -1691,7 +2053,7 @@ async def handle_ton_deposit_status(request):
 @rate_limit(10, 60)
 async def handle_create_star_invoice(request):
     try:
-        data = await request.json()
+        data = await read_json_object(request)
         stars = parse_star_amount(data.get("stars"))
         if stars is None:
             return web.json_response({"success": False, "error": "invalid_stars"}, status=400)
@@ -1743,7 +2105,10 @@ async def reconcile_star_payment(payment_id: uuid.UUID, user_id: str) -> bool:
     """Recover a paid invoice if Telegram's successful_payment update was missed."""
     payment_key = str(payment_id)
     now = time.monotonic()
-    if now - star_reconcile_attempts.get(payment_key, 0) < 4:
+    # Normal payments arrive through successful_payment. This is a fallback,
+    # so querying Telegram on every 1.8 s UI poll only creates latency and
+    # rate-limit pressure without improving the normal path.
+    if now - star_reconcile_attempts.get(payment_key, 0) < 15:
         return False
     star_reconcile_attempts[payment_key] = now
     if len(star_reconcile_attempts) > 1024:
@@ -1865,19 +2230,32 @@ async def reconcile_recent_star_transactions(limit: int = 100) -> int:
 
 async def star_reconciliation_worker():
     while True:
+        next_delay = 300
         try:
-            recovered = await reconcile_recent_star_transactions()
+            needs_reconciliation = await get_pool().fetchval("""
+                SELECT EXISTS(
+                    SELECT 1 FROM star_payments
+                    WHERE status IN ('pending', 'expired')
+                      AND created_at > NOW() - INTERVAL '2 days'
+                )
+            """)
+            recovered = (
+                await reconcile_recent_star_transactions()
+                if needs_reconciliation else 0
+            )
             if recovered:
                 logging.info("Recovered %s missed Telegram Stars payment(s)", recovered)
+                next_delay = 60
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             logging.warning("Telegram Stars reconciliation worker error: %s", exc)
-        await asyncio.sleep(60)
+            next_delay = 60
+        await asyncio.sleep(next_delay)
 
 
 async def moderation_expiry_worker():
-    """Clear expired timed restrictions even when the user does not reopen the app."""
+    """Run small periodic integrity cleanups outside latency-sensitive requests."""
     while True:
         try:
             result = await get_pool().execute(
@@ -1889,7 +2267,13 @@ async def moderation_expiry_worker():
             raise
         except Exception as exc:
             logging.warning("Moderation expiry cleanup failed: %s", exc)
-        await asyncio.sleep(30)
+        try:
+            await recover_unfinished_game_bets()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logging.warning("Orphan wager recovery failed: %s", exc)
+        await asyncio.sleep(60)
 
 
 @require_auth
@@ -2111,10 +2495,40 @@ async def warm_nft_media_cache(max_items: int = 12):
         source_url = canonical_telegram_nft_url(row["nft_link"])
         if not source_url or source_url in seen_sources:
             continue
+        item_nft_source_cache[int(row["id"])] = (
+            time.monotonic() + ITEM_SOURCE_CACHE_TTL,
+            source_url,
+        )
         seen_sources.add(source_url)
         jobs.append(fetch_telegram_nft_media(source_url, int(row["id"])))
     if jobs:
         await asyncio.gather(*jobs, return_exceptions=True)
+
+
+async def warm_nft_media_cache_safely():
+    try:
+        await warm_nft_media_cache()
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logging.exception("Background NFT cache warm-up failed")
+
+
+async def get_item_nft_source(item_id: int) -> str:
+    now = time.monotonic()
+    cached = item_nft_source_cache.get(item_id)
+    if cached and cached[0] > now:
+        item_nft_source_cache.move_to_end(item_id)
+        return cached[1]
+    if cached:
+        item_nft_source_cache.pop(item_id, None)
+    nft_link = await get_pool().fetchval("SELECT nft_link FROM items WHERE id = $1", item_id)
+    source_url = canonical_telegram_nft_url(nft_link)
+    item_nft_source_cache[item_id] = (now + ITEM_SOURCE_CACHE_TTL, source_url)
+    item_nft_source_cache.move_to_end(item_id)
+    while len(item_nft_source_cache) > ITEM_SOURCE_CACHE_MAX:
+        item_nft_source_cache.popitem(last=False)
+    return source_url
 
 
 @require_auth
@@ -2127,8 +2541,7 @@ async def handle_nft_media(request):
     if item_id <= 0:
         return web.json_response({"animated": False, "error": "invalid_item_id"}, status=400)
 
-    nft_link = await get_pool().fetchval("SELECT nft_link FROM items WHERE id = $1", item_id)
-    source_url = canonical_telegram_nft_url(nft_link)
+    source_url = await get_item_nft_source(item_id)
     if not source_url:
         return web.json_response({"animated": False})
     return web.json_response(await fetch_telegram_nft_media(source_url, item_id))
@@ -2154,14 +2567,12 @@ async def handle_get_inventory(request):
                               AS withdraw_remaining_seconds
                    FROM items
                    WHERE buyer_id = $1
-                     AND status IN ('Продан','withdrawn','Выведен','pending_withdraw','disposed')
+                     AND status IN ('Продан','pending_withdraw')
                    ORDER BY id DESC""",
                 user_id,
             )
         items = normalize_records(rows)
         for item in items:
-            if item['status'] in ('Выведен', 'withdrawn'):
-                item['status'] = 'withdrawn'
             item['can_sell'] = (
                 item.get('acquisition_source') == 'case'
                 and item.get('status') == 'Продан'
@@ -2214,7 +2625,7 @@ async def handle_activity_history(request):
 async def handle_buy(request):
     purchase_id = uuid.uuid4()
     try:
-        data = await request.json()
+        data = await read_json_object(request)
         try:
             if data.get("requestId"):
                 purchase_id = uuid.UUID(str(data["requestId"]))
@@ -2245,11 +2656,17 @@ async def handle_buy(request):
                 # с одним requestId. После ожидания второй запрос увидит запись
                 # первого и безопасно вернёт уже завершённый результат.
                 completed_purchase = await conn.fetchrow(
-                    "SELECT total_price FROM purchase_records WHERE id = $1 AND user_id = $2",
+                    "SELECT item_ids, total_price FROM purchase_records WHERE id = $1 AND user_id = $2",
                     purchase_id,
                     user_id,
                 )
                 if completed_purchase:
+                    if sorted(int(value) for value in completed_purchase["item_ids"]) != sorted(item_ids):
+                        return web.json_response(
+                            {"success": False, "error": "request_id_conflict"},
+                            status=409,
+                            headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
+                        )
                     return web.json_response({
                         "success": True,
                         "balance": float(locked_user['balance'] or 0),
@@ -2335,7 +2752,7 @@ async def handle_buy(request):
 @rate_limit(10, 60)
 async def handle_request_withdraw(request):
     try:
-        data = await request.json()
+        data = await read_json_object(request)
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
@@ -2394,12 +2811,20 @@ async def handle_request_withdraw(request):
             )
         except Exception as notify_error:
             logging.exception("Withdraw notification failed for item %s: %s", item_id, notify_error)
-            await get_pool().execute(
-                """UPDATE items SET last_event = 'withdraw_notification_failed'
-                   WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'""",
-                item_id,
-                user_id,
+            restored = await get_pool().fetchval(
+                """UPDATE items
+                   SET status = 'Продан', last_event = 'withdraw_notification_failed',
+                       withdraw_requested_at = NULL, withdraw_expires_at = NULL
+                   WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
+                   RETURNING id""",
+                item_id, user_id,
             )
+            if restored:
+                return web.json_response(
+                    {"success": False, "error": "withdraw_notification_failed"},
+                    status=503,
+                    headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
+                )
         return web.json_response({
             "success": True,
             "remainingSeconds": WITHDRAW_WINDOW_SECONDS,
@@ -2411,6 +2836,7 @@ async def handle_request_withdraw(request):
 
 @require_auth
 async def handle_game_state(request):
+    compact = request.query.get("compact") == "1"
     async with game_lock:
         sorted_players = [game_state["players"][uid] for uid in sorted(game_state["players"].keys())]
         polys = game_state.get("polygons") or game_state.get("last_polygons")
@@ -2419,12 +2845,18 @@ async def handle_game_state(request):
             "players": sorted_players,
             "pool": game_state["pool"],
             "timer": game_state["timer"],
-            "spin_params": game_state.get("spin_params"),
+            # The trajectory is the largest object in the game payload.  A client
+            # only needs it once, when it starts the local animation.
+            "spin_params": (
+                game_state.get("spin_params")
+                if not compact and game_state["status"] == "spinning"
+                else None
+            ),
             "winner": game_state.get("winner"),
             "last_winner_id": game_state.get("last_winner_id"),
             "round_id": game_state.get("round_id"),
             "game_number": game_state.get("game_number", 0),
-            "polygons": polys
+            "polygons": None if compact else polys
         }
     return web.json_response(resp, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -2433,7 +2865,7 @@ async def handle_game_state(request):
 async def handle_game_bet(request):
     global game_state
     try:
-        data = await request.json()
+        data = await read_json_object(request)
         user = request['telegram_user']
         user_id = user['id']
         username = user['username']
@@ -2502,6 +2934,32 @@ async def handle_game_bet(request):
                                 "total_bet": int(parsed_amount),
                             }),
                         )
+                    ledger_amount = await conn.fetchval(
+                        """
+                        INSERT INTO active_game_bets
+                            (game_number, user_id, username, amount, balance_type, history_event_id, owner_token)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        ON CONFLICT (game_number, user_id) DO UPDATE
+                        SET amount = active_game_bets.amount + EXCLUDED.amount,
+                            username = EXCLUDED.username,
+                            history_event_id = EXCLUDED.history_event_id,
+                            owner_token = EXCLUDED.owner_token,
+                            updated_at = NOW()
+                        WHERE active_game_bets.status = 'pending'
+                          AND active_game_bets.balance_type = EXCLUDED.balance_type
+                          AND active_game_bets.owner_token IS NOT DISTINCT FROM EXCLUDED.owner_token
+                        RETURNING amount
+                        """,
+                        int(game_state.get("game_number", 0)),
+                        user_id,
+                        username,
+                        parsed_amount,
+                        balance_type,
+                        history_event_id,
+                        PROCESS_INSTANCE_ID,
+                    )
+                    if ledger_amount is None:
+                        raise RuntimeError("Game wager ledger conflict")
             if user_id in game_state["players"]:
                 game_state["players"][user_id]["amount"] += amount
                 game_state["players"][user_id]["bets_count"] += 1
@@ -2546,23 +3004,42 @@ async def handle_game_cancel(request):
         user_id = user['id']
         async with game_lock:
             if len(game_state["players"]) == 1 and user_id in game_state["players"]:
-                refund = game_state["players"][user_id]["amount"]
-                balance_column = (
-                    "bonus_balance"
-                    if game_state["players"][user_id].get("balance_type") == "bonus"
-                    else "balance"
-                )
                 async with get_pool().acquire() as conn:
                     async with conn.transaction():
-                        await conn.execute(
+                        ledger = await conn.fetchrow(
+                            """
+                            UPDATE active_game_bets
+                            SET status = 'refunded', updated_at = NOW()
+                            WHERE game_number = $1 AND user_id = $2 AND status = 'pending'
+                              AND owner_token = $3
+                            RETURNING amount, balance_type
+                            """,
+                            int(game_state.get("game_number", 0)),
+                            user_id,
+                            PROCESS_INSTANCE_ID,
+                        )
+                        if not ledger:
+                            return web.json_response(
+                                {"success": False, "error": "wager_not_pending"},
+                                status=409,
+                                headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
+                            )
+                        refund = ledger["amount"]
+                        balance_type = ledger["balance_type"]
+                        balance_column = "bonus_balance" if balance_type == "bonus" else "balance"
+                        updated = await conn.execute(
                             f"UPDATE users SET {balance_column} = {balance_column} + $1 WHERE id = $2",
-                            Decimal(str(refund)), user_id)
+                            refund,
+                            user_id,
+                        )
+                        if updated != "UPDATE 1":
+                            raise RuntimeError("Refund user disappeared")
                         await record_user_event(
                             conn,
                             user_id,
                             "game_refund",
                             amount=Decimal(str(refund)),
-                            balance_type=("bonus" if balance_column == "bonus_balance" else "main"),
+                            balance_type=balance_type,
                             title="Возврат ставки",
                             metadata={"game_number": game_state.get("game_number", 0)},
                         )
@@ -2743,8 +3220,20 @@ async def handle_case_nft_media(request):
 async def handle_open_case(request):
     """Открытие кейса (цена и дропы из кеша, запись в БД)"""
     try:
-        data = await request.json()
+        data = await read_json_object(request)
         user_id = request['telegram_user']['id']
+        raw_request_id = data.get("requestId")
+        if raw_request_id in (None, ""):
+            # Backwards compatibility for an older client. Current clients always
+            # send an idempotency key so a lost response can be retried safely.
+            request_id = uuid.uuid4()
+        else:
+            try:
+                request_id = uuid.UUID(str(raw_request_id))
+            except (ValueError, TypeError, AttributeError):
+                return web.json_response(
+                    {"success": False, "error": "invalid_request_id"}, status=400
+                )
         balance_type = str(data.get("balanceType") or "main")
         if balance_type not in {"main", "bonus"}:
             return web.json_response({"success": False, "error": "invalid_balance_type"}, status=400)
@@ -2774,6 +3263,25 @@ async def handle_open_case(request):
         async with get_pool().acquire() as conn:
             async with conn.transaction():
                 await ensure_user(conn, user_id, request['telegram_user']['username'])
+                await conn.fetchval("SELECT id FROM users WHERE id = $1 FOR UPDATE", user_id)
+                replay = await conn.fetchrow(
+                    """SELECT case_id, balance_type, winner_payload FROM case_open_records
+                       WHERE id = $1 AND user_id = $2""",
+                    request_id, user_id,
+                )
+                if replay:
+                    if int(replay["case_id"]) != case_id or replay["balance_type"] != balance_type:
+                        return web.json_response(
+                            {"success": False, "error": "idempotency_conflict"}, status=409
+                        )
+                    payload = replay["winner_payload"]
+                    if isinstance(payload, str):
+                        payload = json.loads(payload)
+                    return web.json_response(
+                        {"success": True, "won_item": payload,
+                         "requestId": str(request_id), "replayed": True},
+                        headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
+                    )
                 balance_column = "bonus_balance" if balance_type == "bonus" else "balance"
                 new_balance = await conn.fetchval("""
                     UPDATE users
@@ -2800,7 +3308,9 @@ async def handle_open_case(request):
                 total_chance = sum(real_chances)
                 if total_chance <= 0:
                     raise ValueError("total real_chance must be positive")
-                rand_val = random.uniform(0, total_chance)
+                # Preserve the configured probabilities, but use an OS-backed
+                # random source for a monetary outcome.
+                rand_val = (secrets.randbelow(10**12) / 10**12) * total_chance
                 current_sum = 0
                 won_drop = drops[-1]
                 won_drop_index = len(drops) - 1
@@ -2852,12 +3362,21 @@ async def handle_open_case(request):
                 won_item_dict['drop_index'] = won_drop_index
                 won_item_dict['has_live_nft'] = bool(canonical_telegram_nft_url(won_drop.get('nft_link')))
 
-        return web.json_response({"success": True, "won_item": won_item_dict},
+                await conn.execute(
+                    """INSERT INTO case_open_records
+                       (id, user_id, case_id, balance_type, price, generated_item_id, winner_payload)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)""",
+                    request_id, user_id, case_id, balance_type, case_price,
+                    new_item_id, json.dumps(won_item_dict),
+                )
+
+        return web.json_response({"success": True, "won_item": won_item_dict,
+                                  "requestId": str(request_id)},
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
     except Exception as e:
-        logging.error(f"Case open error: {e}")
-        return web.json_response({"success": False}, status=500,
+        logging.exception("Case open failed: %s", e)
+        return web.json_response({"success": False, "error": "case_open_failed"}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 @require_auth
@@ -2865,7 +3384,7 @@ async def handle_open_case(request):
 async def handle_sell_drop(request):
     """Продажа кейсового предмета с сохранением строки и аудита."""
     try:
-        data = await request.json()
+        data = await read_json_object(request)
         user_id = request['telegram_user']['id']
         try:
             item_id = int(data.get('itemId'))
@@ -2886,7 +3405,14 @@ async def handle_sell_drop(request):
                     return web.json_response({"success": False, "error": "item_not_found"},
                                              headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
                 sale_price = floor_stars(item['price'])
-                await conn.execute("UPDATE users SET balance = balance + $1 WHERE id = $2", sale_price, user_id)
+                credited = await conn.fetchval(
+                    """UPDATE users SET balance = balance + $1
+                       WHERE id = $2 RETURNING balance""",
+                    sale_price,
+                    user_id,
+                )
+                if credited is None:
+                    raise RuntimeError("case drop owner disappeared during sale")
                 await conn.execute(
                     """INSERT INTO item_events (item_id, user_id, event_type, amount)
                        VALUES ($1, $2, 'case_drop_sold', $3)""",
@@ -2905,7 +3431,7 @@ async def handle_sell_drop(request):
                 )
         return web.json_response({"success": True, "credited": int(sale_price)}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
-        logging.error(f"Sell drop error: {e}")
+        logging.exception("Sell drop failed: %s", e)
         return web.json_response({"success": False, "error": "server_error"}, status=500,
                                  headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
@@ -2918,12 +3444,26 @@ async def is_admin_callback(callback: types.CallbackQuery) -> bool:
     return True
 
 
+async def parse_withdraw_callback(callback: types.CallbackQuery):
+    parts = str(callback.data or "").split("_")
+    if len(parts) != 4 or parts[0] != "with" or parts[1] not in {"yes", "no"}:
+        await callback.answer("Некорректная команда", show_alert=True)
+        return None
+    uid, item_id_text = parts[2], parts[3]
+    if not uid.isdigit() or not item_id_text.isdigit():
+        await callback.answer("Некорректные данные", show_alert=True)
+        return None
+    return uid, int(item_id_text)
+
+
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
     if not await is_admin_callback(callback):
         return
-    parts = callback.data.split("_")
-    _, _, uid, item_id = parts
+    parsed = await parse_withdraw_callback(callback)
+    if not parsed:
+        return
+    uid, item_id = parsed
     async with get_pool().acquire() as conn:
         async with conn.transaction():
             item = await conn.fetchrow(
@@ -2931,25 +3471,25 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
                    WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
                      AND withdraw_expires_at > NOW()
                    RETURNING name""",
-                int(item_id), uid)
+                item_id, uid)
             result = "UPDATE 1" if item else "UPDATE 0"
             if item:
                 await conn.execute(
                     """INSERT INTO item_events (item_id, user_id, event_type)
                        VALUES ($1, $2, 'withdraw_approved')""",
-                    int(item_id), uid,
+                    item_id, uid,
                 )
                 await record_user_event(
                     conn, uid, "withdraw_approved",
                     title=f"NFT выведен · {item['name']}",
-                    metadata={"item_id": int(item_id)},
+                    metadata={"item_id": item_id},
                 )
     if result != "UPDATE 1":
         await get_pool().execute(
             """UPDATE items SET status = 'Продан', last_event = 'withdraw_expired'
                WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
                  AND withdraw_expires_at <= NOW()""",
-            int(item_id),
+            item_id,
             uid,
         )
         await callback.answer("Запрос уже обработан или двухчасовое окно истекло", show_alert=True)
@@ -2964,26 +3504,28 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
 async def admin_withdraw_reject(callback: types.CallbackQuery):
     if not await is_admin_callback(callback):
         return
-    parts = callback.data.split("_")
-    _, _, uid, item_id = parts
+    parsed = await parse_withdraw_callback(callback)
+    if not parsed:
+        return
+    uid, item_id = parsed
     async with get_pool().acquire() as conn:
         async with conn.transaction():
             item = await conn.fetchrow(
                 """UPDATE items SET status = 'Продан', last_event = 'withdraw_rejected'
                    WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
                    RETURNING name""",
-                int(item_id), uid)
+                item_id, uid)
             result = "UPDATE 1" if item else "UPDATE 0"
             if item:
                 await conn.execute(
                     """INSERT INTO item_events (item_id, user_id, event_type)
                        VALUES ($1, $2, 'withdraw_rejected')""",
-                    int(item_id), uid,
+                    item_id, uid,
                 )
                 await record_user_event(
                     conn, uid, "withdraw_rejected",
                     title=f"Вывод отклонён · {item['name']}",
-                    metadata={"item_id": int(item_id)},
+                    metadata={"item_id": item_id},
                 )
     if result != "UPDATE 1":
         await callback.answer("Запрос уже обработан", show_alert=True)
@@ -3043,7 +3585,7 @@ async def process_successful_star_payment(message: types.Message):
                         raise ValueError("invoice already paid with another charge")
                     return
                 if (
-                    row["status"] != "pending"
+                    row["status"] not in {"pending", "expired"}
                     or row["user_id"] != str(message.from_user.id)
                     or row["stars"] != payment.total_amount
                 ):
@@ -3051,7 +3593,7 @@ async def process_successful_star_payment(message: types.Message):
                 updated = await conn.fetchrow("""
                     UPDATE star_payments
                     SET status = 'paid', telegram_payment_charge_id = $1, paid_at = NOW()
-                    WHERE id = $2 AND status = 'pending'
+                    WHERE id = $2 AND status IN ('pending', 'expired')
                     RETURNING user_id, stars
                 """, payment.telegram_payment_charge_id, row["id"])
                 if not updated:
@@ -3251,26 +3793,22 @@ async def main():
     ton_task = None
     star_task = None
     moderation_task = None
+    warmup_task = None
     try:
         db_pool = await create_db_pool()
-        ton_http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
+        ton_http_session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=10, connect=4, sock_read=8),
+            connector=aiohttp.TCPConnector(limit=16, limit_per_host=8, ttl_dns_cache=300),
+        )
         await init_db()
+        await recover_unfinished_game_bets()
         await log_database_audit(db_pool)
         if not BOT_USERNAME:
-            me = await bot.get_me()
-            BOT_USERNAME = me.username or ""
-        try:
-            await asyncio.wait_for(warm_nft_media_cache(), timeout=6)
-        except asyncio.TimeoutError:
-            logging.info("NFT media warm-up continues on demand")
-        except Exception as exc:
-            logging.warning("NFT media warm-up failed: %s", exc)
-        try:
-            recovered = await reconcile_recent_star_transactions()
-            if recovered:
-                logging.info("Recovered %s missed Telegram Stars payment(s) on startup", recovered)
-        except Exception as exc:
-            logging.warning("Initial Telegram Stars reconciliation failed: %s", exc)
+            try:
+                me = await asyncio.wait_for(bot.get_me(), timeout=5)
+                BOT_USERNAME = me.username or ""
+            except Exception as exc:
+                logging.warning("Could not prefetch bot username: %s", exc)
         game_task = asyncio.create_task(game_worker())
         ton_task = asyncio.create_task(ton_payment_worker())
         star_task = asyncio.create_task(star_reconciliation_worker())
@@ -3279,9 +3817,14 @@ async def main():
         runner = web.AppRunner(app)
         await runner.setup()
         await web.TCPSite(runner, '0.0.0.0', port).start()
+        warmup_task = asyncio.create_task(warm_nft_media_cache_safely())
         await dp.start_polling(bot)
     finally:
-        tasks = [task for task in (game_task, ton_task, star_task, moderation_task) if task is not None]
+        tasks = [
+            task for task in
+            (game_task, ton_task, star_task, moderation_task, warmup_task)
+            if task is not None
+        ]
         for task in tasks:
             task.cancel()
         if tasks:
