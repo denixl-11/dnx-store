@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.7" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.8" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -2647,7 +2647,15 @@
             grid-template-columns: minmax(0, 1fr) !important;
             gap: 10px !important;
         }
-        #nft-modal-actions.inventory-actions > button {
+        #nft-modal-actions > [hidden] {
+            display: none !important;
+        }
+        #nft-modal-actions.inventory-actions > #nft-modal-btn-buy,
+        #nft-modal-actions.inventory-actions > #nft-modal-btn-cart {
+            display: none !important;
+        }
+        #nft-modal-actions.inventory-actions > #nft-modal-btn-withdraw,
+        #nft-modal-actions.inventory-actions > #nft-modal-btn-sell {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -2670,6 +2678,10 @@
             height: 54px !important;
             min-height: 54px !important;
             border-radius: 15px !important;
+        }
+        #nft-modal-actions.inventory-actions > #nft-modal-btn-withdraw[hidden],
+        #nft-modal-actions.inventory-actions > #nft-modal-btn-sell[hidden] {
+            display: none !important;
         }
 
         .case-modal-content { padding-top: 24px !important; }
@@ -2818,14 +2830,14 @@
             backface-visibility: visible !important;
         }
 
-        /* V8.9 opt.7: deterministic case frame zero. Telegram's preview image
+        /* V8.9 opt.8: deterministic case frame zero. Telegram's preview image
            is deliberately not used here because it contains its own pattern. */
         .case-nft-zero-frame {
             position: absolute;
-            inset: 0;
+            inset: 15%;
             z-index: 1;
-            width: 100% !important;
-            height: 100% !important;
+            width: 70% !important;
+            height: 70% !important;
             margin: 0 !important;
             border-radius: inherit !important;
             object-fit: contain !important;
@@ -2843,6 +2855,11 @@
             background: #242424 !important;
         }
         .case-roulette-poster--pending { border-radius: inherit; }
+        .case-roulette-poster--live {
+            width: 70% !important;
+            height: 70% !important;
+            margin: 15% !important;
+        }
         .case-poster-render-host {
             position: fixed;
             left: -10000px;
@@ -3223,7 +3240,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.7"></script>
+    <script src="tgsticker.js?v=8.9-opt.8"></script>
     <script>
         const tg = window.Telegram.WebApp;
         const isAndroidPlatform = String(tg.platform || '').toLowerCase() === 'android' || /Android/i.test(navigator.userAgent);
@@ -3318,7 +3335,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.7';
+        const EXPECTED_API_RELEASE = '8.9-opt.8';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -4363,7 +4380,10 @@
         }
 
         function renderNftModalItem(item, isInventoryContext, resetMedia = false) {
-            const isShopItem = !isInventoryContext && item.is_shop_item === true;
+            // The caller's explicit context is authoritative for controls.
+            // Server data may arrive later, but it must never make controls
+            // from the other mode flash for even a single rendered frame.
+            const isShopItem = !isInventoryContext;
             currentNftItem = item;
             const modalMedia = document.getElementById('nft-modal-media');
             if (resetMedia) {
@@ -4399,8 +4419,13 @@
             const withdrawBtn = document.getElementById('nft-modal-btn-withdraw');
             const sellBtn = document.getElementById('nft-modal-btn-sell');
             const actions = document.getElementById('nft-modal-actions');
+            actions.dataset.mode = isShopItem ? 'catalog' : 'inventory';
             if (isShopItem) {
                 actions.classList.remove('inventory-actions');
+                buyBtn.hidden = false;
+                cartBtn.hidden = false;
+                withdrawBtn.hidden = true;
+                sellBtn.hidden = true;
                 buyBtn.style.display = 'block';
                 cartBtn.style.display = 'flex';
                 withdrawBtn.style.display = 'none';
@@ -4410,16 +4435,21 @@
                 cartBtn.onclick = () => { closeNftModal(true); addToCart(item); };
             } else {
                 actions.classList.add('inventory-actions');
+                buyBtn.hidden = true;
+                cartBtn.hidden = true;
+                const itemUnavailable = item.status === 'withdrawn' || item.status === 'disposed';
+                withdrawBtn.hidden = itemUnavailable;
+                sellBtn.hidden = itemUnavailable;
                 buyBtn.style.display = 'none';
                 cartBtn.style.display = 'none';
                 const remaining = Number(item.withdraw_remaining_seconds || 0);
-                withdrawBtn.style.display = item.status === 'withdrawn' || item.status === 'disposed' ? 'none' : 'block';
+                withdrawBtn.style.display = itemUnavailable ? 'none' : 'block';
                 withdrawBtn.disabled = remaining > 0 || item.status === 'pending_withdraw';
                 withdrawBtn.dataset.withdrawExpires = remaining > 0 ? String(Date.now() + remaining * 1000) : '';
                 withdrawBtn.dataset.withdrawItemId = String(item.id);
                 withdrawBtn.textContent = remaining > 0 ? formatWithdrawCountdown(remaining) : 'ВЫВЕСТИ';
                 withdrawBtn.onclick = () => { if (!withdrawBtn.disabled) { closeNftModal(true); withdraw(item.id); } };
-                sellBtn.style.display = item.status === 'withdrawn' || item.status === 'disposed' ? 'none' : 'block';
+                sellBtn.style.display = itemUnavailable ? 'none' : 'block';
                 sellBtn.disabled = remaining > 0 || item.status === 'pending_withdraw';
                 sellBtn.classList.toggle('catalog-locked', !item.can_sell);
                 sellBtn.innerHTML = item.can_sell ? inventorySellMarkup(item.sell_value || 0) : 'НЕЛЬЗЯ ПРОДАТЬ';
@@ -6127,20 +6157,21 @@
                 : null;
             const livePoster = safePosterImageUrl(caseMedia?.posterDataUrl || itemMedia?.posterDataUrl);
             if (drop?.has_live_nft && !livePoster) {
-                return `<span class="case-roulette-poster case-roulette-poster--pending" data-case-id="${caseId}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`;
+                return `<span class="case-roulette-poster case-roulette-poster--pending case-roulette-poster--live" data-case-id="${caseId}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`;
             }
             // Animated rewards use a locally rendered transparent TGS frame.
             // Telegram's preview is never used because it contains its own
             // background and pattern. Non-animated rewards keep their image.
             const poster = livePoster || safeImageUrl(drop?.image_url);
-            return `<img class="case-roulette-poster" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+            const liveClass = drop?.has_live_nft ? ' case-roulette-poster--live' : '';
+            return `<img class="case-roulette-poster${liveClass}" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
         }
 
         function applyCasePosterFrame(caseId, dropIndex, posterUrl) {
             if (!posterUrl) return;
             document.querySelectorAll(`.case-roulette-poster--pending[data-case-id="${Number(caseId)}"][data-drop-index="${Number(dropIndex)}"]`).forEach(slot => {
                 const image = new Image();
-                image.className = 'case-roulette-poster';
+                image.className = 'case-roulette-poster case-roulette-poster--live';
                 image.alt = slot.getAttribute('aria-label') || '';
                 image.decoding = 'async';
                 image.src = posterUrl;
