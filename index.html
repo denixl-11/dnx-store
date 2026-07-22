@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.3" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.4" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -2648,11 +2648,27 @@
             gap: 10px !important;
         }
         #nft-modal-actions.inventory-actions > button {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             box-sizing: border-box;
             width: 100% !important;
+            min-width: 100% !important;
+            max-width: none !important;
             height: 54px !important;
             min-height: 54px !important;
             margin: 0 !important;
+            padding: 0 16px !important;
+            border-radius: 15px !important;
+            flex: none !important;
+        }
+        #nft-modal-actions.inventory-actions > #nft-modal-btn-withdraw,
+        #nft-modal-actions.inventory-actions > #nft-modal-btn-sell {
+            width: 100% !important;
+            min-width: 100% !important;
+            max-width: none !important;
+            height: 54px !important;
+            min-height: 54px !important;
             border-radius: 15px !important;
         }
 
@@ -3165,7 +3181,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.3"></script>
+    <script src="tgsticker.js?v=8.9-opt.4"></script>
     <script>
         const tg = window.Telegram.WebApp;
         const isAndroidPlatform = String(tg.platform || '').toLowerCase() === 'android' || /Android/i.test(navigator.userAgent);
@@ -3180,7 +3196,7 @@
         document.documentElement.classList.toggle('android-device', isAndroidPlatform);
         document.documentElement.classList.toggle('low-power-device', lowPowerNftDevice);
         if (window.RLottie) {
-            window.RLottie.WORKERS_LIMIT = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : Math.min(4, logicalCores || 4));
+            window.RLottie.WORKERS_LIMIT = Math.max(4, Math.min(8, logicalCores || 4));
         }
         tg.ready();
         try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
@@ -3260,7 +3276,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.3';
+        const EXPECTED_API_RELEASE = '8.9-opt.4';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -3426,14 +3442,17 @@
         let nftMediaActiveLoads = 0;
         let nftMediaObserver = null;
         let nftAuxMediaObserver = null;
-        const NFT_MEDIA_MAX_LOADS = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : 3);
-        const NFT_MEDIA_MAX_PLAYING = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : 3);
+        // No artificial display cap: every NFT intersecting the viewport is
+        // fetched and started immediately. The worker pool still distributes
+        // decoding across CPU cores without hiding later cards.
+        const NFT_MEDIA_MAX_LOADS = Number.POSITIVE_INFINITY;
+        const NFT_MEDIA_MAX_PLAYING = Number.POSITIVE_INFINITY;
         const NFT_MEDIA_CACHE_LIMIT = 96;
         const nftMediaPlaying = new Set();
         const nftMediaPlaybackQueue = [];
         let nftMediaPlaybackPumpScheduled = false;
         let nftMediaPersistTimer = null;
-        const NFT_MEDIA_HOVER_MODE = window.matchMedia?.('(hover: hover) and (pointer: fine)').matches === true;
+        const NFT_MEDIA_HOVER_MODE = false;
         let catalogRenderedSignature = '';
         let catalogLoadedAt = 0;
         let catalogRequest = null;
@@ -3774,7 +3793,7 @@
                 entries.forEach(entry => {
                     const catalogVisible = document.getElementById('page-store')?.classList.contains('page-active')
                         && document.getElementById('catalog-container')?.style.display !== 'none';
-                    const visible = entry.isIntersecting && entry.intersectionRatio >= .12
+                    const visible = entry.isIntersecting
                         && catalogVisible && !entry.target.closest('.item-card')?.hidden;
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
@@ -3785,7 +3804,7 @@
                         pauseNftMedia(entry.target, true);
                     }
                 });
-            }, { rootMargin: '0px', threshold: [0, .12, .5] });
+            }, { rootMargin: '160px 0px', threshold: [0, .01, .5] });
             elements.forEach(element => nftMediaObserver.observe(element));
         }
 
@@ -3890,7 +3909,7 @@
             }
             nftAuxMediaObserver = new IntersectionObserver(entries => {
                 entries.forEach(entry => {
-                    const visible = entry.isIntersecting && entry.intersectionRatio >= .12 && auxNftMediaIsVisible(entry.target);
+                    const visible = entry.isIntersecting && auxNftMediaIsVisible(entry.target);
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
                         entry.target.dataset.mediaPlayed = 'false';
@@ -3901,7 +3920,7 @@
                         else pauseNftMedia(entry.target, true);
                     }
                 });
-            }, { rootMargin: '0px', threshold: [0, .12, .5] });
+            }, { rootMargin: '160px 0px', threshold: [0, .01, .5] });
             elements.forEach(element => nftAuxMediaObserver.observe(element));
         }
 

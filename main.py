@@ -112,7 +112,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.3"
+API_RELEASE = "8.9-opt.4"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 
@@ -2895,6 +2895,39 @@ async def handle_game_bet(request):
                 return web.json_response({"success": False, "error": "balance_type_locked"}, status=409)
             balance_column = "bonus_balance" if balance_type == "bonus" else "balance"
             existing_player = game_state["players"].get(user_id)
+
+            # Prepare every fallible in-memory calculation before charging the
+            # user.  Player palettes are JSON arrays on the wire, therefore
+            # convert them back to tuples before using them as set members.
+            candidate_players = {
+                player_id: dict(player)
+                for player_id, player in game_state["players"].items()
+            }
+            if existing_player:
+                candidate_players[user_id]["amount"] += amount
+                candidate_players[user_id]["bets_count"] += 1
+            else:
+                occupied_colors = {
+                    tuple(player.get("color") or ())
+                    for player in candidate_players.values()
+                    if player.get("color")
+                }
+                color = choose_player_palette(occupied_colors)
+                candidate_players[user_id] = {
+                    "id": user_id,
+                    "username": username,
+                    "amount": amount,
+                    "color": color,
+                    "balance_type": balance_type,
+                    "bets_count": 1,
+                    "history_event_id": None,
+                    "photo_url": user.get('photo_url', ''),
+                }
+            candidate_polygons = build_weighted_voronoi(
+                list(candidate_players.values()),
+                (0.0, 0.0, 1.0, 1.0),
+            )
+
             async with get_pool().acquire() as conn:
                 async with conn.transaction():
                     new_balance = await conn.fetchval(
@@ -2960,31 +2993,14 @@ async def handle_game_bet(request):
                     )
                     if ledger_amount is None:
                         raise RuntimeError("Game wager ledger conflict")
-            if user_id in game_state["players"]:
-                game_state["players"][user_id]["amount"] += amount
-                game_state["players"][user_id]["bets_count"] += 1
-                game_state["players"][user_id]["history_event_id"] = history_event_id
-            else:
-                occupied_colors = {p["color"] for p in game_state["players"].values()}
-                color = choose_player_palette(occupied_colors)
-                photo_url = user.get('photo_url', '')
-                game_state["players"][user_id] = {
-                    "id": user_id, "username": username,
-                    "amount": amount, "color": color,
-                    "balance_type": balance_type,
-                    "bets_count": 1,
-                    "history_event_id": history_event_id,
-                    "photo_url": photo_url
-                }
+            candidate_players[user_id]["history_event_id"] = history_event_id
+            game_state["players"] = candidate_players
             game_state["pool"] += amount
 
             if len(game_state["players"]) == 1:
                 game_state["last_polygons"] = None
 
-            game_state["polygons"] = build_weighted_voronoi(
-                list(game_state["players"].values()),
-                (0.0, 0.0, 1.0, 1.0)
-            )
+            game_state["polygons"] = candidate_polygons
 
             if len(game_state["players"]) >= 2 and game_state["status"] == "waiting":
                 game_state["status"] = "counting"
@@ -2992,8 +3008,12 @@ async def handle_game_bet(request):
 
         return web.json_response({"success": True}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
-        logging.error(f"Bet error: {e}")
-        return web.json_response({"success": False}, status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        logging.exception("Bet error: %s", e)
+        return web.json_response(
+            {"success": False, "error": "bet_failed"},
+            status=500,
+            headers={"Access-Control-Allow-Origin": CORS_ORIGIN},
+        )
 
 @require_auth
 @rate_limit(10, 60)
