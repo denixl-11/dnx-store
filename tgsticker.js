@@ -57,7 +57,6 @@ var RLottie = (function () {
     return !!(rlPlayer && rlPlayer.frameCount && (
       rlPlayer.forceRender || (
         !rlPlayer.paused &&
-        rlPlayer.isVisible &&
         !document.hidden &&
         rlPlayer.isInViewport !== false
       )
@@ -134,7 +133,10 @@ var RLottie = (function () {
       if (!apiInitStarted) {
         console.log(dT(), 'tgsticker init');
         apiInitStarted = true;
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        // Version the worker URL as well: Telegram WebView caches workers
+        // independently from the page and could otherwise keep an older,
+        // already fixed animation loop for days.
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.3', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();

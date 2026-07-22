@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.3" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -2782,14 +2782,6 @@
         }
         button .star-amount { vertical-align: middle; }
 
-        /* Off-screen cards do not need their expensive effects painted. */
-        #catalog-container .item-card,
-        .case-modal-content .drop-row {
-            content-visibility: auto;
-        }
-        #catalog-container .item-card { contain-intrinsic-size: 310px; }
-        .case-modal-content .drop-row { contain-intrinsic-size: 156px; }
-
         @media (max-width: 600px) {
             .case-modal-content .drop-row::after,
             .case-modal-content .roulette-item:not(.case-loading-item)::after {
@@ -3173,25 +3165,22 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js"></script>
+    <script src="tgsticker.js?v=8.9-opt.3"></script>
     <script>
         const tg = window.Telegram.WebApp;
         const isAndroidPlatform = String(tg.platform || '').toLowerCase() === 'android' || /Android/i.test(navigator.userAgent);
-        const isMobileNftPlatform = isAndroidPlatform
-            || String(tg.platform || '').toLowerCase() === 'ios'
-            || window.matchMedia?.('(pointer: coarse)').matches === true;
         const deviceMemoryGb = Number(navigator.deviceMemory || 0);
         const logicalCores = Number(navigator.hardwareConcurrency || 0);
-        const lowPowerNftDevice = (
+        const lowPowerNftDevice = isAndroidPlatform && (
             (deviceMemoryGb > 0 && deviceMemoryGb <= 4) ||
             (logicalCores > 0 && logicalCores <= 4)
         );
-        const nftCardRenderRatio = lowPowerNftDevice ? 1 : (isMobileNftPlatform ? 1.15 : 1.35);
-        const nftModalRenderRatio = lowPowerNftDevice ? 1.15 : (isMobileNftPlatform ? 1.35 : 1.6);
+        const nftCardRenderRatio = lowPowerNftDevice ? 1.05 : (isAndroidPlatform ? 1.25 : 1.4);
+        const nftModalRenderRatio = lowPowerNftDevice ? 1.2 : (isAndroidPlatform ? 1.45 : 1.7);
         document.documentElement.classList.toggle('android-device', isAndroidPlatform);
         document.documentElement.classList.toggle('low-power-device', lowPowerNftDevice);
         if (window.RLottie) {
-            window.RLottie.WORKERS_LIMIT = (lowPowerNftDevice || isMobileNftPlatform) ? 1 : 2;
+            window.RLottie.WORKERS_LIMIT = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : Math.min(4, logicalCores || 4));
         }
         tg.ready();
         try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
@@ -3271,7 +3260,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.2';
+        const EXPECTED_API_RELEASE = '8.9-opt.3';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -3437,8 +3426,8 @@
         let nftMediaActiveLoads = 0;
         let nftMediaObserver = null;
         let nftAuxMediaObserver = null;
-        const NFT_MEDIA_MAX_LOADS = (lowPowerNftDevice || isMobileNftPlatform) ? 1 : 3;
-        const NFT_MEDIA_MAX_PLAYING = (lowPowerNftDevice || isMobileNftPlatform) ? 1 : 2;
+        const NFT_MEDIA_MAX_LOADS = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : 3);
+        const NFT_MEDIA_MAX_PLAYING = lowPowerNftDevice ? 1 : (isAndroidPlatform ? 2 : 3);
         const NFT_MEDIA_CACHE_LIMIT = 96;
         const nftMediaPlaying = new Set();
         const nftMediaPlaybackQueue = [];
@@ -3558,13 +3547,7 @@
             element.dataset.mediaWanted = 'true';
             element.dataset.mediaPlayed = 'playing';
             nftMediaPlaying.add(element);
-            let picture = element.querySelector('.nft-live-model');
-            if (picture?.classList.contains('nft-live-model--snapshot')) {
-                picture.remove();
-                picture = null;
-                element.classList.remove('is-live', 'has-live-frame');
-                element.dataset.mediaState = 'idle';
-            }
+            const picture = element.querySelector('.nft-live-model');
             if (picture) {
                 element.dataset.mediaState = 'live';
                 element.classList.add('is-live');
@@ -3589,6 +3572,20 @@
             if (element.dataset.mediaPlayed === 'true' || element.dataset.mediaPlayed === 'playing') return;
             element.dataset.mediaWanted = 'true';
             startNftMediaPlayback(element);
+        }
+
+        function primeNftMedia(element) {
+            if (!element?.isConnected || element.hidden || element.closest('[hidden]')) return;
+            if (element.dataset.mediaPlayed === 'playing' || element.dataset.mediaPlayed === 'true') return;
+            element.dataset.mediaWanted = 'true';
+            const picture = element.querySelector('.nft-live-model');
+            if (picture) {
+                element.dataset.mediaState = 'ready';
+                element.classList.add('is-live');
+                window.RLottie?.pause?.(picture);
+                return;
+            }
+            queueNftMedia(element);
         }
 
         function sparsePatternSeed(value) {
@@ -3659,14 +3656,6 @@
                 element.dataset.mediaPlayed = 'true';
                 element.dataset.mediaState = 'complete';
                 releaseNftPlaybackSlot(element);
-                // Keep the already painted canvas as the zero-cost frozen frame,
-                // but release the worker, frame queue and RGBA buffers.
-                setTimeout(() => {
-                    if (!picture.isConnected || element.dataset.mediaToken !== mediaToken
-                        || element.dataset.mediaState !== 'complete' || !picture.rlPlayer) return;
-                    window.RLottie?.destroy?.(picture);
-                    picture.classList.add('nft-live-model--snapshot');
-                }, 0);
             });
             picture.addEventListener('tg:frame-visibility', (frameEvent) => {
                 if (!element.isConnected || element.dataset.mediaToken !== mediaToken || element.dataset.mediaWanted !== 'true') return;
@@ -3757,12 +3746,7 @@
 
         function queueNftMedia(element) {
             if (!element?.isConnected || element.dataset.mediaWanted !== 'true') return;
-            let picture = element.querySelector('.nft-live-model');
-            if (picture?.classList.contains('nft-live-model--snapshot')) {
-                picture.remove();
-                picture = null;
-                element.classList.remove('is-live', 'has-live-frame');
-            }
+            const picture = element.querySelector('.nft-live-model');
             if (picture) {
                 element.dataset.mediaState = 'live';
                 if (!document.hidden && element.dataset.mediaPlayed === 'playing') window.RLottie?.playOnce?.(picture, true);
@@ -3782,7 +3766,7 @@
                 elements.filter(element => !element.closest('.item-card')?.hidden).forEach(element => {
                     element.dataset.mediaInView = 'true';
                     element.dataset.mediaPlayed = 'false';
-                    if (!NFT_MEDIA_HOVER_MODE) resumeNftMedia(element);
+                    (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(element);
                 });
                 return;
             }
@@ -3795,7 +3779,7 @@
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
                         entry.target.dataset.mediaPlayed = 'false';
-                        if (!NFT_MEDIA_HOVER_MODE) resumeNftMedia(entry.target);
+                        (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(entry.target);
                     } else if (!visible && entry.target.dataset.mediaInView === 'true') {
                         entry.target.dataset.mediaInView = 'false';
                         pauseNftMedia(entry.target, true);
@@ -3900,7 +3884,7 @@
                 elements.forEach(element => {
                     element.dataset.mediaInView = 'true';
                     element.dataset.mediaPlayed = 'false';
-                    if (!NFT_MEDIA_HOVER_MODE) resumeNftMedia(element);
+                    (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(element);
                 });
                 return;
             }
@@ -3910,7 +3894,7 @@
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
                         entry.target.dataset.mediaPlayed = 'false';
-                        if (!NFT_MEDIA_HOVER_MODE) resumeNftMedia(entry.target);
+                        (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(entry.target);
                     } else if (!visible && entry.target.dataset.mediaInView === 'true') {
                         entry.target.dataset.mediaInView = 'false';
                         if (entry.target.closest('#roulette-track')) deactivateNftMedia(entry.target);
@@ -3954,8 +3938,8 @@
                 activateAccountRestriction(accountRestriction);
                 return;
             }
-            if (id !== 'store') destroyCatalogNftMedia();
-            destroyAuxNftMedia();
+            if (id !== 'store') pauseCatalogNftMedia();
+            pauseAuxNftMedia();
             document.querySelectorAll('.page').forEach(p => p.classList.remove('page-active'));
             document.querySelectorAll('.tab-bar .tab-item').forEach(t => t.classList.remove('active'));
             const pageEl = document.getElementById('page-' + id);
@@ -4696,7 +4680,7 @@
         }
 
         function switchInv(el, type) {
-            destroyAuxNftMedia(document.getElementById('page-inventory'));
+            pauseAuxNftMedia();
             document.querySelectorAll('#page-inventory .tab-item').forEach(t => { t.classList.remove('active'); t.style.borderColor='transparent'; t.style.color='var(--text-muted)'; });
             el.classList.add('active'); el.style.borderColor='var(--accent-gold)'; el.style.color='var(--accent-gold)';
             document.getElementById('inventory-active-container').style.display = type === 'active' ? 'grid' : 'none';
@@ -5657,7 +5641,6 @@
                     const finalPos = trajectory[trajectory.length - 1];
                     drawGameFrame(finalPos, null, null);
                     animationFrameId = null;
-                    isSpinning = false;
                     fetchWinnerNow();
                 }
             }
@@ -5692,7 +5675,7 @@
 
         async function fetchWinnerNow() {
             try {
-                const state = await apiFetch(`${API_BASE}/game/state?compact=1`);
+                const state = await apiFetch(`${API_BASE}/game/state`);
                 if (state.winner && state.round_id && state.round_id !== lastShownRoundId && initialGameStateLoaded) {
                     await showWinnerSequence(state.winner, state.round_id);
                 }
@@ -5919,7 +5902,7 @@
                 document.getElementById('cases-container').style.display = 'none';
                 requestAnimationFrame(resumeCatalogNftMedia);
             } else {
-                destroyCatalogNftMedia();
+                pauseCatalogNftMedia();
                 document.getElementById('page-store').classList.add('cases-active');
                 document.querySelector('.store-tab:last-child').classList.add('active');
                 document.getElementById('catalog-container').style.display = 'none';
