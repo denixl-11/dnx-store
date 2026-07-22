@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.4" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.5" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -3181,7 +3181,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.4"></script>
+    <script src="tgsticker.js?v=8.9-opt.5"></script>
     <script>
         const tg = window.Telegram.WebApp;
         const isAndroidPlatform = String(tg.platform || '').toLowerCase() === 'android' || /Android/i.test(navigator.userAgent);
@@ -3276,7 +3276,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.4';
+        const EXPECTED_API_RELEASE = '8.9-opt.5';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -3421,6 +3421,7 @@
         let pendingTopupStars = 0;
         let pendingBuyItem = null;
         let currentCase = null;
+        let casePosterWarmupPromise = Promise.resolve();
         let rouletteActive = false;
         let caseOpeningRequestActive = false;
         let currentCaseOpenRequestId = null;
@@ -3804,7 +3805,10 @@
                         pauseNftMedia(entry.target, true);
                     }
                 });
-            }, { rootMargin: '160px 0px', threshold: [0, .01, .5] });
+            // Decode exactly the cards that are on screen. Starting the next
+            // row 160px early made visible animations compete with off-screen
+            // workers and was especially noticeable in Android WebView.
+            }, { rootMargin: '0px', threshold: [0, .01, .5] });
             elements.forEach(element => nftMediaObserver.observe(element));
         }
 
@@ -3920,7 +3924,7 @@
                         else pauseNftMedia(entry.target, true);
                     }
                 });
-            }, { rootMargin: '160px 0px', threshold: [0, .01, .5] });
+            }, { rootMargin: '0px', threshold: [0, .01, .5] });
             elements.forEach(element => nftAuxMediaObserver.observe(element));
         }
 
@@ -5964,6 +5968,9 @@
                 .then(details => {
                     caseDetailsCache.set(key, details);
                     warmCaseImages(details?.drops || []);
+                    // Begin fetching Telegram's lightweight preview frames as
+                    // soon as the Cases tab is visible, well before a spin.
+                    warmCaseNftPosters(details).catch(() => {});
                     return details;
                 })
                 .finally(() => caseDetailsRequests.delete(key));
@@ -6023,6 +6030,46 @@
             </div>`;
         }
 
+        function caseDropPosterMarkup(drop) {
+            const title = escapeHtml(drop?.model || drop?.name || 'NFT');
+            const caseId = Number(currentCase?.id || 0);
+            const dropIndex = Number(drop?.drop_index ?? -1);
+            const generatedItemId = Number(drop?.generated_item_id || 0);
+            const caseMedia = caseId > 0 && dropIndex >= 0
+                ? nftMediaCache.get(`case:${caseId}:${dropIndex}`)?.data
+                : null;
+            const itemMedia = generatedItemId > 0
+                ? nftMediaCache.get(generatedItemId)?.data
+                : null;
+            // Telegram preview is the lightweight zero-state of the same NFT.
+            // A moving reel must not decode 31 rlottie canvases concurrently:
+            // that was the source of grey cells and slow animations.
+            const poster = safeImageUrl(caseMedia?.previewUrl || itemMedia?.previewUrl)
+                || safeImageUrl(drop?.image_url);
+            return `<img class="case-roulette-poster" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+        }
+
+        function warmCaseNftPosters(caseData) {
+            const caseId = Number(caseData?.id || 0);
+            if (!caseId) return Promise.resolve();
+            const jobs = (caseData?.drops || [])
+                .filter(drop => drop?.has_live_nft && Number(drop?.drop_index ?? -1) >= 0)
+                .map(async drop => {
+                    const media = await getCaseNftMedia(caseId, Number(drop.drop_index));
+                    const posterUrl = safeImageUrl(media?.previewUrl);
+                    if (!posterUrl) return;
+                    // Decode Telegram's zero-state while the user is still on
+                    // the case page, so the moving reel never flashes grey.
+                    await new Promise(resolve => {
+                        const poster = new Image();
+                        poster.onload = poster.onerror = () => resolve();
+                        poster.src = posterUrl;
+                        if (poster.complete) resolve();
+                    });
+                });
+            return Promise.allSettled(jobs);
+        }
+
         async function openCaseDetail(caseId) {
             const openToken = ++caseDetailOpenToken;
             currentCase = null;
@@ -6058,6 +6105,8 @@
                 selectBalanceType('case', 'main');
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
+                const posterCaseId = Number(currentCase.id);
+                casePosterWarmupPromise = warmCaseNftPosters(currentCase);
                 const dropList = document.getElementById('case-drop-list');
                 destroyAuxNftMedia(dropList);
                 dropList.innerHTML = sortedDrops.map(d => `
@@ -6096,6 +6145,13 @@
                 track.style.paddingLeft = '0px';
 
                 startIdleRoulette(sortedDrops);
+                casePosterWarmupPromise.then(() => {
+                    if (Number(currentCase?.id) === posterCaseId
+                        && overlay.classList.contains('active')
+                        && !rouletteActive && !caseOpeningRequestActive) {
+                        startIdleRoulette(sortedDrops);
+                    }
+                });
                 requestAnimationFrame(resumeAuxNftMedia);
             } catch(e) {
                 if (openToken !== caseDetailOpenToken) return;
@@ -6126,7 +6182,7 @@
                 items.forEach(drop => {
                     const div = document.createElement('div');
                     div.className = 'roulette-item';
-                    div.innerHTML = caseDropMediaMarkup(drop);
+                    div.innerHTML = caseDropPosterMarkup(drop);
                     wrapper.appendChild(div);
                 });
                 return wrapper;
@@ -6135,7 +6191,6 @@
             track.appendChild(createSet());
             void track.offsetWidth;
             track.classList.add('idle-scroll');
-            requestAnimationFrame(resumeAuxNftMedia);
         }
 
         function startActiveRoulette(drops, wonItem) {
@@ -6160,10 +6215,9 @@
             items.forEach(drop => {
                 const div = document.createElement('div');
                 div.className = 'roulette-item';
-                div.innerHTML = caseDropMediaMarkup(drop);
+                div.innerHTML = caseDropPosterMarkup(drop);
                 track.appendChild(div);
             });
-            requestAnimationFrame(resumeAuxNftMedia);
 
             const itemWidth = 126;
             const gap = 15;
@@ -6368,6 +6422,13 @@
                     currentCaseOpenRequestId = null;
                     caseOpeningRequestActive = false;
                     document.getElementById('case-actions').style.display = 'none';
+                    // The metadata warmup starts when the detail opens and is
+                    // usually complete here. Bound the cold-network wait so
+                    // opening a case is never held up by Telegram media.
+                    await Promise.race([
+                        casePosterWarmupPromise,
+                        new Promise(resolve => setTimeout(resolve, 300))
+                    ]);
                     startActiveRoulette(currentCase.drops, result.won_item);
                     updateBalance();
                 } else {

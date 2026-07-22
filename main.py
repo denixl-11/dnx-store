@@ -112,7 +112,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.4"
+API_RELEASE = "8.9-opt.5"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 
@@ -553,6 +553,59 @@ game_state = {
     "last_polygons": None
 }
 
+
+async def ensure_game_ledger_schema(conn) -> None:
+    """Create the durable wager tables even when an old migration marker exists.
+
+    Several deployed V8.9 builds used the same migration marker while their
+    schema differed.  Keeping this tiny, idempotent guard ahead of the marker
+    check prevents a valid bet from turning into a generic HTTP 500 merely
+    because Render restarted on one of those databases.
+    """
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS game_counter (
+            id INT PRIMARY KEY DEFAULT 1,
+            last_game_number INT NOT NULL DEFAULT 0
+        )
+    """)
+    await conn.execute(
+        "INSERT INTO game_counter (id, last_game_number) VALUES (1, 0) ON CONFLICT (id) DO NOTHING"
+    )
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS active_game_bets (
+            game_number INTEGER NOT NULL,
+            user_id VARCHAR(255) NOT NULL,
+            username VARCHAR(255) NOT NULL,
+            amount NUMERIC(20, 0) NOT NULL CHECK (amount > 0),
+            balance_type VARCHAR(16) NOT NULL CHECK (balance_type IN ('main', 'bonus')),
+            history_event_id BIGINT,
+            owner_token UUID,
+            status VARCHAR(16) NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending', 'settled', 'refunded')),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (game_number, user_id)
+        )
+    """)
+    await conn.execute("ALTER TABLE active_game_bets ADD COLUMN IF NOT EXISTS owner_token UUID")
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_active_game_bets_recovery
+        ON active_game_bets(status, updated_at)
+    """)
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS game_round_settlements (
+            game_number INTEGER PRIMARY KEY,
+            round_id BIGINT,
+            winner_id VARCHAR(255) NOT NULL,
+            winner_username VARCHAR(255) NOT NULL,
+            payout NUMERIC(20, 0) NOT NULL,
+            balance_type VARCHAR(16) NOT NULL,
+            win_percent NUMERIC(6, 2) NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+
+
 async def init_db():
     try:
         async with get_pool().acquire() as conn:
@@ -563,7 +616,14 @@ async def init_db():
                         applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
                 """)
-                migration_version = "v8.9-opt.2"
+                # This guard intentionally runs before the migration shortcut.
+                # Old V8.9 releases reused markers and could otherwise leave
+                # the wager table absent forever.
+                await ensure_game_ledger_schema(conn)
+                # Keep the migration marker in sync with durable schema
+                # additions. Reusing the old opt.2 marker made upgraded
+                # databases return above before `active_game_bets` existed.
+                migration_version = "v8.9-opt.5-game-ledger"
                 if await conn.fetchval(
                     "SELECT 1 FROM dnx_schema_migrations WHERE version = $1",
                     migration_version,
@@ -904,35 +964,71 @@ async def recover_unfinished_game_bets() -> int:
     deterministic: return the exact stake to the balance it came from.
     """
     refunded = 0
-    async with get_pool().acquire() as conn:
-        async with conn.transaction():
-            rows = await conn.fetch("""
-                UPDATE active_game_bets
-                SET status = 'refunded', updated_at = NOW()
-                WHERE status = 'pending'
-                  AND owner_token IS DISTINCT FROM $1
-                  AND updated_at <= NOW() - INTERVAL '2 minutes'
-                RETURNING game_number, user_id, amount, balance_type
-            """, PROCESS_INSTANCE_ID)
-            for row in rows:
-                balance_column = "bonus_balance" if row["balance_type"] == "bonus" else "balance"
-                updated = await conn.execute(
-                    f"UPDATE users SET {balance_column} = {balance_column} + $1 WHERE id = $2",
-                    row["amount"],
-                    row["user_id"],
+    next_game_number = None
+    # Keep wager recovery and choosing the next in-memory round atomic with
+    # respect to new bets.  A refunded/old-process ledger row uses
+    # (game_number, user_id) as its primary key; reusing that game number made
+    # every later wager conflict forever even though the balance was valid.
+    async with game_lock:
+        async with get_pool().acquire() as conn:
+            async with conn.transaction():
+                rows = await conn.fetch("""
+                    UPDATE active_game_bets
+                    SET status = 'refunded', updated_at = NOW()
+                    WHERE status = 'pending'
+                      AND owner_token IS DISTINCT FROM $1
+                      AND updated_at <= NOW() - INTERVAL '2 minutes'
+                    RETURNING game_number, user_id, amount, balance_type
+                """, PROCESS_INSTANCE_ID)
+                for row in rows:
+                    balance_column = "bonus_balance" if row["balance_type"] == "bonus" else "balance"
+                    updated = await conn.execute(
+                        f"UPDATE users SET {balance_column} = {balance_column} + $1 WHERE id = $2",
+                        row["amount"],
+                        row["user_id"],
+                    )
+                    if updated != "UPDATE 1":
+                        raise RuntimeError(f"Cannot refund missing game user {row['user_id']}")
+                    await record_user_event(
+                        conn,
+                        row["user_id"],
+                        "game_refund",
+                        amount=row["amount"],
+                        balance_type=row["balance_type"],
+                        title="Возврат ставки после перезапуска",
+                        metadata={"game_number": row["game_number"], "reason": "server_restart"},
+                    )
+                    refunded += 1
+
+                # On a Render restart the database can still contain either a
+                # live wager owned by the previous process or an already
+                # refunded terminal row for the current counter value.  Start
+                # this process on a fresh number immediately instead of making
+                # every user wait for/deadlock on that primary-key collision.
+                if not game_state["players"] and game_state["status"] == "waiting":
+                    current_number = int(game_state.get("game_number", 0))
+                    collision = await conn.fetchval(
+                        "SELECT 1 FROM active_game_bets WHERE game_number = $1 LIMIT 1",
+                        current_number,
+                    )
+                    if collision:
+                        next_game_number = int(await conn.fetchval(
+                            """
+                            UPDATE game_counter
+                            SET last_game_number = GREATEST(last_game_number, $1)
+                            WHERE id = 1
+                            RETURNING last_game_number
+                            """,
+                            current_number + 1,
+                        ))
+            if next_game_number is not None:
+                game_state["game_number"] = next_game_number
+                game_state["last_polygons"] = None
+                game_state["polygons"] = None
+                logging.warning(
+                    "Advanced game number to %s after detecting a stale wager ledger row",
+                    next_game_number,
                 )
-                if updated != "UPDATE 1":
-                    raise RuntimeError(f"Cannot refund missing game user {row['user_id']}")
-                await record_user_event(
-                    conn,
-                    row["user_id"],
-                    "game_refund",
-                    amount=row["amount"],
-                    balance_type=row["balance_type"],
-                    title="Возврат ставки после перезапуска",
-                    metadata={"game_number": row["game_number"], "reason": "server_restart"},
-                )
-                refunded += 1
     if refunded:
         logging.warning("Safely refunded %s unfinished game bet(s)", refunded)
     return refunded
@@ -2893,6 +2989,30 @@ async def handle_game_bet(request):
                 and game_state["players"][user_id].get("balance_type", "main") != balance_type
             ):
                 return web.json_response({"success": False, "error": "balance_type_locked"}, status=409)
+
+            # A Render restart loses the in-memory round but keeps its durable
+            # wager ledger. Never reuse that round number: its primary key
+            # would otherwise reject every later wager. Startup recovery does
+            # this normally; this guard also self-heals older deployments.
+            if not game_state["players"]:
+                current_number = int(game_state.get("game_number", 0))
+                async with get_pool().acquire() as round_conn:
+                    collision = await round_conn.fetchval(
+                        "SELECT 1 FROM active_game_bets WHERE game_number = $1 LIMIT 1",
+                        current_number,
+                    )
+                    if collision:
+                        game_state["game_number"] = int(await round_conn.fetchval(
+                            """
+                            UPDATE game_counter
+                            SET last_game_number = GREATEST(last_game_number, $1)
+                            WHERE id = 1
+                            RETURNING last_game_number
+                            """,
+                            current_number + 1,
+                        ))
+                        game_state["last_polygons"] = None
+                        game_state["polygons"] = None
             balance_column = "bonus_balance" if balance_type == "bonus" else "balance"
             existing_player = game_state["players"].get(user_id)
 
