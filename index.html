@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.5" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.7" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -2817,6 +2817,48 @@
             transform: none !important;
             backface-visibility: visible !important;
         }
+
+        /* V8.9 opt.7: deterministic case frame zero. Telegram's preview image
+           is deliberately not used here because it contains its own pattern. */
+        .case-nft-zero-frame {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            border-radius: inherit !important;
+            object-fit: contain !important;
+            opacity: 1;
+            background: #242424 !important;
+            transition: opacity .12s ease;
+            pointer-events: none;
+        }
+        .nft-live-media--case.has-live-frame > .case-nft-zero-frame { opacity: 0; }
+        .case-roulette-poster {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain !important;
+            background: #242424 !important;
+        }
+        .case-roulette-poster--pending { border-radius: inherit; }
+        .case-poster-render-host {
+            position: fixed;
+            left: -10000px;
+            top: -10000px;
+            width: 160px;
+            height: 160px;
+            overflow: hidden;
+            pointer-events: none;
+            opacity: .001;
+        }
+        .case-poster-render-host picture,
+        .case-poster-render-host canvas {
+            display: block;
+            width: 160px !important;
+            height: 160px !important;
+        }
     </style>
 </head>
 <body>
@@ -3181,7 +3223,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.5"></script>
+    <script src="tgsticker.js?v=8.9-opt.7"></script>
     <script>
         const tg = window.Telegram.WebApp;
         const isAndroidPlatform = String(tg.platform || '').toLowerCase() === 'android' || /Android/i.test(navigator.userAgent);
@@ -3276,7 +3318,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.5';
+        const EXPECTED_API_RELEASE = '8.9-opt.7';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -3422,6 +3464,7 @@
         let pendingBuyItem = null;
         let currentCase = null;
         let casePosterWarmupPromise = Promise.resolve();
+        const casePosterFrameRequests = new Map();
         let rouletteActive = false;
         let caseOpeningRequestActive = false;
         let currentCaseOpenRequestId = null;
@@ -4161,10 +4204,10 @@
                 destroyCatalogNftMedia();
                 container.innerHTML = currentCatalog.length ? currentCatalog.map(item => {
                 const animatedPreview = safeTelegramUrl(item.nft_link) ? `
-                        <button type="button" class="nft-live-media" data-item-id="${Number(item.id)}" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="Открыть ${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">
+                        <button type="button" class="nft-live-media" data-item-id="${Number(item.id)}" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="Открыть ${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)}, 'catalog')">
                             <span class="nft-live-pattern" aria-hidden="true"></span>
                         </button>` : `
-                        <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" alt="${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)})">`;
+                        <img src="${escapeHtml(safeImageUrl(item.image_url))}" class="item-image" alt="${escapeHtml(item.name)}" onclick="openNftModal(${Number(item.id)}, 'catalog')">`;
                 return `
                     <div class="item-card" data-item-id="${Number(item.id)}" data-collection="${escapeHtml(String(item?.name || '').trim())}">
                         ${animatedPreview}
@@ -4276,6 +4319,11 @@
                 return url.protocol === 'https:' ? url.href : '';
             } catch (_) { return ''; }
         }
+        function safePosterImageUrl(value) {
+            const text = String(value || '');
+            if (/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(text)) return text;
+            return safeImageUrl(text);
+        }
         function safeTelegramUrl(value) {
             try {
                 const url = new URL(String(value || ''));
@@ -4291,62 +4339,38 @@
             if (item) addToCart(item);
         }
 
-        async function openNftModal(id) {
-            const openToken = ++nftModalOpenToken;
-            const localItem = currentCatalog.find(i => String(i.id) === String(id)) || inventoryData.find(i => String(i.id) === String(id));
-            if (!localItem) return;
-            let item;
+        let nftTapAudioContext = null;
+        function nftTapFeedback() {
+            try { tg?.HapticFeedback?.selectionChanged?.(); } catch (_) {}
+            try { tg?.HapticFeedback?.impactOccurred?.('light'); } catch (_) {}
+            try { navigator.vibrate?.(10); } catch (_) {}
             try {
-                const authoritativeItem = await apiFetch(`${API_BASE}/item?id=${encodeURIComponent(id)}&_=${Date.now()}`);
-                if (openToken !== nftModalOpenToken) return;
-                if (String(authoritativeItem.api_release || '') !== EXPECTED_API_RELEASE) {
-                    throw new Error(`api_release_mismatch:${authoritativeItem.api_release || 'missing'}`);
-                }
-                if (String(localItem.nft_link || '') !== String(authoritativeItem.nft_link || '')) {
-                    nftMediaCache.delete(Number(id));
-                    persistNftMediaCache();
-                }
-                item = {
-                    ...localItem,
-                    ...authoritativeItem,
-                    // Never inherit traits from a catalogue, cart or inventory
-                    // snapshot. These values are the exact columns returned by
-                    // the current items row on the current Render database.
-                    model: authoritativeItem.model,
-                    pattern: authoritativeItem.pattern,
-                    background: authoritativeItem.background
-                };
-                console.info('DNX authoritative NFT row', {
-                    release: authoritativeItem.api_release,
-                    id: authoritativeItem.id,
-                    digest: authoritativeItem.row_digest,
-                    source: authoritativeItem.traits_source,
-                    model: authoritativeItem.model,
-                    pattern: authoritativeItem.pattern,
-                    background: authoritativeItem.background
-                });
-                const catalogIndex = currentCatalog.findIndex(entry => String(entry.id) === String(id));
-                const inventoryIndex = inventoryData.findIndex(entry => String(entry.id) === String(id));
-                if (catalogIndex >= 0 && item.is_shop_item) currentCatalog[catalogIndex] = item;
-                if (inventoryIndex >= 0 && !item.is_shop_item) inventoryData[inventoryIndex] = item;
-                const cartIndex = cart.findIndex(entry => String(entry.id) === String(id));
-                if (cartIndex >= 0) cart[cartIndex] = { ...cart[cartIndex], ...item };
-            } catch (error) {
-                if (openToken !== nftModalOpenToken) return;
-                console.error('Fresh item read failed', error);
-                const mismatch = String(error?.message || '').startsWith('api_release_mismatch:');
-                showAlert(mismatch
-                    ? 'Фронтенд и сервер имеют разные версии. Дождитесь завершения деплоя Render и откройте мини-приложение заново.'
-                    : 'Не удалось получить актуальные данные NFT. Проверьте соединение и попробуйте ещё раз.');
-                return;
-            }
-            const isShopItem = item.is_shop_item === true;
-            if (!isShopItem && isSimpleInventoryNft(item)) return;
+                const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextCtor) return;
+                nftTapAudioContext ||= new AudioContextCtor();
+                const now = nftTapAudioContext.currentTime;
+                const oscillator = nftTapAudioContext.createOscillator();
+                const gain = nftTapAudioContext.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(760, now);
+                oscillator.frequency.exponentialRampToValueAtTime(520, now + .018);
+                gain.gain.setValueAtTime(.018, now);
+                gain.gain.exponentialRampToValueAtTime(.0001, now + .022);
+                oscillator.connect(gain).connect(nftTapAudioContext.destination);
+                oscillator.start(now);
+                oscillator.stop(now + .024);
+            } catch (_) {}
+        }
+
+        function renderNftModalItem(item, isInventoryContext, resetMedia = false) {
+            const isShopItem = !isInventoryContext && item.is_shop_item === true;
             currentNftItem = item;
             const modalMedia = document.getElementById('nft-modal-media');
-            deactivateNftMedia(modalMedia);
-            modalMedia.dataset.itemId = String(Number(item.id) || '');
-            modalMedia.dataset.mediaWanted = 'false';
+            if (resetMedia) {
+                deactivateNftMedia(modalMedia);
+                modalMedia.dataset.itemId = String(Number(item.id) || '');
+                modalMedia.dataset.mediaWanted = 'false';
+            }
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
 
@@ -4403,9 +4427,56 @@
                 startWithdrawCountdowns();
             }
             document.getElementById('nft-detail-overlay').classList.add('active');
-            if (telegramLink && Number(item.id) > 0) {
+            if (resetMedia && telegramLink && Number(item.id) > 0) {
                 modalMedia.dataset.mediaPlayed = 'false';
+                modalMedia.dataset.mediaInView = 'true';
                 requestAnimationFrame(() => resumeNftMedia(modalMedia));
+            }
+        }
+
+        async function openNftModal(id, context = 'auto') {
+            const openToken = ++nftModalOpenToken;
+            const inventoryItem = inventoryData.find(i => String(i.id) === String(id));
+            const catalogItem = currentCatalog.find(i => String(i.id) === String(id));
+            const inventoryPageActive = document.getElementById('page-inventory')?.classList.contains('active')
+                || document.getElementById('page-inventory')?.classList.contains('page-active');
+            const isInventoryContext = context === 'inventory'
+                || (context === 'auto' && Boolean(inventoryItem) && (inventoryPageActive || !catalogItem));
+            const localItem = isInventoryContext ? (inventoryItem || catalogItem) : (catalogItem || inventoryItem);
+            if (!localItem || (isInventoryContext && isSimpleInventoryNft(localItem))) return;
+
+            nftTapFeedback();
+            const immediateItem = { ...localItem, is_shop_item: !isInventoryContext && localItem.is_shop_item === true };
+            renderNftModalItem(immediateItem, isInventoryContext, true);
+
+            try {
+                const authoritativeItem = await apiFetch(`${API_BASE}/item?id=${encodeURIComponent(id)}&_=${Date.now()}`);
+                if (openToken !== nftModalOpenToken) return;
+                if (String(authoritativeItem.api_release || '') !== EXPECTED_API_RELEASE) {
+                    throw new Error(`api_release_mismatch:${authoritativeItem.api_release || 'missing'}`);
+                }
+                if (String(localItem.nft_link || '') !== String(authoritativeItem.nft_link || '')) {
+                    nftMediaCache.delete(Number(id));
+                    persistNftMediaCache();
+                }
+                const item = {
+                    ...localItem,
+                    ...authoritativeItem,
+                    is_shop_item: isInventoryContext ? false : authoritativeItem.is_shop_item === true,
+                    model: authoritativeItem.model,
+                    pattern: authoritativeItem.pattern,
+                    background: authoritativeItem.background
+                };
+                const catalogIndex = currentCatalog.findIndex(entry => String(entry.id) === String(id));
+                const inventoryIndex = inventoryData.findIndex(entry => String(entry.id) === String(id));
+                if (catalogIndex >= 0 && !isInventoryContext) currentCatalog[catalogIndex] = item;
+                if (inventoryIndex >= 0 && isInventoryContext) inventoryData[inventoryIndex] = item;
+                const cartIndex = cart.findIndex(entry => String(entry.id) === String(id));
+                if (cartIndex >= 0) cart[cartIndex] = { ...cart[cartIndex], ...item };
+                renderNftModalItem(item, isInventoryContext, false);
+            } catch (error) {
+                if (openToken !== nftModalOpenToken) return;
+                console.warn('Fresh item read failed; keeping the instant local modal', error);
             }
         }
         function closeNftModal(forceOrEvent = false) {
@@ -4422,12 +4493,13 @@
             const itemId = Number(item?.id || 0);
             const fallbackUrl = escapeHtml(safeImageUrl(item?.image_url));
             const title = escapeHtml(item?.name || 'NFT');
+            const modalContext = variant === 'inventory' ? 'inventory' : (variant === 'cart' ? 'cart' : 'auto');
             if (!itemId || !safeTelegramUrl(item?.nft_link)) {
-                return `<img src="${fallbackUrl}" class="item-image nft-static-${variant}" alt="${title}"${allowOpen && itemId ? ` onclick="openNftModal(${itemId})"` : ''}>`;
+                return `<img src="${fallbackUrl}" class="item-image nft-static-${variant}" alt="${title}"${allowOpen && itemId ? ` onclick="openNftModal(${itemId}, '${modalContext}')"` : ''}>`;
             }
             const tag = allowOpen ? 'button' : 'div';
             const buttonType = allowOpen ? ' type="button"' : '';
-            const click = allowOpen ? ` onclick="openNftModal(${itemId})"` : '';
+            const click = allowOpen ? ` onclick="openNftModal(${itemId}, '${modalContext}')"` : '';
             return `
                 <${tag}${buttonType} class="nft-live-media nft-live-media--${variant}" data-media-scope="aux" data-item-id="${itemId}" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="${allowOpen ? `Открыть ${title}` : title}"${click}>
                     <span class="nft-live-pattern" aria-hidden="true"></span>
@@ -5979,8 +6051,9 @@
         }
 
         function warmCaseImages(drops) {
-            // Animated Telegram NFT must never flash the legacy PNG while its
-            // TGS is loading. Preload raster art only for non-animated drops.
+            // Static rewards keep their source image. Animated rewards render
+            // their own transparent TGS frame and must never preload Telegram's
+            // preview because that preview contains a background and pattern.
             [...new Set((drops || [])
                 .filter(drop => !drop?.has_live_nft)
                 .map(drop => safeImageUrl(drop.image_url))
@@ -6021,11 +6094,22 @@
             const fallback = escapeHtml(safeImageUrl(drop?.image_url));
             const title = escapeHtml(drop?.model || drop?.name || 'NFT');
             if (!drop?.has_live_nft) return `<img src="${fallback}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+            const caseId = Number(currentCase?.id || 0);
+            const dropIndex = Number(drop?.drop_index ?? -1);
             const generatedItemId = Number(drop?.generated_item_id || 0);
+            const caseMedia = caseId > 0 && dropIndex >= 0
+                ? nftMediaCache.get(`case:${caseId}:${dropIndex}`)?.data
+                : null;
+            const itemMedia = generatedItemId > 0 ? nftMediaCache.get(generatedItemId)?.data : null;
+            const poster = safePosterImageUrl(caseMedia?.posterDataUrl || itemMedia?.posterDataUrl);
             const sourceData = generatedItemId > 0
-                ? `data-media-kind="case" data-item-id="${generatedItemId}"`
-                : `data-media-kind="case" data-case-id="${Number(currentCase?.id || 0)}" data-drop-index="${Number(drop?.drop_index ?? -1)}"`;
+                ? `data-media-kind="case" data-item-id="${generatedItemId}" data-case-id="${caseId}" data-drop-index="${dropIndex}"`
+                : `data-media-kind="case" data-case-id="${caseId}" data-drop-index="${dropIndex}"`;
+            const zeroFrame = poster
+                ? `<img class="case-nft-zero-frame" src="${escapeHtml(poster)}" alt="" loading="eager" decoding="async">`
+                : '<span class="case-nft-zero-frame case-nft-zero-frame--pending" aria-hidden="true"></span>';
             return `<div class="nft-live-media nft-live-media--case" data-media-scope="aux" ${sourceData} data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-token="0" aria-label="${title}">
+                ${zeroFrame}
                 <span class="nft-live-pattern" aria-hidden="true"></span>
             </div>`;
         }
@@ -6041,12 +6125,95 @@
             const itemMedia = generatedItemId > 0
                 ? nftMediaCache.get(generatedItemId)?.data
                 : null;
-            // Telegram preview is the lightweight zero-state of the same NFT.
-            // A moving reel must not decode 31 rlottie canvases concurrently:
-            // that was the source of grey cells and slow animations.
-            const poster = safeImageUrl(caseMedia?.previewUrl || itemMedia?.previewUrl)
-                || safeImageUrl(drop?.image_url);
+            const livePoster = safePosterImageUrl(caseMedia?.posterDataUrl || itemMedia?.posterDataUrl);
+            if (drop?.has_live_nft && !livePoster) {
+                return `<span class="case-roulette-poster case-roulette-poster--pending" data-case-id="${caseId}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`;
+            }
+            // Animated rewards use a locally rendered transparent TGS frame.
+            // Telegram's preview is never used because it contains its own
+            // background and pattern. Non-animated rewards keep their image.
+            const poster = livePoster || safeImageUrl(drop?.image_url);
             return `<img class="case-roulette-poster" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+        }
+
+        function applyCasePosterFrame(caseId, dropIndex, posterUrl) {
+            if (!posterUrl) return;
+            document.querySelectorAll(`.case-roulette-poster--pending[data-case-id="${Number(caseId)}"][data-drop-index="${Number(dropIndex)}"]`).forEach(slot => {
+                const image = new Image();
+                image.className = 'case-roulette-poster';
+                image.alt = slot.getAttribute('aria-label') || '';
+                image.decoding = 'async';
+                image.src = posterUrl;
+                slot.replaceWith(image);
+            });
+            document.querySelectorAll(`.nft-live-media--case[data-case-id="${Number(caseId)}"][data-drop-index="${Number(dropIndex)}"] > .case-nft-zero-frame`).forEach(frame => {
+                if (frame instanceof HTMLImageElement) {
+                    frame.src = posterUrl;
+                    return;
+                }
+                const image = new Image();
+                image.className = 'case-nft-zero-frame';
+                image.alt = '';
+                image.decoding = 'async';
+                image.src = posterUrl;
+                frame.replaceWith(image);
+            });
+        }
+
+        function renderCasePosterFrame(caseId, dropIndex, media) {
+            const cacheKey = `case:${Number(caseId)}:${Number(dropIndex)}`;
+            const cachedPoster = safePosterImageUrl(media?.posterDataUrl);
+            if (cachedPoster) return Promise.resolve(cachedPoster);
+            if (casePosterFrameRequests.has(cacheKey)) return casePosterFrameRequests.get(cacheKey);
+            const tgsUrl = safeTelegramMediaUrl(media?.tgsUrl);
+            if (!tgsUrl || !window.RLottie?.isSupported) return Promise.resolve('');
+
+            const request = new Promise(resolve => {
+                const host = document.createElement('div');
+                host.className = 'case-poster-render-host';
+                const picture = document.createElement('picture');
+                const source = document.createElement('source');
+                source.type = 'application/x-tgsticker';
+                source.srcset = tgsUrl;
+                picture.appendChild(source);
+                host.appendChild(picture);
+                document.body.appendChild(host);
+                let settled = false;
+                const finish = posterUrl => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeoutId);
+                    try { window.RLottie?.destroy?.(picture); } catch (_) {}
+                    host.remove();
+                    const safePoster = safePosterImageUrl(posterUrl);
+                    if (safePoster) {
+                        media.posterDataUrl = safePoster;
+                        applyCasePosterFrame(caseId, dropIndex, safePoster);
+                    }
+                    resolve(safePoster);
+                };
+                const capture = () => {
+                    try {
+                        const canvas = picture.rlPlayer?.canvas;
+                        if (canvas && picture.rlPlayer?.hasVisiblePixels) finish(canvas.toDataURL('image/png'));
+                    } catch (_) {}
+                };
+                picture.addEventListener('tg:frame-visibility', event => {
+                    if (event.detail?.hasVisiblePixels) capture();
+                });
+                picture.addEventListener('tg:load', () => requestAnimationFrame(capture), { once: true });
+                const timeoutId = setTimeout(() => finish(''), 4500);
+                try {
+                    window.RLottie.init(picture, {
+                        maxDeviceRatio: 1,
+                        noAutoPlay: true,
+                        findPosterFrame: true,
+                        cachingModulo: 1
+                    });
+                } catch (_) { finish(''); }
+            }).finally(() => casePosterFrameRequests.delete(cacheKey));
+            casePosterFrameRequests.set(cacheKey, request);
+            return request;
         }
 
         function warmCaseNftPosters(caseData) {
@@ -6055,17 +6222,10 @@
             const jobs = (caseData?.drops || [])
                 .filter(drop => drop?.has_live_nft && Number(drop?.drop_index ?? -1) >= 0)
                 .map(async drop => {
-                    const media = await getCaseNftMedia(caseId, Number(drop.drop_index));
-                    const posterUrl = safeImageUrl(media?.previewUrl);
-                    if (!posterUrl) return;
-                    // Decode Telegram's zero-state while the user is still on
-                    // the case page, so the moving reel never flashes grey.
-                    await new Promise(resolve => {
-                        const poster = new Image();
-                        poster.onload = poster.onerror = () => resolve();
-                        poster.src = posterUrl;
-                        if (poster.complete) resolve();
-                    });
+                    const dropIndex = Number(drop.drop_index);
+                    const media = await getCaseNftMedia(caseId, dropIndex);
+                    if (!media?.animated) return;
+                    await renderCasePosterFrame(caseId, dropIndex, media);
                 });
             return Promise.allSettled(jobs);
         }

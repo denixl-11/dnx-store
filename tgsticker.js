@@ -136,7 +136,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.5', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.7', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
