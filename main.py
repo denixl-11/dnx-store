@@ -2573,7 +2573,11 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
                 nft_media_cache.pop(key, None)
             if len(nft_media_cache) >= 512:
                 nft_media_cache.pop(next(iter(nft_media_cache)), None)
-        cache_ttl = 600 if result.get("animated") else 60
+        # telesco.pe media URLs are signed. Keeping the parsed descriptor for
+        # ten minutes caused an otherwise healthy client to retry an expired
+        # URL after switching tabs. The TGS bytes remain browser/CDN cached;
+        # only the short-lived descriptor is refreshed here.
+        cache_ttl = 75 if result.get("animated") else 30
         nft_media_cache[source_url] = (time.monotonic() + cache_ttl, result)
         return result
 

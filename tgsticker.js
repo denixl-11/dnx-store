@@ -212,6 +212,7 @@ var RLottie = (function () {
     // never turns into an empty coloured square.
     rlPlayer.posterFrame = null;
     rlPlayer.posterFrameNo = 0;
+    rlPlayer.posterReady = false;
     rlPlayer.findPosterFrame = !!options.findPosterFrame;
     rlPlayer.forcePlayFrames = 0;
     rlPlayer.times = [];
@@ -345,6 +346,12 @@ var RLottie = (function () {
         // the card becomes an empty coloured square after a completed cycle or
         // after returning to a tab. The buffer belongs only to an active
         // player and is released together with that player.
+        if (!rlPlayer.posterReady) {
+          rlPlayer.posterReady = true;
+          triggerEvent(rlPlayer.el, 'tg:poster-ready', {
+            detail: { hasVisiblePixels: !!rlPlayer.posterFrame }
+          });
+        }
       } else {
         rlPlayer.forceRender = true;
       }
@@ -385,6 +392,7 @@ var RLottie = (function () {
 
   function requestFrame(reqId, frameNo) {
     var rlPlayer = rlottie.players[reqId];
+    if (!rlPlayer || !rlPlayer.frames || !rlPlayer.workerProxy) return;
     var frame = rlPlayer.frames[frameNo];
     if (frame) {
       // console.log(dT(), '['+reqId+']', 'request frame#'+frameNo+' (cache)');
@@ -435,6 +443,7 @@ var RLottie = (function () {
 
   function onLoaded(reqId, frameCount, fps) {
     var rlPlayer = rlottie.players[reqId];
+    if (!rlPlayer || !rlPlayer.el || !rlPlayer.workerProxy) return;
 
     rlPlayer.canvas = document.createElement('canvas');
     rlPlayer.canvas.width = rlPlayer.width;
@@ -618,10 +627,13 @@ var RLottie = (function () {
     this.proxy.renderFrame(frameNo, false);
   };
   RawPlayer.prototype.destroy = function() {
-    for (var i = 0; i < this.proxy.items.length; i++) {
-      this.proxy.items[i].worker.sendQuery('destroy', this.proxy.items[i].reqId);
-    }
-    this.proxy.items = [];
+    // Use the proxy's canonical teardown so request-to-proxy maps are also
+    // cleared. Leaving those maps behind made late worker frames target a new
+    // card after repeated tab switches.
+    if (this.proxy) this.proxy.destroy();
+    this.proxy = null;
+    this.onReady = null;
+    this.onFrame = null;
   };
 
   rlottie.createRawPlayer = function(width, height, onReady, onFrame) {
