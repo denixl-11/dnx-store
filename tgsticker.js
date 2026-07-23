@@ -136,7 +136,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.8', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.12', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -285,7 +285,11 @@ var RLottie = (function () {
           rlPlayer.waitForFirstFrame = false;
         } else {
           rlPlayer.stopOnFirstFrame = false;
-          if (!rlPlayer.hasVisiblePixels && rlPlayer.posterFrame) {
+          // A completed one-shot animation must always settle on the first
+          // real model frame. Many Telegram NFT files end on a transparent or
+          // nearly transparent frame zero, so trusting the last alpha probe
+          // leaves an empty coloured tile after tab switches.
+          if (rlPlayer.posterFrame) {
             renderPosterFrame(rlPlayer);
           }
           if (!rlPlayer.paused) {
@@ -314,7 +318,12 @@ var RLottie = (function () {
     // animation frame was one of the largest WebView CPU costs.
     if (inspectAlpha) {
       hasVisiblePixels = false;
-      for (var alphaIndex = 3; alphaIndex < frame.frame.length; alphaIndex += 128) {
+      // Search densely while the poster is not known. The previous 128-byte
+      // stride could jump over thin/small NFT models (torches, rings, swords)
+      // and incorrectly classify their frame as empty. Once a poster exists,
+      // the cheaper stride is sufficient for the ordinary frame-zero probe.
+      var alphaStep = (rlPlayer.findPosterFrame || !rlPlayer.posterFrame) ? 16 : 128;
+      for (var alphaIndex = 3; alphaIndex < frame.frame.length; alphaIndex += alphaStep) {
         if (frame.frame[alphaIndex] > 12) {
           hasVisiblePixels = true;
           break;
@@ -331,13 +340,11 @@ var RLottie = (function () {
     if (rlPlayer.findPosterFrame) {
       if (hasVisiblePixels || frame.no >= rlPlayer.frameCount - 1) {
         rlPlayer.findPosterFrame = false;
-        // The visible poster is already painted on the canvas. Keeping a
-        // second full RGBA copy for every paused card multiplies WebView
-        // memory use and caused long-list stutters. A new one-cycle replay
-        // captures its own poster when needed.
-        if (rlPlayer.paused) {
-          rlPlayer.posterFrame = null;
-        }
+        // Keep the first visible frame. A number of Telegram NFTs have a
+        // completely transparent frame zero; without this small poster buffer
+        // the card becomes an empty coloured square after a completed cycle or
+        // after returning to a tab. The buffer belongs only to an active
+        // player and is released together with that player.
       } else {
         rlPlayer.forceRender = true;
       }
@@ -366,8 +373,8 @@ var RLottie = (function () {
     rlPlayer.imageData.data.set(rlPlayer.posterFrame);
     rlPlayer.context.putImageData(rlPlayer.imageData, 0, 0);
     rlPlayer.frameNo = rlPlayer.posterFrameNo;
-    // Canvas now owns the displayed pixels; release the duplicate buffer.
-    rlPlayer.posterFrame = null;
+    // Keep the poster for the next visibility cycle. Some animations return
+    // to a transparent frame zero every time playOnce finishes.
     if (rlPlayer.hasVisiblePixels !== true) {
       rlPlayer.hasVisiblePixels = true;
       triggerEvent(rlPlayer.el, 'tg:frame-visibility', {
