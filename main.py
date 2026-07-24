@@ -100,6 +100,12 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 db_pool: asyncpg.Pool | None = None
 ton_http_session: aiohttp.ClientSession | None = None
+runtime_state = {
+    "ready": False,
+    "phase": "booting",
+    "attempt": 0,
+    "database": "pending",
+}
 nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_media_fetch_semaphore = asyncio.Semaphore(4)
 star_reconcile_attempts: dict[str, float] = {}
@@ -112,7 +118,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.12"
+API_RELEASE = "8.9-opt.18"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 
@@ -435,6 +441,7 @@ async def create_db_pool() -> asyncpg.Pool:
             dsn=dsn,
             min_size=DB_POOL_MIN_SIZE,
             max_size=DB_POOL_MAX_SIZE,
+            timeout=10,
             command_timeout=15,
             max_inactive_connection_lifetime=300,
         )
@@ -447,6 +454,7 @@ async def create_db_pool() -> asyncpg.Pool:
         ssl="require",
         min_size=DB_POOL_MIN_SIZE,
         max_size=DB_POOL_MAX_SIZE,
+        timeout=10,
         command_timeout=15,
         max_inactive_connection_lifetime=300,
     )
@@ -1996,11 +2004,27 @@ async def security_headers_middleware(request, handler):
 
 
 async def handle_health(request):
+    """Render liveness endpoint.
+
+    This endpoint deliberately stays HTTP 200 while external dependencies are
+    reconnecting.  Render must be able to discover the listening port before a
+    cold Neon connection or a schema migration has completed.
+    """
+    database_status = runtime_state["database"]
     try:
-        await asyncio.wait_for(get_pool().fetchval("SELECT 1"), timeout=3)
-        return web.json_response({"status": "ok", "release": API_RELEASE})
+        if db_pool is not None:
+            await asyncio.wait_for(db_pool.fetchval("SELECT 1"), timeout=2)
+            database_status = "ok"
     except Exception:
-        return web.json_response({"status": "unavailable", "release": API_RELEASE}, status=503)
+        database_status = "unavailable"
+    return web.json_response({
+        "status": "ok" if runtime_state["ready"] else "starting",
+        "ready": runtime_state["ready"],
+        "phase": runtime_state["phase"],
+        "database": database_status,
+        "attempt": runtime_state["attempt"],
+        "release": API_RELEASE,
+    })
 
 @require_auth
 async def handle_get_user(request):
@@ -3939,14 +3963,47 @@ async def main():
     moderation_task = None
     warmup_task = None
     try:
-        db_pool = await create_db_pool()
+        # Open the HTTP port before touching Neon or Telegram.  Render kills a
+        # service when it cannot discover a port during a cold dependency start.
+        port = int(os.environ.get("PORT", 8080))
+        runner = web.AppRunner(app)
+        await runner.setup()
+        await web.TCPSite(runner, "0.0.0.0", port).start()
+        runtime_state["phase"] = "connecting_database"
+        logging.info("HTTP server listening on 0.0.0.0:%s (release %s)", port, API_RELEASE)
+
+        retry_delay = 2
+        while db_pool is None:
+            runtime_state["attempt"] += 1
+            runtime_state["database"] = "connecting"
+            try:
+                candidate_pool = await asyncio.wait_for(create_db_pool(), timeout=15)
+                db_pool = candidate_pool
+                runtime_state["database"] = "migrating"
+                runtime_state["phase"] = "initializing_database"
+                await init_db()
+                await recover_unfinished_game_bets()
+                await log_database_audit(db_pool)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logging.exception(
+                    "Backend initialization attempt %s failed; retrying in %ss",
+                    runtime_state["attempt"],
+                    retry_delay,
+                )
+                runtime_state["phase"] = "waiting_for_database"
+                runtime_state["database"] = "unavailable"
+                if db_pool is not None:
+                    await db_pool.close()
+                    db_pool = None
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 30)
+
         ton_http_session = aiohttp.ClientSession(
             timeout=aiohttp.ClientTimeout(total=10, connect=4, sock_read=8),
             connector=aiohttp.TCPConnector(limit=16, limit_per_host=8, ttl_dns_cache=300),
         )
-        await init_db()
-        await recover_unfinished_game_bets()
-        await log_database_audit(db_pool)
         if not BOT_USERNAME:
             try:
                 me = await asyncio.wait_for(bot.get_me(), timeout=5)
@@ -3957,13 +4014,31 @@ async def main():
         ton_task = asyncio.create_task(ton_payment_worker())
         star_task = asyncio.create_task(star_reconciliation_worker())
         moderation_task = asyncio.create_task(moderation_expiry_worker())
-        port = int(os.environ.get("PORT", 8080))
-        runner = web.AppRunner(app)
-        await runner.setup()
-        await web.TCPSite(runner, '0.0.0.0', port).start()
         warmup_task = asyncio.create_task(warm_nft_media_cache_safely())
-        await dp.start_polling(bot)
+        runtime_state["ready"] = True
+        runtime_state["phase"] = "ready"
+        runtime_state["database"] = "ok"
+        logging.info("Backend initialization complete")
+
+        polling_retry_delay = 2
+        while True:
+            try:
+                await dp.start_polling(bot)
+                break
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logging.exception(
+                    "Telegram polling stopped unexpectedly; retrying in %ss",
+                    polling_retry_delay,
+                )
+                runtime_state["phase"] = "telegram_reconnecting"
+                await asyncio.sleep(polling_retry_delay)
+                polling_retry_delay = min(polling_retry_delay * 2, 30)
+                runtime_state["phase"] = "ready"
     finally:
+        runtime_state["ready"] = False
+        runtime_state["phase"] = "stopping"
         tasks = [
             task for task in
             (game_task, ton_task, star_task, moderation_task, warmup_task)

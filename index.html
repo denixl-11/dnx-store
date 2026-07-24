@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.12" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.18" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -3054,6 +3054,36 @@
             box-shadow: none !important;
             transform: none !important;
         }
+
+        /* V8.9 opt.15: every case reward has one #242424 shell.  Both static
+           rewards and transparent TGS posters occupy the same 70% model box;
+           Telegram preview tiles are deliberately never rendered because
+           they contain their own background/pattern. */
+        .case-modal-content .drop-media-shell > img:not(.nft-generated-poster):not(.drop-chance),
+        .case-modal-content .roulette-item:not(.case-loading-item) > img:not(.case-roulette-poster--live) {
+            position: absolute !important;
+            inset: 15% !important;
+            width: 70% !important;
+            height: 70% !important;
+            margin: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            object-fit: contain !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        .nft-live-media--catalog > .nft-live-model,
+        .nft-live-media--cart > .nft-live-model,
+        .nft-live-media--inventory > .nft-live-model,
+        .nft-live-media--modal > .nft-live-model,
+        .nft-live-media--catalog > .nft-generated-poster,
+        .nft-live-media--cart > .nft-generated-poster,
+        .nft-live-media--inventory > .nft-generated-poster,
+        .nft-live-media--modal > .nft-generated-poster {
+            inset: 15% !important;
+            width: 70% !important;
+            height: 70% !important;
+        }
     </style>
 </head>
 <body>
@@ -3418,7 +3448,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.12"></script>
+    <script src="tgsticker.js?v=8.9-opt.18"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -3535,7 +3565,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.12';
+        const EXPECTED_API_RELEASE = '8.9-opt.18';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -3842,11 +3872,27 @@
                 points.forEach(([x, y]) => {
                     if (context.getImageData(x, y, 1, 1).data[3] > 18) opaqueSamples += 1;
                 });
+                const innerInsetX = Math.max(1, Math.floor(width * 0.18));
+                const innerInsetY = Math.max(1, Math.floor(height * 0.18));
+                const innerCorners = [
+                    [innerInsetX, innerInsetY], [width - innerInsetX - 1, innerInsetY],
+                    [innerInsetX, height - innerInsetY - 1],
+                    [width - innerInsetX - 1, height - innerInsetY - 1]
+                ];
+                let opaqueInnerCorners = 0;
+                innerCorners.forEach(([x, y]) => {
+                    if (context.getImageData(x, y, 1, 1).data[3] > 18) opaqueInnerCorners += 1;
+                });
                 // Telegram NFT model-only TGS files are transparent at their
                 // perimeter. An opaque perimeter means that a preview
                 // background/pattern was captured and would create the nested
                 // purple/grey square seen in case cards.
-                return opaqueSamples <= 1;
+                // A Telegram preview with rounded corners can still be
+                // transparent at the outer 3.5% while carrying a complete
+                // coloured/patterned square slightly further inside. A
+                // model-only TGS does not fill three or four of these inner
+                // corners, so reject that preview before it reaches a case.
+                return opaqueSamples <= 1 && opaqueInnerCorners <= 2;
             } catch (_) {
                 return false;
             }
@@ -3865,7 +3911,17 @@
             points.forEach(([x, y]) => {
                 if (rgba[((y * size + x) * 4) + 3] > 18) opaqueSamples += 1;
             });
-            return opaqueSamples <= 1;
+            const innerInset = Math.max(1, Math.floor(size * 0.18));
+            const innerCorners = [
+                [innerInset, innerInset], [size - innerInset - 1, innerInset],
+                [innerInset, size - innerInset - 1],
+                [size - innerInset - 1, size - innerInset - 1]
+            ];
+            let opaqueInnerCorners = 0;
+            innerCorners.forEach(([x, y]) => {
+                if (rgba[((y * size + x) * 4) + 3] > 18) opaqueInnerCorners += 1;
+            });
+            return opaqueSamples <= 1 && opaqueInnerCorners <= 2;
         }
 
         function captureNftGeneratedPoster(element, picture) {
@@ -3926,15 +3982,8 @@
             releaseNftPlaybackSlot(element);
             const picture = element.querySelector('.nft-live-model');
             if (picture?.rlPlayer?.hasVisiblePixels) captureNftGeneratedPoster(element, picture);
-            if (picture && window.RLottie?.pause) {
-                window.RLottie.pause(picture);
-            }
+            if (picture && window.RLottie?.pause) window.RLottie.pause(picture);
             if (rearm) {
-                // Invalidate every outstanding fetch/decoder callback before
-                // a replacement player is queued. Without this generation
-                // bump, a late callback from the previous viewport visit can
-                // reset or remove the new canvas.
-                element.dataset.mediaToken = String((Number(element.dataset.mediaToken) || 0) + 1);
                 element.dataset.mediaPlaybackQueued = 'false';
                 for (let index = nftMediaQueue.length - 1; index >= 0; index--) {
                     if (nftMediaQueue[index] === element) nftMediaQueue.splice(index, 1);
@@ -3942,17 +3991,24 @@
                 for (let index = nftMediaPlaybackQueue.length - 1; index >= 0; index--) {
                     if (nftMediaPlaybackQueue[index] === element) nftMediaPlaybackQueue.splice(index, 1);
                 }
-                // A paused player is still registered in RLottie's shared
-                // worker. Keeping every scrolled-away card alive exhausted
-                // the pool after one catalogue/case tab switch. Preserve its
-                // transparent poster, then fully release the player.
-                if (picture) {
-                    try { window.RLottie?.destroy?.(picture); } catch (_) {}
-                    picture.remove();
-                }
                 element.dataset.mediaPlayed = 'false';
-                element.dataset.mediaState = 'idle';
-                element.classList.remove('is-live', 'has-live-frame');
+                // QueryableWorkerProxy multiplexes many players over the shared
+                // worker pool. Destroying a player merely because its card left
+                // the viewport forced a second network/decode cycle on return
+                // and caused the empty/purple tiles after switching tabs. Keep
+                // the decoded player while its DOM card exists, pause it on the
+                // stable zero frame and replay one cycle when it becomes visible
+                // again. deactivateNftMedia() remains the only destructive path.
+                if (picture) {
+                    element.dataset.mediaState = 'ready';
+                    element.classList.add('is-live');
+                } else {
+                    // Cancel only an unfinished request. A later visibility
+                    // event will enqueue a fresh descriptor/player safely.
+                    element.dataset.mediaToken = String((Number(element.dataset.mediaToken) || 0) + 1);
+                    element.dataset.mediaState = 'idle';
+                    element.classList.remove('is-live', 'has-live-frame');
+                }
                 const poster = nftPosterFrameCache.get(nftMediaDescriptorKey(element));
                 if (poster) installNftGeneratedPoster(element, poster);
             }
@@ -4029,7 +4085,7 @@
             // then start every ready player on the same compositor frame. A
             // slow/broken URL must never hold healthy cards for many seconds;
             // late members join independently when they become ready.
-            batch.timeoutId = setTimeout(() => finishNftSynchronizedPlaybackBatch(batchId), 2200);
+            batch.timeoutId = setTimeout(() => finishNftSynchronizedPlaybackBatch(batchId), 1800);
             nftSynchronizedPlaybackBatches.set(batchId, batch);
             members.forEach(element => { element.dataset.mediaBatchId = batchId; });
         }
@@ -6758,7 +6814,7 @@
             const posterKey = `case:${caseId}:${dropIndex}`;
             const livePoster = safePosterImageUrl(nftPosterFrameCache.get(posterKey) || caseMedia?.casePosterDataUrl);
             if (drop?.has_live_nft && !livePoster) {
-                return `<span class="case-roulette-poster case-roulette-poster--pending case-roulette-poster--live" data-case-id="${caseId}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`;
+                return `<span class="case-roulette-poster case-roulette-poster--pending" data-case-id="${caseId}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`;
             }
             // Animated rewards use a locally rendered transparent TGS frame.
             // Telegram's preview is never used because it contains its own
@@ -6926,10 +6982,12 @@
         }
 
         function caseRouletteReadyDrops(drops) {
-            // Keep the complete reward distribution. Animated rewards without
-            // a prepared frame render as one neutral pending shell and are
-            // replaced in place when their transparent poster is ready.
-            return (drops || []).filter(Boolean);
+            const entries = (drops || []).filter(Boolean);
+            const ready = entries.filter(drop => !drop.has_live_nft || caseDropHasReadyPoster(drop));
+            // The roulette is visual only; the server-selected winner is added
+            // explicitly to the active strip.  Avoid blank live cells while
+            // their transparent zero frame is still being prepared.
+            return ready;
         }
 
         async function ensureCaseDropPoster(drop) {
@@ -7018,27 +7076,27 @@
                 track.style.paddingLeft = '0px';
 
                 startIdleRoulette(sortedDrops);
-                // applyCasePosterFrame updates pending roulette cells in place.
-                // Rebuilding the whole strip here used to disconnect/restart
-                // unrelated players and caused a visible purple/blank flash.
                 requestAnimationFrame(resumeAuxNftMedia);
-                // Visible reward animations have priority over off-screen
-                // poster extraction. Once their first playback has acquired
-                // the decoder slots, warm roulette posters sequentially using
-                // at most one remaining worker.
+                // The poster renderer and visible TGS cards share RLottie's
+                // four-worker pool. Let visible rewards finish their single
+                // playback first. Starting the raw worker after 180 ms was the
+                // device-dependent race that left random cards blank.
                 setTimeout(async () => {
                     if (openToken !== caseDetailOpenToken || Number(currentCase?.id) !== posterCaseId
                         || !overlay.classList.contains('active')) return;
-                    await waitForVisibleNftMediaIdle(4200);
+                    await waitForVisibleNftMediaIdle(7000);
                     if (openToken !== caseDetailOpenToken || Number(currentCase?.id) !== posterCaseId
                         || !overlay.classList.contains('active')) return;
                     casePosterWarmupPromise = warmCaseNftPosters(currentCase).catch(() => {});
                     await casePosterWarmupPromise;
+                    // The initial idle strip contains only already prepared
+                    // entries. Rebuild it once so newly prepared live posters
+                    // can appear without pending blank cells.
                     if (openToken === caseDetailOpenToken && Number(currentCase?.id) === posterCaseId
-                        && !rouletteActive && overlay.classList.contains('active')) {
+                        && overlay.classList.contains('active') && !rouletteActive && !caseOpeningRequestActive) {
                         startIdleRoulette(sortedDrops);
                     }
-                }, 350);
+                }, 250);
             } catch(e) {
                 if (openToken !== caseDetailOpenToken) return;
                 modal.classList.remove('is-loading');
