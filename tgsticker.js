@@ -21,10 +21,7 @@ var RLottie = (function () {
   var userAgent = window.navigator.userAgent;
   var isSafari = !!window.safari ||
                  !!(userAgent && (/\b(iPad|iPhone|iPod)\b/.test(userAgent) || (!!userAgent.match('Safari') && !userAgent.match('Chrome'))));
-  // Synchronizing all supported browsers with the compositor avoids timer
-  // drift and duplicate work in Android WebView while retaining the timeout
-  // fallback for very old engines.
-  var isRAF = typeof window.requestAnimationFrame === 'function';
+  var isRAF = isSafari;
   rlottie.isSafari = isSafari;
 
   function wasmIsSupported() {
@@ -53,25 +50,15 @@ var RLottie = (function () {
 
   rlottie.isSupported = isSupported();
 
-  function playerNeedsLoop(rlPlayer) {
-    return !!(rlPlayer && rlPlayer.frameCount && (
-      rlPlayer.forceRender || (
-        !rlPlayer.paused &&
-        !document.hidden &&
-        rlPlayer.isInViewport !== false
-      )
-    ));
-  }
-
   function mainLoop() {
     var key, rlPlayer, delta, rendered;
-    var hasActivePlayer = false;
+    var isEmpty = true;
     var now = +Date.now();
     var checkViewport = !checkViewportDate || (now - checkViewportDate) > 1000;
     for (key in rlottie.players) {
       rlPlayer = rlottie.players[key];
-      if (playerNeedsLoop(rlPlayer)) {
-        hasActivePlayer = true;
+      if (rlPlayer &&
+          rlPlayer.frameCount) {
         delta = now - rlPlayer.frameThen;
         if (delta > rlPlayer.frameInterval) {
           rendered = render(rlPlayer, checkViewport);
@@ -81,12 +68,7 @@ var RLottie = (function () {
         }
       }
     }
-    if (!hasActivePlayer) {
-      mainLoopAf = false;
-      mainLoopTo = false;
-      mainLoopInited = false;
-      return;
-    }
+    // var delay = !lastRenderDate || now - lastRenderDate < 100 ? 16 : 500;
     var delay = 16;
     if (delay < 20 && isRAF) {
       mainLoopAf = requestAnimationFrame(mainLoop)
@@ -99,10 +81,11 @@ var RLottie = (function () {
     }
   }
   function setupMainLoop() {
-    var key, isEmpty = true, forceRender = false, rlPlayer;
+    var isEmpty = true, forceRender = false, rlPlayer;
     for (key in rlottie.players) {
       rlPlayer = rlottie.players[key];
-      if (playerNeedsLoop(rlPlayer)) {
+      if (rlPlayer &&
+          rlPlayer.frameCount) {
         if (rlPlayer.forceRender) {
           forceRender = true;
         }
@@ -133,10 +116,7 @@ var RLottie = (function () {
       if (!apiInitStarted) {
         console.log(dT(), 'tgsticker init');
         apiInitStarted = true;
-        // Version the worker URL as well: Telegram WebView caches workers
-        // independently from the page and could otherwise keep an older,
-        // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.18', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -212,7 +192,6 @@ var RLottie = (function () {
     // never turns into an empty coloured square.
     rlPlayer.posterFrame = null;
     rlPlayer.posterFrameNo = 0;
-    rlPlayer.posterReady = false;
     rlPlayer.findPosterFrame = !!options.findPosterFrame;
     rlPlayer.forcePlayFrames = 0;
     rlPlayer.times = [];
@@ -286,11 +265,7 @@ var RLottie = (function () {
           rlPlayer.waitForFirstFrame = false;
         } else {
           rlPlayer.stopOnFirstFrame = false;
-          // A completed one-shot animation must always settle on the first
-          // real model frame. Many Telegram NFT files end on a transparent or
-          // nearly transparent frame zero, so trusting the last alpha probe
-          // leaves an empty coloured tile after tab switches.
-          if (rlPlayer.posterFrame) {
+          if (!rlPlayer.hasVisiblePixels && rlPlayer.posterFrame) {
             renderPosterFrame(rlPlayer);
           }
           if (!rlPlayer.paused) {
@@ -312,23 +287,13 @@ var RLottie = (function () {
     rlPlayer.forceRender = false;
     rlPlayer.imageData.data.set(frame.frame);
     rlPlayer.context.putImageData(rlPlayer.imageData, 0, 0);
-    var inspectAlpha = rlPlayer.findPosterFrame || !rlPlayer.hasVisiblePixels || frame.no === 0;
-    var hasVisiblePixels = rlPlayer.hasVisiblePixels === true;
-    // Alpha inspection is only needed while finding a poster/first visible
-    // frame (and at frame zero). Scanning every full RGBA buffer on every
-    // animation frame was one of the largest WebView CPU costs.
-    if (inspectAlpha) {
-      hasVisiblePixels = false;
-      // Search densely while the poster is not known. The previous 128-byte
-      // stride could jump over thin/small NFT models (torches, rings, swords)
-      // and incorrectly classify their frame as empty. Once a poster exists,
-      // the cheaper stride is sufficient for the ordinary frame-zero probe.
-      var alphaStep = (rlPlayer.findPosterFrame || !rlPlayer.posterFrame) ? 16 : 128;
-      for (var alphaIndex = 3; alphaIndex < frame.frame.length; alphaIndex += alphaStep) {
-        if (frame.frame[alphaIndex] > 12) {
-          hasVisiblePixels = true;
-          break;
-        }
+    var hasVisiblePixels = false;
+    // Sample every 16th pixel. This is cheap enough to run per frame and lets
+    // the UI keep its static fallback visible during transparent TGS frames.
+    for (var alphaIndex = 3; alphaIndex < frame.frame.length; alphaIndex += 64) {
+      if (frame.frame[alphaIndex] > 12) {
+        hasVisiblePixels = true;
+        break;
       }
     }
     if (hasVisiblePixels && !rlPlayer.posterFrame) {
@@ -341,16 +306,12 @@ var RLottie = (function () {
     if (rlPlayer.findPosterFrame) {
       if (hasVisiblePixels || frame.no >= rlPlayer.frameCount - 1) {
         rlPlayer.findPosterFrame = false;
-        // Keep the first visible frame. A number of Telegram NFTs have a
-        // completely transparent frame zero; without this small poster buffer
-        // the card becomes an empty coloured square after a completed cycle or
-        // after returning to a tab. The buffer belongs only to an active
-        // player and is released together with that player.
-        if (!rlPlayer.posterReady) {
-          rlPlayer.posterReady = true;
-          triggerEvent(rlPlayer.el, 'tg:poster-ready', {
-            detail: { hasVisiblePixels: !!rlPlayer.posterFrame }
-          });
+        // The visible poster is already painted on the canvas. Keeping a
+        // second full RGBA copy for every paused card multiplies WebView
+        // memory use and caused long-list stutters. A new one-cycle replay
+        // captures its own poster when needed.
+        if (rlPlayer.paused) {
+          rlPlayer.posterFrame = null;
         }
       } else {
         rlPlayer.forceRender = true;
@@ -380,8 +341,8 @@ var RLottie = (function () {
     rlPlayer.imageData.data.set(rlPlayer.posterFrame);
     rlPlayer.context.putImageData(rlPlayer.imageData, 0, 0);
     rlPlayer.frameNo = rlPlayer.posterFrameNo;
-    // Keep the poster for the next visibility cycle. Some animations return
-    // to a transparent frame zero every time playOnce finishes.
+    // Canvas now owns the displayed pixels; release the duplicate buffer.
+    rlPlayer.posterFrame = null;
     if (rlPlayer.hasVisiblePixels !== true) {
       rlPlayer.hasVisiblePixels = true;
       triggerEvent(rlPlayer.el, 'tg:frame-visibility', {
@@ -392,7 +353,6 @@ var RLottie = (function () {
 
   function requestFrame(reqId, frameNo) {
     var rlPlayer = rlottie.players[reqId];
-    if (!rlPlayer || !rlPlayer.frames || !rlPlayer.workerProxy) return;
     var frame = rlPlayer.frames[frameNo];
     if (frame) {
       // console.log(dT(), '['+reqId+']', 'request frame#'+frameNo+' (cache)');
@@ -443,7 +403,6 @@ var RLottie = (function () {
 
   function onLoaded(reqId, frameCount, fps) {
     var rlPlayer = rlottie.players[reqId];
-    if (!rlPlayer || !rlPlayer.el || !rlPlayer.workerProxy) return;
 
     rlPlayer.canvas = document.createElement('canvas');
     rlPlayer.canvas.width = rlPlayer.width;
@@ -520,8 +479,6 @@ var RLottie = (function () {
           rlPlayer.paused = false;
           triggerEvent(el, 'tg:play');
         }
-        rlPlayer.isInViewport = undefined;
-        setupMainLoop();
       } else {
         rlPlayer.needPlayOnce = true;
       }
@@ -538,8 +495,6 @@ var RLottie = (function () {
           rlPlayer.paused = false;
           triggerEvent(el, 'tg:play');
         }
-        rlPlayer.isInViewport = undefined;
-        setupMainLoop();
       } else {
         rlPlayer.needPlayUntilEnd = true;
       }
@@ -552,15 +507,12 @@ var RLottie = (function () {
         rlottie.reset(el);
       }
       el.rlPlayer.paused = false;
-      el.rlPlayer.isInViewport = undefined;
-      setupMainLoop();
     }
   }
 
   rlottie.pause = function(el) {
     if (el && el.rlPlayer) {
       el.rlPlayer.paused = true;
-      setupMainLoop();
     }
   }
 
@@ -581,15 +533,6 @@ var RLottie = (function () {
   rlottie.initWorkers = function(callback) {
     initApi(callback);
   }
-
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) {
-      for (var key in rlottie.players) {
-        if (rlottie.players[key]) rlottie.players[key].isInViewport = undefined;
-      }
-    }
-    setupMainLoop();
-  }, { passive: true });
 
   /* A RawPlayer loads a single .tgs via the worker and hands each rendered
      frame back to the caller as a Uint8ClampedArray of RGBA pixels. It does
@@ -627,13 +570,10 @@ var RLottie = (function () {
     this.proxy.renderFrame(frameNo, false);
   };
   RawPlayer.prototype.destroy = function() {
-    // Use the proxy's canonical teardown so request-to-proxy maps are also
-    // cleared. Leaving those maps behind made late worker frames target a new
-    // card after repeated tab switches.
-    if (this.proxy) this.proxy.destroy();
-    this.proxy = null;
-    this.onReady = null;
-    this.onFrame = null;
+    for (var i = 0; i < this.proxy.items.length; i++) {
+      this.proxy.items[i].worker.sendQuery('destroy', this.proxy.items[i].reqId);
+    }
+    this.proxy.items = [];
   };
 
   rlottie.createRawPlayer = function(width, height, onReady, onFrame) {

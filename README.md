@@ -41,8 +41,7 @@ Telegram Mini App магазина NFT-подарков: игра, катало�
 - `app-icon.png`, `tonconnect-manifest.json` — TON Connect.
 - `tgsticker.js`, `tgsticker-worker.js`, `rlottie-wasm.js`, `rlottie-wasm.wasm`, `pako-inflate.min.js` — локальный официальный Telegram TGS-рендерер.
 - `TELEGRAM_TGS_NOTICE.md` — происхождение файлов TGS-рендерера.
-- `ИНСТРУКЦИЯ_V8.9_OPTIMIZED.md` — актуальная пошаговая инструкция для оптимизированной сборки.
-- `DEPLOYMENT_RU.md` — общая инструкция предыдущей версии.
+- `DEPLOYMENT_RU.md` — подробная инструкция.
 - `V8_7_MEDIA_AND_TRAITS_RU.md` — изменения V8.7 и пошаговое обновление.
 
 ## Render
