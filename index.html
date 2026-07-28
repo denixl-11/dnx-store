@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.19" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.22" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -3084,6 +3084,217 @@
             width: 70% !important;
             height: 70% !important;
         }
+
+        /* V8.9 opt.20: deterministic media contract.
+           Lists (cart, inventory and every case surface) render a zero frame
+           only. The detail modal is the sole animated surface. These final
+           selectors intentionally follow every legacy case rule so an older
+           purple placeholder cannot win the cascade on iOS/Android WebView. */
+        #nft-modal-media {
+            position: relative;
+            overflow: hidden;
+            isolation: isolate;
+        }
+        #nft-modal-media > .nft-modal-zero-frame {
+            position: absolute !important;
+            inset: 0 !important;
+            z-index: 0 !important;
+            display: block !important;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            object-fit: cover !important;
+            border-radius: inherit !important;
+            opacity: 1;
+            transition: opacity 90ms linear;
+        }
+        #nft-modal-media > .nft-live-pattern,
+        #nft-modal-media > .nft-generated-poster,
+        #nft-modal-media > .nft-live-model {
+            z-index: 1;
+        }
+        #nft-modal-media.has-live-frame > .nft-modal-zero-frame {
+            opacity: 0;
+        }
+
+        .case-modal-content .case-zero-media {
+            position: absolute !important;
+            inset: 0 !important;
+            display: block !important;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            overflow: hidden !important;
+            border: 0 !important;
+            border-radius: inherit !important;
+            background: #242424 !important;
+            background-color: #242424 !important;
+            background-image: none !important;
+            box-shadow: none !important;
+            isolation: isolate !important;
+        }
+        .case-modal-content .case-zero-media::before,
+        .case-modal-content .case-zero-media::after {
+            content: none !important;
+            display: none !important;
+        }
+        .case-modal-content .case-zero-media > .case-zero-frame {
+            position: absolute !important;
+            display: block !important;
+            margin: 0 !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            filter: none !important;
+        }
+        .case-modal-content .case-zero-media > .case-zero-frame--transparent {
+            inset: 15% !important;
+            width: 70% !important;
+            height: 70% !important;
+            object-fit: contain !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+        }
+        .case-modal-content .case-zero-media > .case-zero-frame--fallback {
+            inset: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            border-radius: inherit !important;
+            background: #242424 !important;
+        }
+
+        .case-modal-content .roulette-item:not(.case-loading-item) > .case-roulette-poster--fallback {
+            position: absolute !important;
+            inset: 0 !important;
+            display: block !important;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            object-fit: cover !important;
+            border: 0 !important;
+            border-radius: inherit !important;
+            background: #242424 !important;
+            box-shadow: none !important;
+            filter: none !important;
+        }
+        .case-modal-content .roulette-item:not(.case-loading-item) > .case-roulette-poster--live {
+            position: absolute !important;
+            inset: 15% !important;
+            display: block !important;
+            width: 70% !important;
+            height: 70% !important;
+            margin: 0 !important;
+            object-fit: contain !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            filter: none !important;
+        }
+
+        /* Plain image zero frames must never inherit the old live-media glow. */
+        .cart-item > img.nft-static-cart,
+        .item-card > img.nft-static-inventory {
+            display: block !important;
+            opacity: 1 !important;
+            filter: none !important;
+            background: #242424 !important;
+            background-image: none !important;
+            object-fit: cover !important;
+        }
+
+        /* opt.21: before the transparent Telegram zero-frame is decoded,
+           auxiliary cards are a single neutral surface. Legacy purple live
+           media defaults must never flash through after a tab transition. */
+        .nft-live-media--cart,
+        .nft-live-media--inventory {
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            isolation: isolate !important;
+        }
+        .nft-live-media--cart:not(.is-live),
+        .nft-live-media--inventory:not(.is-live) {
+            background: #242424 !important;
+            background-color: #242424 !important;
+            background-image: none !important;
+            box-shadow: none !important;
+        }
+        .nft-live-media--cart:not(.is-live) > .nft-live-pattern,
+        .nft-live-media--inventory:not(.is-live) > .nft-live-pattern {
+            display: none !important;
+        }
+
+        /* Every animated case reward owns exactly one grey shell. A pending
+           zero-frame fills that shell instead of inheriting a legacy violet
+           placeholder; a decoded transparent PNG then occupies 70% of it. */
+        .case-modal-content .case-zero-media > .case-zero-frame--pending,
+        .case-modal-content .roulette-item:not(.case-loading-item) > .case-roulette-poster--pending {
+            position: absolute !important;
+            inset: 0 !important;
+            display: block !important;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            border: 0 !important;
+            border-radius: inherit !important;
+            background: #242424 !important;
+            background-color: #242424 !important;
+            background-image: none !important;
+            box-shadow: none !important;
+            filter: none !important;
+        }
+        .case-modal-content .drop-media-shell,
+        .case-modal-content .roulette-item:not(.case-loading-item) {
+            background: #242424 !important;
+            background-color: #242424 !important;
+            background-image: none !important;
+            overflow: hidden !important;
+            isolation: isolate !important;
+        }
+
+        /* opt.22: cart and profile are zero-frame-only surfaces. They use one
+           neutral shell and a transparent model at the same 70/30 ratio as
+           case rewards; no legacy pattern, gradient or live canvas exists. */
+        .nft-aux-zero-media {
+            appearance: none !important;
+            -webkit-appearance: none !important;
+            position: relative !important;
+            display: block !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            border: 0 !important;
+            border-radius: inherit !important;
+            background: #242424 !important;
+            background-color: #242424 !important;
+            background-image: none !important;
+            box-shadow: none !important;
+            isolation: isolate !important;
+        }
+        .nft-aux-zero-media::before,
+        .nft-aux-zero-media::after {
+            content: none !important;
+            display: none !important;
+        }
+        .nft-aux-zero-frame,
+        .nft-aux-zero-frame-pending {
+            position: absolute !important;
+            inset: 15% !important;
+            display: block !important;
+            width: 70% !important;
+            height: 70% !important;
+            margin: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            object-fit: contain !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            filter: none !important;
+        }
+        .nft-aux-zero-frame-pending {
+            opacity: 0 !important;
+        }
     </style>
 </head>
 <body>
@@ -3448,7 +3659,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.19"></script>
+    <script src="tgsticker.js?v=8.9-opt.22"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -3565,7 +3776,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.19';
+        const EXPECTED_API_RELEASE = '8.9-opt.22';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -3756,7 +3967,7 @@
         const nftSynchronizedPlaybackBatches = new Map();
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v1';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_opt22';
         let nftMediaPlaybackPumpScheduled = false;
         let nftMediaPersistTimer = null;
         // Performance policy: cards, cart, inventory, case contents and the
@@ -3770,6 +3981,8 @@
         let catalogRequest = null;
         let balanceRequest = null;
         let inventoryRequest = null;
+        let cartRenderToken = 0;
+        let inventoryRenderToken = 0;
 
         function setNftMediaCache(cacheKey, entry) {
             nftMediaCache.delete(cacheKey);
@@ -3796,7 +4009,16 @@
             // Persisting them across page/tab lifecycles made WebView restore
             // stale transparent or double-scaled frames. Keep this cache in
             // memory only and remove data written by older builds once.
-            try { sessionStorage.removeItem(NFT_POSTER_STORAGE_KEY); } catch (_) {}
+            const obsoleteKeys = [
+                'dnx_nft_posters_v1',
+                'dnx_nft_posters_v2',
+                'dnx_nft_posters_v3',
+                NFT_POSTER_STORAGE_KEY
+            ];
+            obsoleteKeys.forEach(key => {
+                try { sessionStorage.removeItem(key); } catch (_) {}
+                try { localStorage.removeItem(key); } catch (_) {}
+            });
         }
 
         function persistNftPosterCache() {}
@@ -3808,6 +4030,11 @@
                     ? url.href
                     : '';
             } catch (_) { return ''; }
+        }
+
+        function safeGeneratedPosterUrl(value) {
+            const poster = String(value || '').trim();
+            return /^data:image\/png;base64,[a-z0-9+/=]+$/i.test(poster) ? poster : '';
         }
 
         function nftMediaDescriptorKey(element) {
@@ -3899,7 +4126,7 @@
                 // coloured/patterned square slightly further inside. A
                 // model-only TGS does not fill three or four of these inner
                 // corners, so reject that preview before it reaches a case.
-                return opaqueSamples <= 1 && opaqueInnerCorners <= 2;
+                return opaqueSamples <= 2 && opaqueInnerCorners <= 2;
             } catch (_) {
                 return false;
             }
@@ -3928,7 +4155,7 @@
             innerCorners.forEach(([x, y]) => {
                 if (rgba[((y * size + x) * 4) + 3] > 18) opaqueInnerCorners += 1;
             });
-            return opaqueSamples <= 1 && opaqueInnerCorners <= 2;
+            return opaqueSamples <= 2 && opaqueInnerCorners <= 2;
         }
 
         function captureNftGeneratedPoster(element, picture) {
@@ -3943,8 +4170,6 @@
                 applyNftGeneratedPoster(key, poster);
                 if (key.startsWith('case:')) {
                     const [, caseId, dropIndex] = key.split(':');
-                    const entry = nftMediaCache.get(key);
-                    if (entry?.data) entry.data.casePosterDataUrl = poster;
                     applyCasePosterFrame(Number(caseId), Number(dropIndex), poster);
                 }
             } catch (_) {}
@@ -4006,9 +4231,9 @@
                 // the decoded player while its DOM card exists, pause it on the
                 // stable zero frame and replay one cycle when it becomes visible
                 // again. deactivateNftMedia() remains the only destructive path.
-                if (picture) {
+                if (picture?.dataset.posterReady === 'true' || picture?.rlPlayer?.hasVisiblePixels) {
                     element.dataset.mediaState = 'ready';
-                    element.classList.add('is-live');
+                    element.classList.add('is-live', 'has-live-frame');
                 } else {
                     // Cancel only an unfinished request. A later visibility
                     // event will enqueue a fresh descriptor/player safely.
@@ -4217,7 +4442,11 @@
             const picture = element.querySelector('.nft-live-model');
             if (picture) {
                 element.dataset.mediaState = 'ready';
-                element.classList.add('is-live');
+                if (picture.dataset.posterReady === 'true' || picture.rlPlayer?.hasVisiblePixels) {
+                    element.classList.add('is-live', 'has-live-frame');
+                } else {
+                    element.classList.remove('is-live', 'has-live-frame');
+                }
                 window.RLottie?.pause?.(picture);
                 return;
             }
@@ -4288,8 +4517,9 @@
             const patternUrl = caseMode ? '' : safeTelegramMediaUrl(media.patternUrl);
             renderSparseNftPattern(pattern, patternUrl, element.dataset.itemId || `${element.dataset.caseId}:${element.dataset.dropIndex}`);
             const descriptorKey = nftMediaDescriptorKey(element);
-            const cachedPoster = nftPosterFrameCache.get(descriptorKey)
-                || (caseMode ? safePosterImageUrl(media?.casePosterDataUrl) : '');
+            const cachedPoster = caseMode
+                ? safeGeneratedPosterUrl(nftPosterFrameCache.get(descriptorKey))
+                : safePosterImageUrl(nftPosterFrameCache.get(descriptorKey));
             if (cachedPoster) installNftGeneratedPoster(element, cachedPoster);
 
             const picture = document.createElement('picture');
@@ -4333,10 +4563,10 @@
                     failMediaLoad(false);
                     return;
                 }
-                if (element.dataset.mediaWanted === 'true') {
-                    element.classList.add('is-live');
-                }
-                else failMediaLoad(false);
+                // Parsing a TGS is not the same as painting a visible frame.
+                // Keep the neutral #242424 shell until tg:poster-ready, or a
+                // slow device briefly exposes only the purple NFT background.
+                if (element.dataset.mediaWanted !== 'true') failMediaLoad(false);
             }, { once: true });
             picture.addEventListener('tg:poster-ready', (posterEvent) => {
                 if (mediaLoadWatchdog) clearTimeout(mediaLoadWatchdog);
@@ -4633,6 +4863,15 @@
         }
 
         function resumeAuxNftMedia(root = document) {
+            // Non-modal surfaces are poster-only. Never instantiate a DOM
+            // RLottie player here: detached WebView canvases were the source
+            // of the purple tiles, delayed cards and tab-switch regressions.
+            if (NFT_MEDIA_MODAL_ONLY) {
+                warmAuxNftPosters(root).catch(() => {});
+                return;
+            }
+            /* Legacy observer path retained below for easy rollback, but is
+               intentionally unreachable while NFT_MEDIA_MODAL_ONLY is true. */
             const elements = [...document.querySelectorAll('.nft-live-media[data-media-scope="aux"]')]
                 .filter(element => auxNftMediaIsVisible(element) && (root === document || root?.contains?.(element)));
             if (!elements.length) return;
@@ -5068,12 +5307,33 @@
                 const cachedPoster = nftPosterFrameCache.get(nextKey);
                 if (cachedPoster) installNftGeneratedPoster(modalMedia, cachedPoster);
             }
+            // The modal is the only place where NFT animation is allowed.
+            // Keep an immediate, deterministic frame underneath RLottie so a
+            // slow Telegram/CDN response can never expose a blurred colour tile.
+            let modalZeroFrame = [...modalMedia.children]
+                .find(child => child.classList?.contains('nft-modal-zero-frame'));
+            const telegramLink = safeTelegramUrl(item.nft_link);
+            // A Telegram-linked NFT must never flash its legacy raster preview:
+            // those previews have a different crop/background and caused the
+            // half-second purple tile before RLottie painted the first frame.
+            const modalFallbackUrl = telegramLink ? '' : safeImageUrl(item.image_url);
+            if (modalFallbackUrl) {
+                if (!(modalZeroFrame instanceof HTMLImageElement)) {
+                    modalZeroFrame = new Image();
+                    modalZeroFrame.className = 'nft-modal-zero-frame';
+                    modalZeroFrame.alt = '';
+                    modalZeroFrame.decoding = 'async';
+                    modalMedia.prepend(modalZeroFrame);
+                }
+                if (modalZeroFrame.src !== modalFallbackUrl) modalZeroFrame.src = modalFallbackUrl;
+            } else if (modalZeroFrame) {
+                modalZeroFrame.remove();
+            }
             document.getElementById('nft-modal-title').innerText = item.name;
             document.getElementById('nft-modal-number').innerText = item.number ? `#${item.number}` : '';
 
             const modalTgBtn = document.getElementById('nft-tg-link-btn');
 
-            const telegramLink = safeTelegramUrl(item.nft_link);
             if (telegramLink) {
                 modalTgBtn.style.display = 'grid';
                 modalTgBtn.onclick = () => tg.openTelegramLink(telegramLink);
@@ -5200,17 +5460,23 @@
             const itemId = Number(item?.id || 0);
             const fallbackUrl = escapeHtml(safeImageUrl(item?.image_url));
             const title = escapeHtml(item?.name || 'NFT');
-            const modalContext = variant === 'inventory' ? 'inventory' : (variant === 'cart' ? 'cart' : 'auto');
-            if (!itemId || !safeTelegramUrl(item?.nft_link)) {
-                return `<img src="${fallbackUrl}" class="item-image nft-static-${variant}" alt="${title}"${allowOpen && itemId ? ` onclick="openNftModal(${itemId}, '${modalContext}')"` : ''}>`;
+            const modalContext = variant === 'inventory' ? 'inventory' : 'catalog';
+            const telegramLink = safeTelegramUrl(item?.nft_link);
+            if (!telegramLink || itemId <= 0) {
+                return `<img src="${fallbackUrl}" class="item-image nft-static-${variant}" alt="${title}" decoding="async"${allowOpen && itemId ? ` onclick="openNftModal(${itemId}, '${modalContext}')"` : ''}>`;
             }
+            const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(`item:${itemId}`));
+            // Cart and inventory contain only a stable transparent zero frame.
+            // No image_url and no live canvas may flash while it is prepared.
             const tag = allowOpen ? 'button' : 'div';
-            const buttonType = allowOpen ? ' type="button"' : '';
-            const click = allowOpen ? ` onclick="openNftModal(${itemId}, '${modalContext}')"` : '';
-            return `
-                <${tag}${buttonType} class="nft-live-media nft-live-media--${variant}" data-media-scope="aux" data-item-id="${itemId}" data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-in-view="false" data-media-token="0" aria-label="${allowOpen ? `Открыть ${title}` : title}"${click}>
-                    <span class="nft-live-pattern" aria-hidden="true"></span>
-                </${tag}>`;
+            const openAttrs = allowOpen
+                ? ` type="button" onclick="openNftModal(${itemId}, '${modalContext}')"`
+                : '';
+            return `<${tag} class="item-image nft-aux-zero-media nft-aux-zero-media--${variant}" data-item-id="${itemId}" aria-label="${title}"${openAttrs}>
+                ${poster
+                    ? `<img class="nft-aux-zero-frame" src="${escapeHtml(poster)}" alt="${title}" decoding="async">`
+                    : `<span class="nft-aux-zero-frame-pending" data-item-id="${itemId}" aria-hidden="true"></span>`}
+            </${tag}>`;
         }
 
         function addToCart(item) {
@@ -5222,7 +5488,8 @@
                 renderCart();
             }
         }
-        function renderCart() {
+        async function renderCart() {
+            const renderToken = ++cartRenderToken;
             const list = document.getElementById('cart-items-list');
             // Re-rendering a cart used to detach canvases while leaving their
             // RLottie workers alive. Tear them down before replacing the DOM.
@@ -5231,6 +5498,21 @@
                 list.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Корзина пуста</div>';
                 document.getElementById('pay-footer').style.display = 'none';
             } else {
+                const snapshot = [...cart];
+                // Keep the whole row visible while transparent Telegram zero
+                // frames are prepared. The media shell stays neutral #242424.
+                list.innerHTML = snapshot.map((c, i) => `
+                    <div class="cart-item">
+                        <div class="item-image nft-aux-zero-media nft-aux-zero-media--cart"><span class="nft-aux-zero-frame-pending"></span></div>
+                        <div class="cart-item-info">
+                            <div style="font-weight:500">${escapeHtml(c.name)}</div>
+                            <div style="color:#ffd274; margin-top:4px;">${starAmountMarkup(c.price)}</div>
+                        </div>
+                        <div style="font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 10px;" onclick="removeFromCart(${i})">×</div>
+                    </div>`).join('');
+                document.getElementById('pay-footer').style.display = 'block';
+                await warmItemNftPosters(snapshot);
+                if (renderToken !== cartRenderToken) return;
                 list.innerHTML = cart.map((c, i) => `
                     <div class="cart-item">
                         ${auxiliaryNftMediaMarkup(c, 'cart', true)}
@@ -5242,7 +5524,6 @@
                     </div>`).join('');
                 document.getElementById('pay-footer').style.display = 'block';
             }
-            requestAnimationFrame(resumeAuxNftMedia);
             updateCartFab();
         }
         function removeFromCart(index) { cart.splice(index,1); localStorage.setItem('dnx_cart', JSON.stringify(cart)); renderCart(); }
@@ -5268,7 +5549,6 @@
                     <div style="color:#ffd274;">${starAmountMarkup(price)}</div>
                 </div>`;
             document.getElementById('confirm-buy-modal').classList.add('active');
-            requestAnimationFrame(resumeAuxNftMedia);
         }
 
         async function confirmBuy() {
@@ -5496,6 +5776,7 @@
         }
         async function loadInventory() {
             if (inventoryRequest) return inventoryRequest;
+            const renderToken = ++inventoryRenderToken;
             inventoryRequest = (async () => {
                 try {
                     const data = await apiFetch(`${API_BASE}/inventory`);
@@ -5503,6 +5784,11 @@
                     const active = inventoryData.filter(i => !['withdrawn', 'disposed'].includes(i.status));
                 const activeContainer = document.getElementById('inventory-active-container');
                 destroyAuxNftMedia(activeContainer);
+                if (active.length) {
+                    activeContainer.innerHTML = '<div class="empty-state"><p>Подготавливаем NFT…</p></div>';
+                    await warmItemNftPosters(active);
+                    if (renderToken !== inventoryRenderToken) return;
+                }
                 activeContainer.innerHTML = active.length
                     ? active.map(i => {
                         const simpleNft = isSimpleInventoryNft(i);
@@ -5527,7 +5813,6 @@
                     : `<div class="empty-state"><div class="empty-state-icon">◇</div><h3>ИНВЕНТАРЬ ПУСТ</h3><p>Купленные и выигранные NFT появятся здесь.</p></div>`;
                 const historyContainer = document.getElementById('inventory-history-container');
                 if (!historyContainer.dataset.loaded) historyContainer.innerHTML = '<div class="empty-state"><p>Загружаем историю…</p></div>';
-                requestAnimationFrame(resumeAuxNftMedia);
                 startWithdrawCountdowns();
                 } catch(e) { console.error(e); }
             })().finally(() => { inventoryRequest = null; });
@@ -6815,10 +7100,11 @@
                 ? `data-media-kind="case" data-item-id="${generatedItemId}" data-case-id="${caseId}" data-drop-index="${dropIndex}"`
                 : `data-media-kind="case" data-case-id="${caseId}" data-drop-index="${dropIndex}"`;
             const posterKey = `case:${caseId}:${dropIndex}`;
-            const cachedMedia = nftMediaCache.get(posterKey)?.data;
-            const poster = safePosterImageUrl(nftPosterFrameCache.get(posterKey) || cachedMedia?.casePosterDataUrl);
-            return `<div class="nft-live-media nft-live-media--case" data-media-scope="aux" ${sourceData} data-media-state="idle" data-media-wanted="false" data-media-played="false" data-media-token="0" aria-label="${title}">
-                ${poster ? `<img class="nft-generated-poster" src="${escapeHtml(poster)}" alt="" decoding="async">` : ''}
+            const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(posterKey));
+            return `<div class="case-zero-media" ${sourceData} aria-label="${title}">
+                ${poster
+                    ? `<img class="case-zero-frame case-zero-frame--transparent" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`
+                    : `<span class="case-zero-frame case-zero-frame--pending" data-case-id="${caseId}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`}
             </div>`;
         }
 
@@ -6827,23 +7113,22 @@
             const caseId = Number(currentCase?.id || 0);
             const dropIndex = Number(drop?.drop_index ?? -1);
             const generatedItemId = Number(drop?.generated_item_id || 0);
-            const caseMedia = caseId > 0 && dropIndex >= 0
-                ? nftMediaCache.get(`case:${caseId}:${dropIndex}`)?.data
-                : null;
             const posterKey = `case:${caseId}:${dropIndex}`;
-            const livePoster = safePosterImageUrl(nftPosterFrameCache.get(posterKey) || caseMedia?.casePosterDataUrl);
-            if (drop?.has_live_nft && !livePoster) {
-                return `<span class="case-roulette-poster case-roulette-poster--pending" data-case-id="${caseId}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`;
+            const livePoster = safeGeneratedPosterUrl(nftPosterFrameCache.get(posterKey));
+            if (!drop?.has_live_nft) {
+                return `<img class="case-roulette-poster case-roulette-poster--fallback" src="${escapeHtml(safeImageUrl(drop?.image_url))}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
             }
-            // Animated rewards use a locally rendered transparent TGS frame.
-            // Telegram's preview is never used because it contains its own
-            // background and pattern. Non-animated rewards keep their image.
-            const poster = livePoster || safeImageUrl(drop?.image_url);
-            const liveClass = drop?.has_live_nft ? ' case-roulette-poster--live' : '';
-            return `<img class="case-roulette-poster${liveClass}" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+            if (livePoster) {
+                return `<img class="case-roulette-poster case-roulette-poster--live" src="${escapeHtml(livePoster)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+            }
+            // Never insert image_url for an animated case reward. Telegram's
+            // preview contains its own coloured background and creates the
+            // nested purple/grey square visible in slow-network screenshots.
+            return `<span class="case-roulette-poster case-roulette-poster--pending" data-case-id="${caseId}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`;
         }
 
         function applyCasePosterFrame(caseId, dropIndex, posterUrl) {
+            posterUrl = safeGeneratedPosterUrl(posterUrl);
             if (!posterUrl) return;
             document.querySelectorAll(`.case-roulette-poster--pending[data-case-id="${Number(caseId)}"][data-drop-index="${Number(dropIndex)}"]`).forEach(slot => {
                 const image = new Image();
@@ -6853,11 +7138,149 @@
                 image.src = posterUrl;
                 slot.replaceWith(image);
             });
+            document.querySelectorAll(`.case-zero-frame--pending[data-case-id="${Number(caseId)}"][data-drop-index="${Number(dropIndex)}"]`).forEach(slot => {
+                const image = new Image();
+                image.className = 'case-zero-frame case-zero-frame--transparent';
+                image.alt = slot.getAttribute('aria-label') || '';
+                image.decoding = 'async';
+                image.src = posterUrl;
+                slot.replaceWith(image);
+            });
+        }
+
+        function applyItemPosterFrame(itemId, posterUrl) {
+            posterUrl = safeGeneratedPosterUrl(posterUrl);
+            if (!posterUrl || Number(itemId) <= 0) return;
+            document.querySelectorAll(`.nft-aux-zero-frame-pending[data-item-id="${Number(itemId)}"]`).forEach(slot => {
+                const image = new Image();
+                image.className = 'nft-aux-zero-frame';
+                image.alt = slot.closest('[aria-label]')?.getAttribute('aria-label') || '';
+                image.decoding = 'async';
+                image.src = posterUrl;
+                slot.replaceWith(image);
+            });
+        }
+
+        function renderItemPosterFrame(itemId, media) {
+            itemId = Number(itemId);
+            const cacheKey = `item:${itemId}`;
+            const cachedPoster = safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey));
+            if (cachedPoster) return Promise.resolve(cachedPoster);
+            if (casePosterFrameRequests.has(cacheKey)) return casePosterFrameRequests.get(cacheKey);
+            const tgsUrl = safeTelegramMediaUrl(media?.tgsUrl);
+            if (!itemId || !tgsUrl || !window.RLottie?.isSupported) return Promise.resolve('');
+
+            const request = new Promise(resolve => {
+                const size = 192;
+                let rawPlayer = null;
+                let settled = false;
+                let frameCount = 0;
+                let nextFrame = 0;
+                let timeoutId = 0;
+                const finish = posterUrl => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeoutId);
+                    try { rawPlayer?.destroy?.(); } catch (_) {}
+                    rawPlayer = null;
+                    const safePoster = safeGeneratedPosterUrl(posterUrl);
+                    if (safePoster) {
+                        applyNftGeneratedPoster(cacheKey, safePoster);
+                        applyItemPosterFrame(itemId, safePoster);
+                    }
+                    resolve(safePoster);
+                };
+                const renderNext = () => {
+                    if (settled || !rawPlayer || nextFrame >= frameCount) return finish('');
+                    try { rawPlayer.renderFrame(nextFrame++); }
+                    catch (_) { finish(''); }
+                };
+                try {
+                    window.RLottie.initWorkers(() => {
+                        if (settled) return;
+                        try {
+                            rawPlayer = window.RLottie.createRawPlayer(
+                                size,
+                                size,
+                                count => {
+                                    frameCount = Math.max(1, Number(count) || 1);
+                                    nextFrame = 0;
+                                    renderNext();
+                                },
+                                (_frameNo, rgba) => {
+                                    if (settled || !rgba?.length) return finish('');
+                                    let visible = false;
+                                    for (let index = 3; index < rgba.length; index += 16) {
+                                        if (rgba[index] > 8) { visible = true; break; }
+                                    }
+                                    if (!visible || !rawNftFrameHasTransparentEdge(rgba, size)) return renderNext();
+                                    try {
+                                        const canvas = document.createElement('canvas');
+                                        canvas.width = size;
+                                        canvas.height = size;
+                                        const context = canvas.getContext('2d', { alpha: true });
+                                        context.putImageData(new ImageData(new Uint8ClampedArray(rgba), size, size), 0, 0);
+                                        finish(canvas.toDataURL('image/png'));
+                                    } catch (_) { finish(''); }
+                                }
+                            );
+                            rawPlayer.loadFromUrl(tgsUrl);
+                        } catch (_) { finish(''); }
+                    });
+                } catch (_) { finish(''); }
+                timeoutId = setTimeout(() => finish(''), 12000);
+            }).finally(() => casePosterFrameRequests.delete(cacheKey));
+            casePosterFrameRequests.set(cacheKey, request);
+            return request;
+        }
+
+        async function ensureItemPoster(itemId) {
+            itemId = Number(itemId);
+            if (!itemId) return false;
+            const cacheKey = `item:${itemId}`;
+            if (safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) return true;
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    const media = await getNftMedia(itemId);
+                    if (media?.animated && await renderItemPosterFrame(itemId, media)) return true;
+                } catch (_) {}
+                if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+            }
+            return false;
+        }
+
+        async function warmItemNftPosters(items = []) {
+            const itemIds = [...new Set((items || [])
+                .filter(item => safeTelegramUrl(item?.nft_link))
+                .map(item => Number(item?.id || 0))
+                .filter(Boolean))];
+            if (!itemIds.length) return;
+            let cursor = 0;
+            const worker = async () => {
+                while (cursor < itemIds.length) await ensureItemPoster(itemIds[cursor++]);
+            };
+            await Promise.allSettled(Array.from({ length: Math.min(2, itemIds.length) }, worker));
+        }
+
+        async function warmAuxNftPosters(root = document) {
+            const slots = [...root.querySelectorAll('.nft-aux-zero-frame-pending[data-item-id]')];
+            const itemIds = [...new Set(slots.map(slot => Number(slot.dataset.itemId)).filter(Boolean))];
+            if (!itemIds.length) return;
+            let cursor = 0;
+            const worker = async () => {
+                while (cursor < itemIds.length) {
+                    const itemId = itemIds[cursor++];
+                    const cached = safeGeneratedPosterUrl(nftPosterFrameCache.get(`item:${itemId}`));
+                    if (cached) { applyItemPosterFrame(itemId, cached); continue; }
+                    await ensureItemPoster(itemId);
+                }
+            };
+            await Promise.allSettled(Array.from({ length: Math.min(2, itemIds.length) }, worker));
         }
 
         function renderCasePosterFrame(caseId, dropIndex, media) {
             const cacheKey = `case:${Number(caseId)}:${Number(dropIndex)}`;
-            const cachedPoster = safePosterImageUrl(nftPosterFrameCache.get(cacheKey) || media?.casePosterDataUrl);
+            const cachedPoster = safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey));
             if (cachedPoster) return Promise.resolve(cachedPoster);
             if (casePosterFrameRequests.has(cacheKey)) return casePosterFrameRequests.get(cacheKey);
             const tgsUrl = safeTelegramMediaUrl(media?.tgsUrl);
@@ -6876,9 +7299,8 @@
                     clearTimeout(timeoutId);
                     try { rawPlayer?.destroy?.(); } catch (_) {}
                     rawPlayer = null;
-                    const safePoster = safePosterImageUrl(posterUrl);
+                    const safePoster = safeGeneratedPosterUrl(posterUrl);
                     if (safePoster) {
-                        media.casePosterDataUrl = safePoster;
                         applyNftGeneratedPoster(cacheKey, safePoster);
                         applyCasePosterFrame(caseId, dropIndex, safePoster);
                     }
@@ -6928,7 +7350,7 @@
                         rawPlayer.loadFromUrl(tgsUrl);
                     } catch (_) { finish(''); }
                 };
-                timeoutId = setTimeout(() => finish(''), 9000);
+                timeoutId = setTimeout(() => finish(''), 12000);
                 try {
                     // RawPlayer uses the same initialized worker pool but does
                     // not allocate or register a visible DOM/canvas player.
@@ -6952,25 +7374,19 @@
                     const dropIndex = Number(drop.drop_index);
                     const cacheKey = `case:${caseId}:${dropIndex}`;
                     if (nftPosterFrameCache.has(cacheKey)) continue;
-                    try {
-                        const media = await getCaseNftMedia(caseId, dropIndex);
-                        if (media?.animated) {
-                            let poster = await renderCasePosterFrame(caseId, dropIndex, media);
-                            // A worker can be temporarily unavailable while a
-                            // visible card is decoding. Retry once instead of
-                            // leaving this reward as a permanently empty tile.
-                            if (!poster) {
-                                await new Promise(resolve => setTimeout(resolve, 700));
-                                poster = await renderCasePosterFrame(caseId, dropIndex, media);
-                            }
-                        }
-                    } catch (_) {}
+                    for (let attempt = 0; attempt < 3; attempt++) {
+                        try {
+                            const media = await getCaseNftMedia(caseId, dropIndex);
+                            if (media?.animated && await renderCasePosterFrame(caseId, dropIndex, media)) break;
+                        } catch (_) {}
+                        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+                    }
                 }
             };
-            // A single sequential renderer consumes at most one worker and is
-            // deterministic. The previous six-second priority wait left case
-            // cards blank precisely when visible players were active.
-            return Promise.allSettled(Array.from({ length: 1 }, worker));
+            // Two bounded raw renderers prepare zero frames quickly without
+            // reviving dozens of DOM animations. This is below RLottie's
+            // shared worker limit and remains stable in Android WebView.
+            return Promise.allSettled(Array.from({ length: Math.min(2, drops.length) }, worker));
         }
 
         function waitForVisibleNftMediaIdle(maxWaitMs = 7000) {
@@ -6994,19 +7410,14 @@
             const caseId = Number(currentCase?.id || 0);
             const dropIndex = Number(drop?.drop_index ?? -1);
             if (!caseId || dropIndex < 0) return false;
-            const media = nftMediaCache.get(`case:${caseId}:${dropIndex}`)?.data;
-            return Boolean(safePosterImageUrl(
-                nftPosterFrameCache.get(`case:${caseId}:${dropIndex}`) || media?.casePosterDataUrl
+            return Boolean(safeGeneratedPosterUrl(
+                nftPosterFrameCache.get(`case:${caseId}:${dropIndex}`)
             ));
         }
 
         function caseRouletteReadyDrops(drops) {
             const entries = (drops || []).filter(Boolean);
-            const ready = entries.filter(drop => !drop.has_live_nft || caseDropHasReadyPoster(drop));
-            // The roulette is visual only; the server-selected winner is added
-            // explicitly to the active strip.  Avoid blank live cells while
-            // their transparent zero frame is still being prepared.
-            return ready;
+            return entries.filter(drop => !drop.has_live_nft || caseDropHasReadyPoster(drop));
         }
 
         async function ensureCaseDropPoster(drop) {
@@ -7014,16 +7425,23 @@
             const caseId = Number(currentCase?.id || 0);
             const dropIndex = Number(drop?.drop_index ?? -1);
             if (!caseId || dropIndex < 0) return false;
-            try {
-                const media = await getCaseNftMedia(caseId, dropIndex);
-                if (!media?.animated) return false;
-                return Boolean(await renderCasePosterFrame(caseId, dropIndex, media));
-            } catch (_) { return false; }
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    const media = await getCaseNftMedia(caseId, dropIndex);
+                    if (media?.animated && await renderCasePosterFrame(caseId, dropIndex, media)) return true;
+                } catch (_) {}
+                if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+            }
+            return false;
         }
 
         async function openCaseDetail(caseId) {
             const openToken = ++caseDetailOpenToken;
             currentCase = null;
+            // A promise from a previously opened case must never unblock the
+            // new case. The new promise is installed only after fresh case
+            // data arrives and always belongs to this open token.
+            casePosterWarmupPromise = Promise.resolve();
             const overlay = document.getElementById('case-detail-overlay');
             const modal = overlay.querySelector('.case-modal-content');
             const track = document.getElementById('roulette-track');
@@ -7048,7 +7466,6 @@
             try {
                 currentCase = await getCaseDetails(caseId);
                 if (openToken !== caseDetailOpenToken || !overlay.classList.contains('active')) return;
-                modal.classList.remove('is-loading');
                 document.getElementById('case-detail-title').innerText = currentCase.name;
                 selectedCaseBalance = 'main';
                 const caseBalanceChoice = document.getElementById('case-balance-choice');
@@ -7059,6 +7476,14 @@
                 const posterCaseId = Number(currentCase.id);
                 const dropList = document.getElementById('case-drop-list');
                 destroyAuxNftMedia(dropList);
+                dropList.innerHTML = '<div class="empty-state"><p>Подготавливаем награды…</p></div>';
+                // Do not expose partially prepared case cards. Every linked
+                // NFT gets its transparent zero frame before the contents grid
+                // and roulette become interactive.
+                casePosterWarmupPromise = warmCaseNftPosters(currentCase).catch(() => {});
+                await casePosterWarmupPromise;
+                if (openToken !== caseDetailOpenToken || Number(currentCase?.id) !== posterCaseId
+                    || !overlay.classList.contains('active')) return;
                 dropList.innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
                         <span class="drop-media-shell${d.has_live_nft ? ' drop-media-shell--live' : ''}">
@@ -7095,27 +7520,7 @@
                 track.style.paddingLeft = '0px';
 
                 startIdleRoulette(sortedDrops);
-                requestAnimationFrame(resumeAuxNftMedia);
-                // The poster renderer and visible TGS cards share RLottie's
-                // four-worker pool. Let visible rewards finish their single
-                // playback first. Starting the raw worker after 180 ms was the
-                // device-dependent race that left random cards blank.
-                setTimeout(async () => {
-                    if (openToken !== caseDetailOpenToken || Number(currentCase?.id) !== posterCaseId
-                        || !overlay.classList.contains('active')) return;
-                    await waitForVisibleNftMediaIdle(7000);
-                    if (openToken !== caseDetailOpenToken || Number(currentCase?.id) !== posterCaseId
-                        || !overlay.classList.contains('active')) return;
-                    casePosterWarmupPromise = warmCaseNftPosters(currentCase).catch(() => {});
-                    await casePosterWarmupPromise;
-                    // The initial idle strip contains only already prepared
-                    // entries. Rebuild it once so newly prepared live posters
-                    // can appear without pending blank cells.
-                    if (openToken === caseDetailOpenToken && Number(currentCase?.id) === posterCaseId
-                        && overlay.classList.contains('active') && !rouletteActive && !caseOpeningRequestActive) {
-                        startIdleRoulette(sortedDrops);
-                    }
-                }, 250);
+                modal.classList.remove('is-loading');
             } catch(e) {
                 if (openToken !== caseDetailOpenToken) return;
                 modal.classList.remove('is-loading');
@@ -7134,9 +7539,13 @@
             track.style.paddingLeft = '0px';
 
             const readyDrops = caseRouletteReadyDrops(drops);
+            if (!readyDrops.length) {
+                track.innerHTML = '<div class="roulette-item case-loading-item"></div><div class="roulette-item case-loading-item"></div><div class="roulette-item case-loading-item"></div>';
+                return;
+            }
             const items = [];
             for (let i = 0; i < 8; i++) {
-                items.push(readyDrops.length ? readyDrops[Math.floor(Math.random() * readyDrops.length)] : null);
+                items.push(readyDrops[Math.floor(Math.random() * readyDrops.length)]);
             }
 
             const createSet = () => {
@@ -7148,7 +7557,7 @@
                 items.forEach(drop => {
                     const div = document.createElement('div');
                     div.className = `roulette-item${drop?.has_live_nft ? ' roulette-item--live' : ''}`;
-                    div.innerHTML = drop ? caseDropPosterMarkup(drop) : '';
+                    div.innerHTML = caseDropPosterMarkup(drop);
                     wrapper.appendChild(div);
                 });
                 return wrapper;
@@ -7262,7 +7671,6 @@
             winDisplay.style.display = 'block';
             void winDisplay.offsetWidth;
             winDisplay.classList.add('is-revealed');
-            requestAnimationFrame(resumeAuxNftMedia);
         }
 
         function claimItem() {
@@ -7362,6 +7770,9 @@
             document.getElementById('case-back-btn').style.pointerEvents = 'none';
 
             try {
+                // The roulette must never start with unresolved live rewards.
+                // Reuse the detail warm-up instead of decoding during motion.
+                if (casePosterWarmupPromise) await casePosterWarmupPromise;
                 if (!currentCaseOpenRequestId) {
                     try {
                         const saved = JSON.parse(localStorage.getItem('dnx_case_open_request') || 'null');
