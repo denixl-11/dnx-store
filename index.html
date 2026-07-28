@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.18" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.19" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -3448,7 +3448,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.18"></script>
+    <script src="tgsticker.js?v=8.9-opt.19"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -3565,7 +3565,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.18';
+        const EXPECTED_API_RELEASE = '8.9-opt.19';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -3744,7 +3744,9 @@
         // pool. A second, smaller UI limit left random visible cards waiting
         // with an empty background. All visible NFTs must be admitted here;
         // decoding remains bounded by NFT_MEDIA_MAX_LOADS and the worker pool.
-        const NFT_MEDIA_MAX_PLAYING = 64;
+        // Единственный допустимый проигрыватель — NFT в открытом окне
+        // характеристик. Все карточки и элементы кейсов держим на 0 кадре.
+        const NFT_MEDIA_MAX_PLAYING = 1;
         const NFT_MEDIA_CACHE_LIMIT = 96;
         const nftMediaPlaying = new Set();
         const nftMediaPlaybackQueue = [];
@@ -3757,7 +3759,12 @@
         const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v1';
         let nftMediaPlaybackPumpScheduled = false;
         let nftMediaPersistTimer = null;
-        const NFT_MEDIA_HOVER_MODE = false;
+        // Performance policy: cards, cart, inventory, case contents and the
+        // case roulette render only the stable Telegram poster frame. The only
+        // place allowed to play a TGS cycle is the characteristics modal, once
+        // per opening. This keeps dozens of shared RLottie workers from
+        // competing inside Telegram WebView.
+        const NFT_MEDIA_MODAL_ONLY = true;
         let catalogRenderedSignature = '';
         let catalogLoadedAt = 0;
         let catalogRequest = null;
@@ -4022,6 +4029,14 @@
             return rect.bottom > 0 && rect.right > 0 && rect.top < viewportHeight && rect.left < viewportWidth;
         }
 
+        function nftMediaMayAnimate(element) {
+            if (!NFT_MEDIA_MODAL_ONLY) return true;
+            return Boolean(
+                element?.classList?.contains('nft-live-media--modal')
+                && element.closest('#nft-detail-overlay')?.classList.contains('active')
+            );
+        }
+
         function finishNftSynchronizedPlaybackBatch(batchId) {
             const batch = nftSynchronizedPlaybackBatches.get(batchId);
             if (!batch || batch.started) return;
@@ -4030,7 +4045,12 @@
             requestAnimationFrame(() => {
                 batch.ready.forEach((picture, element) => {
                     if (!element?.isConnected || element.dataset.mediaWanted !== 'true'
-                        || element.dataset.mediaPlayed !== 'playing') return;
+                        || element.dataset.mediaPlayed !== 'playing'
+                        || !nftMediaMayAnimate(element)) {
+                        window.RLottie?.pause?.(picture);
+                        releaseNftPlaybackSlot(element);
+                        return;
+                    }
                     window.RLottie?.playOnce?.(picture, true);
                 });
             });
@@ -4040,6 +4060,13 @@
         }
 
         function markNftSynchronizedPlaybackReady(element, picture) {
+            if (!nftMediaMayAnimate(element)) {
+                window.RLottie?.pause?.(picture);
+                element.dataset.mediaPlayed = 'true';
+                element.dataset.mediaState = 'ready';
+                releaseNftPlaybackSlot(element);
+                return;
+            }
             const batchId = element?.dataset.mediaBatchId || '';
             const batch = nftSynchronizedPlaybackBatches.get(batchId);
             if (!batch) {
@@ -4091,6 +4118,10 @@
         }
 
         function armVisibleNftMedia(element) {
+            if (!nftMediaMayAnimate(element)) {
+                primeNftMedia(element);
+                return;
+            }
             if (!elementIntersectsViewport(element) || element.closest('.item-card')?.hidden) return;
             if (['playing', 'queued', 'true'].includes(element.dataset.mediaPlayed)) return;
             element.dataset.mediaInView = 'true';
@@ -4099,6 +4130,10 @@
 
         function queueVisibleNftMedia(element) {
             if (!element?.isConnected) return;
+            if (!nftMediaMayAnimate(element)) {
+                primeNftMedia(element);
+                return;
+            }
             nftMediaArmBatch.add(element);
             if (nftMediaArmBatchScheduled) return;
             nftMediaArmBatchScheduled = true;
@@ -4121,7 +4156,7 @@
         }
 
         function replayNftMedia(element) {
-            if (!element?.isConnected || !elementIntersectsViewport(element)) return;
+            if (!nftMediaMayAnimate(element) || !element?.isConnected || !elementIntersectsViewport(element)) return;
             pauseNftMedia(element, true);
             element.dataset.mediaInView = 'true';
             element.dataset.mediaPlayed = 'false';
@@ -4130,6 +4165,10 @@
 
         function startNftMediaPlayback(element) {
             if (!element?.isConnected || element.hidden || element.closest('[hidden]') || document.hidden) return;
+            if (!nftMediaMayAnimate(element)) {
+                primeNftMedia(element);
+                return;
+            }
             if (nftMediaPlaying.size >= NFT_MEDIA_MAX_PLAYING) {
                 if (element.dataset.mediaPlaybackQueued !== 'true') {
                     element.dataset.mediaPlaybackQueued = 'true';
@@ -4233,7 +4272,8 @@
                 if (!element?.isConnected || element.dataset.mediaToken !== mediaToken
                     || !elementIntersectsViewport(element) || document.hidden) return;
                 element.dataset.mediaWanted = 'true';
-                armVisibleNftMedia(element);
+                if (nftMediaMayAnimate(element)) armVisibleNftMedia(element);
+                else primeNftMedia(element);
             }, delay);
         }
 
@@ -4439,7 +4479,9 @@
                 releaseNftPlaybackSlot(element);
                 if (media?.transient) {
                     setTimeout(() => {
-                        if (elementIntersectsViewport(element)) armVisibleNftMedia(element);
+                        if (!elementIntersectsViewport(element)) return;
+                        if (nftMediaMayAnimate(element)) armVisibleNftMedia(element);
+                        else primeNftMedia(element);
                     }, 800);
                 }
             }
@@ -4482,7 +4524,7 @@
                 elements.filter(element => !element.closest('.item-card')?.hidden).forEach(element => {
                     element.dataset.mediaInView = 'true';
                     element.dataset.mediaPlayed = 'false';
-                    (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(element);
+                    primeNftMedia(element);
                 });
                 return;
             }
@@ -4495,7 +4537,7 @@
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
                         entry.target.dataset.mediaPlayed = 'false';
-                        (NFT_MEDIA_HOVER_MODE ? primeNftMedia : queueVisibleNftMedia)(entry.target);
+                        primeNftMedia(entry.target);
                     } else if (!visible && entry.target.dataset.mediaInView === 'true') {
                         entry.target.dataset.mediaInView = 'false';
                         pauseNftMedia(entry.target, true);
@@ -4532,31 +4574,8 @@
             const container = document.getElementById('catalog-container');
             if (!store?.classList.contains('page-active') || container?.style.display === 'none') return;
             observeCatalogNftMedia();
-            document.querySelectorAll('#catalog-container .nft-live-media').forEach(queueVisibleNftMedia);
+            document.querySelectorAll('#catalog-container .nft-live-media').forEach(primeNftMedia);
         }
-
-        document.addEventListener('pointerover', event => {
-            if (event.pointerType && event.pointerType !== 'mouse') return;
-            const media = event.target.closest?.('.nft-live-media');
-            if (!media || media.contains(event.relatedTarget) || media.closest('.item-card')?.hidden || !auxNftMediaIsVisible(media)) return;
-            replayNftMedia(media);
-        }, { passive: true });
-
-        document.addEventListener('pointerout', event => {
-            if (event.pointerType && event.pointerType !== 'mouse') return;
-            const media = event.target.closest?.('.nft-live-media');
-            if (!media || media.contains(event.relatedTarget)) return;
-            // Leaving does not destroy the poster. IntersectionObserver rearms
-            // the next viewport entry; pointerenter explicitly replays it.
-        }, { passive: true });
-
-        document.addEventListener('click', event => {
-            const media = event.target.closest?.('.nft-live-media--case, .nft-live-media--modal');
-            if (!media || !auxNftMediaIsVisible(media)) return;
-            // A tap/click is an explicit replay request even when the card is
-            // already visible or its previous single cycle has completed.
-            replayNftMedia(media);
-        }, { passive: true });
 
         function auxNftMediaIsVisible(element) {
             const page = element?.closest('.page');
@@ -4603,7 +4622,7 @@
                     if (visible && entry.target.dataset.mediaInView !== 'true') {
                         entry.target.dataset.mediaInView = 'true';
                         entry.target.dataset.mediaPlayed = 'false';
-                        (NFT_MEDIA_HOVER_MODE ? primeNftMedia : queueVisibleNftMedia)(entry.target);
+                        primeNftMedia(entry.target);
                     } else if (!visible && entry.target.dataset.mediaInView === 'true') {
                         entry.target.dataset.mediaInView = 'false';
                         pauseNftMedia(entry.target, true);
@@ -4621,7 +4640,7 @@
                 elements.forEach(element => {
                     element.dataset.mediaInView = 'true';
                     element.dataset.mediaPlayed = 'false';
-                    (NFT_MEDIA_HOVER_MODE ? primeNftMedia : resumeNftMedia)(element);
+                    primeNftMedia(element);
                 });
                 return;
             }
@@ -4632,7 +4651,7 @@
                     element.dataset.mediaObserved = 'true';
                 }
             });
-            elements.forEach(queueVisibleNftMedia);
+            elements.forEach(primeNftMedia);
         }
 
         document.addEventListener('visibilitychange', () => {
