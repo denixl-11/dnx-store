@@ -3295,6 +3295,109 @@
         .nft-aux-zero-frame-pending {
             opacity: 0 !important;
         }
+
+        /* ===== V9.1: instant secondary surfaces and compact game summary ===== */
+        .cart-item > img.nft-instant-preview,
+        .item-card > img.nft-instant-preview {
+            display: block !important;
+            opacity: 1 !important;
+            object-fit: cover !important;
+            background: #242424 !important;
+            filter: none !important;
+        }
+        .game-top-actions,
+        .game-highlight-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .game-top-actions .elite-leaderboard-bar,
+        .game-top-actions .history-btn {
+            width: 100%;
+            min-width: 0;
+            height: 54px;
+            margin: 0 !important;
+            padding: 8px 10px;
+            border-radius: 15px;
+        }
+        .game-top-actions .elite-leaderboard-bar { min-height: 54px; }
+        .game-top-actions .elite-icon-container { display: none; }
+        .game-top-actions .elite-title { font-size: clamp(.68rem, 3vw, .82rem); }
+        .game-top-actions .elite-subtitle { font-size: .48rem; letter-spacing: .08em; }
+        .game-top-actions .elite-score { font-size: .72rem; }
+        .game-top-actions .history-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            border: 1px solid rgba(255, 70, 126, .38);
+            background: linear-gradient(115deg, rgba(68, 18, 83, .72), rgba(87, 13, 49, .68));
+            color: #f6e8f2;
+            font-size: .72rem;
+            font-weight: 850;
+        }
+        .game-highlight-btn {
+            min-width: 0;
+            min-height: 58px;
+            padding: 8px 10px;
+            border: 1px solid rgba(255, 57, 122, .68);
+            border-radius: 16px;
+            color: #fff;
+            background: radial-gradient(circle at 15% 20%, rgba(155, 53, 215, .18), transparent 42%), #0c0910;
+            text-align: left;
+        }
+        .game-highlight-btn strong,
+        .game-highlight-btn small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .game-highlight-btn strong { color: #ff4f92; font-size: clamp(.75rem, 3.5vw, .94rem); }
+        .game-highlight-btn small { margin-top: 4px; color: #a696a5; font-size: .5rem; letter-spacing: .11em; }
+        .game-bank-frame {
+            min-height: 48px;
+            margin-bottom: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            border: 1px solid rgba(255, 57, 122, .68);
+            border-radius: 16px;
+            color: #ff4f92;
+            background: rgba(10, 8, 13, .9);
+            font-size: clamp(.74rem, 3.4vw, .92rem);
+            font-weight: 850;
+        }
+        .game-bank-frame strong { color: #fff; font-size: 1.1em; }
+        .spotlight-history-row {
+            grid-template-columns: 52px minmax(0, 1fr) minmax(100px, auto) !important;
+            min-height: 84px;
+            padding: 15px 12px !important;
+        }
+        .spotlight-history-row .history-round,
+        .spotlight-history-row .history-winner,
+        .spotlight-history-row .history-result { font-size: .86rem; }
+        #inventory-history-container.activity-history-list { gap: 5px; padding-top: 2px; }
+        .activity-strip {
+            grid-template-columns: 32px minmax(0, 1fr) auto;
+            gap: 8px;
+            min-height: 50px;
+            padding: 6px 9px 6px 11px;
+            border-radius: 12px;
+        }
+        .activity-strip::before { inset-block: 6px; }
+        .activity-icon { width: 32px; height: 32px; border-radius: 10px; }
+        .activity-icon svg { width: 17px; height: 17px; }
+        .activity-title { font-size: .66rem; }
+        .activity-meta { margin-top: 2px; font-size: .5rem; }
+        .activity-value { min-width: 66px; gap: 2px; }
+        .activity-amount { font-size: .64rem; }
+        .activity-time { font-size: .46rem; }
+        @media (max-width: 360px) {
+            .game-top-actions, .game-highlight-row { gap: 6px; }
+            .game-top-actions .elite-subtitle { display: none; }
+            .game-highlight-btn { padding-inline: 8px; }
+            .activity-strip { grid-template-columns: 29px minmax(0, 1fr) auto; gap: 6px; padding-inline: 9px 7px; }
+            .activity-icon { width: 29px; height: 29px; }
+            .activity-value { min-width: 58px; }
+        }
     </style>
 </head>
 <body>
@@ -3323,19 +3426,28 @@
     <!-- ================= СТРАНИЦЫ ================= -->
     <div id="page-game" class="page">
         <div class="game-container">
-            <div class="elite-leaderboard-bar" onclick="openLeaderboardModal()">
-                <div class="elite-left">
-                    <div class="elite-icon-container"><div class="elite-pulse"></div><span class="elite-icon"><svg viewBox="0 0 24 24"><path d="m3 7 4 4 5-7 5 7 4-4-2 11H5zM6 21h12"/></svg></span></div>
-                    <div class="elite-text-group"><span class="elite-title">Лидерборд</span><span class="elite-subtitle">Рейтинг сезона</span></div>
+            <div class="game-top-actions">
+                <div class="elite-leaderboard-bar" onclick="openLeaderboardModal()">
+                    <div class="elite-left">
+                        <div class="elite-icon-container"><div class="elite-pulse"></div><span class="elite-icon"><svg viewBox="0 0 24 24"><path d="m3 7 4 4 5-7 5 7 4-4-2 11H5zM6 21h12"/></svg></span></div>
+                        <div class="elite-text-group"><span class="elite-title">Лидеры</span><span class="elite-subtitle">Рейтинг сезона</span></div>
+                    </div>
+                    <div class="elite-right"><span id="leaderboard-preview" class="elite-score">0<br><small>ПОБЕД</small></span></div>
                 </div>
-                <div class="elite-right"><span id="leaderboard-preview" class="elite-score">0<br><small>ПОБЕД</small></span></div>
-            </div>
-            <div class="game-history-row">
                 <div class="history-btn" onclick="openHistoryModal()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     История
                 </div>
             </div>
+            <div class="game-highlight-row">
+                <button class="game-highlight-btn" type="button" onclick="openGameSpotlight('best')">
+                    <strong id="game-best-preview">—</strong><small>ЛУЧШАЯ</small>
+                </button>
+                <button class="game-highlight-btn" type="button" onclick="openGameSpotlight('last')">
+                    <strong id="game-last-preview">—</strong><small>ПОСЛЕДНЯЯ</small>
+                </button>
+            </div>
+            <div class="game-bank-frame" aria-live="polite">ОБЩИЙ БАНК <strong id="game-bank-rubles">0 ₽</strong></div>
             <div class="game-canvas-wrap">
                 <canvas id="gameCanvas"></canvas>
                 <div class="game-timer-overlay" id="game-timer-bg"></div>
@@ -3480,6 +3592,14 @@
             <div class="premium-history-title"><span>ИСТОРИЯ ИГР</span><small>ПОСЛЕДНИЕ РАУНДЫ</small></div>
             <div class="history-modal-list" id="history-modal-list-inner">Загрузка...</div>
             <button class="btn-secondary premium-history-close" onclick="closeModal('history-modal')">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="game-spotlight-modal" class="modal-overlay" onclick="closeModal('game-spotlight-modal')">
+        <div class="modal-content premium-history-modal" onclick="event.stopPropagation()">
+            <div class="premium-history-title"><span id="game-spotlight-title">ЛУЧШАЯ ИГРА</span><small id="game-spotlight-subtitle">ЗА ВСЁ ВРЕМЯ</small></div>
+            <div class="history-modal-list" id="game-spotlight-content">Загрузка...</div>
+            <button class="btn-secondary premium-history-close" onclick="closeModal('game-spotlight-modal')">Закрыть</button>
         </div>
     </div>
 
@@ -4939,6 +5059,7 @@
                 drawGameFrame();
                 pollGame();
                 loadLeaderboardPreview();
+                loadGameHighlights();
             }
             if(id === 'store') {
                 loadCatalog(false);
@@ -5461,22 +5582,10 @@
             const fallbackUrl = escapeHtml(safeImageUrl(item?.image_url));
             const title = escapeHtml(item?.name || 'NFT');
             const modalContext = variant === 'inventory' ? 'inventory' : 'catalog';
-            const telegramLink = safeTelegramUrl(item?.nft_link);
-            if (!telegramLink || itemId <= 0) {
-                return `<img src="${fallbackUrl}" class="item-image nft-static-${variant}" alt="${title}" decoding="async"${allowOpen && itemId ? ` onclick="openNftModal(${itemId}, '${modalContext}')"` : ''}>`;
-            }
-            const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(`item:${itemId}`));
-            // Cart and inventory contain only a stable transparent zero frame.
-            // No image_url and no live canvas may flash while it is prepared.
-            const tag = allowOpen ? 'button' : 'div';
-            const openAttrs = allowOpen
-                ? ` type="button" onclick="openNftModal(${itemId}, '${modalContext}')"`
-                : '';
-            return `<${tag} class="item-image nft-aux-zero-media nft-aux-zero-media--${variant}" data-item-id="${itemId}" aria-label="${title}"${openAttrs}>
-                ${poster
-                    ? `<img class="nft-aux-zero-frame" src="${escapeHtml(poster)}" alt="${title}" decoding="async">`
-                    : `<span class="nft-aux-zero-frame-pending" data-item-id="${itemId}" aria-hidden="true"></span>`}
-            </${tag}>`;
+            // The catalogue image is the authoritative instant preview. Cart
+            // and inventory must reuse it verbatim instead of replacing it by
+            // a grey TGS placeholder and waiting for a client-side decoder.
+            return `<img src="${fallbackUrl}" class="item-image nft-static-${variant} nft-instant-preview" alt="${title}" loading="eager" decoding="async"${allowOpen && itemId ? ` onclick="openNftModal(${itemId}, '${modalContext}')"` : ''}>`;
         }
 
         function addToCart(item) {
@@ -5489,7 +5598,7 @@
             }
         }
         async function renderCart() {
-            const renderToken = ++cartRenderToken;
+            ++cartRenderToken;
             const list = document.getElementById('cart-items-list');
             // Re-rendering a cart used to detach canvases while leaving their
             // RLottie workers alive. Tear them down before replacing the DOM.
@@ -5498,21 +5607,6 @@
                 list.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">Корзина пуста</div>';
                 document.getElementById('pay-footer').style.display = 'none';
             } else {
-                const snapshot = [...cart];
-                // Keep the whole row visible while transparent Telegram zero
-                // frames are prepared. The media shell stays neutral #242424.
-                list.innerHTML = snapshot.map((c, i) => `
-                    <div class="cart-item">
-                        <div class="item-image nft-aux-zero-media nft-aux-zero-media--cart"><span class="nft-aux-zero-frame-pending"></span></div>
-                        <div class="cart-item-info">
-                            <div style="font-weight:500">${escapeHtml(c.name)}</div>
-                            <div style="color:#ffd274; margin-top:4px;">${starAmountMarkup(c.price)}</div>
-                        </div>
-                        <div style="font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 10px;" onclick="removeFromCart(${i})">×</div>
-                    </div>`).join('');
-                document.getElementById('pay-footer').style.display = 'block';
-                await warmItemNftPosters(snapshot);
-                if (renderToken !== cartRenderToken) return;
                 list.innerHTML = cart.map((c, i) => `
                     <div class="cart-item">
                         ${auxiliaryNftMediaMarkup(c, 'cart', true)}
@@ -5784,11 +5878,7 @@
                     const active = inventoryData.filter(i => !['withdrawn', 'disposed'].includes(i.status));
                 const activeContainer = document.getElementById('inventory-active-container');
                 destroyAuxNftMedia(activeContainer);
-                if (active.length) {
-                    activeContainer.innerHTML = '<div class="empty-state"><p>Подготавливаем NFT…</p></div>';
-                    await warmItemNftPosters(active);
-                    if (renderToken !== inventoryRenderToken) return;
-                }
+                if (renderToken !== inventoryRenderToken) return;
                 activeContainer.innerHTML = active.length
                     ? active.map(i => {
                         const simpleNft = isSimpleInventoryNft(i);
@@ -6032,23 +6122,72 @@
             }
         }
 
+        let gameHistorySnapshot = [];
+        let gameHistoryLoadedAt = 0;
+        let gameHistoryRequest = null;
+        async function getGameHistory(force = false) {
+            if (!force && gameHistorySnapshot.length && Date.now() - gameHistoryLoadedAt < 15000) return gameHistorySnapshot;
+            if (!gameHistoryRequest) {
+                gameHistoryRequest = apiFetch(`${API_BASE}/game/history`).then(data => {
+                    gameHistorySnapshot = Array.isArray(data) ? data : [];
+                    gameHistoryLoadedAt = Date.now();
+                    return gameHistorySnapshot;
+                }).finally(() => { gameHistoryRequest = null; });
+            }
+            return gameHistoryRequest;
+        }
+        function gameHistoryRowMarkup(game, spotlight = false) {
+            return `<div class="history-modal-row${spotlight ? ' spotlight-history-row' : ''}">
+                <span class="history-round">#${Number(game.game_number || 0)}</span>
+                <span class="history-winner">${escapeHtml(game.winner_name || '—')}</span>
+                <span class="history-result">${starAmountMarkup(game.win_amount || 0)}<small>ШАНС ${Number(game.win_percent || 0).toLocaleString('ru-RU')}%</small></span>
+            </div>`;
+        }
+        async function loadGameHighlights(force = false) {
+            try {
+                const data = await getGameHistory(force);
+                const last = data[0] || null;
+                const best = data.reduce((winner, entry) => !winner || Number(entry.win_amount || 0) > Number(winner.win_amount || 0) ? entry : winner, null);
+                document.getElementById('game-best-preview').textContent = best ? `${formatStars(best.win_amount)} ⭐` : '—';
+                document.getElementById('game-last-preview').textContent = last ? `${formatStars(last.win_amount)} ⭐` : '—';
+            } catch (_) {
+                document.getElementById('game-best-preview').textContent = '—';
+                document.getElementById('game-last-preview').textContent = '—';
+            }
+        }
+        async function openGameSpotlight(kind) {
+            const modal = document.getElementById('game-spotlight-modal');
+            const content = document.getElementById('game-spotlight-content');
+            const isBest = kind === 'best';
+            document.getElementById('game-spotlight-title').textContent = isBest ? 'ЛУЧШАЯ ИГРА' : 'ПОСЛЕДНЯЯ ИГРА';
+            document.getElementById('game-spotlight-subtitle').textContent = isBest ? 'МАКСИМАЛЬНЫЙ ВЫИГРЫШ ЗА ВСЁ ВРЕМЯ' : 'ПОСЛЕДНИЙ ЗАВЕРШЁННЫЙ РАУНД';
+            content.innerHTML = 'Загрузка...';
+            modal.classList.add('active');
+            try {
+                const data = await getGameHistory();
+                const game = isBest
+                    ? data.reduce((winner, entry) => !winner || Number(entry.win_amount || 0) > Number(winner.win_amount || 0) ? entry : winner, null)
+                    : data[0];
+                content.innerHTML = game
+                    ? gameHistoryRowMarkup(game, true)
+                    : '<div style="text-align:center; color:var(--text-muted); padding:28px 12px;">Завершённых игр пока нет</div>';
+                loadGameHighlights();
+            } catch (_) { content.innerHTML = 'Ошибка загрузки'; }
+        }
+
         async function openHistoryModal() {
             const modal = document.getElementById('history-modal');
             const list = document.getElementById('history-modal-list-inner');
             list.innerHTML = 'Загрузка...';
             modal.classList.add('active');
             try {
-                const data = await apiFetch(`${API_BASE}/game/history`);
+                const data = await getGameHistory(true);
                 if (!data || data.length === 0) {
                     list.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:28px 12px;">История пока пуста</div>';
                     return;
                 }
-                list.innerHTML = data.map(h => `
-                    <div class="history-modal-row">
-                        <span class="history-round">#${h.game_number}</span>
-                        <span class="history-winner">${escapeHtml(h.winner_name)}</span>
-                        <span class="history-result">${starAmountMarkup(h.win_amount)}<small>ШАНС ${Number(h.win_percent || 0).toLocaleString('ru-RU')}%</small></span>
-                    </div>`).join('');
+                list.innerHTML = data.map(h => gameHistoryRowMarkup(h)).join('');
+                loadGameHighlights();
             } catch(e) { list.innerHTML = 'Ошибка загрузки'; }
         }
 
@@ -6845,6 +6984,7 @@
                 gState.game_number = newState.game_number;
                 document.getElementById('game-players-count').innerText = `Игроки: ${gState.players.length}/20`;
                 document.getElementById('game-number-display').innerText = `#${gState.game_number || 0}`;
+                document.getElementById('game-bank-rubles').innerText = `${Math.round(Number(gState.pool || 0)).toLocaleString('ru-RU')} ₽`;
                 renderBetsList();
                 if (!isSpinning && !isShowingWinner) drawGameFrame(null, highlightPolygon);
                 const myId = String(tg.initDataUnsafe?.user?.id);
@@ -7416,8 +7556,10 @@
         }
 
         function caseRouletteReadyDrops(drops) {
-            const entries = (drops || []).filter(Boolean);
-            return entries.filter(drop => !drop.has_live_nft || caseDropHasReadyPoster(drop));
+            // The roulette is useful immediately. Animated rewards start as a
+            // single #242424 tile and are upgraded in place when frame zero is
+            // ready; one slow Telegram asset must not blank the whole case.
+            return (drops || []).filter(Boolean);
         }
 
         async function ensureCaseDropPoster(drop) {
@@ -7473,17 +7615,8 @@
                 selectBalanceType('case', 'main');
 
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
-                const posterCaseId = Number(currentCase.id);
                 const dropList = document.getElementById('case-drop-list');
                 destroyAuxNftMedia(dropList);
-                dropList.innerHTML = '<div class="empty-state"><p>Подготавливаем награды…</p></div>';
-                // Do not expose partially prepared case cards. Every linked
-                // NFT gets its transparent zero frame before the contents grid
-                // and roulette become interactive.
-                casePosterWarmupPromise = warmCaseNftPosters(currentCase).catch(() => {});
-                await casePosterWarmupPromise;
-                if (openToken !== caseDetailOpenToken || Number(currentCase?.id) !== posterCaseId
-                    || !overlay.classList.contains('active')) return;
                 dropList.innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
                         <span class="drop-media-shell${d.has_live_nft ? ' drop-media-shell--live' : ''}">
@@ -7493,6 +7626,10 @@
                         <span class="drop-name">${escapeHtml(d.model || d.name)}</span>
                     </div>
                 `).join('');
+                // Decode frame zero in the background. applyCasePosterFrame()
+                // replaces only matching pending slots, so closing or changing
+                // a case cannot inject stale artwork into another modal.
+                casePosterWarmupPromise = warmCaseNftPosters(currentCase).catch(() => {});
 
                 rouletteActive = false;
                 caseOpeningRequestActive = false;
@@ -7770,9 +7907,6 @@
             document.getElementById('case-back-btn').style.pointerEvents = 'none';
 
             try {
-                // The roulette must never start with unresolved live rewards.
-                // Reuse the detail warm-up instead of decoding during motion.
-                if (casePosterWarmupPromise) await casePosterWarmupPromise;
                 if (!currentCaseOpenRequestId) {
                     try {
                         const saved = JSON.parse(localStorage.getItem('dnx_case_open_request') || 'null');
@@ -7808,11 +7942,13 @@
                     ) || currentCase.drops.find(drop =>
                         String(drop.model || drop.name) === String(result.won_item?.model || result.won_item?.name)
                     ) || result.won_item;
-                    // The winning live NFT must have a real transparent frame
-                    // before it enters the strip. Starting first and hoping a
-                    // pending span would update later caused blank winners on
-                    // slow mobile networks.
-                    await ensureCaseDropPoster(winningDrop);
+                    // Give the winner's frame a short head start, but never
+                    // freeze the paid opening because Telegram media is slow.
+                    // Pending slots are upgraded safely during the animation.
+                    await Promise.race([
+                        ensureCaseDropPoster(winningDrop),
+                        new Promise(resolve => setTimeout(resolve, 1800))
+                    ]);
                     startActiveRoulette(currentCase.drops, winningDrop);
                     updateBalance();
                 } else {
