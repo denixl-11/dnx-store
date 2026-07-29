@@ -214,6 +214,7 @@ var RLottie = (function () {
     rlPlayer.posterFrameNo = 0;
     rlPlayer.posterReady = false;
     rlPlayer.findPosterFrame = !!options.findPosterFrame;
+    rlPlayer.trackFrameVisibility = !!options.trackFrameVisibility;
     rlPlayer.forcePlayFrames = 0;
     rlPlayer.times = [];
     rlPlayer.imageData = new ImageData(rlPlayer.width, rlPlayer.height);
@@ -308,28 +309,52 @@ var RLottie = (function () {
     return true;
   }
 
+  function frameLooksRenderable(bytes, width, height) {
+    if (!bytes || !bytes.length || width < 8 || height < 8) return false;
+    var step = 2;
+    var opaque = 0;
+    var connected = 0;
+    var minX = width;
+    var minY = height;
+    var maxX = -1;
+    var maxY = -1;
+    for (var y = 0; y < height; y += step) {
+      for (var x = 0; x < width; x += step) {
+        if (bytes[((y * width + x) * 4) + 3] <= 32) continue;
+        opaque++;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+        var right = x + step < width ? bytes[((y * width + x + step) * 4) + 3] : 0;
+        var down = y + step < height ? bytes[((((y + step) * width) + x) * 4) + 3] : 0;
+        if (right > 32 || down > 32) connected++;
+      }
+    }
+    var sampled = Math.ceil(width / step) * Math.ceil(height / step);
+    var boxWidth = maxX >= minX ? maxX - minX + step : 0;
+    var boxHeight = maxY >= minY ? maxY - minY + step : 0;
+    return opaque >= Math.max(18, sampled * .002) &&
+      opaque / sampled < .72 &&
+      connected / Math.max(1, opaque) >= .14 &&
+      boxWidth >= width * .035 && boxHeight >= height * .035;
+  }
+
   function doRender(rlPlayer, frame) {
     rlPlayer.forceRender = false;
     rlPlayer.imageData.data.set(frame.frame);
     rlPlayer.context.putImageData(rlPlayer.imageData, 0, 0);
-    var inspectAlpha = rlPlayer.findPosterFrame || !rlPlayer.hasVisiblePixels || frame.no === 0;
+    var inspectAlpha = rlPlayer.findPosterFrame || rlPlayer.trackFrameVisibility || !rlPlayer.hasVisiblePixels || frame.no === 0;
     var hasVisiblePixels = rlPlayer.hasVisiblePixels === true;
     // Alpha inspection is only needed while finding a poster/first visible
     // frame (and at frame zero). Scanning every full RGBA buffer on every
     // animation frame was one of the largest WebView CPU costs.
     if (inspectAlpha) {
       hasVisiblePixels = false;
-      // Search densely while the poster is not known. The previous 128-byte
-      // stride could jump over thin/small NFT models (torches, rings, swords)
-      // and incorrectly classify their frame as empty. Once a poster exists,
-      // the cheaper stride is sufficient for the ordinary frame-zero probe.
-      var alphaStep = (rlPlayer.findPosterFrame || !rlPlayer.posterFrame) ? 16 : 128;
-      for (var alphaIndex = 3; alphaIndex < frame.frame.length; alphaIndex += alphaStep) {
-        if (frame.frame[alphaIndex] > 12) {
-          hasVisiblePixels = true;
-          break;
-        }
-      }
+      // Reject sparse decoder noise and partially initialised worker buffers.
+      // A real NFT model has a meaningful, locally connected alpha region;
+      // one bright pixel is not a valid poster frame.
+      hasVisiblePixels = frameLooksRenderable(frame.frame, rlPlayer.width, rlPlayer.height);
     }
     if (hasVisiblePixels && !rlPlayer.posterFrame) {
       rlPlayer.posterFrame = new Uint8ClampedArray(frame.frame);
