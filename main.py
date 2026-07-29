@@ -107,7 +107,7 @@ runtime_state = {
     "database": "pending",
 }
 nft_media_cache: dict[str, tuple[float, dict]] = {}
-nft_media_fetch_semaphore = asyncio.Semaphore(4)
+nft_media_fetch_semaphore = asyncio.Semaphore(12)
 star_reconcile_attempts: dict[str, float] = {}
 auth_cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
 restriction_cache: OrderedDict[str, tuple[float, dict | None]] = OrderedDict()
@@ -118,7 +118,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.22"
+API_RELEASE = "8.9-opt.23"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 
@@ -2606,7 +2606,7 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
         return result
 
 
-async def warm_nft_media_cache(max_items: int = 12):
+async def warm_nft_media_cache(max_items: int = 24, max_case_sources: int = 48):
     rows = await get_pool().fetch("""
         SELECT id, nft_link FROM items
         WHERE COALESCE(nft_link, '') <> ''
@@ -2625,6 +2625,22 @@ async def warm_nft_media_cache(max_items: int = 12):
         )
         seen_sources.add(source_url)
         jobs.append(fetch_telegram_nft_media(source_url, int(row["id"])))
+    case_source_count = 0
+    for case_id, case in CASES_CACHE.items():
+        for drop_index, drop in enumerate(case.get("drops") or []):
+            source_url = canonical_telegram_nft_url(drop.get("nft_link"))
+            if not source_url or source_url in seen_sources:
+                continue
+            seen_sources.add(source_url)
+            jobs.append(fetch_telegram_nft_media(
+                source_url,
+                -(int(case_id) * 1000 + drop_index + 1),
+            ))
+            case_source_count += 1
+            if case_source_count >= max_case_sources:
+                break
+        if case_source_count >= max_case_sources:
+            break
     if jobs:
         await asyncio.gather(*jobs, return_exceptions=True)
 
