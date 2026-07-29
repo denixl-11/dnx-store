@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.23" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.24" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -256,7 +256,7 @@
         }
         .premium-back-btn svg {
             width: 20px;
-            height: 20px;
+            height: 24px;
             margin-right: 2px;
         }
 
@@ -3356,12 +3356,12 @@
         .game-top-actions .history-btn {
             width: 100%;
             min-width: 0;
-            height: 20px;
+            height: 24px;
             margin: 0 !important;
             padding: 2px 6px;
             border-radius: 10px;
         }
-        .game-top-actions .elite-leaderboard-bar { min-height: 20px; }
+        .game-top-actions .elite-leaderboard-bar { min-height: 24px; }
         .game-top-actions .elite-icon-container { display: none; }
         .game-top-actions .elite-left {
             flex: 1 1 auto;
@@ -3376,7 +3376,7 @@
         }
         .game-top-actions .elite-title {
             overflow: hidden;
-            font-size: clamp(.46rem, 2.1vw, .52rem);
+            font-size: clamp(.51rem, 2.3vw, .58rem);
             line-height: 1.02;
             letter-spacing: .055em;
             text-overflow: ellipsis;
@@ -3385,7 +3385,7 @@
             display: block;
             overflow: hidden;
             margin-top: 1px;
-            font-size: clamp(.23rem, 1.15vw, .28rem);
+            font-size: clamp(.27rem, 1.3vw, .32rem);
             line-height: 1;
             letter-spacing: .045em;
             text-overflow: ellipsis;
@@ -3393,18 +3393,18 @@
         .game-top-actions .elite-right {
             flex: 0 0 38px;
             width: 38px;
-            height: 16px;
+            height: 20px;
             margin-left: 4px;
             padding: 0;
             border-radius: 9px;
         }
         .game-top-actions .elite-score {
-            font-size: .44rem;
+            font-size: .48rem;
             line-height: .88;
         }
         .game-top-actions .elite-score small {
             margin-top: 1px;
-            font-size: .23rem;
+            font-size: .26rem;
             line-height: 1;
             letter-spacing: .04em;
         }
@@ -3416,14 +3416,14 @@
             border: 1px solid rgba(255, 70, 126, .38);
             background: linear-gradient(115deg, rgba(68, 18, 83, .72), rgba(87, 13, 49, .68));
             color: #f6e8f2;
-            font-size: .46rem;
+            font-size: .52rem;
             font-weight: 850;
         }
         .game-top-actions .history-btn svg { width: 8px; height: 8px; flex: 0 0 8px; }
         .game-highlight-btn {
             min-width: 0;
-            height: 25px;
-            min-height: 25px;
+            height: 29px;
+            min-height: 29px;
             padding: 3px 8px;
             border: 1px solid rgba(255, 57, 122, .68);
             border-radius: 11px;
@@ -3436,8 +3436,8 @@
         .game-highlight-btn strong { color: #ff4f92; font-size: clamp(.58rem, 2.7vw, .7rem); line-height: 1; }
         .game-highlight-btn small { margin-top: 2px; color: #a696a5; font-size: .35rem; line-height: 1; letter-spacing: .09em; }
         .game-bank-frame {
-            height: 25px;
-            min-height: 25px;
+            height: 29px;
+            min-height: 29px;
             margin-bottom: 5px;
             display: flex;
             align-items: center;
@@ -3466,14 +3466,14 @@
             margin-top: 5px;
         }
         #page-game .game-controls .btn-gold-outline {
-            height: 26px;
-            min-height: 26px;
+            height: 30px;
+            min-height: 30px;
             border-radius: 10px;
             font-size: .68rem;
         }
         #page-game .game-btn-cancel {
-            height: 26px;
-            min-height: 26px;
+            height: 30px;
+            min-height: 30px;
             margin-top: 6px;
         }
         #page-game .bets-list-container { margin-top: 8px; }
@@ -3894,7 +3894,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.23"></script>
+    <script src="tgsticker.js?v=8.9-opt.24"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4011,7 +4011,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.23';
+        const EXPECTED_API_RELEASE = '8.9-opt.24';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -4158,6 +4158,9 @@
         let currentCase = null;
         let casePosterWarmupPromise = Promise.resolve();
         const casePosterFrameRequests = new Map();
+        const casePosterItemAliases = new Map();
+        const casePosterPrewarmRequests = new Map();
+        let casePosterPrewarmQueue = Promise.resolve();
         let rouletteActive = false;
         let caseOpeningRequestActive = false;
         let currentCaseOpenRequestId = null;
@@ -4202,7 +4205,11 @@
         const nftSynchronizedPlaybackBatches = new Map();
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_opt22';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_opt24';
+        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-opt24';
+        let nftPosterDbPromise = null;
+        let nftPosterDbRestorePromise = Promise.resolve();
+        let nftPosterDbWriteCount = 0;
         let nftPosterPersistTimer = null;
         let nftMediaPlaybackPumpScheduled = false;
         let nftMediaPersistTimer = null;
@@ -4278,6 +4285,76 @@
             }, 60);
         }
 
+        function openNftPosterDb() {
+            if (!('indexedDB' in window)) return Promise.resolve(null);
+            if (nftPosterDbPromise) return nftPosterDbPromise;
+            nftPosterDbPromise = new Promise(resolve => {
+                let request;
+                try { request = indexedDB.open(NFT_POSTER_DB_NAME, 1); }
+                catch (_) { resolve(null); return; }
+                request.onupgradeneeded = () => {
+                    const db = request.result;
+                    if (!db.objectStoreNames.contains('posters')) {
+                        const store = db.createObjectStore('posters', { keyPath: 'key' });
+                        store.createIndex('updatedAt', 'updatedAt');
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => resolve(null);
+                request.onblocked = () => resolve(null);
+            });
+            return nftPosterDbPromise;
+        }
+
+        async function restoreNftPosterDb() {
+            const db = await openNftPosterDb();
+            if (!db) return;
+            const records = await new Promise(resolve => {
+                try {
+                    const request = db.transaction('posters', 'readonly').objectStore('posters').getAll();
+                    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+                    request.onerror = () => resolve([]);
+                } catch (_) { resolve([]); }
+            });
+            records.sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0)).slice(-96).forEach(record => {
+                const key = String(record?.key || '');
+                const poster = safeGeneratedPosterUrl(record?.poster);
+                if (/^(?:item:\d+|case:\d+:\d+)$/.test(key) && poster && !nftPosterFrameCache.has(key)) {
+                    nftPosterFrameCache.set(key, poster);
+                }
+            });
+            nftPosterFrameCache.forEach((poster, key) => {
+                if (key.startsWith('item:')) applyItemPosterFrame(Number(key.split(':')[1]), poster);
+                if (key.startsWith('case:')) {
+                    const [, caseId, dropIndex] = key.split(':');
+                    applyCasePosterFrame(Number(caseId), Number(dropIndex), poster);
+                }
+            });
+        }
+
+        async function persistNftPosterDb(key, poster) {
+            const db = await openNftPosterDb();
+            if (!db) return;
+            try {
+                db.transaction('posters', 'readwrite').objectStore('posters').put({ key, poster, updatedAt: Date.now() });
+            } catch (_) { return; }
+            nftPosterDbWriteCount += 1;
+            if (nftPosterDbWriteCount % 12 !== 0) return;
+            try {
+                const records = await new Promise(resolve => {
+                    const request = db.transaction('posters', 'readonly').objectStore('posters').getAll();
+                    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+                    request.onerror = () => resolve([]);
+                });
+                if (records.length > 120) {
+                    records.sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0));
+                    const transaction = db.transaction('posters', 'readwrite');
+                    const store = transaction.objectStore('posters');
+                    records.slice(0, records.length - 120).forEach(record => store.delete(record.key));
+                }
+            } catch (_) {}
+        }
+
         function safeTelegramMediaUrl(value) {
             try {
                 const url = new URL(String(value || ''));
@@ -4330,6 +4407,7 @@
                 nftPosterFrameCache.delete(nftPosterFrameCache.keys().next().value);
             }
             persistNftPosterCache();
+            persistNftPosterDb(key, safePoster).catch(() => {});
             document.querySelectorAll('.nft-live-media').forEach(element => {
                 if (nftMediaDescriptorKey(element) === key) installNftGeneratedPoster(element, safePoster);
             });
@@ -4401,7 +4479,9 @@
                 sampled += 1;
                 if (rgba[index] > 18) opaque += 1;
             }
-            return opaqueSamples <= 4 && opaque / Math.max(1, sampled) < 0.62;
+            // Reject only a truly opaque Telegram preview. Wide/diagonal NFT
+            // models may legitimately touch most perimeter probes.
+            return opaqueSamples < 8 && opaque / Math.max(1, sampled) < 0.92;
         }
 
         function captureNftGeneratedPoster(element, picture) {
@@ -4422,6 +4502,7 @@
         }
 
         restoreNftPosterCache();
+        nftPosterDbRestorePromise = restoreNftPosterDb().catch(() => {});
 
         function scheduleNftPlaybackPump() {
             if (nftMediaPlaybackPumpScheduled) return;
@@ -5494,9 +5575,9 @@
             } catch (_) { return ''; }
         }
         const STATIC_REWARD_ASSETS = Object.freeze({
-            ring: 'case-ring.png?v=9.1.1',
-            cup: 'case-cup.png?v=9.1.1',
-            diamond: 'case-diamond.png?v=9.1.1'
+            ring: 'case-ring-cutout.png?v=9.1.2',
+            cup: 'case-cup-cutout.png?v=9.1.2',
+            diamond: 'case-diamond-cutout.png?v=9.1.2'
         });
         function staticRewardAssetUrl(value) {
             const key = String(value || '').trim().toLowerCase();
@@ -7325,12 +7406,13 @@
                 .then(details => {
                     caseDetailsCache.set(key, details);
                     warmCaseImages(details?.drops || []);
-                    // Fetch all small media descriptors ahead of the click.
-                    // Actual RLottie decoding still starts only for the open
-                    // case, so hidden cases cannot occupy graphics workers.
+                    // Fetch descriptors and enqueue a bounded poster warm-up
+                    // ahead of the click. The queue never exceeds three raw
+                    // decoders, so it cannot exhaust mobile graphics workers.
                     Promise.allSettled((details?.drops || [])
                         .filter(drop => drop?.has_live_nft && Number(drop?.drop_index ?? -1) >= 0)
                         .map(drop => getCaseNftMedia(key, Number(drop.drop_index))))
+                        .then(() => scheduleCasePosterPrewarm(details))
                         .catch(() => {});
                     return details;
                 })
@@ -7358,10 +7440,9 @@
 
         function prefetchCaseDetails(cases) {
             const run = () => (cases || []).slice(0, 4).forEach(entry => {
-                // Fetching JSON is cheap and makes opening a case immediate.
-                // Never decode hidden TGS posters here: four prefetched cases
-                // used to consume the complete worker pool and starve every
-                // visible catalogue/case animation.
+                // Details and poster frames are prepared before the click.
+                // scheduleCasePosterPrewarm() serializes cases and keeps each
+                // case on a bounded three-decoder pool.
                 getCaseDetails(entry.id).catch(() => {});
             });
             if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 1400 });
@@ -7443,6 +7524,26 @@
                 image.src = posterUrl;
                 slot.replaceWith(image);
             });
+            const aliasKey = `case:${Number(caseId)}:${Number(dropIndex)}`;
+            casePosterItemAliases.get(aliasKey)?.forEach(itemId => {
+                applyNftGeneratedPoster(`item:${Number(itemId)}`, posterUrl);
+                applyItemPosterFrame(Number(itemId), posterUrl);
+            });
+        }
+
+        function registerCasePosterItemAlias(caseId, dropIndex, itemId) {
+            caseId = Number(caseId);
+            dropIndex = Number(dropIndex);
+            itemId = Number(itemId);
+            if (!caseId || dropIndex < 0 || !itemId) return;
+            const caseKey = `case:${caseId}:${dropIndex}`;
+            if (!casePosterItemAliases.has(caseKey)) casePosterItemAliases.set(caseKey, new Set());
+            casePosterItemAliases.get(caseKey).add(itemId);
+            const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(caseKey));
+            if (poster) {
+                applyNftGeneratedPoster(`item:${itemId}`, poster);
+                applyItemPosterFrame(itemId, poster);
+            }
         }
 
         function applyItemPosterFrame(itemId, posterUrl) {
@@ -7688,20 +7789,36 @@
             const drops = (caseData?.drops || [])
                 .filter(drop => drop?.has_live_nft && Number(drop?.drop_index ?? -1) >= 0);
             if (!drops.length) return Promise.resolve();
-            // Resolve every lightweight Telegram descriptor together first.
-            // Rendering remains bounded by the shared RLottie pool, while one
-            // slow URL can no longer serialize the rest of the case grid.
-            return Promise.allSettled(drops.map(async drop => {
-                const dropIndex = Number(drop.drop_index);
-                const cacheKey = `case:${caseId}:${dropIndex}`;
-                if (nftPosterFrameCache.has(cacheKey)) return true;
-                try {
-                    const media = await getCaseNftMedia(caseId, dropIndex);
-                    return Boolean(media?.animated && await renderCasePosterFrame(caseId, dropIndex, media));
-                } catch (_) {
-                    return false;
-                }
-            }));
+            return Promise.all(drops.map(async drop => ({
+                drop,
+                media: await getCaseNftMedia(caseId, Number(drop.drop_index)).catch(() => null)
+            }))).then(entries => {
+                let cursor = 0;
+                const worker = async () => {
+                    while (cursor < entries.length) {
+                        const { drop, media } = entries[cursor++];
+                        const dropIndex = Number(drop.drop_index);
+                        const cacheKey = `case:${caseId}:${dropIndex}`;
+                        if (safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) continue;
+                        if (media?.animated) await renderCasePosterFrame(caseId, dropIndex, media).catch(() => '');
+                    }
+                };
+                // Three extractors leave one graphics worker available for an
+                // already-open characteristics animation on mobile WebViews.
+                return Promise.allSettled(Array.from({ length: Math.min(3, entries.length) }, worker));
+            });
+        }
+
+        function scheduleCasePosterPrewarm(caseData) {
+            const caseId = Number(caseData?.id || 0);
+            if (!caseId) return Promise.resolve();
+            if (casePosterPrewarmRequests.has(caseId)) return casePosterPrewarmRequests.get(caseId);
+            const request = casePosterPrewarmQueue = casePosterPrewarmQueue
+                .catch(() => {})
+                .then(() => warmCaseNftPosters(caseData));
+            casePosterPrewarmRequests.set(caseId, request);
+            request.finally(() => casePosterPrewarmRequests.delete(caseId));
+            return request;
         }
 
         function waitForVisibleNftMediaIdle(maxWaitMs = 7000) {
@@ -7781,6 +7898,10 @@
             modal.classList.add('is-loading');
             overlay.classList.add('active');
             try {
+                await Promise.race([
+                    nftPosterDbRestorePromise,
+                    new Promise(resolve => setTimeout(resolve, 350))
+                ]);
                 currentCase = await getCaseDetails(caseId);
                 if (openToken !== caseDetailOpenToken || !overlay.classList.contains('active')) return;
                 document.getElementById('case-detail-title').innerText = currentCase.name;
@@ -7804,7 +7925,7 @@
                 // Decode frame zero in the background. applyCasePosterFrame()
                 // replaces only matching pending slots, so closing or changing
                 // a case cannot inject stale artwork into another modal.
-                casePosterWarmupPromise = warmCaseNftPosters(currentCase).catch(() => {});
+                casePosterWarmupPromise = scheduleCasePosterPrewarm(currentCase).catch(() => {});
 
                 rouletteActive = false;
                 caseOpeningRequestActive = false;
@@ -8112,11 +8233,13 @@
                     caseOpeningRequestActive = false;
                     document.getElementById('case-actions').style.display = 'none';
                     const wonDropIndex = Number(result.won_item?.drop_index ?? -1);
-                    const winningDrop = currentCase.drops.find(drop =>
+                    const configuredWinningDrop = currentCase.drops.find(drop =>
                         wonDropIndex >= 0 && Number(drop.drop_index) === wonDropIndex
                     ) || currentCase.drops.find(drop =>
                         String(drop.model || drop.name) === String(result.won_item?.model || result.won_item?.name)
                     ) || result.won_item;
+                    const winningDrop = { ...configuredWinningDrop, ...result.won_item, drop_index: wonDropIndex };
+                    registerCasePosterItemAlias(currentCase.id, wonDropIndex, result.won_item?.generated_item_id);
                     // Give the winner's frame a short head start, but never
                     // freeze the paid opening because Telegram media is slow.
                     // Pending slots are upgraded safely during the animation.
@@ -8168,6 +8291,11 @@
         updateBalance();
         clearLegacyCatalogSnapshots();
         loadCatalog(true);
+        const prewarmCasesInBackground = () => {
+            getCases().then(cases => prefetchCaseDetails(cases)).catch(() => {});
+        };
+        if ('requestIdleCallback' in window) requestIdleCallback(prewarmCasesInBackground, { timeout: 1800 });
+        else setTimeout(prewarmCasesInBackground, 450);
         loadPrizeItems();
         loadLeaderboardPreview();
         const pendingTonDeposit = localStorage.getItem('dnx_ton_deposit');
