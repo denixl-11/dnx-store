@@ -125,7 +125,15 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.35"
+API_RELEASE = "8.9-opt.38"
+GITHUB_CASE_ASSET_BASE = os.getenv(
+    "GITHUB_CASE_ASSET_BASE",
+    "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
+).rstrip("/") + "/"
+GITHUB_CASE_COVER_BASE = os.getenv(
+    "GITHUB_CASE_COVER_BASE",
+    "https://denixl-11.github.io/dnx-store/assets/cases/",
+).rstrip("/") + "/"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 NFT_TGS_BINARY_TTL = 6 * 60 * 60
@@ -440,6 +448,42 @@ def case_drop_attribute(drop: dict, attribute: str) -> str | None:
         if label in aliases.get(attribute, set()) and trait.get("value") not in (None, ""):
             return str(trait["value"])[:255]
     return None
+
+
+def case_asset_slug(value: object) -> str:
+    """Create the GitHub filename used by both Render and the web client."""
+    slug = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower()).strip("-")
+    return slug[:120]
+
+
+def case_drop_asset_filename(drop: dict) -> str:
+    """Resolve an explicit GitHub filename or derive it from model/name."""
+    explicit = str(drop.get("github_asset") or drop.get("case_asset_file") or "").strip()
+    if explicit:
+        filename = explicit.rsplit("/", 1)[-1]
+        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.(?:png|webp|jpe?g)", filename, re.I):
+            return filename
+    slug = case_asset_slug(case_drop_attribute(drop, "model") or drop.get("name"))
+    return f"{slug}.png" if slug else ""
+
+
+def case_drop_image_url(drop: dict) -> str:
+    """Return the authoritative high-quality image hosted by GitHub Pages."""
+    filename = case_drop_asset_filename(drop)
+    return f"{GITHUB_CASE_ASSET_BASE}{filename}?v={API_RELEASE}" if filename else ""
+
+
+def case_cover_image_url(case: dict) -> str:
+    """Return a GitHub Pages cover so CASES_JSON no longer needs image_url."""
+    explicit = str(case.get("github_cover") or case.get("cover_asset_file") or "").strip()
+    if explicit:
+        filename = explicit.rsplit("/", 1)[-1]
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.(?:png|webp|jpe?g)", filename, re.I):
+            filename = ""
+    else:
+        slug = case_asset_slug(case.get("name"))
+        filename = f"{slug}.png" if slug else ""
+    return f"{GITHUB_CASE_COVER_BASE}{filename}?v={API_RELEASE}" if filename else ""
 
 
 def case_allows_bonus(case: dict) -> bool:
@@ -2092,6 +2136,13 @@ async def handle_health(request):
             database_status = "ok"
     except Exception:
         database_status = "unavailable"
+    case_drops = [drop for case in CASES_CACHE.values() for drop in (case.get("drops") or [])]
+    bundled_static_names = {"ring", "cup", "diamond"}
+    missing_case_static = sum(
+        1 for drop in case_drops
+        if not case_drop_image_url(drop)
+        and str(case_drop_attribute(drop, "model") or drop.get("name") or "").strip().lower() not in bundled_static_names
+    )
     return web.json_response({
         "status": "ok" if runtime_state["ready"] else "starting",
         "ready": runtime_state["ready"],
@@ -2099,6 +2150,8 @@ async def handle_health(request):
         "database": database_status,
         "attempt": runtime_state["attempt"],
         "release": API_RELEASE,
+        "case_static_total": len(case_drops),
+        "case_static_missing": missing_case_static,
     })
 
 @require_auth
@@ -2873,8 +2926,9 @@ async def handle_nft_preview_asset(request):
 async def warm_nft_media_cache():
     rows = await get_pool().fetch("""
         SELECT id, nft_link FROM items
-        WHERE COALESCE(nft_link, '') <> ''
-        ORDER BY CASE WHEN status = 'Доступен' THEN 0 ELSE 1 END, id
+        WHERE COALESCE(nft_link, '') <> '' AND status = 'Доступен'
+        ORDER BY id
+        LIMIT 200
     """)
     sources: list[tuple[str, int]] = []
     seen_sources = set()
@@ -2888,16 +2942,6 @@ async def warm_nft_media_cache():
         )
         seen_sources.add(source_url)
         sources.append((source_url, int(row["id"])))
-    for case_id, case in CASES_CACHE.items():
-        for drop_index, drop in enumerate(case.get("drops") or []):
-            source_url = canonical_telegram_nft_url(drop.get("nft_link"))
-            if not source_url or source_url in seen_sources:
-                continue
-            seen_sources.add(source_url)
-            sources.append((
-                source_url,
-                -(int(case_id) * 1000 + drop_index + 1),
-            ))
     if sources:
         # Render and Telegram both throttle large bursts. Warm in small batches
         # so startup never turns hundreds of valid gifts into cached failures.
@@ -3603,7 +3647,7 @@ async def handle_get_cases(request):
             "id": case_data["id"],
             "name": case_data["name"],
             "price": case_data["price"],
-            "image_url": case_data["image_url"],
+            "image_url": case_cover_image_url(case_data),
             "bonus_enabled": case_allows_bonus(case_data),
         })
     return web.json_response(cases_list, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -3630,12 +3674,14 @@ async def handle_get_case_details(request):
         "id": case["id"],
         "name": case["name"],
         "price": case["price"],
-        "image_url": case["image_url"],
+        "image_url": case_cover_image_url(case),
         "bonus_enabled": case_allows_bonus(case),
         "drops": [
             {
                 **{key: value for key, value in drop.items() if key not in {"real_chance", "nft_link", "traits"}},
                 "drop_index": index,
+                "image_url": case_drop_image_url(drop),
+                "static_image_missing": not bool(case_drop_image_url(drop)),
                 "has_live_nft": bool(canonical_telegram_nft_url(drop.get("nft_link"))),
                 "nft_preview_path": make_nft_preview_path(drop.get("nft_link")),
                 "nft_asset_path": make_nft_asset_path(drop.get("nft_link")),
@@ -3791,7 +3837,7 @@ async def handle_open_case(request):
                     )
                     VALUES ($1, $2, 'Продан', $3, $4, $5, $6, $7, $8, $9, 'case', 'case_drop') RETURNING id
                 """, str(won_drop['name'])[:255], drop_value,
-                      safe_https_url(won_drop.get('image_url')), case_drop_attribute(won_drop, "model"),
+                      safe_https_url(case_drop_image_url(won_drop)), case_drop_attribute(won_drop, "model"),
                       case_drop_attribute(won_drop, "pattern"), case_drop_attribute(won_drop, "background"), user_id,
                       canonical_telegram_nft_url(won_drop.get('nft_link')),
                       str(won_drop.get('number') or '')[:20])
