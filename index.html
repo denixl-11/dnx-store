@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.40" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.44" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -2799,6 +2799,44 @@
             justify-content: center;
             gap: 10px;
         }
+        .case-win-media-host {
+            position: relative;
+            width: min(230px, 72vw);
+            height: min(230px, 72vw);
+            max-width: 230px;
+            max-height: 230px;
+            margin: 0 auto 12px;
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 22px;
+            background: #242424 !important;
+            box-shadow: inset 0 1px rgba(255,255,255,.045), 0 14px 34px rgba(0,0,0,.4);
+            filter: none;
+            isolation: isolate;
+        }
+        .case-win-media-host > img.static-case-reward {
+            position: absolute !important;
+            inset: 12% !important;
+            width: 76% !important;
+            height: 76% !important;
+            margin: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            object-fit: contain !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        #catalog-filter-empty.catalog-end-line {
+            min-height: 1px;
+            height: 1px;
+            margin: 8px 4px 2px;
+            padding: 0;
+            overflow: hidden;
+            border: 0;
+            border-radius: 999px;
+            background: linear-gradient(90deg, transparent, rgba(204,64,255,.82) 16%, rgba(255,71,145,.82) 84%, transparent);
+            box-shadow: 0 0 10px rgba(207,63,255,.28);
+        }
+        #catalog-filter-empty.catalog-end-line > * { display: none !important; }
         #case-claim-btn,
         #sell-drop-btn {
             box-sizing: border-box !important;
@@ -3107,7 +3145,7 @@
             object-fit: cover !important;
             border-radius: inherit !important;
             opacity: 1;
-            transition: opacity 90ms linear;
+            transition: opacity 180ms ease-out;
         }
         #nft-modal-media > .nft-live-pattern,
         #nft-modal-media > .nft-generated-poster,
@@ -3123,6 +3161,8 @@
             margin: 0 !important;
             overflow: hidden !important;
             background: transparent !important;
+            opacity: 0;
+            transition: opacity 180ms ease-out;
         }
         #nft-modal-media > picture.nft-live-model > canvas {
             position: static !important;
@@ -3134,14 +3174,18 @@
             transform: none !important;
             background: transparent !important;
         }
-        #nft-modal-media.has-live-frame > .nft-modal-zero-frame {
+        #nft-modal-media.has-current-frame > .nft-modal-zero-frame {
             opacity: 0;
         }
         /* A modal player may legitimately pass through an empty transition
            frame. Keep the validated zero-frame poster underneath and reveal
            it only while the current animated frame has no real model pixels. */
-        #nft-modal-media > .nft-generated-poster { opacity: 1; }
+        #nft-modal-media > .nft-generated-poster {
+            opacity: 1;
+            transition: opacity 180ms ease-out;
+        }
         #nft-modal-media.has-current-frame > .nft-generated-poster { opacity: 0; }
+        #nft-modal-media.has-current-frame > picture.nft-live-model { opacity: 1; }
         #nft-modal-media[data-case-origin="true"] {
             background: #242424 !important;
             background-color: #242424 !important;
@@ -4143,7 +4187,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.40"></script>
+    <script src="tgsticker.js?v=8.9-opt.44"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4265,7 +4309,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.40';
+        const EXPECTED_API_RELEASE = '8.9-opt.44';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -5263,10 +5307,10 @@
                 }
                 if (stallRecoveryTimer) clearTimeout(stallRecoveryTimer);
                 stallRecoveryTimer = 0;
-                // A parsed TGS is playable. Do not gate the animation behind a
-                // separate poster event: some valid Telegram gifts have a long
-                // transparent intro and never satisfied the old poster test.
-                playLoadedAnimationOnce();
+                // Decoding continues while the deterministic poster remains
+                // visible. Playback begins only after RLottie has rendered a
+                // genuine model frame, so no transparent frame-zero flash can
+                // appear between the static cover and the one-shot cycle.
             }, { once: true });
             picture.addEventListener('tg:poster-ready', (posterEvent) => {
                 if (stallRecoveryTimer) clearTimeout(stallRecoveryTimer);
@@ -5282,8 +5326,12 @@
                     element.classList.add('is-live', 'has-live-frame', 'has-current-frame');
                     captureNftGeneratedPoster(element, picture);
                 }
-                settleLoad(true);
-                playLoadedAnimationOnce();
+                if (hasVisibleFrame) {
+                    settleLoad(true);
+                    playLoadedAnimationOnce();
+                } else {
+                    failMediaLoad(true);
+                }
             }, { once: true });
             picture.addEventListener('tg:error', errorEvent => {
                 element.dataset.mediaError = String(errorEvent.detail?.reason || 'worker_error');
@@ -5910,7 +5958,7 @@
                 const empty = document.createElement('div');
                 empty.id = 'catalog-filter-empty';
                 empty.className = 'empty-state';
-                empty.innerHTML = '<h3>НЕТ ПРЕДМЕТОВ</h3><p>Для выбранного названия пока нет доступных NFT.</p>';
+                empty.innerHTML = '<h3>НЕТ ПРЕДМЕТОВ</h3><p>В каталоге пока нет доступных NFT.</p>';
                 empty.hidden = true;
                 container.appendChild(empty);
                 catalogRenderedSignature = signature;
@@ -5934,7 +5982,12 @@
                 if (visible) visibleCount++;
             });
             const empty = document.getElementById('catalog-filter-empty');
-            if (empty) empty.hidden = visibleCount > 0;
+            if (empty) {
+                const catalogIsEmpty = currentCatalog.length === 0;
+                empty.hidden = visibleCount > 0;
+                empty.classList.toggle('catalog-end-line', !catalogIsEmpty && visibleCount === 0);
+                empty.setAttribute('aria-hidden', catalogIsEmpty ? 'false' : 'true');
+            }
             if (visibleCount) warmAuxNftPosters(container).catch(() => {});
         }
 
@@ -6239,11 +6292,11 @@
             // one-shot path and prevents a proxy from targeting a terminated
             // worker when characteristics are opened repeatedly.
             deactivateNftMedia(document.getElementById('nft-modal-media'));
-            // Poster generation and modal playback must never share a used
-            // WASM arena.  The bundled RLottie allocator can stay fragmented
-            // after many static frames even when individual handles are
-            // released, producing frame-0/frame-1 aborts on the next model.
-            // Cards are static at this point, so recycling the pool is safe.
+            // The bundled RLottie WASM allocator cannot safely accept a second
+            // Telegram animation after a completed one-shot cycle. Recycle the
+            // worker before mounting the new player, while the ordinary image
+            // cover stays visible. This makes every tap deterministic without
+            // exposing worker startup as a blank or frozen animation frame.
             try { window.RLottie?.destroyWorkers?.(); } catch (_) {}
             const immediateItem = { ...localItem, is_shop_item: !isInventoryContext && localItem.is_shop_item === true };
             // Reuse the fresh signed asset delivered with catalogue/inventory.
@@ -6624,6 +6677,7 @@
                 try {
                     const data = await apiFetch(`${API_BASE}/inventory`);
                     inventoryData = Array.isArray(data) ? data : [];
+                    seedNftMediaFromItems(inventoryData);
                     const active = inventoryData.filter(i => !['withdrawn', 'disposed'].includes(i.status));
                 const activeContainer = document.getElementById('inventory-active-container');
                 activeContainer.innerHTML = '<div class="empty-state"><p>Подготавливаем модели инвентаря…</p></div>';
@@ -8583,7 +8637,7 @@
 
             void track.offsetWidth;
             requestAnimationFrame(() => {
-                track.style.transition = 'transform 6.5s cubic-bezier(0.1, 0.9, 0.1, 1)';
+                track.style.transition = 'transform 8.5s cubic-bezier(0.1, 0.9, 0.1, 1)';
                 track.style.transform = `translateX(-${finalOffset}px)`;
                 requestAnimationFrame(checkTick);
             });
@@ -8594,7 +8648,7 @@
                 showWinItem(wonItem);
                 document.getElementById('case-back-btn').style.opacity = '1';
                 document.getElementById('case-back-btn').style.pointerEvents = 'auto';
-            }, 7000);
+            }, 9000);
         }
 
         function showWinItem(wonItem) {

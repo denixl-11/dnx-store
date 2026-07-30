@@ -84,7 +84,10 @@ var RLottieWorker = (function() {
 
   function initApi() {
     worker.Api = {
-      init: Module.cwrap('lottie_init', '', []),
+      // lottie_init returns the renderer handle. Declaring it as void made
+      // every player lose that pointer, so destroy() could not release the
+      // previous animation and the next catalogue item aborted on frame 0.
+      init: Module.cwrap('lottie_init', 'number', []),
       destroy: Module.cwrap('lottie_destroy', '', ['number']),
       resize: Module.cwrap('lottie_resize', '', ['number', 'number', 'number']),
       buffer: Module.cwrap('lottie_buffer', 'number', ['number']),
