@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.31" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.32" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -3627,7 +3627,7 @@
         /* The storefront is a frozen Telegram preview, cropped just enough to
            make the collectible read larger without clipping its silhouette. */
         .nft-preview-shell--catalog > .nft-instant-preview {
-            transform: scale(1.09) !important;
+            transform: none !important;
         }
         /* Case-origin previews remain visible immediately, with one neutral
            overlay owned by the shell. There is never a second inner square. */
@@ -3704,6 +3704,28 @@
         #nft-modal-media[data-case-origin="true"] > .nft-live-pattern {
             display: block !important;
         }
+
+        /* Catalogue starts with Telegram's instant raster and upgrades in
+           place to a 384px transparent TGS model on the reconstructed vector
+           background. The low-resolution raster is then fully removed. */
+        .nft-catalog-upgrade {
+            --nft-bg-a: #3e245d;
+            --nft-bg-b: #160d27;
+            background: radial-gradient(circle at 50% 45%, var(--nft-bg-a), var(--nft-bg-b) 82%) !important;
+        }
+        .nft-catalog-upgrade > .nft-instant-preview { z-index: 1 !important; transition: opacity 120ms linear; }
+        .nft-catalog-upgrade > .nft-live-pattern { display: none !important; z-index: 2 !important; opacity: .22 !important; }
+        .nft-catalog-upgrade > .nft-catalog-hires-frame {
+            position: absolute !important;
+            inset: 12% !important;
+            z-index: 3 !important;
+            width: 76% !important;
+            height: 76% !important;
+            object-fit: contain !important;
+            background: transparent !important;
+        }
+        .nft-catalog-upgrade.has-hires-model > .nft-instant-preview { opacity: 0 !important; }
+        .nft-catalog-upgrade.has-hires-model > .nft-live-pattern { display: block !important; }
     </style>
 </head>
 <body>
@@ -4085,7 +4107,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.31"></script>
+    <script src="tgsticker.js?v=8.9-opt.32"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4117,10 +4139,10 @@
             (deviceMemoryGb > 0 && deviceMemoryGb <= 4) ||
             (logicalCores > 0 && logicalCores <= 4)
         );
-        const nftCardRenderRatio = lowPowerNftDevice ? 1.15 : (isAndroidPlatform ? 1.4 : 1.6);
+        const nftCardRenderRatio = lowPowerNftDevice ? 1.15 : (isAndroidPlatform ? 1.35 : 1.5);
         // Only the characteristics sheet plays TGS, so it can use a sharper
         // canvas without multiplying memory use across catalogue cards.
-        const nftModalRenderRatio = lowPowerNftDevice ? 1.4 : (isAndroidPlatform ? 1.7 : 2);
+        const nftModalRenderRatio = lowPowerNftDevice ? 1.25 : (isAndroidPlatform ? 1.5 : 1.75);
         document.documentElement.classList.toggle('android-device', isAndroidPlatform);
         document.documentElement.classList.toggle('low-power-device', lowPowerNftDevice);
         if (window.RLottie) {
@@ -4204,7 +4226,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.31';
+        const EXPECTED_API_RELEASE = '8.9-opt.32';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -4391,9 +4413,11 @@
         const nftSynchronizedPlaybackBatches = new Map();
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v931';
-        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v931';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v932';
+        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v932';
         const nftPosterRetryTimers = new Map();
+        const activePosterRenderCancels = new Set();
+        let nftModalPriorityActive = false;
         let nftPosterDbPromise = null;
         let nftPosterDbRestorePromise = Promise.resolve();
         let nftPosterDbWriteCount = 0;
@@ -4413,6 +4437,18 @@
         let inventoryRequest = null;
         let cartRenderToken = 0;
         let inventoryRenderToken = 0;
+
+        function cancelBackgroundPosterRenders() {
+            [...activePosterRenderCancels].forEach(cancel => {
+                try { cancel(); } catch (_) {}
+            });
+        }
+
+        async function waitForModalMediaPriority() {
+            while (nftModalPriorityActive) {
+                await new Promise(resolve => setTimeout(resolve, 120));
+            }
+        }
 
         function setNftMediaCache(cacheKey, entry) {
             nftMediaCache.delete(cacheKey);
@@ -5231,7 +5267,10 @@
                     maxDeviceRatio: isModal ? nftModalRenderRatio : nftCardRenderRatio,
                     noAutoPlay: true,
                     findPosterFrame: true,
-                    trackFrameVisibility: isModal,
+                    // Once the first real alpha frame is found, do not scan a
+                    // full RGBA canvas on every animation frame. That scan was
+                    // the main source of modal stutter on Telegram mobile.
+                    trackFrameVisibility: false,
                     // 1 keeps only frame zero in JS memory; workers render the
                     // remaining frames. This avoids iOS WebView memory pressure.
                     cachingModulo: 1
@@ -6049,6 +6088,8 @@
             if (!localItem || (isInventoryContext && isSimpleInventoryNft(localItem))) return;
 
             nftTapFeedback();
+            nftModalPriorityActive = true;
+            cancelBackgroundPosterRenders();
             // Every opening receives a fresh descriptor/player. The old modal
             // must never inherit a completed or failed playback state.
             nftMediaCache.delete(Number(id));
@@ -6094,6 +6135,7 @@
             const modalMedia = document.getElementById('nft-modal-media');
             modalMedia.dataset.mediaWanted = 'false';
             deactivateNftMedia(modalMedia);
+            nftModalPriorityActive = false;
             currentNftItem = null;
         }
 
@@ -6121,8 +6163,14 @@
             if (directPreview && !caseOrigin) {
                 const tag = allowOpen ? 'button' : 'div';
                 const action = allowOpen ? ` type="button" onclick="openNftModal(${itemId}, '${modalContext}')"` : '';
-                return `<${tag} class="item-image nft-preview-shell nft-preview-shell--${variant}${caseOrigin ? ' nft-preview-shell--case' : ''}" aria-label="${title}"${action}>
+                const catalogUpgrade = variant === 'catalog';
+                const hiresPoster = catalogUpgrade
+                    ? safeGeneratedPosterUrl(nftPosterFrameCache.get(`item:${itemId}`))
+                    : '';
+                return `<${tag} class="item-image nft-preview-shell nft-preview-shell--${variant}${catalogUpgrade ? ` nft-catalog-upgrade${hiresPoster ? ' has-hires-model' : ''}` : ''}${caseOrigin ? ' nft-preview-shell--case' : ''}"${catalogUpgrade ? ` data-item-id="${itemId}"` : ''} aria-label="${title}"${action}>
                     <img class="nft-instant-preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high" onerror="retryNftPreviewImage(this)">
+                    ${catalogUpgrade ? '<span class="nft-live-pattern" aria-hidden="true"></span>' : ''}
+                    ${hiresPoster ? `<img class="nft-catalog-hires-frame" src="${escapeHtml(hiresPoster)}" alt="${title}" decoding="async">` : ''}
                 </${tag}>`;
             }
             const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(`item:${itemId}`));
@@ -6427,6 +6475,8 @@
                     inventoryData = Array.isArray(data) ? data : [];
                     const active = inventoryData.filter(i => !['withdrawn', 'disposed'].includes(i.status));
                 const activeContainer = document.getElementById('inventory-active-container');
+                activeContainer.innerHTML = '<div class="empty-state"><p>Подготавливаем модели инвентаря…</p></div>';
+                await warmItemNftPosters(active.filter(isCaseOriginItem));
                 destroyAuxNftMedia(activeContainer);
                 if (renderToken !== inventoryRenderToken) return;
                 activeContainer.innerHTML = active.length
@@ -7755,7 +7805,9 @@
 
         function prefetchCaseDetails(cases) {
             const run = () => (cases || []).forEach(entry => {
-                getCaseDetails(entry.id, true).catch(() => {});
+                // Cache JSON only. Model decoding is started by the selected
+                // case and completes before that case becomes interactive.
+                getCaseDetails(entry.id, false).catch(() => {});
             });
             if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 1400 });
             else setTimeout(run, 120);
@@ -7871,13 +7923,26 @@
                 image.src = posterUrl;
                 slot.replaceWith(image);
             });
+            document.querySelectorAll(`.nft-catalog-upgrade[data-item-id="${Number(itemId)}"]`).forEach(surface => {
+                let image = surface.querySelector('.nft-catalog-hires-frame');
+                if (!(image instanceof HTMLImageElement)) {
+                    image = new Image();
+                    image.className = 'nft-catalog-hires-frame';
+                    image.alt = surface.getAttribute('aria-label') || '';
+                    image.decoding = 'async';
+                    surface.appendChild(image);
+                }
+                image.onload = () => surface.classList.add('has-hires-model');
+                image.src = posterUrl;
+                if (image.complete) surface.classList.add('has-hires-model');
+            });
         }
 
         function applyItemMediaTheme(itemId, media) {
             const colors = Array.isArray(media?.colors)
                 ? media.colors.filter(color => /^#[0-9a-fA-F]{6}$/.test(color)).slice(0, 2)
                 : [];
-            document.querySelectorAll(`.nft-aux-zero-media--themed[data-item-id="${Number(itemId)}"]`).forEach(element => {
+            document.querySelectorAll(`.nft-aux-zero-media--themed[data-item-id="${Number(itemId)}"], .nft-catalog-upgrade[data-item-id="${Number(itemId)}"]`).forEach(element => {
                 element.style.setProperty('--nft-bg-a', colors[0] || '#3e245d');
                 element.style.setProperty('--nft-bg-b', colors[1] || '#160d27');
                 renderSparseNftPattern(
@@ -7898,17 +7963,19 @@
             if (!itemId || !tgsUrl || !window.RLottie?.isSupported) return Promise.resolve('');
 
             const request = new Promise(resolve => {
-                const size = 256;
+                const size = 384;
                 let rawPlayer = null;
                 let settled = false;
                 let frameCount = 0;
                 let framePlan = [];
                 let frameCursor = 0;
                 let stallRecoveryTimer = 0;
+                let cancelRender = null;
                 const finish = posterUrl => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(stallRecoveryTimer);
+                    if (cancelRender) activePosterRenderCancels.delete(cancelRender);
                     try { rawPlayer?.destroy?.(); } catch (_) {}
                     rawPlayer = null;
                     const safePoster = safeGeneratedPosterUrl(posterUrl);
@@ -7918,6 +7985,8 @@
                     }
                     resolve(safePoster);
                 };
+                cancelRender = () => finish('');
+                activePosterRenderCancels.add(cancelRender);
                 const renderNext = () => {
                     if (settled || !rawPlayer || frameCursor >= framePlan.length) return finish('');
                     try { rawPlayer.renderFrame(framePlan[frameCursor++]); }
@@ -7964,6 +8033,7 @@
         async function ensureItemPoster(itemId, allowBackgroundRetry = true) {
             itemId = Number(itemId);
             if (!itemId) return false;
+            await waitForModalMediaPriority();
             const cacheKey = `item:${itemId}`;
             try {
                 const media = await getNftMedia(itemId);
@@ -7993,17 +8063,41 @@
                 .map(item => Number(item?.id || 0))
                 .filter(Boolean))];
             if (!itemIds.length) return;
-            await Promise.allSettled(itemIds.map(itemId => ensureItemPoster(itemId)));
+            const ensureReady = async itemId => {
+                const cacheKey = `item:${itemId}`;
+                while (!safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) {
+                    await waitForModalMediaPriority();
+                    if (await ensureItemPoster(itemId, false)) return true;
+                    nftMediaCache.delete(itemId);
+                    await new Promise(resolve => setTimeout(resolve, 750));
+                }
+                return true;
+            };
+            await runNftPosterJobs(itemIds, ensureReady);
+        }
+
+        async function runNftPosterJobs(values, job, concurrency = 3) {
+            const queue = [...values];
+            let cursor = 0;
+            const worker = async () => {
+                while (cursor < queue.length) {
+                    const value = queue[cursor++];
+                    await job(value);
+                }
+            };
+            await Promise.allSettled(Array.from(
+                { length: Math.min(concurrency, queue.length) }, worker
+            ));
         }
 
         async function warmAuxNftPosters(root = document) {
             // Theme data must be restored even when a poster PNG already came
             // from IndexedDB. Looking only for pending frames left cached cards
             // on the generic purple fallback after returning to a tab.
-            const surfaces = [...root.querySelectorAll('.nft-aux-zero-media[data-item-id]')];
+            const surfaces = [...root.querySelectorAll('.nft-aux-zero-media[data-item-id], .nft-catalog-upgrade[data-item-id]')];
             const itemIds = [...new Set(surfaces.map(surface => Number(surface.dataset.itemId)).filter(Boolean))];
             if (!itemIds.length) return;
-            await Promise.allSettled(itemIds.map(itemId => ensureItemPoster(itemId)));
+            await runNftPosterJobs(itemIds, itemId => ensureItemPoster(itemId), 2);
         }
 
         function renderCasePosterFrame(caseId, dropIndex, media) {
@@ -8015,17 +8109,19 @@
             if (!tgsUrl || !window.RLottie?.isSupported) return Promise.resolve('');
 
             const request = new Promise(resolve => {
-                const size = 256;
+                const size = 384;
                 let rawPlayer = null;
                 let settled = false;
                 let frameCount = 0;
                 let framePlan = [];
                 let frameCursor = 0;
                 let stallRecoveryTimer = 0;
+                let cancelRender = null;
                 const finish = posterUrl => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(stallRecoveryTimer);
+                    if (cancelRender) activePosterRenderCancels.delete(cancelRender);
                     try { rawPlayer?.destroy?.(); } catch (_) {}
                     rawPlayer = null;
                     const safePoster = safeGeneratedPosterUrl(posterUrl);
@@ -8035,6 +8131,8 @@
                     }
                     resolve(safePoster);
                 };
+                cancelRender = () => finish('');
+                activePosterRenderCancels.add(cancelRender);
                 const renderNext = () => {
                     if (settled || !rawPlayer || frameCursor >= framePlan.length) return finish('');
                     try { rawPlayer.renderFrame(framePlan[frameCursor++]); }
@@ -8096,6 +8194,7 @@
                     const dropIndex = Number(drop.drop_index);
                     const cacheKey = `case:${caseId}:${dropIndex}`;
                     while (!safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) {
+                        await waitForModalMediaPriority();
                         try {
                             const media = await getCaseNftMedia(caseId, dropIndex);
                             if (media?.animated && await renderCasePosterFrame(caseId, dropIndex, media)) return true;
@@ -8105,7 +8204,7 @@
                     }
                     return true;
             };
-            return Promise.allSettled(drops.map(warmDrop));
+            return runNftPosterJobs(drops, warmDrop);
         }
 
         function scheduleCasePosterPrewarm(caseData) {
@@ -8158,6 +8257,7 @@
             if (!caseId || dropIndex < 0) return false;
             const cacheKey = `case:${caseId}:${dropIndex}`;
             while (!safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) {
+                await waitForModalMediaPriority();
                 try {
                     const media = await getCaseNftMedia(caseId, dropIndex);
                     if (media?.animated && await renderCasePosterFrame(caseId, dropIndex, media)) return true;
@@ -8212,6 +8312,13 @@
                 const sortedDrops = [...currentCase.drops].sort((a, b) => a.chance - b.chance);
                 const dropList = document.getElementById('case-drop-list');
                 destroyAuxNftMedia(dropList);
+                dropList.innerHTML = '<div style="grid-column:1/-1;padding:26px 10px;text-align:center;color:#c89bd8;font-size:.72rem;">ПОДГОТАВЛИВАЕМ ВСЕ МОДЕЛИ…</div>';
+                // Never reveal a half-ready case. A bounded decoder pool
+                // prepares every transparent model first; only then is the
+                // complete grid and roulette mounted into the DOM.
+                casePosterWarmupPromise = scheduleCasePosterPrewarm(currentCase);
+                await casePosterWarmupPromise;
+                if (openToken !== caseDetailOpenToken || !overlay.classList.contains('active')) return;
                 dropList.innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
                         <span class="drop-media-shell${d.has_live_nft ? ' drop-media-shell--live' : ''}">
@@ -8221,11 +8328,6 @@
                         <span class="drop-name">${escapeHtml(d.model || d.name)}</span>
                     </div>
                 `).join('');
-                // Decode frame zero in the background. applyCasePosterFrame()
-                // replaces only matching pending slots, so closing or changing
-                // a case cannot inject stale artwork into another modal.
-                casePosterWarmupPromise = scheduleCasePosterPrewarm(currentCase).catch(() => {});
-
                 rouletteActive = false;
                 caseOpeningRequestActive = false;
                 currentWonItem = null;
@@ -8590,10 +8692,6 @@
         updateBalance();
         clearLegacyCatalogSnapshots();
         loadCatalog(true);
-        // Fetch and render the hidden inventory now, not on the first Profile
-        // tap. Its case-origin model posters can then decode off-screen and
-        // every product is already present when the tab becomes visible.
-        loadInventory();
         const prewarmCasesInBackground = () => {
             getCases().then(cases => prefetchCaseDetails(cases)).catch(() => {});
         };
