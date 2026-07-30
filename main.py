@@ -121,7 +121,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.28"
+API_RELEASE = "8.9-opt.29"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 NFT_TGS_BINARY_TTL = 6 * 60 * 60
@@ -1142,13 +1142,18 @@ def make_nft_asset_path(source_url: str) -> str:
 
 
 def make_nft_preview_path(source_url: str) -> str:
-    """Return a signed same-origin Telegram preview URL.
+    """Return a stable same-origin Telegram preview URL.
 
     Ordinary browser images load independently and in parallel, so catalogue,
     cart, inventory and case grids never wait for the RLottie worker queue.
+    Unlike an expiring asset token, the strict Telegram slug remains valid in
+    a saved cart and throughout a long-running Mini App session.
     """
-    asset_path = make_nft_asset_path(source_url)
-    return asset_path.replace("/nft/tgs?", "/nft/preview?", 1) if asset_path else ""
+    source_url = canonical_telegram_nft_url(source_url)
+    if not source_url:
+        return ""
+    slug = urlparse(source_url).path.removeprefix("/nft/").strip("/")
+    return f"/nft/preview?slug={urlencode({'value': slug})[6:]}"
 
 
 def add_nft_preview_path(record: dict) -> dict:
@@ -2718,7 +2723,7 @@ async def fetch_telegram_preview_bytes(source_url: str) -> tuple[str, bytes]:
 
     async def load() -> tuple[str, bytes]:
         last_error: Exception | None = None
-        for attempt in range(3):
+        for attempt in range(5):
             try:
                 if attempt:
                     nft_media_cache.pop(source_url, None)
@@ -2747,6 +2752,8 @@ async def fetch_telegram_preview_bytes(source_url: str) -> tuple[str, bytes]:
                 return content_type, data
             except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
                 last_error = exc
+                if attempt < 4:
+                    await asyncio.sleep(0.15 * (attempt + 1))
         raise web.HTTPBadGateway(text=f"NFT preview unavailable: {last_error}")
 
     request = nft_preview_requests.get(source_url)
@@ -2777,7 +2784,11 @@ async def handle_nft_tgs_asset(request):
 
 
 async def handle_nft_preview_asset(request):
-    source_url = parse_nft_asset_token(request.query.get("token", ""))
+    slug = str(request.query.get("slug", "")).strip()
+    source_url = canonical_telegram_nft_url(f"https://t.me/nft/{slug}") if slug else ""
+    # Backward compatibility for a tab that was opened on the previous build.
+    if not source_url:
+        source_url = parse_nft_asset_token(request.query.get("token", ""))
     if not source_url:
         raise web.HTTPForbidden(text="Invalid or expired NFT preview token")
     content_type, data = await fetch_telegram_preview_bytes(source_url)

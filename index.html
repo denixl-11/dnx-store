@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.28" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.29" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -3598,7 +3598,7 @@
             .activity-icon { width: 29px; height: 29px; }
             .activity-value { min-width: 58px; }
         }
-        /* opt.28: previews are ordinary parallel browser images. Catalogue,
+        /* opt.29: previews are ordinary parallel browser images. Catalogue,
            cart and catalogue-origin inventory use Telegram's square as-is. */
         .nft-preview-shell {
             position: relative !important;
@@ -4057,7 +4057,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.28"></script>
+    <script src="tgsticker.js?v=8.9-opt.29"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4174,7 +4174,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.28';
+        const EXPECTED_API_RELEASE = '8.9-opt.29';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -4542,6 +4542,20 @@
                 if (url.origin === apiOrigin && url.pathname === '/nft/preview') return url.href;
                 return safeTelegramMediaUrl(url.href);
             } catch (_) { return ''; }
+        }
+
+        function retryNftPreviewImage(image) {
+            if (!(image instanceof HTMLImageElement)) return;
+            const retries = Number(image.dataset.previewRetries || 0);
+            if (retries >= 4) return;
+            image.dataset.previewRetries = String(retries + 1);
+            const original = image.dataset.previewSource || image.currentSrc || image.src;
+            image.dataset.previewSource = original;
+            try {
+                const url = new URL(original);
+                url.searchParams.set('_retry', `${Date.now()}-${retries + 1}`);
+                setTimeout(() => { if (image.isConnected) image.src = url.href; }, 180 * (retries + 1));
+            } catch (_) {}
         }
 
         function safeGeneratedPosterUrl(value) {
@@ -5982,6 +5996,7 @@
                     modalZeroFrame.className = 'nft-modal-zero-frame';
                     modalZeroFrame.alt = '';
                     modalZeroFrame.decoding = 'async';
+                    modalZeroFrame.onerror = () => retryNftPreviewImage(modalZeroFrame);
                     modalMedia.prepend(modalZeroFrame);
                 }
                 if (modalZeroFrame.src !== modalFallbackUrl) modalZeroFrame.src = modalFallbackUrl;
@@ -6138,7 +6153,7 @@
                 const tag = allowOpen ? 'button' : 'div';
                 const action = allowOpen ? ` type="button" onclick="openNftModal(${itemId}, '${modalContext}')"` : '';
                 return `<${tag} class="item-image nft-preview-shell nft-preview-shell--${variant}${caseOrigin ? ' nft-preview-shell--case' : ''}" aria-label="${title}"${action}>
-                    <img class="nft-instant-preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">
+                    <img class="nft-instant-preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high" onerror="retryNftPreviewImage(this)">
                 </${tag}>`;
             }
             const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(`item:${itemId}`));
@@ -7809,7 +7824,7 @@
             const directPreview = safeNftPreviewUrl(drop?.nft_preview_path);
             if (directPreview) {
                 return `<div class="case-zero-media case-zero-media--preview" aria-label="${title}">
-                    <img class="case-zero-frame case-zero-frame--preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">
+                    <img class="case-zero-frame case-zero-frame--preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high" onerror="retryNftPreviewImage(this)">
                 </div>`;
             }
             const caseId = Number(currentCase?.id || 0);
@@ -7841,7 +7856,7 @@
             }
             const directPreview = safeNftPreviewUrl(drop?.nft_preview_path);
             if (directPreview) {
-                return `<img class="case-roulette-poster case-roulette-poster--preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+                return `<img class="case-roulette-poster case-roulette-poster--preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high" onerror="retryNftPreviewImage(this)">`;
             }
             if (livePoster) {
                 return `<img class="case-roulette-poster case-roulette-poster--live" src="${escapeHtml(livePoster)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
