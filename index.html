@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.38" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.39" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -2732,9 +2732,10 @@
         }
         .case-heading-spacer { width: 46px; height: 46px; }
         .case-bonus-badge {
-            padding: 3px 6px !important;
-            font-size: clamp(.4rem, 1.75vw, .48rem) !important;
-            letter-spacing: .025em !important;
+            margin-top: 3px !important;
+            padding: 2px 5px !important;
+            font-size: clamp(.32rem, 1.35vw, .39rem) !important;
+            letter-spacing: .018em !important;
             line-height: 1.1 !important;
         }
 
@@ -4142,7 +4143,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.38"></script>
+    <script src="tgsticker.js?v=8.9-opt.39"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4181,7 +4182,10 @@
         document.documentElement.classList.toggle('android-device', isAndroidPlatform);
         document.documentElement.classList.toggle('low-power-device', lowPowerNftDevice);
         if (window.RLottie) {
-            window.RLottie.WORKERS_LIMIT = Math.max(4, logicalCores || 4);
+            // Catalogue/cards are static; only one characteristics modal can
+            // animate at a time. A single fresh worker avoids iOS WebView
+            // stalls caused by recreating 4-12 unused WASM workers per tap.
+            window.RLottie.WORKERS_LIMIT = 1;
         }
         tg.ready();
         try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
@@ -4261,7 +4265,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.38';
+        const EXPECTED_API_RELEASE = '8.9-opt.39';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -5329,7 +5333,10 @@
             try {
                 window.RLottie.init(picture, {
                     maxDeviceRatio: isModal ? nftModalRenderRatio : nftCardRenderRatio,
-                    maxRenderDimension: 384,
+                    // The modal is at most ~300 CSS px wide on a phone. A
+                    // 320px canvas stays sharp while avoiding long stalls on
+                    // complex Telegram gifts in iOS WebView.
+                    maxRenderDimension: 320,
                     noAutoPlay: true,
                     findPosterFrame: true,
                     // Once the first real alpha frame is found, do not scan a
@@ -6227,6 +6234,11 @@
             nftTapFeedback();
             nftModalPriorityActive = true;
             cancelBackgroundPosterRenders();
+            // Always destroy the previous modal player before recycling its
+            // worker. This keeps every catalogue item on the exact same clean
+            // one-shot path and prevents a proxy from targeting a terminated
+            // worker when characteristics are opened repeatedly.
+            deactivateNftMedia(document.getElementById('nft-modal-media'));
             // Poster generation and modal playback must never share a used
             // WASM arena.  The bundled RLottie allocator can stay fragmented
             // after many static frames even when individual handles are

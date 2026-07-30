@@ -12,7 +12,8 @@ var RLottie = (function () {
   // Follow the device's actual parallel capacity instead of imposing the old
   // fixed four-worker bottleneck. Preview grids no longer consume workers;
   // these workers are reserved for requested characteristics animations.
-  rlottie.WORKERS_LIMIT = Math.max(4, Number(window.navigator.hardwareConcurrency) || 4);
+  // The application animates only one characteristics modal at a time.
+  rlottie.WORKERS_LIMIT = 1;
 
   var reqId = 0;
   var mainLoopAf = false;
@@ -139,7 +140,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.38', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.39', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -197,6 +198,7 @@ var RLottie = (function () {
     rlPlayer.el = el;
     rlPlayer.frameNo = false;
     rlPlayer.nextFrameNo = false;
+    rlPlayer.frameStep = 1;
     rlPlayer.frames = {};
     rlPlayer.width = Math.trunc(pic_width * curDeviceRatio);
     rlPlayer.height = Math.trunc(pic_height * curDeviceRatio);
@@ -434,7 +436,10 @@ var RLottie = (function () {
         (!frameNo || (rlPlayer.options.cachingModulo && ((reqId + frameNo) % rlPlayer.options.cachingModulo)))) {
       rlPlayer.frames[frameNo] = new Uint8ClampedArray(frame)
     }
-    var prevNo = frameNo > 0 ? frameNo - 1 : rlPlayer.frameCount - 1;
+    var frameStep = Math.max(1, rlPlayer.frameStep || 1);
+    var prevNo = frameNo > 0
+      ? Math.max(0, frameNo - frameStep)
+      : Math.floor((rlPlayer.frameCount - 1) / frameStep) * frameStep;
     var lastQueueFrame = rlPlayer.frameQueue.last();
     if (lastQueueFrame &&
         lastQueueFrame.no != prevNo) {
@@ -444,7 +449,7 @@ var RLottie = (function () {
       no: frameNo,
       frame: frame
     });
-    var nextFrameNo = ++frameNo;
+    var nextFrameNo = frameNo + frameStep;
     if (nextFrameNo >= rlPlayer.frameCount) {
       nextFrameNo = 0;
       if (rlPlayer.times.length) {
@@ -474,11 +479,17 @@ var RLottie = (function () {
     rlPlayer.context = rlPlayer.canvas.getContext('2d');
 
     rlPlayer.fps = fps;
-    rlPlayer.frameInterval = 1000 / rlPlayer.fps;
+    // Telegram NFTs are commonly authored at 60 FPS. Rendering every source
+    // frame through WASM makes several complex models take 10-20 seconds on
+    // iPhone. Preserve the source timing while drawing at most 30 FPS; skipped
+    // in-between frames are never visible and the complete cycle still ends
+    // on the model's frame zero exactly once.
+    rlPlayer.frameStep = Math.max(1, Math.ceil(rlPlayer.fps / 30));
+    rlPlayer.frameInterval = 1000 * rlPlayer.frameStep / rlPlayer.fps;
     rlPlayer.frameThen = Date.now();
     rlPlayer.frameCount = frameCount;
     rlPlayer.forceRender = true;
-    rlPlayer.frameQueue = new FrameQueue(fps / 4);
+    rlPlayer.frameQueue = new FrameQueue(Math.max(2, Math.ceil((fps / rlPlayer.frameStep) / 4)));
     setupMainLoop();
     requestFrame(reqId, 0);
     triggerEvent(rlPlayer.el, 'tg:load');
@@ -656,7 +667,7 @@ var RLottie = (function () {
   RawPlayer.prototype.loadFromUrl = function(url) {
     if (this.worker) return;
     var self = this;
-    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.38', document.baseURI).href;
+    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.39', document.baseURI).href;
     this.worker = new Worker(workerUrl);
     this.worker.onmessage = function(event) {
       var data = event && event.data || {};
