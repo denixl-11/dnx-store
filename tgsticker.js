@@ -136,7 +136,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.26', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.27', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -794,8 +794,13 @@ var QueryableWorkerProxy = (function() {
     if (finished) {
       if (proxy.items.length == 1) {
         var loadedFrame = proxy.items[0].frameLoaded[frameNo];
-        proxy.onFrame(proxy.playerId, frameNo, loadedFrame);
+        // The callback may synchronously destroy a one-shot RawPlayer after a
+        // valid poster is found. Clear the bookkeeping first; doing it after
+        // the callback accessed proxy.items[0] after destroy() had emptied the
+        // array, threw an exception in the shared worker listener and left the
+        // remaining case cards as permanent grey shells.
         delete proxy.items[0].frameLoaded[frameNo];
+        proxy.onFrame(proxy.playerId, frameNo, loadedFrame);
       } else {
         var promises = [];
         for (var i = 0; i < proxy.items.length; i++) {
