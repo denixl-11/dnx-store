@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.44" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.45" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -982,6 +982,7 @@
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             text-align: center; color: #9e929f;
         }
+        #catalog-filter-empty[hidden] { display: none !important; }
         .empty-state-icon {
             display: grid; place-items: center; width: 148px; height: 148px;
             border: 1px solid rgba(205, 57, 255, .3); border-radius: 50%;
@@ -4187,7 +4188,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.44"></script>
+    <script src="tgsticker.js?v=8.9-opt.45"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4309,7 +4310,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.44';
+        const EXPECTED_API_RELEASE = '8.9-opt.45';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -4684,10 +4685,22 @@
         function retryNftPreviewImage(image) {
             if (!(image instanceof HTMLImageElement)) return;
             const retries = Number(image.dataset.previewRetries || 0);
-            if (retries >= 4) return;
+            // Safari paints its blue broken-image badge over the NFT while a
+            // preview request is being retried. Hide only the failed <img>;
+            // the themed static cover underneath remains visible until either
+            // the preview recovers or the first real TGS frame arrives.
+            image.style.visibility = 'hidden';
+            if (retries >= 4) {
+                image.removeAttribute('src');
+                return;
+            }
             image.dataset.previewRetries = String(retries + 1);
             const original = image.dataset.previewSource || image.currentSrc || image.src;
             image.dataset.previewSource = original;
+            image.addEventListener('load', () => {
+                image.style.removeProperty('visibility');
+                image.dataset.previewRetries = '0';
+            }, { once: true });
             try {
                 const url = new URL(original);
                 url.searchParams.set('_retry', `${Date.now()}-${retries + 1}`);
@@ -5245,6 +5258,7 @@
             let settleLoadSlot;
             let loadSlotSettled = false;
             let stallRecoveryTimer = 0;
+            let posterGraceTimer = 0;
             const loadSlot = new Promise(resolve => { settleLoadSlot = resolve; });
             const settleLoad = result => {
                 if (loadSlotSettled) return;
@@ -5254,6 +5268,8 @@
             const failMediaLoad = (retry = true) => {
                 if (stallRecoveryTimer) clearTimeout(stallRecoveryTimer);
                 stallRecoveryTimer = 0;
+                if (posterGraceTimer) clearTimeout(posterGraceTimer);
+                posterGraceTimer = 0;
                 settleLoad(false);
                 leaveNftSynchronizedPlaybackBatch(element);
                 try { window.RLottie?.destroy?.(picture); } catch (_) {}
@@ -5283,6 +5299,10 @@
                     }
                     return;
                 }
+                if (stallRecoveryTimer) clearTimeout(stallRecoveryTimer);
+                stallRecoveryTimer = 0;
+                if (posterGraceTimer) clearTimeout(posterGraceTimer);
+                posterGraceTimer = 0;
                 picture.dataset.playStarted = 'true';
                 element.dataset.mediaRetries = '0';
                 element.dataset.mediaState = 'live';
@@ -5305,16 +5325,17 @@
                     failMediaLoad(false);
                     return;
                 }
-                if (stallRecoveryTimer) clearTimeout(stallRecoveryTimer);
-                stallRecoveryTimer = 0;
-                // Decoding continues while the deterministic poster remains
-                // visible. Playback begins only after RLottie has rendered a
-                // genuine model frame, so no transparent frame-zero flash can
-                // appear between the static cover and the one-shot cycle.
+                // Most stickers expose a rendered poster immediately. Some
+                // valid Telegram TGS files do not complete the paused poster
+                // scan, though, so give that path a brief head start and then
+                // begin the same one-shot cycle. The static cover remains
+                // visible until RLottie reports the first non-transparent
+                // frame, preventing a blank flash during this fallback.
+                posterGraceTimer = setTimeout(playLoadedAnimationOnce, 240);
             }, { once: true });
             picture.addEventListener('tg:poster-ready', (posterEvent) => {
-                if (stallRecoveryTimer) clearTimeout(stallRecoveryTimer);
-                stallRecoveryTimer = 0;
+                if (posterGraceTimer) clearTimeout(posterGraceTimer);
+                posterGraceTimer = 0;
                 if (!element.isConnected || element.dataset.mediaToken !== mediaToken) {
                     failMediaLoad(false);
                     return;
@@ -5326,12 +5347,10 @@
                     element.classList.add('is-live', 'has-live-frame', 'has-current-frame');
                     captureNftGeneratedPoster(element, picture);
                 }
-                if (hasVisibleFrame) {
-                    settleLoad(true);
-                    playLoadedAnimationOnce();
-                } else {
-                    failMediaLoad(true);
-                }
+                // Even when the paused scan did not detect pixels, let the
+                // live pass render once. This covers valid stickers whose
+                // first visible layer is time-dependent or mask-driven.
+                playLoadedAnimationOnce();
             }, { once: true });
             picture.addEventListener('tg:error', errorEvent => {
                 element.dataset.mediaError = String(errorEvent.detail?.reason || 'worker_error');
