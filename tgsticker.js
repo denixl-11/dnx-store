@@ -139,7 +139,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.33b', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.34', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -634,12 +634,13 @@ var RLottie = (function () {
     /* need_clamped=false below makes the worker allocate a fresh
        Uint8ClampedArray per frame, so the caller may mutate it (e.g.
        recolour) without affecting subsequent frames. */
-    this.proxy = QueryableWorkerProxy.create(
-      this.reqId,
-      this._onFrame.bind(this),
-      this._onLoaded.bind(this),
-      this._onError.bind(this)
-    );
+    // Poster extraction must not share the long-lived modal WASM pool.
+    // A case can contain many unrelated, large TGS files; reusing the same
+    // fixed WASM heaps made one fragmented worker fail every later card and
+    // left the UI as a grid of #242424 shells.  Each RawPlayer owns a tiny,
+    // short-lived worker and releases its entire heap after one poster.
+    this.worker = null;
+    this.loaded = false;
   }
   RawPlayer.prototype._onLoaded = function(playerId, frameCount, fps) {
     this.frameCount = frameCount;
@@ -653,17 +654,48 @@ var RLottie = (function () {
     if (this.onFrame) this.onFrame(-1, null);
   };
   RawPlayer.prototype.loadFromUrl = function(url) {
-    this.proxy.loadFromData([{url: url}], this.width, this.height);
+    if (this.worker) return;
+    var self = this;
+    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.34', document.baseURI).href;
+    this.worker = new Worker(workerUrl);
+    this.worker.onmessage = function(event) {
+      var data = event && event.data || {};
+      var method = data.queryMethodListener;
+      var args = data.queryMethodArguments || [];
+      if (method === 'ready') {
+        if (!self.worker) return;
+        self.worker.postMessage({
+          queryMethod: 'loadFromData',
+          queryMethodArguments: [self.reqId, url, self.width, self.height]
+        });
+      } else if (method === 'loaded' && args[0] === self.reqId) {
+        self._onLoaded.apply(self, args);
+      } else if (method === 'frame' && args[0] === self.reqId) {
+        self._onFrame.apply(self, args);
+      } else if (method === 'error' && args[0] === self.reqId) {
+        self._onError.apply(self, args);
+      }
+    };
+    this.worker.onerror = function() { self._onError(self.reqId, 'isolated_worker_error'); };
   };
   RawPlayer.prototype.renderFrame = function(frameNo) {
-    this.proxy.renderFrame(frameNo, false);
+    if (!this.worker) return;
+    this.worker.postMessage({
+      queryMethod: 'renderFrame',
+      queryMethodArguments: [this.reqId, frameNo, false]
+    });
   };
   RawPlayer.prototype.destroy = function() {
-    // Use the proxy's canonical teardown so request-to-proxy maps are also
-    // cleared. Leaving those maps behind made late worker frames target a new
-    // card after repeated tab switches.
-    if (this.proxy) this.proxy.destroy();
-    this.proxy = null;
+    if (this.worker) {
+      try {
+        this.worker.postMessage({
+          queryMethod: 'destroy',
+          queryMethodArguments: [this.reqId]
+        });
+      } catch (_) {}
+      this.worker.terminate();
+    }
+    this.worker = null;
     this.onReady = null;
     this.onFrame = null;
   };

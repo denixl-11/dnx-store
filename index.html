@@ -4230,7 +4230,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.33';
+        const EXPECTED_API_RELEASE = '8.9-opt.34';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -4417,8 +4417,8 @@
         const nftSynchronizedPlaybackBatches = new Map();
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v935';
-        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v935';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v938';
+        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v938';
         const nftPosterRetryTimers = new Map();
         const activePosterRenderCancels = new Set();
         let nftModalPriorityActive = false;
@@ -8086,10 +8086,7 @@
                     catch (_) { finish(''); }
                 };
                 try {
-                    window.RLottie.initWorkers(() => {
-                        if (settled) return;
-                        try {
-                            rawPlayer = window.RLottie.createRawPlayer(
+                    rawPlayer = window.RLottie.createRawPlayer(
                                 size,
                                 size,
                                 count => {
@@ -8113,9 +8110,7 @@
                                     } catch (_) { finish(''); }
                                 }
                             );
-                            rawPlayer.loadFromUrl(tgsUrl);
-                        } catch (_) { finish(''); }
-                    });
+                    rawPlayer.loadFromUrl(tgsUrl);
                 } catch (_) { finish(''); }
                 stallRecoveryTimer = setTimeout(() => finish(''), 30000);
             }).finally(() => casePosterFrameRequests.delete(cacheKey));
@@ -8232,10 +8227,8 @@
                     try { rawPlayer.renderFrame(framePlan[frameCursor++]); }
                     catch (_) { finish(''); }
                 };
-                const start = () => {
-                    if (settled) return;
-                    try {
-                        rawPlayer = window.RLottie.createRawPlayer(
+                try {
+                    rawPlayer = window.RLottie.createRawPlayer(
                             size,
                             size,
                             count => {
@@ -8264,13 +8257,7 @@
                                 } catch (_) { finish(''); }
                             }
                         );
-                        rawPlayer.loadFromUrl(tgsUrl);
-                    } catch (_) { finish(''); }
-                };
-                try {
-                    // RawPlayer uses the same initialized worker pool but does
-                    // not allocate or register a visible DOM/canvas player.
-                    window.RLottie.initWorkers(start);
+                    rawPlayer.loadFromUrl(tgsUrl);
                 } catch (_) { finish(''); }
                 stallRecoveryTimer = setTimeout(() => finish(''), 30000);
             }).finally(() => casePosterFrameRequests.delete(cacheKey));
