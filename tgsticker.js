@@ -136,7 +136,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.24', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.26', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -197,7 +197,7 @@ var RLottie = (function () {
     rlPlayer.frames = {};
     rlPlayer.width = Math.trunc(pic_width * curDeviceRatio);
     rlPlayer.height = Math.trunc(pic_height * curDeviceRatio);
-    rlPlayer.workerProxy = QueryableWorkerProxy.create(rlPlayer.reqId, onFrame, onLoaded);
+    rlPlayer.workerProxy = QueryableWorkerProxy.create(rlPlayer.reqId, onFrame, onLoaded, onWorkerError);
     rlPlayer.options = options;
     rlPlayer.isVisible = true;
     rlPlayer.paused = !!options.noAutoPlay;
@@ -509,6 +509,12 @@ var RLottie = (function () {
     }
   }
 
+  function onWorkerError(reqId, reason) {
+    var rlPlayer = rlottie.players[reqId];
+    if (!rlPlayer || !rlPlayer.el) return;
+    triggerEvent(rlPlayer.el, 'tg:error', { detail: { reason: reason || 'worker_error' } });
+  }
+
   rlottie.init = function(el, options) {
     if (!rlottie.isSupported) {
       return false;
@@ -634,7 +640,8 @@ var RLottie = (function () {
     this.proxy = QueryableWorkerProxy.create(
       this.reqId,
       this._onFrame.bind(this),
-      this._onLoaded.bind(this)
+      this._onLoaded.bind(this),
+      this._onError.bind(this)
     );
   }
   RawPlayer.prototype._onLoaded = function(playerId, frameCount, fps) {
@@ -644,6 +651,9 @@ var RLottie = (function () {
   };
   RawPlayer.prototype._onFrame = function(playerId, frameNo, frame) {
     if (this.onFrame) this.onFrame(frameNo, frame);
+  };
+  RawPlayer.prototype._onError = function() {
+    if (this.onFrame) this.onFrame(-1, null);
   };
   RawPlayer.prototype.loadFromUrl = function(url) {
     this.proxy.loadFromData([{url: url}], this.width, this.height);
@@ -683,11 +693,12 @@ var QueryableWorkerProxy = (function() {
     return '[' + ((+(new Date()) - startTime)/ 1000.0) + '] ';
   }
 
-  function Proxy(playerId, onFrame, onLoaded) {
+  function Proxy(playerId, onFrame, onLoaded, onError) {
     this.proxyId = ++proxyId;
     this.playerId = playerId;
     this.onFrame = onFrame;
     this.onLoaded = onLoaded;
+    this.onError = onError;
     this.items = [];
     this.itemsMap = {};
     proxies[this.proxyId] = this;
@@ -858,6 +869,13 @@ var QueryableWorkerProxy = (function() {
     }
   }
 
+  function onError(wReqId, reason) {
+    var proxyId = wrMap[wReqId];
+    var proxy = proxies[proxyId];
+    if (!proxy) return;
+    if (proxy.onError) proxy.onError(proxy.playerId, reason);
+  }
+
   workerproxy.init = function(worker_url, workers_limit, callback) {
     var workersRemain = workers_limit;
     var firstWorker = rlottieWorkers[0] = new QueryableWorker(worker_url);
@@ -865,6 +883,7 @@ var QueryableWorkerProxy = (function() {
       console.log(dT(), 'worker #0 ready');
       firstWorker.addListener('frame', onFrame);
       firstWorker.addListener('loaded', onLoaded);
+      firstWorker.addListener('error', onError);
       --workersRemain;
       if (!workersRemain) {
         console.log(dT(), 'workers ready');
@@ -877,6 +896,7 @@ var QueryableWorkerProxy = (function() {
               console.log(dT(), 'worker #' + workerNum + ' ready');
               rlottieWorker.addListener('frame', onFrame);
               rlottieWorker.addListener('loaded', onLoaded);
+              rlottieWorker.addListener('error', onError);
               --workersRemain;
               if (!workersRemain) {
                 console.log(dT(), 'workers ready');
@@ -888,8 +908,8 @@ var QueryableWorkerProxy = (function() {
       }
     });
   };
-  workerproxy.create = function(playerId, onFrame, onLoaded) {
-    return new Proxy(playerId, onFrame, onLoaded);
+  workerproxy.create = function(playerId, onFrame, onLoaded, onError) {
+    return new Proxy(playerId, onFrame, onLoaded, onError);
   };
   workerproxy.destroy = function() {
     for (var workerNum = 0; workerNum < rlottieWorkers.length; workerNum++) {

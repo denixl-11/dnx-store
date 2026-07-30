@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import hashlib
 import hmac
 import logging
@@ -108,6 +109,8 @@ runtime_state = {
 }
 nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_media_fetch_semaphore = asyncio.Semaphore(12)
+nft_tgs_binary_cache: OrderedDict[str, tuple[float, bytes]] = OrderedDict()
+nft_tgs_fetch_semaphore = asyncio.Semaphore(6)
 star_reconcile_attempts: dict[str, float] = {}
 auth_cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
 restriction_cache: OrderedDict[str, tuple[float, dict | None]] = OrderedDict()
@@ -118,9 +121,12 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.24"
+API_RELEASE = "8.9-opt.26"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
+NFT_TGS_BINARY_TTL = 6 * 60 * 60
+NFT_TGS_BINARY_CACHE_MAX = 160
+NFT_ASSET_TOKEN_TTL = 15 * 60
 
 
 def floor_stars(value) -> Decimal:
@@ -1121,6 +1127,38 @@ def safe_telegram_media_url(value) -> str:
     return value
 
 
+def make_nft_asset_path(source_url: str) -> str:
+    """Issue a short-lived, tamper-proof URL for the same-origin TGS proxy."""
+    source_url = canonical_telegram_nft_url(source_url)
+    if not source_url:
+        return ""
+    expires = int(time.time()) + NFT_ASSET_TOKEN_TTL
+    payload = f"{expires}\n{source_url}".encode("utf-8")
+    encoded = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+    signature = hmac.new(BOT_TOKEN.encode("utf-8"), encoded.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"/nft/tgs?token={encoded}.{signature}"
+
+
+def parse_nft_asset_token(token: str) -> str:
+    if not isinstance(token, str) or len(token) > 1024 or "." not in token:
+        return ""
+    encoded, supplied_signature = token.rsplit(".", 1)
+    expected_signature = hmac.new(
+        BOT_TOKEN.encode("utf-8"), encoded.encode("ascii"), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(supplied_signature, expected_signature):
+        return ""
+    try:
+        padding = "=" * (-len(encoded) % 4)
+        payload = base64.urlsafe_b64decode(encoded + padding).decode("utf-8")
+        raw_expires, source_url = payload.split("\n", 1)
+        if int(raw_expires) < int(time.time()):
+            return ""
+    except (ValueError, UnicodeDecodeError):
+        return ""
+    return canonical_telegram_nft_url(source_url)
+
+
 def normalize_hex_color(value, fallback="") -> str:
     if isinstance(value, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", value.strip()):
         return value.strip().upper()
@@ -1992,7 +2030,8 @@ async def security_headers_middleware(request, handler):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers["Cache-Control"] = "no-store"
+    if request.path != "/nft/tgs":
+        response.headers["Cache-Control"] = "no-store"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if (
         response.content_type == "application/json"
@@ -2582,6 +2621,7 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
             result = {
                 "animated": bool(parser.tgs_url),
                 "tgsUrl": parser.tgs_url,
+                "assetPath": make_nft_asset_path(source_url) if parser.tgs_url else "",
                 "patternUrl": parser.pattern_url,
                 "previewUrl": parser.preview_url,
                 "colors": colors if len(colors) == 2 else ["#3E245D", "#160D27"],
@@ -2606,7 +2646,78 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
         return result
 
 
-async def warm_nft_media_cache(max_items: int = 24, max_case_sources: int = 48):
+async def fetch_telegram_tgs_bytes(source_url: str) -> bytes:
+    """Fetch and retain the compact TGS once on the backend.
+
+    WebViews no longer contact short-lived telesco.pe URLs directly. This also
+    removes CORS and signed-URL timing differences between iOS, Android and
+    desktop browsers.
+    """
+    source_url = canonical_telegram_nft_url(source_url)
+    if not source_url:
+        raise web.HTTPNotFound()
+    now = time.monotonic()
+    cached = nft_tgs_binary_cache.get(source_url)
+    if cached and cached[0] > now:
+        nft_tgs_binary_cache.move_to_end(source_url)
+        return cached[1]
+
+    async with nft_tgs_fetch_semaphore:
+        cached = nft_tgs_binary_cache.get(source_url)
+        if cached and cached[0] > time.monotonic():
+            nft_tgs_binary_cache.move_to_end(source_url)
+            return cached[1]
+
+        data = b""
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                if attempt:
+                    nft_media_cache.pop(source_url, None)
+                media = await fetch_telegram_nft_media(source_url, -1)
+                tgs_url = safe_telegram_media_url(media.get("tgsUrl"))
+                if not tgs_url:
+                    raise ValueError("Telegram NFT has no TGS animation")
+                async with get_ton_session().get(
+                    tgs_url,
+                    headers={"User-Agent": "DNXStore/1.0 TelegramMiniApp"},
+                ) as response:
+                    if response.status != 200:
+                        raise ValueError(f"unexpected TGS response: {response.status}")
+                    data = await response.content.read(4 * 1024 * 1024 + 1)
+                if not 32 <= len(data) <= 4 * 1024 * 1024 or not data.startswith(b"\x1f\x8b"):
+                    raise ValueError("invalid TGS payload")
+                break
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+                last_error = exc
+                data = b""
+        if not data:
+            raise web.HTTPBadGateway(text=f"NFT animation unavailable: {last_error}")
+
+        nft_tgs_binary_cache[source_url] = (time.monotonic() + NFT_TGS_BINARY_TTL, data)
+        nft_tgs_binary_cache.move_to_end(source_url)
+        while len(nft_tgs_binary_cache) > NFT_TGS_BINARY_CACHE_MAX:
+            nft_tgs_binary_cache.popitem(last=False)
+        return data
+
+
+async def handle_nft_tgs_asset(request):
+    source_url = parse_nft_asset_token(request.query.get("token", ""))
+    if not source_url:
+        raise web.HTTPForbidden(text="Invalid or expired NFT asset token")
+    data = await fetch_telegram_tgs_bytes(source_url)
+    return web.Response(
+        body=data,
+        content_type="application/x-tgsticker",
+        headers={
+            "Access-Control-Allow-Origin": CORS_ORIGIN,
+            "Cache-Control": "public, max-age=21600, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+async def warm_nft_media_cache(max_items: int = 40, max_case_sources: int = 120):
     rows = await get_pool().fetch("""
         SELECT id, nft_link FROM items
         WHERE COALESCE(nft_link, '') <> ''
@@ -2643,6 +2754,12 @@ async def warm_nft_media_cache(max_items: int = 24, max_case_sources: int = 48):
             break
     if jobs:
         await asyncio.gather(*jobs, return_exceptions=True)
+        # Cache the actual compressed animations as well as their descriptors.
+        # Case opening then performs no cross-origin Telegram request at all.
+        await asyncio.gather(
+            *(fetch_telegram_tgs_bytes(source_url) for source_url in seen_sources),
+            return_exceptions=True,
+        )
 
 
 async def warm_nft_media_cache_safely():
@@ -3947,6 +4064,7 @@ app.router.add_get('/items', handle_get_items)
 app.router.add_get('/item', handle_get_item)
 app.router.add_get('/admin/db-audit', handle_admin_db_audit)
 app.router.add_get('/nft/media', handle_nft_media)
+app.router.add_get('/nft/tgs', handle_nft_tgs_asset)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_get('/activity/history', handle_activity_history)
 app.router.add_post('/ton/deposit/create', handle_create_ton_deposit)

@@ -106,14 +106,18 @@ var queryableFunctions = {
         return;
       }
       if (err) {
-        return console.warn('Can\'t fetch file ' + url, err);
+        console.warn('Can\'t fetch file ' + url, err);
+        reply('error', reqId, 'fetch_failed');
+        return;
       }
       try {
         var json = pako.inflate(data, {to: 'string'});
         var json_parsed = JSON.parse(json);
         items[reqId] = new RLottieItem(reqId, json, width, height, json_parsed.fr);
       } catch (e) {
-        return console.warn('Invalid file ' + url);
+        console.warn('Invalid file ' + url);
+        reply('error', reqId, 'invalid_tgs');
+        return;
       }
     });
   },
@@ -126,6 +130,10 @@ var queryableFunctions = {
     }
   },
   renderFrame: function(reqId, frameNo, clamped) {
+    if (!items[reqId]) {
+      reply('error', reqId, 'player_not_ready');
+      return;
+    }
     items[reqId].render(frameNo, clamped);
   }
 };
@@ -195,6 +203,12 @@ onmessage = function(oEvent) {
 function getUrlContent(path, callback) {
   try {
     var xhr = new XMLHttpRequest();
+    var completed = false;
+    var finish = function(err, data) {
+      if (completed) return;
+      completed = true;
+      callback(err, data);
+    };
     xhr.open('GET', path, true);
     if ('responseType' in xhr) {
       xhr.responseType = 'arraybuffer';
@@ -205,12 +219,15 @@ function getUrlContent(path, callback) {
     xhr.onreadystatechange = function (event) {
       if (xhr.readyState === 4) {
         if (xhr.status === 200 || xhr.status === 0) {
-          callback(null, xhr.response || xhr.responseText);
+          finish(null, xhr.response || xhr.responseText);
         } else {
-          callback(new Error('Ajax error: ' + this.status + ' ' + this.statusText));
+          finish(new Error('Ajax error: ' + this.status + ' ' + this.statusText));
         }
       }
     };
+    xhr.onerror = function () { finish(new Error('Network error')); };
+    xhr.ontimeout = function () { finish(new Error('Network timeout')); };
+    xhr.timeout = 8000;
     xhr.send();
   } catch (e) {
     callback(new Error(e));
