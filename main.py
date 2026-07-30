@@ -121,7 +121,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.32"
+API_RELEASE = "8.9-opt.33"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 NFT_TGS_BINARY_TTL = 6 * 60 * 60
@@ -752,6 +752,11 @@ async def init_db():
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS withdraw_requested_at TIMESTAMPTZ")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS withdraw_expires_at TIMESTAMPTZ")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS disposed_at TIMESTAMPTZ")
+                # Static case rewards still need a local/fallback asset, but
+                # animated catalogue NFTs no longer depend on the legacy
+                # image_url column.  Keeping this separate lets image_url be
+                # removed without breaking catalogue/inventory reads.
+                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS case_asset_url TEXT")
                 await conn.execute("UPDATE items SET acquisition_source = 'catalog' WHERE acquisition_source IS NULL")
                 await conn.execute("""
                     UPDATE items SET acquisition_source = 'case'
@@ -1159,6 +1164,10 @@ def make_nft_preview_path(source_url: str) -> str:
 def add_nft_preview_path(record: dict) -> dict:
     source_url = canonical_telegram_nft_url(record.get("nft_link"))
     record["nft_preview_path"] = make_nft_preview_path(source_url) if source_url else ""
+    # The signed same-origin animation path is cheap to issue and does not
+    # require scraping Telegram first.  Returning it with the item removes a
+    # descriptor request from the modal and poster critical paths.
+    record["nft_asset_path"] = make_nft_asset_path(source_url) if source_url else ""
     return record
 
 
@@ -2491,7 +2500,10 @@ async def handle_star_payment_status(request):
 async def handle_get_items(request):
     try:
         rows = await get_pool().fetch(
-            "SELECT id, name, price, status, image_url, nft_link, number, model, pattern, background FROM items WHERE status = 'Доступен'")
+            """SELECT id, name, price, status,
+                      COALESCE(to_jsonb(items)->>'case_asset_url', to_jsonb(items)->>'image_url', '') AS image_url,
+                      nft_link, number, model, pattern, background
+               FROM items WHERE status = 'Доступен'""")
         items = normalize_records(rows)
         now = time.monotonic()
         for item in items:
@@ -2526,7 +2538,9 @@ async def handle_get_item(request):
     try:
         row = await get_pool().fetchrow(
             """
-            SELECT id, name, price, status, image_url, nft_link, number,
+            SELECT id, name, price, status,
+                   COALESCE(to_jsonb(items)->>'case_asset_url', to_jsonb(items)->>'image_url', '') AS image_url,
+                   nft_link, number,
                    model, pattern, background, acquisition_source, last_event,
                    withdraw_requested_at, withdraw_expires_at, disposed_at,
                    GREATEST(0, EXTRACT(EPOCH FROM (withdraw_expires_at - NOW())))::BIGINT
@@ -2902,7 +2916,9 @@ async def handle_get_inventory(request):
                 user_id,
             )
             rows = await conn.fetch(
-                """SELECT id, name, price, image_url, nft_link, model, pattern, background, status, number,
+                """SELECT id, name, price,
+                          COALESCE(to_jsonb(items)->>'case_asset_url', to_jsonb(items)->>'image_url', '') AS image_url,
+                          nft_link, model, pattern, background, status, number,
                           acquisition_source, last_event, withdraw_requested_at, withdraw_expires_at,
                           disposed_at,
                           GREATEST(0, EXTRACT(EPOCH FROM (withdraw_expires_at - NOW())))::BIGINT
@@ -3568,6 +3584,7 @@ async def handle_get_case_details(request):
                 "drop_index": index,
                 "has_live_nft": bool(canonical_telegram_nft_url(drop.get("nft_link"))),
                 "nft_preview_path": make_nft_preview_path(drop.get("nft_link")),
+                "nft_asset_path": make_nft_asset_path(drop.get("nft_link")),
                 "model": case_drop_attribute(drop, "model"),
                 "pattern": case_drop_attribute(drop, "pattern"),
                 "background": case_drop_attribute(drop, "background"),
@@ -3715,7 +3732,7 @@ async def handle_open_case(request):
 
                 new_item_id = await conn.fetchval("""
                     INSERT INTO items (
-                        name, price, status, image_url, model, pattern, background, buyer_id, nft_link, number,
+                        name, price, status, case_asset_url, model, pattern, background, buyer_id, nft_link, number,
                         acquisition_source, last_event
                     )
                     VALUES ($1, $2, 'Продан', $3, $4, $5, $6, $7, $8, $9, 'case', 'case_drop') RETURNING id
@@ -3760,6 +3777,7 @@ async def handle_open_case(request):
                 # Signed paths are response-only and must not be persisted in
                 # the immutable case audit payload where they would expire.
                 won_item_dict['nft_preview_path'] = make_nft_preview_path(won_drop.get('nft_link'))
+                won_item_dict['nft_asset_path'] = make_nft_asset_path(won_drop.get('nft_link'))
 
         return web.json_response({"success": True, "won_item": won_item_dict,
                                   "requestId": str(request_id)},

@@ -59,13 +59,23 @@ RLottieItem.prototype.render = function(frameNo, clamped) {
   } catch(e) {
     console.error('Render error:', e);
     this.dead = true;
+    reply('error', this.reqId, 'render_failed_' + frameNo + ':' + String(e && e.message || e));
   }
 };
 
 RLottieItem.prototype.destroy = function() {
   this.dead = true;
-
-  RLottieWorker.Api.destroy(this.handle);
+  if (this.handle) {
+    RLottieWorker.Api.destroy(this.handle);
+    this.handle = null;
+  }
+  // Every loaded TGS is copied onto the WASM heap.  The legacy player freed
+  // only the renderer handle, so catalogue/case poster prewarming exhausted
+  // the fixed heap and the next modal failed on frame 1.
+  if (this.stringOnWasmHeap) {
+    Module._free(this.stringOnWasmHeap);
+    this.stringOnWasmHeap = null;
+  }
 };
 
 var RLottieWorker = (function() {

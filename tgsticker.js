@@ -139,7 +139,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.29', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.33b', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -200,6 +200,12 @@ var RLottie = (function () {
     rlPlayer.frames = {};
     rlPlayer.width = Math.trunc(pic_width * curDeviceRatio);
     rlPlayer.height = Math.trunc(pic_height * curDeviceRatio);
+    var maxRenderDimension = Math.max(0, Number(options.maxRenderDimension) || 0);
+    if (maxRenderDimension && Math.max(rlPlayer.width, rlPlayer.height) > maxRenderDimension) {
+      var renderScale = maxRenderDimension / Math.max(rlPlayer.width, rlPlayer.height);
+      rlPlayer.width = Math.max(1, Math.trunc(rlPlayer.width * renderScale));
+      rlPlayer.height = Math.max(1, Math.trunc(rlPlayer.height * renderScale));
+    }
     rlPlayer.workerProxy = QueryableWorkerProxy.create(rlPlayer.reqId, onFrame, onLoaded, onWorkerError);
     rlPlayer.options = options;
     rlPlayer.isVisible = true;
@@ -299,6 +305,10 @@ var RLottie = (function () {
           }
           if (!rlPlayer.paused) {
             rlPlayer.paused = true;
+            rlPlayer.completedCycles = (rlPlayer.completedCycles || 0) + 1;
+            triggerEvent(rlPlayer.el, 'tg:cycle-complete', {
+              detail: { cycles: rlPlayer.completedCycles }
+            });
             triggerEvent(rlPlayer.el, 'tg:pause');
           }
         }
@@ -407,7 +417,11 @@ var RLottie = (function () {
       onFrame(reqId, frameNo, frame);
     } else {
       // console.log(dT(), '['+reqId+']', 'request frame#'+frameNo+' (worker)');
-      rlPlayer.workerProxy.renderFrame(frameNo, !isSafari);
+      // A transferred reusable Uint8ClampedArray can remain detached in iOS
+      // WebView and Chromium after frame zero, silently stopping the queue.
+      // Only one visible player exists (the detail modal), so requesting an
+      // independent frame buffer is both cheap and deterministic.
+      rlPlayer.workerProxy.renderFrame(frameNo, false);
     }
   }
 
