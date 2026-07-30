@@ -125,7 +125,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.39"
+API_RELEASE = "8.9-opt.40"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -618,72 +618,12 @@ game_state = {
 }
 
 
-async def ensure_game_ledger_schema(conn) -> None:
-    """Create the durable wager tables even when an old migration marker exists.
-
-    Several deployed V8.9 builds used the same migration marker while their
-    schema differed.  Keeping this tiny, idempotent guard ahead of the marker
-    check prevents a valid bet from turning into a generic HTTP 500 merely
-    because Render restarted on one of those databases.
-    """
-    await conn.execute("""
-        CREATE TABLE IF NOT EXISTS game_counter (
-            id INT PRIMARY KEY DEFAULT 1,
-            last_game_number INT NOT NULL DEFAULT 0
-        )
-    """)
-    await conn.execute(
-        "INSERT INTO game_counter (id, last_game_number) VALUES (1, 0) ON CONFLICT (id) DO NOTHING"
-    )
-    await conn.execute("""
-        CREATE TABLE IF NOT EXISTS active_game_bets (
-            game_number INTEGER NOT NULL,
-            user_id VARCHAR(255) NOT NULL,
-            username VARCHAR(255) NOT NULL,
-            amount NUMERIC(20, 0) NOT NULL CHECK (amount > 0),
-            balance_type VARCHAR(16) NOT NULL CHECK (balance_type IN ('main', 'bonus')),
-            history_event_id BIGINT,
-            owner_token UUID,
-            status VARCHAR(16) NOT NULL DEFAULT 'pending'
-                CHECK (status IN ('pending', 'settled', 'refunded')),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (game_number, user_id)
-        )
-    """)
-    await conn.execute("ALTER TABLE active_game_bets ADD COLUMN IF NOT EXISTS owner_token UUID")
-    await conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_active_game_bets_recovery
-        ON active_game_bets(status, updated_at)
-    """)
-    await conn.execute("""
-        CREATE TABLE IF NOT EXISTS game_round_settlements (
-            game_number INTEGER PRIMARY KEY,
-            round_id BIGINT,
-            winner_id VARCHAR(255) NOT NULL,
-            winner_username VARCHAR(255) NOT NULL,
-            payout NUMERIC(20, 0) NOT NULL,
-            balance_type VARCHAR(16) NOT NULL,
-            win_percent NUMERIC(6, 2) NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-    """)
-
-
 async def init_db():
     try:
         async with get_pool().acquire() as conn:
             async with conn.transaction():
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS dnx_schema_migrations (
-                        version VARCHAR(64) PRIMARY KEY,
-                        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                    )
-                """)
-                # This guard intentionally runs before the migration shortcut.
-                # Old V8.9 releases reused markers and could otherwise leave
-                # the wager table absent forever.
-                await ensure_game_ledger_schema(conn)
+                # Critical idempotency tables are provisioned explicitly in
+                # Neon before deployment; startup only verifies/uses them.
                 # Keep the migration marker in sync with durable schema
                 # additions. Reusing the old opt.2 marker made upgraded
                 # databases return above before `active_game_bets` existed.
@@ -822,18 +762,6 @@ async def init_db():
                     )
                 """)
                 await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS case_open_records (
-                        id UUID PRIMARY KEY,
-                        user_id VARCHAR(255) NOT NULL,
-                        case_id INTEGER NOT NULL,
-                        balance_type VARCHAR(16) NOT NULL,
-                        price NUMERIC(20, 0) NOT NULL,
-                        generated_item_id INTEGER NOT NULL,
-                        winner_payload JSONB NOT NULL,
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                    )
-                """)
-                await conn.execute("""
                     CREATE TABLE IF NOT EXISTS item_events (
                         id BIGSERIAL PRIMARY KEY,
                         item_id INTEGER NOT NULL,
@@ -901,27 +829,6 @@ async def init_db():
                         traits JSONB DEFAULT '[]'::jsonb
                     )
                 """)
-                # Таблицы cases и case_drops больше не нужны для чтения, но оставим для совместимости и администрирования
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS cases (
-                        id SERIAL PRIMARY KEY,
-                        name VARCHAR(255),
-                        price NUMERIC DEFAULT 0.0,
-                        image_url TEXT
-                    )
-                """)
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS case_drops (
-                        id SERIAL PRIMARY KEY,
-                        case_id INTEGER REFERENCES cases(id),
-                        name VARCHAR(255),
-                        image_url TEXT,
-                        model VARCHAR(255) DEFAULT '',
-                        chance NUMERIC,
-                        value NUMERIC DEFAULT 0.0
-                    )
-                """)
-                await conn.execute("ALTER TABLE case_drops ADD COLUMN IF NOT EXISTS real_chance NUMERIC DEFAULT 0")
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS ton_deposits (
                         id UUID PRIMARY KEY,
@@ -962,45 +869,11 @@ async def init_db():
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_item_events_item ON item_events(item_id, created_at DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_item_events_user ON item_events(user_id, created_at DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_purchase_records_user ON purchase_records(user_id, created_at DESC)")
-                await conn.execute("CREATE INDEX IF NOT EXISTS idx_case_open_records_user ON case_open_records(user_id, created_at DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_user_events_owner ON user_events(user_id, id DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_game_history_number ON game_history(game_number DESC)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_ton_deposits_pending ON ton_deposits(status, expires_at)")
                 await conn.execute("CREATE INDEX IF NOT EXISTS idx_star_payments_user_status ON star_payments(user_id, status, expires_at)")
                 await conn.execute("ALTER TABLE star_payments ADD COLUMN IF NOT EXISTS telegram_star_transaction_id TEXT UNIQUE")
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS active_game_bets (
-                        game_number INTEGER NOT NULL,
-                        user_id VARCHAR(255) NOT NULL,
-                        username VARCHAR(255) NOT NULL,
-                        amount NUMERIC(20, 0) NOT NULL CHECK (amount > 0),
-                        balance_type VARCHAR(16) NOT NULL CHECK (balance_type IN ('main', 'bonus')),
-                        history_event_id BIGINT,
-                        owner_token UUID,
-                        status VARCHAR(16) NOT NULL DEFAULT 'pending'
-                            CHECK (status IN ('pending', 'settled', 'refunded')),
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                        PRIMARY KEY (game_number, user_id)
-                    )
-                """)
-                await conn.execute("ALTER TABLE active_game_bets ADD COLUMN IF NOT EXISTS owner_token UUID")
-                await conn.execute("""
-                    CREATE INDEX IF NOT EXISTS idx_active_game_bets_recovery
-                    ON active_game_bets(status, updated_at)
-                """)
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS game_round_settlements (
-                        game_number INTEGER PRIMARY KEY,
-                        round_id BIGINT,
-                        winner_id VARCHAR(255) NOT NULL,
-                        winner_username VARCHAR(255) NOT NULL,
-                        payout NUMERIC(20, 0) NOT NULL,
-                        balance_type VARCHAR(16) NOT NULL,
-                        win_percent NUMERIC(6, 2) NOT NULL,
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                    )
-                """)
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS referral_rewards (
                         id BIGSERIAL PRIMARY KEY,
