@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.30" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.31" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -4085,7 +4085,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.30"></script>
+    <script src="tgsticker.js?v=8.9-opt.31"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4204,7 +4204,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.30';
+        const EXPECTED_API_RELEASE = '8.9-opt.31';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -4383,7 +4383,6 @@
         // Единственный допустимый проигрыватель — NFT в открытом окне
         // характеристик. Все карточки и элементы кейсов держим на 0 кадре.
         const NFT_MEDIA_MAX_PLAYING = Number.POSITIVE_INFINITY;
-        const NFT_MEDIA_CACHE_LIMIT = 96;
         const nftMediaPlaying = new Set();
         const nftMediaPlaybackQueue = [];
         const nftMediaArmBatch = new Set();
@@ -4392,8 +4391,9 @@
         const nftSynchronizedPlaybackBatches = new Map();
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v930';
-        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v930';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v931';
+        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v931';
+        const nftPosterRetryTimers = new Map();
         let nftPosterDbPromise = null;
         let nftPosterDbRestorePromise = Promise.resolve();
         let nftPosterDbWriteCount = 0;
@@ -4417,9 +4417,6 @@
         function setNftMediaCache(cacheKey, entry) {
             nftMediaCache.delete(cacheKey);
             nftMediaCache.set(cacheKey, entry);
-            while (nftMediaCache.size > NFT_MEDIA_CACHE_LIMIT) {
-                nftMediaCache.delete(nftMediaCache.keys().next().value);
-            }
         }
 
         function restoreNftMediaCache() {
@@ -4448,7 +4445,7 @@
             try {
                 const entries = JSON.parse(sessionStorage.getItem(NFT_POSTER_STORAGE_KEY) || '[]');
                 if (!Array.isArray(entries)) return;
-                entries.slice(-48).forEach(entry => {
+                entries.forEach(entry => {
                     if (!Array.isArray(entry) || entry.length !== 2) return;
                     const key = String(entry[0] || '');
                     const poster = safeGeneratedPosterUrl(entry[1]);
@@ -4463,12 +4460,10 @@
             if (nftPosterPersistTimer) clearTimeout(nftPosterPersistTimer);
             nftPosterPersistTimer = setTimeout(() => {
                 nftPosterPersistTimer = null;
-                const entries = [...nftPosterFrameCache.entries()].slice(-48);
+                const entries = [...nftPosterFrameCache.entries()];
                 try {
                     sessionStorage.setItem(NFT_POSTER_STORAGE_KEY, JSON.stringify(entries));
-                } catch (_) {
-                    try { sessionStorage.setItem(NFT_POSTER_STORAGE_KEY, JSON.stringify(entries.slice(-20))); } catch (_) {}
-                }
+                } catch (_) {}
             }, 60);
         }
 
@@ -4503,7 +4498,7 @@
                     request.onerror = () => resolve([]);
                 } catch (_) { resolve([]); }
             });
-            records.sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0)).slice(-96).forEach(record => {
+            records.sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0)).forEach(record => {
                 const key = String(record?.key || '');
                 const poster = safeGeneratedPosterUrl(record?.poster);
                 if (/^(?:item:\d+|case:\d+:\d+)$/.test(key) && poster && !nftPosterFrameCache.has(key)) {
@@ -4526,20 +4521,6 @@
                 db.transaction('posters', 'readwrite').objectStore('posters').put({ key, poster, updatedAt: Date.now() });
             } catch (_) { return; }
             nftPosterDbWriteCount += 1;
-            if (nftPosterDbWriteCount % 12 !== 0) return;
-            try {
-                const records = await new Promise(resolve => {
-                    const request = db.transaction('posters', 'readonly').objectStore('posters').getAll();
-                    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
-                    request.onerror = () => resolve([]);
-                });
-                if (records.length > 120) {
-                    records.sort((a, b) => Number(a.updatedAt || 0) - Number(b.updatedAt || 0));
-                    const transaction = db.transaction('posters', 'readwrite');
-                    const store = transaction.objectStore('posters');
-                    records.slice(0, records.length - 120).forEach(record => store.delete(record.key));
-                }
-            } catch (_) {}
         }
 
         function safeTelegramMediaUrl(value) {
@@ -4622,14 +4603,8 @@
         function applyNftGeneratedPoster(key, posterUrl) {
             const safePoster = safePosterImageUrl(posterUrl);
             if (!key || !safePoster) return;
-            // Keep the newest posters hot, but never allow base64 snapshots to
-            // grow without bounds during long catalogue/case browsing sessions.
-            // Re-inserting also refreshes the key's LRU position.
             nftPosterFrameCache.delete(key);
             nftPosterFrameCache.set(key, safePoster);
-            while (nftPosterFrameCache.size > 64) {
-                nftPosterFrameCache.delete(nftPosterFrameCache.keys().next().value);
-            }
             persistNftPosterCache();
             persistNftPosterDb(key, safePoster).catch(() => {});
             document.querySelectorAll('.nft-live-media').forEach(element => {
@@ -4707,57 +4682,37 @@
             width = Number(width) || 0;
             height = Number(height) || 0;
             if (!rgba?.length || width < 8 || height < 8 || rgba.length < width * height * 4) return false;
-            const step = 2;
             let opaque = 0;
-            let connected = 0;
             let minX = width;
             let minY = height;
             let maxX = -1;
             let maxY = -1;
-            for (let y = 0; y < height; y += step) {
-                for (let x = 0; x < width; x += step) {
-                    if (rgba[((y * width + x) * 4) + 3] <= 32) continue;
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    if (rgba[((y * width + x) * 4) + 3] <= 8) continue;
                     opaque += 1;
                     minX = Math.min(minX, x);
                     minY = Math.min(minY, y);
                     maxX = Math.max(maxX, x);
                     maxY = Math.max(maxY, y);
-                    const right = x + step < width ? rgba[((y * width + x + step) * 4) + 3] : 0;
-                    const down = y + step < height ? rgba[((((y + step) * width) + x) * 4) + 3] : 0;
-                    if (right > 32 || down > 32) connected += 1;
                 }
             }
-            const sampled = Math.ceil(width / step) * Math.ceil(height / step);
-            const boxWidth = maxX >= minX ? maxX - minX + step : 0;
-            const boxHeight = maxY >= minY ? maxY - minY + step : 0;
-            // Some Telegram gifts are deliberately very thin (a match, a
-            // flashlight beam, a ring).  The old connectivity threshold
-            // rejected those perfectly valid models and left only the grey
-            // case shell.  Noise is still rejected by the minimum pixel and
-            // bounding-box checks, while thin continuous artwork is allowed.
-            return opaque >= Math.max(10, sampled * .001)
-                && opaque / sampled < .72
-                && connected / Math.max(1, opaque) >= .035
-                && boxWidth >= width * .025
-                && boxHeight >= height * .025;
+            const boxWidth = maxX >= minX ? maxX - minX + 1 : 0;
+            const boxHeight = maxY >= minY ? maxY - minY + 1 : 0;
+            // Telegram's TGS endpoint contains the model layer, not its raster
+            // preview. Accept every genuinely non-empty model, including very
+            // thin, very large and edge-touching gifts.
+            return opaque > 0 && boxWidth > 0 && boxHeight > 0;
         }
 
         function nftPosterFramePlan(frameCount) {
             frameCount = Math.max(1, Number(frameCount) || 1);
             const last = frameCount - 1;
-            // Always try the real zero frame first. If it is transparent,
-            // inspect representative frames over the whole animation instead
-            // of rendering every preceding frame. The former sequential scan
-            // was why some case rewards took minutes or never appeared before
-            // the seven-second timeout.
-            const candidates = [
-                0, 1, 2,
-                Math.round(last * .08), Math.round(last * .16),
-                Math.round(last * .25), Math.round(last * .36),
-                Math.round(last * .50), Math.round(last * .66),
-                Math.round(last * .82), last
-            ];
-            return [...new Set(candidates.map(frame => Math.max(0, Math.min(last, frame))))];
+            // Try representative full-model moments first, then every omitted
+            // frame. Nothing is discarded, but transparent intros no longer
+            // delay a usable case poster or select a one-pixel fade-in.
+            const anchors = [0, Math.round(last * .25), Math.round(last * .5), Math.round(last * .75), last];
+            return [...new Set([...anchors, ...Array.from({ length: frameCount }, (_, frame) => frame)])];
         }
 
         function nftFrameHasTransparentEdge(canvas) {
@@ -4766,35 +4721,8 @@
                 const context = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
                 if (!context) return false;
                 const { width, height } = canvas;
-                const insetX = Math.max(1, Math.floor(width * 0.035));
-                const insetY = Math.max(1, Math.floor(height * 0.035));
-                const points = [
-                    [insetX, insetY], [width - insetX - 1, insetY],
-                    [insetX, height - insetY - 1], [width - insetX - 1, height - insetY - 1],
-                    [Math.floor(width / 2), insetY], [Math.floor(width / 2), height - insetY - 1],
-                    [insetX, Math.floor(height / 2)], [width - insetX - 1, Math.floor(height / 2)]
-                ];
-                let opaqueSamples = 0;
-                points.forEach(([x, y]) => {
-                    if (context.getImageData(x, y, 1, 1).data[3] > 18) opaqueSamples += 1;
-                });
-                // Telegram NFT model-only TGS files are transparent at their
-                // perimeter. An opaque perimeter means that a preview
-                // background/pattern was captured and would create the nested
-                // purple/grey square seen in case cards.
-                // Do not inspect inner corners: wide gifts legitimately reach
-                // them and the former test silently rejected part of a case.
-                // The eight perimeter probes are sufficient to reject the
-                // opaque Telegram preview while admitting every model TGS.
                 const pixels = context.getImageData(0, 0, width, height).data;
-                if (!rawNftFrameLooksRenderable(pixels, width, height)) return false;
-                let sampled = 0;
-                let opaque = 0;
-                for (let index = 3; index < pixels.length; index += 16) {
-                    sampled += 1;
-                    if (pixels[index] > 18) opaque += 1;
-                }
-                return opaqueSamples <= 4 && opaque / Math.max(1, sampled) < 0.62;
+                return rawNftFrameLooksRenderable(pixels, width, height);
             } catch (_) {
                 return false;
             }
@@ -4802,26 +4730,7 @@
 
         function rawNftFrameHasTransparentEdge(rgba, size) {
             if (!rgba?.length || !size) return false;
-            const inset = Math.max(1, Math.floor(size * 0.035));
-            const points = [
-                [inset, inset], [size - inset - 1, inset],
-                [inset, size - inset - 1], [size - inset - 1, size - inset - 1],
-                [Math.floor(size / 2), inset], [Math.floor(size / 2), size - inset - 1],
-                [inset, Math.floor(size / 2)], [size - inset - 1, Math.floor(size / 2)]
-            ];
-            let opaqueSamples = 0;
-            points.forEach(([x, y]) => {
-                if (rgba[((y * size + x) * 4) + 3] > 18) opaqueSamples += 1;
-            });
-            let sampled = 0;
-            let opaque = 0;
-            for (let index = 3; index < rgba.length; index += 16) {
-                sampled += 1;
-                if (rgba[index] > 18) opaque += 1;
-            }
-            // Reject only a truly opaque Telegram preview. Wide/diagonal NFT
-            // models may legitimately touch most perimeter probes.
-            return opaqueSamples < 8 && opaque / Math.max(1, sampled) < 0.92;
+            return rawNftFrameLooksRenderable(rgba, size, size);
         }
 
         function captureNftGeneratedPoster(element, picture) {
@@ -5165,11 +5074,10 @@
             releaseNftPlaybackSlot(element);
             const delay = Math.min(5000, 500 * Math.pow(1.55, Math.min(retries - 1, 6)));
             setTimeout(() => {
-                if (!element?.isConnected || element.dataset.mediaToken !== mediaToken
-                    || !elementIntersectsViewport(element) || document.hidden) return;
+                if (!element?.isConnected || element.dataset.mediaToken !== mediaToken || document.hidden) return;
                 element.dataset.mediaWanted = 'true';
-                if (nftMediaMayAnimate(element)) armVisibleNftMedia(element);
-                else primeNftMedia(element);
+                if (nftMediaMayAnimate(element)) resumeNftMedia(element);
+                else if (elementIntersectsViewport(element)) primeNftMedia(element);
             }, delay);
         }
 
@@ -5200,7 +5108,7 @@
             picture.appendChild(source);
             let settleLoadSlot;
             let loadSlotSettled = false;
-            let mediaLoadWatchdog = 0;
+            let stallRecoveryTimer = 0;
             const loadSlot = new Promise(resolve => { settleLoadSlot = resolve; });
             const settleLoad = result => {
                 if (loadSlotSettled) return;
@@ -5208,8 +5116,8 @@
                 settleLoadSlot(Boolean(result));
             };
             const failMediaLoad = (retry = true) => {
-                if (mediaLoadWatchdog) clearTimeout(mediaLoadWatchdog);
-                mediaLoadWatchdog = 0;
+                if (stallRecoveryTimer) clearTimeout(stallRecoveryTimer);
+                stallRecoveryTimer = 0;
                 settleLoad(false);
                 leaveNftSynchronizedPlaybackBatch(element);
                 try { window.RLottie?.destroy?.(picture); } catch (_) {}
@@ -5222,46 +5130,68 @@
                     if (retry) scheduleNftMediaRetry(element, mediaToken);
                 }
             };
-            mediaLoadWatchdog = setTimeout(() => {
-                // `loaded` only means that the TGS file was parsed. It is not a
-                // visual-ready signal: transparent intro frames and a busy
-                // worker used to release the queue here and leave empty cards.
-                failMediaLoad(true);
-            }, 9000);
+            // This is recovery, not a retry limit: a silent worker/network
+            // stall is destroyed after 30 seconds and retried indefinitely.
+            stallRecoveryTimer = setTimeout(() => failMediaLoad(true), 30000);
+            const playLoadedAnimationOnce = () => {
+                if (picture.dataset.playStarted === 'true'
+                    || !element.isConnected || element.dataset.mediaToken !== mediaToken
+                    || element.dataset.mediaWanted !== 'true' || !nftMediaMayAnimate(element)) return;
+                if (document.hidden) {
+                    if (picture.dataset.waitingForVisibility !== 'true') {
+                        picture.dataset.waitingForVisibility = 'true';
+                        document.addEventListener('visibilitychange', () => {
+                            picture.dataset.waitingForVisibility = 'false';
+                            if (!document.hidden) playLoadedAnimationOnce();
+                        }, { once: true });
+                    }
+                    return;
+                }
+                picture.dataset.playStarted = 'true';
+                element.dataset.mediaRetries = '0';
+                element.dataset.mediaState = 'live';
+                element.dataset.mediaPlayed = 'playing';
+                element.classList.add('is-live');
+                settleLoad(true);
+                requestAnimationFrame(() => {
+                    if (element.isConnected && element.dataset.mediaToken === mediaToken
+                        && element.dataset.mediaWanted === 'true') {
+                        window.RLottie?.playOnce?.(picture, true);
+                    }
+                });
+            };
             picture.addEventListener('tg:load', () => {
                 if (!element.isConnected || element.dataset.mediaToken !== mediaToken) {
                     failMediaLoad(false);
                     return;
                 }
-                // Parsing a TGS is not the same as painting a visible frame.
-                // Keep the neutral #242424 shell until tg:poster-ready, or a
-                // slow device briefly exposes only the purple NFT background.
-                if (element.dataset.mediaWanted !== 'true') failMediaLoad(false);
+                if (element.dataset.mediaWanted !== 'true') {
+                    failMediaLoad(false);
+                    return;
+                }
+                if (stallRecoveryTimer) clearTimeout(stallRecoveryTimer);
+                stallRecoveryTimer = 0;
+                // A parsed TGS is playable. Do not gate the animation behind a
+                // separate poster event: some valid Telegram gifts have a long
+                // transparent intro and never satisfied the old poster test.
+                playLoadedAnimationOnce();
             }, { once: true });
             picture.addEventListener('tg:poster-ready', (posterEvent) => {
-                if (mediaLoadWatchdog) clearTimeout(mediaLoadWatchdog);
-                mediaLoadWatchdog = 0;
+                if (stallRecoveryTimer) clearTimeout(stallRecoveryTimer);
+                stallRecoveryTimer = 0;
                 if (!element.isConnected || element.dataset.mediaToken !== mediaToken) {
                     failMediaLoad(false);
                     return;
                 }
                 const hasVisibleFrame = posterEvent.detail?.hasVisiblePixels === true
                     || picture.rlPlayer?.hasVisiblePixels === true;
-                if (!hasVisibleFrame) {
-                    failMediaLoad(true);
-                    return;
+                if (hasVisibleFrame) {
+                    picture.dataset.posterReady = 'true';
+                    element.classList.add('is-live', 'has-live-frame', 'has-current-frame');
+                    captureNftGeneratedPoster(element, picture);
                 }
-                picture.dataset.posterReady = 'true';
-                element.dataset.mediaRetries = '0';
-                element.classList.add('is-live', 'has-live-frame', 'has-current-frame');
-                captureNftGeneratedPoster(element, picture);
                 settleLoad(true);
-                requestAnimationFrame(() => {
-                    if (!document.hidden && element.isConnected && element.dataset.mediaToken === mediaToken
-                        && element.dataset.mediaWanted === 'true' && element.dataset.mediaPlayed === 'playing') {
-                        markNftSynchronizedPlaybackReady(element, picture);
-                    }
-                });
+                playLoadedAnimationOnce();
             }, { once: true });
             picture.addEventListener('tg:error', () => {
                 failMediaLoad(element.isConnected && element.dataset.mediaToken === mediaToken);
@@ -6119,6 +6049,9 @@
             if (!localItem || (isInventoryContext && isSimpleInventoryNft(localItem))) return;
 
             nftTapFeedback();
+            // Every opening receives a fresh descriptor/player. The old modal
+            // must never inherit a completed or failed playback state.
+            nftMediaCache.delete(Number(id));
             const immediateItem = { ...localItem, is_shop_item: !isInventoryContext && localItem.is_shop_item === true };
             renderNftModalItem(immediateItem, isInventoryContext, true);
 
@@ -7821,11 +7754,8 @@
         }
 
         function prefetchCaseDetails(cases) {
-            const run = () => (cases || []).slice(0, 4).forEach((entry, index) => {
-                // Warm the first case completely; cache only lightweight
-                // details for the others. A background case must never occupy
-                // the decoder queue ahead of the case the user actually opens.
-                getCaseDetails(entry.id, index === 0).catch(() => {});
+            const run = () => (cases || []).forEach(entry => {
+                getCaseDetails(entry.id, true).catch(() => {});
             });
             if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 1400 });
             else setTimeout(run, 120);
@@ -7974,11 +7904,11 @@
                 let frameCount = 0;
                 let framePlan = [];
                 let frameCursor = 0;
-                let timeoutId = 0;
+                let stallRecoveryTimer = 0;
                 const finish = posterUrl => {
                     if (settled) return;
                     settled = true;
-                    clearTimeout(timeoutId);
+                    clearTimeout(stallRecoveryTimer);
                     try { rawPlayer?.destroy?.(); } catch (_) {}
                     rawPlayer = null;
                     const safePoster = safeGeneratedPosterUrl(posterUrl);
@@ -8007,7 +7937,8 @@
                                     renderNext();
                                 },
                                 (_frameNo, rgba) => {
-                                    if (settled || !rgba?.length) return finish('');
+                                    if (settled) return;
+                                    if (!rgba?.length) return renderNext();
                                     if (!rawNftFrameLooksRenderable(rgba, size)
                                         || !rawNftFrameHasTransparentEdge(rgba, size)) return renderNext();
                                     try {
@@ -8024,7 +7955,7 @@
                         } catch (_) { finish(''); }
                     });
                 } catch (_) { finish(''); }
-                timeoutId = setTimeout(() => finish(''), 12000);
+                stallRecoveryTimer = setTimeout(() => finish(''), 30000);
             }).finally(() => casePosterFrameRequests.delete(cacheKey));
             casePosterFrameRequests.set(cacheKey, request);
             return request;
@@ -8044,14 +7975,14 @@
                 }
                 if (media?.animated && await renderItemPosterFrame(itemId, media)) return true;
             } catch (_) {}
-            // Do not block the whole grid with repeated 7-second waits. One
-            // detached retry heals a transient CDN miss without serializing
-            // healthy cards behind it.
             if (allowBackgroundRetry) {
-                setTimeout(() => {
+                if (nftPosterRetryTimers.has(cacheKey)) return false;
+                const retryTimer = setTimeout(() => {
+                    nftPosterRetryTimers.delete(cacheKey);
                     nftMediaCache.delete(itemId);
-                    ensureItemPoster(itemId, false).catch(() => {});
-                }, 1200);
+                    ensureItemPoster(itemId, true).catch(() => {});
+                }, 1000);
+                nftPosterRetryTimers.set(cacheKey, retryTimer);
             }
             return false;
         }
@@ -8062,28 +7993,17 @@
                 .map(item => Number(item?.id || 0))
                 .filter(Boolean))];
             if (!itemIds.length) return;
-            let cursor = 0;
-            const worker = async () => {
-                while (cursor < itemIds.length) await ensureItemPoster(itemIds[cursor++]);
-            };
-            await Promise.allSettled(Array.from({ length: Math.min(4, itemIds.length) }, worker));
+            await Promise.allSettled(itemIds.map(itemId => ensureItemPoster(itemId)));
         }
 
         async function warmAuxNftPosters(root = document) {
             // Theme data must be restored even when a poster PNG already came
             // from IndexedDB. Looking only for pending frames left cached cards
             // on the generic purple fallback after returning to a tab.
-            const surfaces = [...root.querySelectorAll('.nft-aux-zero-media--themed[data-item-id]')];
+            const surfaces = [...root.querySelectorAll('.nft-aux-zero-media[data-item-id]')];
             const itemIds = [...new Set(surfaces.map(surface => Number(surface.dataset.itemId)).filter(Boolean))];
             if (!itemIds.length) return;
-            let cursor = 0;
-            const worker = async () => {
-                while (cursor < itemIds.length) {
-                    const itemId = itemIds[cursor++];
-                    await ensureItemPoster(itemId);
-                }
-            };
-            await Promise.allSettled(Array.from({ length: Math.min(4, itemIds.length) }, worker));
+            await Promise.allSettled(itemIds.map(itemId => ensureItemPoster(itemId)));
         }
 
         function renderCasePosterFrame(caseId, dropIndex, media) {
@@ -8101,11 +8021,11 @@
                 let frameCount = 0;
                 let framePlan = [];
                 let frameCursor = 0;
-                let timeoutId = 0;
+                let stallRecoveryTimer = 0;
                 const finish = posterUrl => {
                     if (settled) return;
                     settled = true;
-                    clearTimeout(timeoutId);
+                    clearTimeout(stallRecoveryTimer);
                     try { rawPlayer?.destroy?.(); } catch (_) {}
                     rawPlayer = null;
                     const safePoster = safeGeneratedPosterUrl(posterUrl);
@@ -8133,7 +8053,8 @@
                                 renderNext();
                             },
                             (_frameNo, rgba) => {
-                                if (settled || !rgba?.length) return finish('');
+                                if (settled) return;
+                                if (!rgba?.length) return renderNext();
                                 if (!rawNftFrameLooksRenderable(rgba, size)
                                     || !rawNftFrameHasTransparentEdge(rgba, size)) return renderNext();
                                 try {
@@ -8154,12 +8075,12 @@
                         rawPlayer.loadFromUrl(tgsUrl);
                     } catch (_) { finish(''); }
                 };
-                timeoutId = setTimeout(() => finish(''), 12000);
                 try {
                     // RawPlayer uses the same initialized worker pool but does
                     // not allocate or register a visible DOM/canvas player.
                     window.RLottie.initWorkers(start);
                 } catch (_) { finish(''); }
+                stallRecoveryTimer = setTimeout(() => finish(''), 30000);
             }).finally(() => casePosterFrameRequests.delete(cacheKey));
             casePosterFrameRequests.set(cacheKey, request);
             return request;
@@ -8171,31 +8092,20 @@
             const drops = (caseData?.drops || [])
                 .filter(drop => drop?.has_live_nft && Number(drop?.drop_index ?? -1) >= 0);
             if (!drops.length) return Promise.resolve();
-            let cursor = 0;
-            const worker = async () => {
-                while (cursor < drops.length) {
-                    const drop = drops[cursor++];
+            const warmDrop = async drop => {
                     const dropIndex = Number(drop.drop_index);
                     const cacheKey = `case:${caseId}:${dropIndex}`;
-                    if (safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) continue;
-                    // A descriptor/TGS CDN miss must not turn into a permanent
-                    // grey card. Refresh both the short-lived descriptor and
-                    // the one-shot decoder up to three times while the other
-                    // workers continue loading independent rewards.
-                    for (let attempt = 0; attempt < 3; attempt++) {
-                        if (attempt) nftMediaCache.delete(cacheKey);
+                    while (!safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) {
                         try {
                             const media = await getCaseNftMedia(caseId, dropIndex);
-                            if (media?.animated && await renderCasePosterFrame(caseId, dropIndex, media)) break;
+                            if (media?.animated && await renderCasePosterFrame(caseId, dropIndex, media)) return true;
                         } catch (_) {}
-                        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 220 * (attempt + 1)));
+                        nftMediaCache.delete(cacheKey);
+                        await new Promise(resolve => setTimeout(resolve, 750));
                     }
-                }
+                    return true;
             };
-            // Use the complete four-worker pool while a case is open. Each
-            // item now renders at most eleven representative frames, so all
-            // rewards can become visible together without a serial queue.
-            return Promise.allSettled(Array.from({ length: Math.min(4, drops.length) }, worker));
+            return Promise.allSettled(drops.map(warmDrop));
         }
 
         function scheduleCasePosterPrewarm(caseData) {
@@ -8246,14 +8156,16 @@
             const caseId = Number(currentCase?.id || 0);
             const dropIndex = Number(drop?.drop_index ?? -1);
             if (!caseId || dropIndex < 0) return false;
-            for (let attempt = 0; attempt < 3; attempt++) {
+            const cacheKey = `case:${caseId}:${dropIndex}`;
+            while (!safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) {
                 try {
                     const media = await getCaseNftMedia(caseId, dropIndex);
                     if (media?.animated && await renderCasePosterFrame(caseId, dropIndex, media)) return true;
                 } catch (_) {}
-                if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+                nftMediaCache.delete(cacheKey);
+                await new Promise(resolve => setTimeout(resolve, 750));
             }
-            return false;
+            return true;
         }
 
         async function openCaseDetail(caseId) {

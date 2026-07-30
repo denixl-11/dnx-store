@@ -121,7 +121,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.30"
+API_RELEASE = "8.9-opt.31"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 NFT_TGS_BINARY_TTL = 6 * 60 * 60
@@ -2875,7 +2875,6 @@ async def get_item_nft_source(item_id: int) -> str:
 
 
 @require_auth
-@rate_limit(90, 60)
 async def handle_nft_media(request):
     try:
         item_id = int(request.query.get("item_id", "0"))
@@ -3580,7 +3579,6 @@ async def handle_get_case_details(request):
 
 
 @require_auth
-@rate_limit(90, 60)
 async def handle_case_nft_media(request):
     """Serve case animation metadata while keeping its Telegram NFT link private."""
     try:

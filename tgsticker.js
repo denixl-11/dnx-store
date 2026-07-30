@@ -314,33 +314,13 @@ var RLottie = (function () {
 
   function frameLooksRenderable(bytes, width, height) {
     if (!bytes || !bytes.length || width < 8 || height < 8) return false;
-    var step = 2;
-    var opaque = 0;
-    var connected = 0;
-    var minX = width;
-    var minY = height;
-    var maxX = -1;
-    var maxY = -1;
-    for (var y = 0; y < height; y += step) {
-      for (var x = 0; x < width; x += step) {
-        if (bytes[((y * width + x) * 4) + 3] <= 32) continue;
-        opaque++;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
-        var right = x + step < width ? bytes[((y * width + x + step) * 4) + 3] : 0;
-        var down = y + step < height ? bytes[((((y + step) * width) + x) * 4) + 3] : 0;
-        if (right > 32 || down > 32) connected++;
-      }
+    // The source is the model-only Telegram TGS. Any alpha-bearing pixel is a
+    // valid part of the gift; density/connectivity thresholds incorrectly hid
+    // thin flares, rings and edge-touching models behind the fallback image.
+    for (var index = 3; index < bytes.length; index += 4) {
+      if (bytes[index] > 8) return true;
     }
-    var sampled = Math.ceil(width / step) * Math.ceil(height / step);
-    var boxWidth = maxX >= minX ? maxX - minX + step : 0;
-    var boxHeight = maxY >= minY ? maxY - minY + step : 0;
-    return opaque >= Math.max(18, sampled * .002) &&
-      opaque / sampled < .72 &&
-      connected / Math.max(1, opaque) >= .14 &&
-      boxWidth >= width * .035 && boxHeight >= height * .035;
+    return false;
   }
 
   function doRender(rlPlayer, frame) {
