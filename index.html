@@ -4230,7 +4230,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.34';
+        const EXPECTED_API_RELEASE = '8.9-opt.35';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -4417,8 +4417,8 @@
         const nftSynchronizedPlaybackBatches = new Map();
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v938';
-        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v938';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v939';
+        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v939';
         const nftPosterRetryTimers = new Map();
         const activePosterRenderCancels = new Set();
         let nftModalPriorityActive = false;
@@ -4434,6 +4434,10 @@
         // per opening. This keeps dozens of shared RLottie workers from
         // competing inside Telegram WebView.
         const NFT_MEDIA_MODAL_ONLY = true;
+        // iOS Telegram WebView enforces a much smaller practical Worker/WASM
+        // budget than desktop browsers. Poster jobs stay serial there; every
+        // job still owns a fresh worker, so one heavy TGS cannot blank others.
+        const NFT_POSTER_JOB_CONCURRENCY = /iP(?:hone|ad|od)/i.test(navigator.userAgent) ? 1 : 3;
         let catalogRenderedSignature = '';
         let catalogLoadedAt = 0;
         let catalogRequest = null;
@@ -8165,7 +8169,7 @@
             await runNftPosterJobs(itemIds, ensureReady);
         }
 
-        async function runNftPosterJobs(values, job, concurrency = 3) {
+        async function runNftPosterJobs(values, job, concurrency = NFT_POSTER_JOB_CONCURRENCY) {
             const queue = [...values];
             let cursor = 0;
             const worker = async () => {
@@ -8186,7 +8190,7 @@
             const surfaces = [...root.querySelectorAll('.nft-aux-zero-media[data-item-id], .nft-catalog-upgrade[data-item-id]')];
             const itemIds = [...new Set(surfaces.map(surface => Number(surface.dataset.itemId)).filter(Boolean))];
             if (!itemIds.length) return;
-            await runNftPosterJobs(itemIds, itemId => ensureItemPoster(itemId), 2);
+            await runNftPosterJobs(itemIds, itemId => ensureItemPoster(itemId), NFT_POSTER_JOB_CONCURRENCY);
         }
 
         function renderCasePosterFrame(caseId, dropIndex, media) {

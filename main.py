@@ -110,7 +110,11 @@ runtime_state = {
 nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_tgs_binary_cache: OrderedDict[str, tuple[float, bytes]] = OrderedDict()
 nft_preview_binary_cache: OrderedDict[str, tuple[float, str, bytes]] = OrderedDict()
+nft_media_requests: dict[str, asyncio.Task] = {}
+nft_tgs_requests: dict[str, asyncio.Task] = {}
 nft_preview_requests: dict[str, asyncio.Task] = {}
+telegram_page_semaphore = asyncio.Semaphore(3)
+telegram_asset_semaphore = asyncio.Semaphore(4)
 star_reconcile_attempts: dict[str, float] = {}
 auth_cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
 restriction_cache: OrderedDict[str, tuple[float, dict | None]] = OrderedDict()
@@ -121,7 +125,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.34"
+API_RELEASE = "8.9-opt.35"
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 NFT_TGS_BINARY_TTL = 6 * 60 * 60
@@ -2632,39 +2636,71 @@ async def handle_admin_db_audit(request):
 
 
 async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
+    source_url = canonical_telegram_nft_url(source_url)
+    if not source_url:
+        return {"animated": False, "transient": False}
     now = time.monotonic()
     cached = nft_media_cache.get(source_url)
     if cached and cached[0] > now:
         return cached[1]
-    try:
-        async with get_ton_session().get(
-            source_url,
-            allow_redirects=False,
-            headers={"User-Agent": "DNXStore/1.0 TelegramMiniApp"},
-        ) as response:
-            content_type = response.headers.get("Content-Type", "").lower()
-            if response.status != 200 or "text/html" not in content_type:
-                raise ValueError(f"unexpected Telegram response: {response.status}")
-            html_bytes = await response.content.read(512 * 1024 + 1)
-            if len(html_bytes) > 512 * 1024:
-                raise ValueError("Telegram NFT page is too large")
+    existing_request = nft_media_requests.get(source_url)
+    if existing_request is not None:
+        return await asyncio.shield(existing_request)
 
-        parser = TelegramNftMediaParser()
-        parser.feed(html_bytes.decode("utf-8", errors="replace"))
-        colors = parser.gradient_colors[:2]
-        result = {
-            "animated": bool(parser.tgs_url),
-            "tgsUrl": parser.tgs_url,
-            "assetPath": make_nft_asset_path(source_url) if parser.tgs_url else "",
-            "previewPath": make_nft_preview_path(source_url) if parser.preview_url else "",
-            "patternUrl": parser.pattern_url,
-            "previewUrl": parser.preview_url,
-            "colors": colors if len(colors) == 2 else ["#3E245D", "#160D27"],
-            "patternColor": parser.pattern_color,
+    async def load() -> dict:
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                async with telegram_page_semaphore:
+                    async with get_ton_session().get(
+                        source_url,
+                        allow_redirects=True,
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 TelegramMiniApp",
+                            "Accept": "text/html,application/xhtml+xml",
+                            "Accept-Language": "en-US,en;q=0.8",
+                        },
+                    ) as response:
+                        content_type = response.headers.get("Content-Type", "").lower()
+                        if response.status != 200 or "text/html" not in content_type:
+                            raise ValueError(f"unexpected Telegram response: {response.status}")
+                        html_bytes = await response.content.read(512 * 1024 + 1)
+                if len(html_bytes) > 512 * 1024:
+                    raise ValueError("Telegram NFT page is too large")
+                parser = TelegramNftMediaParser()
+                parser.feed(html_bytes.decode("utf-8", errors="replace"))
+                if not parser.tgs_url:
+                    raise ValueError("Telegram NFT page has no TGS source")
+                colors = parser.gradient_colors[:2]
+                return {
+                    "animated": True,
+                    "tgsUrl": parser.tgs_url,
+                    "assetPath": make_nft_asset_path(source_url),
+                    "previewPath": make_nft_preview_path(source_url) if parser.preview_url else "",
+                    "patternUrl": parser.pattern_url,
+                    "previewUrl": parser.preview_url,
+                    "colors": colors if len(colors) == 2 else ["#3E245D", "#160D27"],
+                    "patternColor": parser.pattern_color,
+                    "transient": False,
+                }
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+                last_error = exc
+                if attempt < 4:
+                    await asyncio.sleep(0.35 * (2 ** attempt))
+        logging.warning("Telegram NFT media temporarily unavailable for item %s: %s", item_id, last_error)
+        return {
+            "animated": False,
+            "transient": True,
+            "previewPath": make_nft_preview_path(source_url),
         }
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
-        logging.warning("Telegram NFT media unavailable for item %s: %s", item_id, exc)
-        result = {"animated": False, "previewPath": make_nft_preview_path(source_url)}
+
+    request = asyncio.create_task(load())
+    nft_media_requests[source_url] = request
+    try:
+        result = await asyncio.shield(request)
+    finally:
+        if nft_media_requests.get(source_url) is request:
+            nft_media_requests.pop(source_url, None)
 
     if len(nft_media_cache) >= 512:
         expired = [key for key, (expires, _) in nft_media_cache.items() if expires <= time.monotonic()]
@@ -2672,7 +2708,9 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
             nft_media_cache.pop(key, None)
         if len(nft_media_cache) >= 512:
             nft_media_cache.pop(next(iter(nft_media_cache)), None)
-    cache_ttl = 75 if result.get("animated") else 30
+    # A network/rate-limit failure is not proof that the NFT has no animation.
+    # Keep it only briefly so the next card retry can recover immediately.
+    cache_ttl = 75 if result.get("animated") else (1 if result.get("transient") else 30)
     nft_media_cache[source_url] = (time.monotonic() + cache_ttl, result)
     return result
 
@@ -2692,38 +2730,51 @@ async def fetch_telegram_tgs_bytes(source_url: str) -> bytes:
     if cached and cached[0] > now:
         nft_tgs_binary_cache.move_to_end(source_url)
         return cached[1]
+    existing_request = nft_tgs_requests.get(source_url)
+    if existing_request is not None:
+        return await asyncio.shield(existing_request)
 
-    data = b""
-    last_error: Exception | None = None
-    for attempt in range(3):
-        try:
-            if attempt:
-                nft_media_cache.pop(source_url, None)
-            media = await fetch_telegram_nft_media(source_url, -1)
-            tgs_url = safe_telegram_media_url(media.get("tgsUrl"))
-            if not tgs_url:
-                raise ValueError("Telegram NFT has no TGS animation")
-            async with get_ton_session().get(
-                tgs_url,
-                headers={"User-Agent": "DNXStore/1.0 TelegramMiniApp"},
-            ) as response:
-                if response.status != 200:
-                    raise ValueError(f"unexpected TGS response: {response.status}")
-                data = await response.content.read(4 * 1024 * 1024 + 1)
-            if not 32 <= len(data) <= 4 * 1024 * 1024 or not data.startswith(b"\x1f\x8b"):
-                raise ValueError("invalid TGS payload")
-            break
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
-            last_error = exc
-            data = b""
-    if not data:
-        raise web.HTTPBadGateway(text=f"NFT animation unavailable: {last_error}")
+    async def load() -> bytes:
+        data = b""
+        last_error: Exception | None = None
+        for attempt in range(5):
+            try:
+                if attempt:
+                    nft_media_cache.pop(source_url, None)
+                media = await fetch_telegram_nft_media(source_url, -1)
+                tgs_url = safe_telegram_media_url(media.get("tgsUrl"))
+                if not tgs_url:
+                    raise ValueError("Telegram NFT has no TGS animation")
+                async with telegram_asset_semaphore:
+                    async with get_ton_session().get(
+                        tgs_url,
+                        allow_redirects=True,
+                        headers={"User-Agent": "Mozilla/5.0 AppleWebKit/605.1.15 TelegramMiniApp"},
+                    ) as response:
+                        if response.status != 200:
+                            raise ValueError(f"unexpected TGS response: {response.status}")
+                        data = await response.content.read(4 * 1024 * 1024 + 1)
+                if not 32 <= len(data) <= 4 * 1024 * 1024 or not data.startswith(b"\x1f\x8b"):
+                    raise ValueError("invalid TGS payload")
+                nft_tgs_binary_cache[source_url] = (time.monotonic() + NFT_TGS_BINARY_TTL, data)
+                nft_tgs_binary_cache.move_to_end(source_url)
+                while len(nft_tgs_binary_cache) > NFT_TGS_BINARY_CACHE_MAX:
+                    nft_tgs_binary_cache.popitem(last=False)
+                return data
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+                last_error = exc
+                data = b""
+                if attempt < 4:
+                    await asyncio.sleep(0.4 * (2 ** attempt))
+        raise web.HTTPBadGateway(text=f"NFT animation temporarily unavailable: {last_error}")
 
-    nft_tgs_binary_cache[source_url] = (time.monotonic() + NFT_TGS_BINARY_TTL, data)
-    nft_tgs_binary_cache.move_to_end(source_url)
-    while len(nft_tgs_binary_cache) > NFT_TGS_BINARY_CACHE_MAX:
-        nft_tgs_binary_cache.popitem(last=False)
-    return data
+    request = asyncio.create_task(load())
+    nft_tgs_requests[source_url] = request
+    try:
+        return await asyncio.shield(request)
+    finally:
+        if nft_tgs_requests.get(source_url) is request:
+            nft_tgs_requests.pop(source_url, None)
 
 
 async def fetch_telegram_preview_bytes(source_url: str) -> tuple[str, bytes]:
@@ -2745,14 +2796,16 @@ async def fetch_telegram_preview_bytes(source_url: str) -> tuple[str, bytes]:
                 preview_url = safe_telegram_media_url(media.get("previewUrl"))
                 if not preview_url:
                     raise ValueError("Telegram NFT has no preview")
-                async with get_ton_session().get(
-                    preview_url,
-                    headers={"User-Agent": "DNXStore/1.0 TelegramMiniApp"},
-                ) as response:
-                    content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
-                    if response.status != 200 or content_type not in {"image/jpeg", "image/png", "image/webp"}:
-                        raise ValueError(f"unexpected preview response: {response.status} {content_type}")
-                    data = await response.content.read(6 * 1024 * 1024 + 1)
+                async with telegram_asset_semaphore:
+                    async with get_ton_session().get(
+                        preview_url,
+                        allow_redirects=True,
+                        headers={"User-Agent": "Mozilla/5.0 AppleWebKit/605.1.15 TelegramMiniApp"},
+                    ) as response:
+                        content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
+                        if response.status != 200 or content_type not in {"image/jpeg", "image/png", "image/webp"}:
+                            raise ValueError(f"unexpected preview response: {response.status} {content_type}")
+                        data = await response.content.read(6 * 1024 * 1024 + 1)
                 if not 64 <= len(data) <= 6 * 1024 * 1024:
                     raise ValueError("invalid Telegram preview payload")
                 nft_preview_binary_cache[source_url] = (
@@ -2823,7 +2876,7 @@ async def warm_nft_media_cache():
         WHERE COALESCE(nft_link, '') <> ''
         ORDER BY CASE WHEN status = 'Доступен' THEN 0 ELSE 1 END, id
     """)
-    jobs = []
+    sources: list[tuple[str, int]] = []
     seen_sources = set()
     for row in rows:
         source_url = canonical_telegram_nft_url(row["nft_link"])
@@ -2834,32 +2887,33 @@ async def warm_nft_media_cache():
             source_url,
         )
         seen_sources.add(source_url)
-        jobs.append(fetch_telegram_nft_media(source_url, int(row["id"])))
+        sources.append((source_url, int(row["id"])))
     for case_id, case in CASES_CACHE.items():
         for drop_index, drop in enumerate(case.get("drops") or []):
             source_url = canonical_telegram_nft_url(drop.get("nft_link"))
             if not source_url or source_url in seen_sources:
                 continue
             seen_sources.add(source_url)
-            jobs.append(fetch_telegram_nft_media(
+            sources.append((
                 source_url,
                 -(int(case_id) * 1000 + drop_index + 1),
             ))
-    if jobs:
-        await asyncio.gather(*jobs, return_exceptions=True)
-        # Warm every unique preview and animation concurrently. There is no
-        # catalogue/case split and no artificial batch size.
-        await asyncio.gather(
-            *(
-                task
-                for source_url in seen_sources
-                for task in (
-                    fetch_telegram_preview_bytes(source_url),
-                    fetch_telegram_tgs_bytes(source_url),
-                )
-            ),
-            return_exceptions=True,
-        )
+    if sources:
+        # Render and Telegram both throttle large bursts. Warm in small batches
+        # so startup never turns hundreds of valid gifts into cached failures.
+        for offset in range(0, len(sources), 3):
+            await asyncio.gather(
+                *(fetch_telegram_nft_media(url, item_id) for url, item_id in sources[offset:offset + 3]),
+                return_exceptions=True,
+            )
+        # The app no longer uses Telegram raster previews for animated cards.
+        # Only warm the compact model-only TGS files that iPhone actually needs.
+        source_urls = [url for url, _ in sources]
+        for offset in range(0, len(source_urls), 3):
+            await asyncio.gather(
+                *(fetch_telegram_tgs_bytes(url) for url in source_urls[offset:offset + 3]),
+                return_exceptions=True,
+            )
 
 
 async def warm_nft_media_cache_safely():
