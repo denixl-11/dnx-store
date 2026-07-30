@@ -9,7 +9,10 @@ var RLottie = (function () {
 
   rlottie.Api = {};
   rlottie.players = Object.create(null);;
-  rlottie.WORKERS_LIMIT = 4;
+  // Follow the device's actual parallel capacity instead of imposing the old
+  // fixed four-worker bottleneck. Preview grids no longer consume workers;
+  // these workers are reserved for requested characteristics animations.
+  rlottie.WORKERS_LIMIT = Math.max(4, Number(window.navigator.hardwareConcurrency) || 4);
 
   var reqId = 0;
   var mainLoopAf = false;
@@ -136,7 +139,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.27', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.28', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();

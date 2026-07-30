@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.27" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.28" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -3598,6 +3598,84 @@
             .activity-icon { width: 29px; height: 29px; }
             .activity-value { min-width: 58px; }
         }
+        /* opt.28: previews are ordinary parallel browser images. Catalogue,
+           cart and catalogue-origin inventory use Telegram's square as-is. */
+        .nft-preview-shell {
+            position: relative !important;
+            display: block !important;
+            overflow: hidden !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: inherit !important;
+            background: #242424 !important;
+            isolation: isolate !important;
+        }
+        .nft-preview-shell > .nft-instant-preview {
+            position: absolute !important;
+            inset: 0 !important;
+            display: block !important;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            object-fit: cover !important;
+            object-position: center !important;
+            border: 0 !important;
+            border-radius: inherit !important;
+            background: #242424 !important;
+            transform: none !important;
+        }
+        /* Case-origin previews remain visible immediately, with one neutral
+           overlay owned by the shell. There is never a second inner square. */
+        .nft-preview-shell--case::after,
+        .case-modal-content .case-zero-media--preview::after,
+        .case-modal-content .roulette-item--live::after {
+            content: '' !important;
+            position: absolute !important;
+            inset: 0 !important;
+            z-index: 2 !important;
+            display: block !important;
+            pointer-events: none !important;
+            background: rgba(36, 36, 36, .22) !important;
+        }
+        .case-modal-content .case-zero-frame--preview,
+        .case-modal-content .case-roulette-poster--preview {
+            position: absolute !important;
+            inset: 0 !important;
+            display: block !important;
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            object-fit: cover !important;
+            object-position: center !important;
+            border: 0 !important;
+            border-radius: inherit !important;
+            background: #242424 !important;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+        .case-modal-content .drop-chance {
+            z-index: 3 !important;
+        }
+
+        /* Characteristics: the animation viewport itself occupies 70% of the
+           square. The canvas fills that viewport once, preventing the model
+           from expanding to roughly 95% on tall/large TGS artwork. */
+        #nft-modal-media > picture.nft-live-model,
+        #nft-modal-media > .nft-generated-poster {
+            position: absolute !important;
+            inset: 15% !important;
+            width: 70% !important;
+            height: 70% !important;
+            margin: 0 !important;
+            object-fit: contain !important;
+            object-position: center !important;
+            background: transparent !important;
+        }
+        #nft-modal-media > picture.nft-live-model > canvas {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+        }
     </style>
 </head>
 <body>
@@ -3979,7 +4057,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.27"></script>
+    <script src="tgsticker.js?v=8.9-opt.28"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4016,7 +4094,7 @@
         document.documentElement.classList.toggle('android-device', isAndroidPlatform);
         document.documentElement.classList.toggle('low-power-device', lowPowerNftDevice);
         if (window.RLottie) {
-            window.RLottie.WORKERS_LIMIT = Math.max(4, Math.min(8, logicalCores || 4));
+            window.RLottie.WORKERS_LIMIT = Math.max(4, logicalCores || 4);
         }
         tg.ready();
         try { tg.setHeaderColor('#0a0a0c'); tg.setBackgroundColor('#0a0a0c'); } catch (e) {}
@@ -4096,7 +4174,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.27';
+        const EXPECTED_API_RELEASE = '8.9-opt.28';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
         const TON_STAR_RATE = 85;
         const initData = tg.initData || '';
@@ -4266,20 +4344,15 @@
         let nftMediaActiveLoads = 0;
         let nftMediaObserver = null;
         let nftAuxMediaObserver = null;
-        // Every visible NFT is queued, but decoding is bounded. Starting an
-        // unlimited number of workers at once made iOS/Android WebViews evict
-        // canvases and left random cards blank after tab switches.
-        // Match the decoder queue to RLottie's actual shared worker pool. The
-        // previous 8-16 "loads" returned immediately after init(), so dozens
-        // of players fought for 4 workers and some never emitted tg:load.
-        const NFT_MEDIA_MAX_LOADS = 4;
-        // Playback itself is already distributed over RLottie's bounded worker
-        // pool. A second, smaller UI limit left random visible cards waiting
-        // with an empty background. All visible NFTs must be admitted here;
-        // decoding remains bounded by NFT_MEDIA_MAX_LOADS and the worker pool.
+        // Preview cards are ordinary images and never enter this queue. Do not
+        // impose an additional client limit on requested modal media.
+        const NFT_MEDIA_MAX_LOADS = Number.POSITIVE_INFINITY;
+        // Playback itself is distributed over all available RLottie workers.
+        // A second UI queue used to leave random NFTs waiting on an empty tile.
+        // Admit every requested modal animation immediately.
         // Единственный допустимый проигрыватель — NFT в открытом окне
         // характеристик. Все карточки и элементы кейсов держим на 0 кадре.
-        const NFT_MEDIA_MAX_PLAYING = 1;
+        const NFT_MEDIA_MAX_PLAYING = Number.POSITIVE_INFINITY;
         const NFT_MEDIA_CACHE_LIMIT = 96;
         const nftMediaPlaying = new Set();
         const nftMediaPlaybackQueue = [];
@@ -4289,8 +4362,8 @@
         const nftSynchronizedPlaybackBatches = new Map();
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_opt27';
-        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-opt27';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_opt28';
+        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-opt28';
         let nftPosterDbPromise = null;
         let nftPosterDbRestorePromise = Promise.resolve();
         let nftPosterDbWriteCount = 0;
@@ -4458,6 +4531,17 @@
                 } catch (_) {}
             }
             return safeTelegramMediaUrl(media?.tgsUrl);
+        }
+
+        function safeNftPreviewUrl(value) {
+            const candidate = String(value || '').trim();
+            if (!candidate) return '';
+            try {
+                const url = new URL(candidate, `${API_BASE}/`);
+                const apiOrigin = new URL(API_BASE).origin;
+                if (url.origin === apiOrigin && url.pathname === '/nft/preview') return url.href;
+                return safeTelegramMediaUrl(url.href);
+            } catch (_) { return ''; }
         }
 
         function safeGeneratedPosterUrl(value) {
@@ -5664,7 +5748,7 @@
             const container = document.getElementById('catalog-container');
             const signature = currentCatalog.map(item => [
                 item.id, item.name, item.price, item.image_url, item.nft_link,
-                item.model, item.pattern, item.background
+                item.nft_preview_path, item.model, item.pattern, item.background
             ].join('|')).join('::');
             if (signature !== catalogRenderedSignature || container.dataset.catalogRendered !== 'true') {
                 destroyCatalogNftMedia();
@@ -5885,11 +5969,12 @@
                     Number(item.id || 0)
                 );
             }
-            // A Telegram-linked NFT must never flash its legacy raster preview:
-            // those previews have a different crop/background and caused the
-            // half-second purple tile before RLottie painted the first frame.
+            // Telegram's signed preview is an immediate square fallback. It is
+            // loaded as a normal image, independently from the animation
+            // worker, so opening characteristics can never expose an empty
+            // violet/black canvas while TGS initializes.
             const modalFallbackUrl = telegramLink
-                ? ''
+                ? safeNftPreviewUrl(item?.nft_preview_path || immediateMedia?.previewPath || immediateMedia?.previewUrl)
                 : (staticRewardAssetUrl(item.name) || safeImageUrl(item.image_url));
             if (modalFallbackUrl) {
                 if (!(modalZeroFrame instanceof HTMLImageElement)) {
@@ -6047,6 +6132,14 @@
                     </${allowOpen && itemId ? 'button' : 'div'}>`;
                 }
                 return `<img src="${fallbackUrl}" class="item-image nft-static-${variant}" alt="${title}" loading="eager" decoding="async"${allowOpen && itemId ? ` onclick="openNftModal(${itemId}, '${modalContext}')"` : ''}>`;
+            }
+            const directPreview = safeNftPreviewUrl(item?.nft_preview_path || item?.nft_media?.previewPath);
+            if (directPreview) {
+                const tag = allowOpen ? 'button' : 'div';
+                const action = allowOpen ? ` type="button" onclick="openNftModal(${itemId}, '${modalContext}')"` : '';
+                return `<${tag} class="item-image nft-preview-shell nft-preview-shell--${variant}${caseOrigin ? ' nft-preview-shell--case' : ''}" aria-label="${title}"${action}>
+                    <img class="nft-instant-preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">
+                </${tag}>`;
             }
             const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(`item:${itemId}`));
             const tag = allowOpen ? 'button' : 'div';
@@ -7713,6 +7806,12 @@
             const fallback = escapeHtml(staticRewardAssetUrl(staticKey) || safeImageUrl(drop?.image_url));
             const title = escapeHtml(drop?.model || drop?.name || 'NFT');
             if (!drop?.has_live_nft) return `<img class="static-case-reward${staticKey ? ` nft-static-reward-model nft-static-reward-model--${staticKey}` : ''}" src="${fallback}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+            const directPreview = safeNftPreviewUrl(drop?.nft_preview_path);
+            if (directPreview) {
+                return `<div class="case-zero-media case-zero-media--preview" aria-label="${title}">
+                    <img class="case-zero-frame case-zero-frame--preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">
+                </div>`;
+            }
             const caseId = Number(currentCase?.id || 0);
             const dropIndex = Number(drop?.drop_index ?? -1);
             const generatedItemId = Number(drop?.generated_item_id || 0);
@@ -7739,6 +7838,10 @@
                 const staticKey = staticRewardKey(drop?.model || drop?.name);
                 const fallback = staticRewardAssetUrl(staticKey) || safeImageUrl(drop?.image_url);
                 return `<img class="case-roulette-poster case-roulette-poster--fallback${staticKey ? ` nft-static-reward-model nft-static-reward-model--${staticKey}` : ''}" src="${escapeHtml(fallback)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
+            }
+            const directPreview = safeNftPreviewUrl(drop?.nft_preview_path);
+            if (directPreview) {
+                return `<img class="case-roulette-poster case-roulette-poster--preview" src="${escapeHtml(directPreview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
             }
             if (livePoster) {
                 return `<img class="case-roulette-poster case-roulette-poster--live" src="${escapeHtml(livePoster)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">`;
@@ -8029,7 +8132,9 @@
             const caseId = Number(caseData?.id || 0);
             if (!caseId) return Promise.resolve();
             const drops = (caseData?.drops || [])
-                .filter(drop => drop?.has_live_nft && Number(drop?.drop_index ?? -1) >= 0);
+                .filter(drop => drop?.has_live_nft
+                    && !safeNftPreviewUrl(drop?.nft_preview_path)
+                    && Number(drop?.drop_index ?? -1) >= 0);
             if (!drops.length) return Promise.resolve();
             let cursor = 0;
             const worker = async () => {
