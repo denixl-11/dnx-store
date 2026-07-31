@@ -124,7 +124,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.55"
+API_RELEASE = "8.9-opt.57"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -2665,9 +2665,7 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
                         content_type = response.headers.get("Content-Type", "").lower()
                         if response.status != 200 or "text/html" not in content_type:
                             raise ValueError(f"unexpected Telegram response: {response.status}")
-                        html_bytes = await response.content.read(512 * 1024 + 1)
-                if len(html_bytes) > 512 * 1024:
-                    raise ValueError("Telegram NFT page is too large")
+                        html_bytes = await read_response_body_limited(response, 512 * 1024)
                 parser = TelegramNftMediaParser()
                 parser.feed(html_bytes.decode("utf-8", errors="replace"))
                 if not parser.tgs_url:
@@ -2729,6 +2727,24 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
     return bind_item_asset(result)
 
 
+async def read_response_body_limited(response: aiohttp.ClientResponse, max_bytes: int) -> bytes:
+    """Read the complete response without trusting a single socket read.
+
+    ``StreamReader.read(n)`` may legally return only the bytes currently
+    available.  Telegram's CDN often splits larger TGS files into multiple
+    chunks, so a one-shot read produced a valid gzip header followed by a
+    truncated animation.  Accumulate chunks and enforce the limit ourselves.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.content.iter_chunked(64 * 1024):
+        total += len(chunk)
+        if total > max_bytes:
+            raise ValueError("Telegram response is too large")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 async def fetch_telegram_tgs_bytes(source_url: str) -> bytes:
     """Fetch and retain the compact TGS once on the backend.
 
@@ -2767,7 +2783,7 @@ async def fetch_telegram_tgs_bytes(source_url: str) -> bytes:
                     ) as response:
                         if response.status != 200:
                             raise ValueError(f"unexpected TGS response: {response.status}")
-                        data = await response.content.read(4 * 1024 * 1024 + 1)
+                        data = await read_response_body_limited(response, 4 * 1024 * 1024)
                 if not 32 <= len(data) <= 4 * 1024 * 1024 or not data.startswith(b"\x1f\x8b"):
                     raise ValueError("invalid TGS payload")
                 nft_tgs_binary_cache[source_url] = (time.monotonic() + NFT_TGS_BINARY_TTL, data)
@@ -2819,7 +2835,7 @@ async def fetch_telegram_preview_bytes(source_url: str) -> tuple[str, bytes]:
                         content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
                         if response.status != 200 or content_type not in {"image/jpeg", "image/png", "image/webp"}:
                             raise ValueError(f"unexpected preview response: {response.status} {content_type}")
-                        data = await response.content.read(6 * 1024 * 1024 + 1)
+                        data = await read_response_body_limited(response, 6 * 1024 * 1024)
                 if not 64 <= len(data) <= 6 * 1024 * 1024:
                     raise ValueError("invalid Telegram preview payload")
                 nft_preview_binary_cache[source_url] = (
@@ -2891,7 +2907,7 @@ async def fetch_telegram_pattern_bytes(source_url: str) -> tuple[str, bytes]:
                     declared_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
                     if response.status != 200:
                         raise ValueError(f"unexpected NFT pattern response: {response.status} {declared_type}")
-                    data = await response.content.read(512 * 1024 + 1)
+                    data = await read_response_body_limited(response, 512 * 1024)
             if not 16 <= len(data) <= 512 * 1024:
                 raise ValueError("invalid NFT pattern payload")
             content_type = sniff_image_content_type(data)

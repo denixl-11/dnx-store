@@ -1423,6 +1423,11 @@
             opacity: 1;
             transition: opacity .12s ease;
         }
+        .nft-generated-poster:not(.is-decoded),
+        .nft-catalog-hires-frame:not(.is-decoded) {
+            visibility: hidden !important;
+            opacity: 0 !important;
+        }
         .nft-live-media.has-live-frame > .nft-generated-poster { opacity: 0; }
         .nft-live-fallback {
             inset: 0;
@@ -4432,7 +4437,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.55';
+        const EXPECTED_API_RELEASE = '8.9-opt.57';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -4927,9 +4932,24 @@
                 image.className = 'nft-generated-poster';
                 image.alt = '';
                 image.decoding = 'async';
-                element.prepend(image);
             }
+            image.classList.remove('is-decoded');
+            image.onload = () => {
+                if (!element.isConnected) return;
+                image.classList.add('is-decoded');
+                if (!image.isConnected) element.prepend(image);
+            };
+            image.onerror = () => {
+                const key = nftMediaDescriptorKey(element);
+                image.remove();
+                if (key) nftPosterFrameCache.delete(key);
+                if (key.startsWith('item:')) {
+                    const itemId = Number(key.split(':')[1]);
+                    if (itemId) ensureItemPoster(itemId, true).catch(() => {});
+                }
+            };
             if (image.src !== safePoster) image.src = safePoster;
+            if (image.complete && image.naturalWidth > 0) image.onload();
         }
 
         function applyNftGeneratedPoster(key, posterUrl) {
@@ -5464,7 +5484,13 @@
             const cachedPoster = caseMode
                 ? safeGeneratedPosterUrl(nftPosterFrameCache.get(descriptorKey))
                 : safePosterImageUrl(nftPosterFrameCache.get(descriptorKey));
-            if (cachedPoster) installNftGeneratedPoster(element, cachedPoster);
+            // The modal already has Telegram's own zero-frame preview. Never
+            // insert a generated image there before decoding: a single bad
+            // poster used to paint Safari's blue broken-image badge even when
+            // the TGS itself was healthy.
+            if (cachedPoster && !element.classList.contains('nft-live-media--modal')) {
+                installNftGeneratedPoster(element, cachedPoster);
+            }
 
             const picture = document.createElement('picture');
             picture.className = 'nft-live-model';
@@ -6445,8 +6471,8 @@
                         || child.classList?.contains('nft-modal-zero-frame')
                         || child.classList?.contains('nft-modal-theme-frame'))
                     .forEach(child => child.remove());
-                const cachedPoster = nftPosterFrameCache.get(nextKey);
-                if (cachedPoster) installNftGeneratedPoster(modalMedia, cachedPoster);
+                // Telegram preview is the modal fallback; generated posters
+                // are reserved for list/card surfaces after successful decode.
             }
             // The modal is the only place where NFT animation is allowed.
             // Keep an immediate, deterministic frame underneath RLottie so a
@@ -6746,7 +6772,7 @@
                 return `<${tag} class="item-image nft-preview-shell nft-preview-shell--catalog nft-catalog-upgrade${poster ? ' has-hires-model' : ''}" data-item-id="${itemId}" aria-label="${title}"${action}>
                     ${themeUrl ? `<img class="nft-card-theme-frame" src="${escapeHtml(themeUrl)}" alt="" loading="eager" decoding="async">` : ''}
                     <img class="nft-instant-preview" src="${escapeHtml(previewUrl)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high" data-preview-source="${escapeHtml(previewUrl)}" onerror="retryNftPreviewImage(this)">
-                    ${poster ? `<img class="nft-catalog-hires-frame" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high">` : ''}
+                    ${poster ? `<img class="nft-catalog-hires-frame" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high" onload="this.classList.add('is-decoded');this.parentElement.classList.add('has-hires-model')" onerror="this.remove();this.parentElement?.classList.remove('has-hires-model')">` : ''}
                 </${tag}>`;
             }
             // Never reuse Telegram's small raster preview here: it can remain
@@ -6758,7 +6784,7 @@
             return `<${tag} class="item-image nft-aux-zero-media nft-aux-zero-media--${variant} nft-aux-zero-media--themed nft-catalog-upgrade" data-item-id="${itemId}" aria-label="${title}"${action}>
                 <span class="nft-live-pattern" aria-hidden="true"></span>
                 ${poster
-                    ? `<img class="nft-catalog-hires-frame" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high" onload="this.parentElement.classList.add('has-hires-model')">`
+                    ? `<img class="nft-catalog-hires-frame" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high" onload="this.classList.add('is-decoded');this.parentElement.classList.add('has-hires-model')" onerror="this.remove();this.parentElement?.classList.remove('has-hires-model')">`
                     : `<span class="nft-aux-zero-frame-pending" data-item-id="${itemId}" aria-label="${title}"></span>`}
             </${tag}>`;
         }
@@ -8524,8 +8550,16 @@
                     image.fetchPriority = 'high';
                     surface.appendChild(image);
                 }
-                image.onload = () => surface.classList.add('has-hires-model');
-                image.onerror = () => surface.classList.remove('has-hires-model');
+                image.classList.remove('is-decoded');
+                image.onload = () => {
+                    image.classList.add('is-decoded');
+                    surface.classList.add('has-hires-model');
+                };
+                image.onerror = () => {
+                    image.remove();
+                    surface.classList.remove('has-hires-model');
+                    nftPosterFrameCache.delete(`item:${Number(itemId)}`);
+                };
                 image.src = posterUrl;
                 if (image.complete && image.naturalWidth > 0) surface.classList.add('has-hires-model');
             });
