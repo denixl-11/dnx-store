@@ -123,7 +123,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.51"
+API_RELEASE = "8.9-opt.52"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1094,10 +1094,11 @@ def make_nft_pattern_path(source_url: str) -> str:
 
 def add_nft_preview_path(record: dict) -> dict:
     source_url = canonical_telegram_nft_url(record.get("nft_link"))
-    # Catalogue/inventory posters are rendered from the current TGS. Telegram's
-    # small raster preview can outlive a changed DB link in Safari's image
-    # cache, so it is deliberately not part of the item contract.
-    record["nft_preview_path"] = ""
+    # Telegram's own square preview is the authoritative static/zero-frame
+    # surface for catalogue cards.  Proxying it through our origin removes
+    # WebView CORS and expiring telesco.pe URL problems; the slug changes with
+    # nft_link, so Safari cannot reuse another collectible's cached image.
+    record["nft_preview_path"] = make_nft_preview_path(source_url) if source_url else ""
     # The signed same-origin animation path is cheap to issue and does not
     # require scraping Telegram first.  Returning it with the item removes a
     # descriptor request from the modal and poster critical paths.
@@ -2029,7 +2030,7 @@ async def security_headers_middleware(request, handler):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    if request.path not in {"/nft/tgs", "/nft/preview"}:
+    if request.path not in {"/nft/tgs", "/nft/preview", "/nft/pattern"}:
         response.headers["Cache-Control"] = "no-store"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if (
@@ -2824,22 +2825,38 @@ async def fetch_telegram_pattern_bytes(source_url: str) -> tuple[str, bytes]:
     if cached and cached[0] > time.monotonic():
         nft_pattern_binary_cache.move_to_end(source_url)
         return cached[1], cached[2]
-    media = await fetch_telegram_nft_media(source_url, -1)
-    pattern_url = safe_telegram_media_url(media.get("patternUrl"))
-    if not pattern_url:
-        raise web.HTTPNotFound(text="NFT pattern unavailable")
-    async with telegram_asset_semaphore:
-        async with get_ton_session().get(
-            pattern_url,
-            allow_redirects=True,
-            headers={"User-Agent": "Mozilla/5.0 AppleWebKit/605.1.15 TelegramMiniApp"},
-        ) as response:
-            content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
-            if response.status != 200 or content_type not in {"image/png", "image/webp", "image/svg+xml"}:
-                raise web.HTTPBadGateway(text=f"unexpected NFT pattern response: {response.status}")
-            data = await response.content.read(512 * 1024 + 1)
-    if not 16 <= len(data) <= 512 * 1024:
-        raise web.HTTPBadGateway(text="invalid NFT pattern payload")
+    last_error: Exception | None = None
+    content_type = ""
+    data = b""
+    for attempt in range(5):
+        try:
+            if attempt:
+                nft_media_cache.pop(source_url, None)
+            media = await fetch_telegram_nft_media(source_url, -1)
+            pattern_url = safe_telegram_media_url(media.get("patternUrl"))
+            if not pattern_url:
+                raise ValueError("NFT pattern unavailable")
+            async with telegram_asset_semaphore:
+                async with get_ton_session().get(
+                    pattern_url,
+                    allow_redirects=True,
+                    headers={"User-Agent": "Mozilla/5.0 AppleWebKit/605.1.15 TelegramMiniApp"},
+                ) as response:
+                    content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
+                    if response.status != 200 or content_type not in {"image/png", "image/webp", "image/svg+xml"}:
+                        raise ValueError(f"unexpected NFT pattern response: {response.status} {content_type}")
+                    data = await response.content.read(512 * 1024 + 1)
+            if not 16 <= len(data) <= 512 * 1024:
+                raise ValueError("invalid NFT pattern payload")
+            break
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
+            last_error = exc
+            content_type = ""
+            data = b""
+            if attempt < 4:
+                await asyncio.sleep(0.2 * (attempt + 1))
+    if not data or not content_type:
+        raise web.HTTPBadGateway(text=f"NFT pattern unavailable: {last_error}")
     nft_pattern_binary_cache[source_url] = (
         time.monotonic() + NFT_PATTERN_BINARY_TTL,
         content_type,

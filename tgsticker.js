@@ -140,7 +140,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.51', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.52', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -186,6 +186,12 @@ var RLottie = (function () {
     if (!urls.length) {
       console.warn('picture source application/x-tgsticker not found');
       return;
+    }
+    // The worker already owns the extracted URLs. Remove custom <source>
+    // elements before WebKit attempts to paint them as native image formats;
+    // iOS otherwise shows its blue broken-image badge over the animation.
+    for (var sourceIndex = 0; sourceIndex < tgs_sources.length; sourceIndex++) {
+      tgs_sources[sourceIndex].remove();
     }
     var pic_width = el.clientWidth || el.getAttribute('width');
     var pic_height = el.clientHeight || el.getAttribute('height');
@@ -667,7 +673,7 @@ var RLottie = (function () {
   RawPlayer.prototype.loadFromUrl = function(url) {
     if (this.worker) return;
     var self = this;
-    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.51', document.baseURI).href;
+    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.52', document.baseURI).href;
     this.worker = new Worker(workerUrl);
     this.worker.onmessage = function(event) {
       var data = event && event.data || {};

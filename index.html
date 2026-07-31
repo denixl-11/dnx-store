@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.51" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.52" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -3788,7 +3788,7 @@
             background: #242424 !important;
             transition: opacity 300ms cubic-bezier(.22,.61,.36,1);
         }
-        .nft-catalog-upgrade > .nft-live-pattern { display: none !important; z-index: 2 !important; opacity: 1 !important; }
+        .nft-catalog-upgrade > .nft-live-pattern { display: block !important; z-index: 2 !important; opacity: 1 !important; }
         .nft-catalog-upgrade > .nft-catalog-hires-frame {
             position: absolute !important;
             inset: 12% !important;
@@ -4260,7 +4260,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.51"></script>
+    <script src="tgsticker.js?v=8.9-opt.52"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4382,7 +4382,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.51';
+        const EXPECTED_API_RELEASE = '8.9-opt.52';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -4747,6 +4747,13 @@
                 setTimeout(() => finish(false), 8000);
             });
             nftPatternPreloads.set(url, request);
+            request.then(loaded => {
+                // A temporary Telegram/CDN failure must not poison this URL for
+                // the entire Mini App session. A later modal open may retry it.
+                if (!loaded && nftPatternPreloads.get(url) === request) {
+                    nftPatternPreloads.delete(url);
+                }
+            });
             return request;
         }
 
@@ -6349,11 +6356,16 @@
                     immediateMedia.patternColor
                 );
             }
-            // Telegram raster previews are only 160px and Safari paints a blue
-            // broken-image badge while retrying them. The modal uses the same
-            // generated TGS zero-frame as the catalogue, over the exact theme.
+            // Keep Telegram's own square preview below the transparent TGS.
+            // It is an immediate, cross-platform zero-frame and prevents iOS
+            // from ever exposing a broken <picture> badge while the worker loads.
+            const telegramPreviewUrl = safeNftPreviewUrl(
+                item?.nft_preview_path
+                || immediateMedia?.previewPath
+                || immediateMedia?.previewUrl
+            );
             const modalFallbackUrl = telegramLink
-                ? ''
+                ? telegramPreviewUrl
                 : (staticRewardAssetUrl(item.name) || safeImageUrl(item.case_asset_url));
             if (modalFallbackUrl) {
                 if (!(modalZeroFrame instanceof HTMLImageElement)) {
@@ -6364,7 +6376,9 @@
                     modalZeroFrame.onerror = () => retryNftPreviewImage(modalZeroFrame);
                     modalMedia.prepend(modalZeroFrame);
                 }
-                modalZeroFrame.dataset.previewFallback = safeImageUrl(item.case_asset_url);
+                modalZeroFrame.dataset.previewFallback = telegramLink
+                    ? safeNftPreviewUrl(immediateMedia?.previewUrl)
+                    : safeImageUrl(item.case_asset_url);
                 modalZeroFrame.dataset.fallbackTried = 'false';
                 if (modalZeroFrame.src !== modalFallbackUrl) modalZeroFrame.src = modalFallbackUrl;
             } else if (modalZeroFrame) {
@@ -6483,11 +6497,11 @@
                 if (openToken !== nftModalOpenToken) return;
                 syncItemMediaSource(Number(id), exactMedia?.sourceKey);
                 applyItemMediaTheme(Number(id), exactMedia);
-                await Promise.allSettled([
-                    preloadNftPattern(exactMedia),
-                    ensureItemPoster(Number(id), false)
-                ]);
-                if (openToken !== nftModalOpenToken) return;
+                // The Telegram preview is already the modal's visible zero
+                // frame. Do not block opening on client-side poster rendering;
+                // the descriptor supplies the transparent TGS immediately and
+                // the small pattern asset may finish in parallel.
+                preloadNftPattern(exactMedia).catch(() => {});
             } catch (_) {}
             nftModalPriorityActive = true;
             cancelBackgroundPosterRenders();
@@ -6580,6 +6594,18 @@
                 return `<${allowOpen ? 'button' : 'div'} class="item-image nft-case-static-shell" data-item-id="${itemId}" aria-label="${title}"${allowOpen ? ` type="button" onclick="openNftModal(${itemId}, 'inventory')"` : ''}>
                     <img class="nft-case-static-model" src="${fallbackUrl}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high" onerror="retryGithubCaseImage(this)">
                 </${allowOpen ? 'button' : 'div'}>`;
+            }
+            const previewUrl = safeNftPreviewUrl(
+                item?.nft_preview_path
+                || item?.nft_media?.previewPath
+                || item?.nft_media?.previewUrl
+            );
+            if (previewUrl) {
+                const tag = allowOpen ? 'button' : 'div';
+                const action = allowOpen ? ` type="button" onclick="openNftModal(${itemId}, '${modalContext}')"` : '';
+                return `<${tag} class="item-image nft-preview-shell nft-preview-shell--catalog" data-item-id="${itemId}" aria-label="${title}"${action}>
+                    <img class="nft-instant-preview" src="${escapeHtml(previewUrl)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high" data-preview-source="${escapeHtml(previewUrl)}" onerror="retryNftPreviewImage(this)">
+                </${tag}>`;
             }
             // Never reuse Telegram's small raster preview here: it can remain
             // in Safari's image cache after the DB nft_link changes. The card
