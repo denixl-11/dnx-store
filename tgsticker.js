@@ -140,7 +140,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.52', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.53', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -168,6 +168,11 @@ var RLottie = (function () {
     var tgs_sources = el.querySelectorAll('source[type="application/x-tgsticker"]');
     var multi_source = el.hasAttribute('data-multi-source');
     var urls = [], urls_map = {};
+    var direct_url = el.getAttribute('data-tgs-src') || '';
+    if (direct_url) {
+      urls_map[direct_url] = true;
+      urls.push({ url: direct_url, framesAlign: el.getAttribute('data-frames-align') || '' });
+    }
     for (var i = 0; i < tgs_sources.length; i++) {
       var tgs_source = tgs_sources[i];
       var url = tgs_source && tgs_source.getAttribute('srcset') || '';
@@ -184,7 +189,7 @@ var RLottie = (function () {
       }
     }
     if (!urls.length) {
-      console.warn('picture source application/x-tgsticker not found');
+      console.warn('picture TGS source not found');
       return;
     }
     // The worker already owns the extracted URLs. Remove custom <source>
@@ -673,7 +678,7 @@ var RLottie = (function () {
   RawPlayer.prototype.loadFromUrl = function(url) {
     if (this.worker) return;
     var self = this;
-    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.52', document.baseURI).href;
+    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.53', document.baseURI).href;
     this.worker = new Worker(workerUrl);
     this.worker.onmessage = function(event) {
       var data = event && event.data || {};

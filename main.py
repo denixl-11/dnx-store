@@ -111,6 +111,7 @@ nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_tgs_binary_cache: OrderedDict[str, tuple[float, bytes]] = OrderedDict()
 nft_preview_binary_cache: OrderedDict[str, tuple[float, str, bytes]] = OrderedDict()
 nft_pattern_binary_cache: OrderedDict[str, tuple[float, str, bytes]] = OrderedDict()
+nft_theme_binary_cache: OrderedDict[str, tuple[float, bytes]] = OrderedDict()
 nft_media_requests: dict[str, asyncio.Task] = {}
 nft_tgs_requests: dict[str, asyncio.Task] = {}
 nft_preview_requests: dict[str, asyncio.Task] = {}
@@ -123,7 +124,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.52"
+API_RELEASE = "8.9-opt.53"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -140,6 +141,8 @@ NFT_PREVIEW_BINARY_TTL = 6 * 60 * 60
 NFT_PREVIEW_BINARY_CACHE_MAX = 256
 NFT_PATTERN_BINARY_TTL = 6 * 60 * 60
 NFT_PATTERN_BINARY_CACHE_MAX = 256
+NFT_THEME_BINARY_TTL = 6 * 60 * 60
+NFT_THEME_BINARY_CACHE_MAX = 256
 NFT_ASSET_TOKEN_TTL = 15 * 60
 
 
@@ -1092,6 +1095,14 @@ def make_nft_pattern_path(source_url: str) -> str:
     return f"/nft/pattern?slug={urlencode({'value': slug})[6:]}"
 
 
+def make_nft_theme_path(source_url: str) -> str:
+    source_url = canonical_telegram_nft_url(source_url)
+    if not source_url:
+        return ""
+    slug = urlparse(source_url).path.removeprefix("/nft/").strip("/")
+    return f"/nft/theme?slug={urlencode({'value': slug})[6:]}"
+
+
 def add_nft_preview_path(record: dict) -> dict:
     source_url = canonical_telegram_nft_url(record.get("nft_link"))
     # Telegram's own square preview is the authoritative static/zero-frame
@@ -1139,6 +1150,7 @@ class TelegramNftMediaParser(HTMLParser):
         self.tgs_url = ""
         self.pattern_url = ""
         self.preview_url = ""
+        self.description = ""
         self.gradient_colors: list[str] = []
         self.pattern_color = "#000000"
         self.pattern_layout: list[dict[str, float]] = []
@@ -1180,6 +1192,8 @@ class TelegramNftMediaParser(HTMLParser):
             self.pattern_url = self.pattern_url or safe_telegram_media_url(raw_url)
         elif tag == "meta" and attributes.get("property") == "og:image":
             self.preview_url = self.preview_url or safe_telegram_media_url(attributes.get("content", ""))
+        elif tag == "meta" and attributes.get("property") == "og:description":
+            self.description = str(attributes.get("content") or "")[:2048]
         elif tag == "radialgradient" and attributes.get("id") == "giftGradient":
             self._inside_gift_gradient = True
         elif tag == "stop" and self._inside_gift_gradient:
@@ -2030,7 +2044,7 @@ async def security_headers_middleware(request, handler):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    if request.path not in {"/nft/tgs", "/nft/preview", "/nft/pattern"}:
+    if request.path not in {"/nft/tgs", "/nft/preview", "/nft/pattern", "/nft/theme"}:
         response.headers["Cache-Control"] = "no-store"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if (
@@ -2653,16 +2667,27 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
                 if not parser.tgs_url:
                     raise ValueError("Telegram NFT page has no TGS source")
                 colors = parser.gradient_colors[:2]
+                live_traits = {}
+                for raw_label, raw_value in re.findall(
+                    r"(?im)^\s*(Model|Backdrop|Symbol)\s*:\s*([^\r\n]+)",
+                    parser.description,
+                ):
+                    trait_key = {"model": "model", "backdrop": "background", "symbol": "pattern"}.get(raw_label.lower())
+                    trait_value = re.sub(r"\s+", " ", raw_value).strip()
+                    if trait_key and trait_value:
+                        live_traits[trait_key] = trait_value[:160]
                 return {
                     "animated": True,
                     "tgsUrl": parser.tgs_url,
                     "previewPath": make_nft_preview_path(source_url) if parser.preview_url else "",
                     "patternPath": make_nft_pattern_path(source_url) if parser.pattern_url else "",
+                    "themePath": make_nft_theme_path(source_url),
                     "patternUrl": parser.pattern_url,
                     "patternLayout": parser.pattern_layout,
                     "previewUrl": parser.preview_url,
                     "colors": colors if len(colors) == 2 else ["#3E245D", "#160D27"],
                     "patternColor": parser.pattern_color,
+                    "traits": live_traits,
                     "transient": False,
                 }
             except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
@@ -2816,6 +2841,20 @@ async def fetch_telegram_preview_bytes(source_url: str) -> tuple[str, bytes]:
             nft_preview_requests.pop(source_url, None)
 
 
+def sniff_image_content_type(data: bytes) -> str:
+    """Trust the payload, not Telegram CDN's occasionally incorrect MIME."""
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    head = data.lstrip()[:512].lower()
+    if head.startswith(b"<svg") or (head.startswith(b"<?xml") and b"<svg" in head):
+        return "image/svg+xml"
+    return ""
+
+
 async def fetch_telegram_pattern_bytes(source_url: str) -> tuple[str, bytes]:
     """Proxy the tiny Telegram pattern asset so it is ready with the theme."""
     source_url = canonical_telegram_nft_url(source_url)
@@ -2842,12 +2881,15 @@ async def fetch_telegram_pattern_bytes(source_url: str) -> tuple[str, bytes]:
                     allow_redirects=True,
                     headers={"User-Agent": "Mozilla/5.0 AppleWebKit/605.1.15 TelegramMiniApp"},
                 ) as response:
-                    content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
-                    if response.status != 200 or content_type not in {"image/png", "image/webp", "image/svg+xml"}:
-                        raise ValueError(f"unexpected NFT pattern response: {response.status} {content_type}")
+                    declared_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
+                    if response.status != 200:
+                        raise ValueError(f"unexpected NFT pattern response: {response.status} {declared_type}")
                     data = await response.content.read(512 * 1024 + 1)
             if not 16 <= len(data) <= 512 * 1024:
                 raise ValueError("invalid NFT pattern payload")
+            content_type = sniff_image_content_type(data)
+            if not content_type:
+                raise ValueError(f"invalid NFT pattern image (declared {declared_type})")
             break
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
             last_error = exc
@@ -2866,6 +2908,64 @@ async def fetch_telegram_pattern_bytes(source_url: str) -> tuple[str, bytes]:
     while len(nft_pattern_binary_cache) > NFT_PATTERN_BINARY_CACHE_MAX:
         nft_pattern_binary_cache.popitem(last=False)
     return content_type, data
+
+
+async def fetch_telegram_theme_bytes(source_url: str) -> bytes:
+    """Build Telegram's exact centred 280x280 backdrop as one immutable SVG.
+
+    Keeping gradient and symbols in a single image guarantees that the static
+    preview and transparent TGS animation share identical geometry.
+    """
+    source_url = canonical_telegram_nft_url(source_url)
+    if not source_url:
+        raise web.HTTPNotFound()
+    cached = nft_theme_binary_cache.get(source_url)
+    if cached and cached[0] > time.monotonic():
+        nft_theme_binary_cache.move_to_end(source_url)
+        return cached[1]
+    media = await fetch_telegram_nft_media(source_url, -1)
+    if media.get("transient") or not media.get("animated"):
+        raise web.HTTPBadGateway(text="NFT theme temporarily unavailable")
+    colors = media.get("colors") if isinstance(media.get("colors"), list) else []
+    color_a = normalize_hex_color(colors[0] if len(colors) > 0 else "", "#3E245D")
+    color_b = normalize_hex_color(colors[1] if len(colors) > 1 else "", "#160D27")
+    pattern_color = normalize_hex_color(media.get("patternColor"), "#000000")
+    pattern_definition = ""
+    pattern_uses: list[str] = []
+    if media.get("patternUrl"):
+        pattern_type, pattern_data = await fetch_telegram_pattern_bytes(source_url)
+        pattern_uri = f"data:{pattern_type};base64,{base64.b64encode(pattern_data).decode('ascii')}"
+        pattern_definition = f'<image id="giftPattern" width="100" height="100" href="{pattern_uri}"/>'
+        for slot in media.get("patternLayout") or []:
+            try:
+                x = float(slot["x"]); y = float(slot["y"])
+                scale = float(slot["scale"]); opacity = float(slot["opacity"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if not (-500 <= x <= 900 and -500 <= y <= 800 and 0 < scale <= 2 and 0 <= opacity <= 1):
+                continue
+            pattern_uses.append(
+                f'<g transform="translate({x:g},{y:g})" opacity="{opacity:g}">'
+                f'<use href="#giftPattern" transform="scale({scale:g})"/></g>'
+            )
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="70 0 280 280" preserveAspectRatio="xMidYMid slice">'
+        '<defs>'
+        '<radialGradient id="giftGradient" cx="50%" cy="50%" fx="50%" fy="50%" r="69.65%" '
+        'gradientTransform="translate(.5 .5) scale(.6667 1) rotate(90) translate(-.5 -.5)">'
+        f'<stop stop-color="{color_a}" offset="0%"/><stop stop-color="{color_b}" offset="100%"/></radialGradient>'
+        '<filter id="giftPatternColor" color-interpolation-filters="sRGB">'
+        f'<feFlood flood-color="{pattern_color}" result="flood"/>'
+        '<feComposite in="flood" in2="SourceGraphic" operator="in"/></filter>'
+        f'{pattern_definition}</defs>'
+        '<rect width="420" height="280" fill="url(#giftGradient)"/>'
+        f'<g filter="url(#giftPatternColor)">{"".join(pattern_uses)}</g></svg>'
+    ).encode("utf-8")
+    nft_theme_binary_cache[source_url] = (time.monotonic() + NFT_THEME_BINARY_TTL, svg)
+    nft_theme_binary_cache.move_to_end(source_url)
+    while len(nft_theme_binary_cache) > NFT_THEME_BINARY_CACHE_MAX:
+        nft_theme_binary_cache.popitem(last=False)
+    return svg
 
 
 async def handle_nft_tgs_asset(request):
@@ -2923,6 +3023,23 @@ async def handle_nft_pattern_asset(request):
     return web.Response(
         body=data,
         content_type=content_type,
+        headers={
+            "Access-Control-Allow-Origin": CORS_ORIGIN,
+            "Cache-Control": "public, max-age=21600, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+async def handle_nft_theme_asset(request):
+    slug = str(request.query.get("slug", "")).strip()
+    source_url = canonical_telegram_nft_url(f"https://t.me/nft/{slug}") if slug else ""
+    if not source_url:
+        raise web.HTTPForbidden(text="Invalid NFT theme slug")
+    data = await fetch_telegram_theme_bytes(source_url)
+    return web.Response(
+        body=data,
+        content_type="image/svg+xml",
         headers={
             "Access-Control-Allow-Origin": CORS_ORIGIN,
             "Cache-Control": "public, max-age=21600, immutable",
@@ -4275,6 +4392,7 @@ app.router.add_get('/nft/media', handle_nft_media)
 app.router.add_get('/nft/tgs', handle_nft_tgs_asset)
 app.router.add_get('/nft/preview', handle_nft_preview_asset)
 app.router.add_get('/nft/pattern', handle_nft_pattern_asset)
+app.router.add_get('/nft/theme', handle_nft_theme_asset)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_get('/activity/history', handle_activity_history)
 app.router.add_post('/ton/deposit/create', handle_create_ton_deposit)
