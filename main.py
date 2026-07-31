@@ -110,6 +110,7 @@ runtime_state = {
 nft_media_cache: dict[str, tuple[float, dict]] = {}
 nft_tgs_binary_cache: OrderedDict[str, tuple[float, bytes]] = OrderedDict()
 nft_preview_binary_cache: OrderedDict[str, tuple[float, str, bytes]] = OrderedDict()
+nft_pattern_binary_cache: OrderedDict[str, tuple[float, str, bytes]] = OrderedDict()
 nft_media_requests: dict[str, asyncio.Task] = {}
 nft_tgs_requests: dict[str, asyncio.Task] = {}
 nft_preview_requests: dict[str, asyncio.Task] = {}
@@ -125,7 +126,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.49"
+API_RELEASE = "8.9-opt.50"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -140,6 +141,8 @@ NFT_TGS_BINARY_TTL = 6 * 60 * 60
 NFT_TGS_BINARY_CACHE_MAX = 160
 NFT_PREVIEW_BINARY_TTL = 6 * 60 * 60
 NFT_PREVIEW_BINARY_CACHE_MAX = 256
+NFT_PATTERN_BINARY_TTL = 6 * 60 * 60
+NFT_PATTERN_BINARY_CACHE_MAX = 256
 NFT_ASSET_TOKEN_TTL = 15 * 60
 
 
@@ -716,7 +719,6 @@ async def init_db():
                         name VARCHAR(255),
                         price NUMERIC DEFAULT 0.0,
                         status VARCHAR(50) DEFAULT 'Доступен',
-                        image_url TEXT,
                         nft_link TEXT DEFAULT '',
                         model VARCHAR(255),
                         pattern VARCHAR(255),
@@ -1055,11 +1057,13 @@ def safe_telegram_media_url(value) -> str:
     return value
 
 
-def make_nft_asset_path(source_url: str) -> str:
+def make_nft_asset_path(source_url: str, item_id: int = 0) -> str:
     """Issue a short-lived, tamper-proof URL for the same-origin TGS proxy."""
     source_url = canonical_telegram_nft_url(source_url)
     if not source_url:
         return ""
+    if item_id > 0:
+        return f"/nft/tgs?item_id={item_id}"
     expires = int(time.time()) + NFT_ASSET_TOKEN_TTL
     payload = f"{expires}\n{source_url}".encode("utf-8")
     encoded = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
@@ -1082,13 +1086,22 @@ def make_nft_preview_path(source_url: str) -> str:
     return f"/nft/preview?slug={urlencode({'value': slug})[6:]}"
 
 
+def make_nft_pattern_path(source_url: str) -> str:
+    source_url = canonical_telegram_nft_url(source_url)
+    if not source_url:
+        return ""
+    slug = urlparse(source_url).path.removeprefix("/nft/").strip("/")
+    return f"/nft/pattern?slug={urlencode({'value': slug})[6:]}"
+
+
 def add_nft_preview_path(record: dict) -> dict:
     source_url = canonical_telegram_nft_url(record.get("nft_link"))
     record["nft_preview_path"] = make_nft_preview_path(source_url) if source_url else ""
     # The signed same-origin animation path is cheap to issue and does not
     # require scraping Telegram first.  Returning it with the item removes a
     # descriptor request from the modal and poster critical paths.
-    record["nft_asset_path"] = make_nft_asset_path(source_url) if source_url else ""
+    record["nft_asset_path"] = make_nft_asset_path(source_url, int(record.get("id") or 0)) if source_url else ""
+    record["nft_media_key"] = hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:16] if source_url else ""
     return record
 
 
@@ -1126,10 +1139,38 @@ class TelegramNftMediaParser(HTMLParser):
         self.preview_url = ""
         self.gradient_colors: list[str] = []
         self.pattern_color = "#000000"
+        self.pattern_layout: list[dict[str, float]] = []
         self._inside_gift_gradient = False
+        self._full_pattern_depth = 0
+        self._pattern_group: dict[str, float] | None = None
 
     def handle_starttag(self, tag, attrs):
         attributes = dict(attrs)
+        if tag == "g" and attributes.get("id") == "fullPattern":
+            self._full_pattern_depth = 1
+        elif tag == "g" and self._full_pattern_depth:
+            self._full_pattern_depth += 1
+            translate = re.fullmatch(
+                r"translate\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)",
+                str(attributes.get("transform") or ""),
+            )
+            try:
+                opacity = float(attributes.get("opacity", 0))
+            except (TypeError, ValueError):
+                opacity = 0
+            self._pattern_group = {
+                "x": float(translate.group(1)) if translate else 0.0,
+                "y": float(translate.group(2)) if translate else 0.0,
+                "opacity": max(0.0, min(1.0, opacity)),
+            }
+        elif tag == "use" and self._full_pattern_depth and self._pattern_group:
+            href = attributes.get("xlink:href") or attributes.get("href") or ""
+            scale = re.fullmatch(
+                r"scale\(\s*(\d+(?:\.\d+)?)\s*\)",
+                str(attributes.get("transform") or ""),
+            )
+            if href == "#giftPattern" and scale and len(self.pattern_layout) < 48:
+                self.pattern_layout.append({**self._pattern_group, "scale": float(scale.group(1))})
         if tag == "source" and attributes.get("type") == "application/x-tgsticker":
             self.tgs_url = self.tgs_url or safe_telegram_media_url(attributes.get("srcset", ""))
         elif tag == "image" and attributes.get("id") == "giftPattern":
@@ -1149,6 +1190,10 @@ class TelegramNftMediaParser(HTMLParser):
     def handle_endtag(self, tag):
         if tag == "radialgradient":
             self._inside_gift_gradient = False
+        if tag == "g" and self._full_pattern_depth:
+            self._full_pattern_depth -= 1
+            if self._full_pattern_depth <= 1:
+                self._pattern_group = None
 
 
 def parse_positive_amount(value, *, minimum=Decimal("0.01"), maximum=Decimal("1000000")) -> Decimal | None:
@@ -2431,18 +2476,19 @@ async def handle_get_items(request):
     try:
         rows = await get_pool().fetch(
             """SELECT id, name, price, status,
-                      COALESCE(to_jsonb(items)->>'image_url', to_jsonb(items)->>'case_asset_url', '') AS image_url,
                       nft_link, number, model, pattern, background,
                       acquisition_source, last_event
                FROM items WHERE status = 'Доступен'""")
         items = normalize_records(rows)
-        now = time.monotonic()
         for item in items:
             add_nft_preview_path(item)
-            source_url = canonical_telegram_nft_url(item.get("nft_link"))
-            cached = nft_media_cache.get(source_url) if source_url else None
-            if cached and cached[0] > now and cached[1].get("animated"):
-                item["nft_media"] = cached[1]
+        media = await asyncio.gather(*(
+            fetch_telegram_nft_media(canonical_telegram_nft_url(item.get("nft_link")), int(item["id"]))
+            for item in items
+        ), return_exceptions=True)
+        for item, descriptor in zip(items, media):
+            if isinstance(descriptor, dict) and descriptor.get("animated"):
+                item["nft_media"] = descriptor
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get items error: {e}")
@@ -2469,11 +2515,7 @@ async def handle_get_item(request):
     try:
         row = await get_pool().fetchrow(
             """
-            SELECT id, name, price, status,
-                   CASE WHEN acquisition_source = 'case'
-                        THEN COALESCE(to_jsonb(items)->>'case_asset_url', to_jsonb(items)->>'image_url', '')
-                        ELSE COALESCE(to_jsonb(items)->>'image_url', to_jsonb(items)->>'case_asset_url', '')
-                   END AS image_url,
+            SELECT id, name, price, status, case_asset_url,
                    nft_link, number,
                    model, pattern, background, acquisition_source, last_event,
                    withdraw_requested_at, withdraw_expires_at, disposed_at,
@@ -2605,9 +2647,11 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
                 return {
                     "animated": True,
                     "tgsUrl": parser.tgs_url,
-                    "assetPath": make_nft_asset_path(source_url),
+                    "assetPath": make_nft_asset_path(source_url, item_id if item_id > 0 else 0),
                     "previewPath": make_nft_preview_path(source_url) if parser.preview_url else "",
+                    "patternPath": make_nft_pattern_path(source_url) if parser.pattern_url else "",
                     "patternUrl": parser.pattern_url,
+                    "patternLayout": parser.pattern_layout,
                     "previewUrl": parser.preview_url,
                     "colors": colors if len(colors) == 2 else ["#3E245D", "#160D27"],
                     "patternColor": parser.pattern_color,
@@ -2764,8 +2808,50 @@ async def fetch_telegram_preview_bytes(source_url: str) -> tuple[str, bytes]:
             nft_preview_requests.pop(source_url, None)
 
 
+async def fetch_telegram_pattern_bytes(source_url: str) -> tuple[str, bytes]:
+    """Proxy the tiny Telegram pattern asset so it is ready with the theme."""
+    source_url = canonical_telegram_nft_url(source_url)
+    if not source_url:
+        raise web.HTTPNotFound()
+    cached = nft_pattern_binary_cache.get(source_url)
+    if cached and cached[0] > time.monotonic():
+        nft_pattern_binary_cache.move_to_end(source_url)
+        return cached[1], cached[2]
+    media = await fetch_telegram_nft_media(source_url, -1)
+    pattern_url = safe_telegram_media_url(media.get("patternUrl"))
+    if not pattern_url:
+        raise web.HTTPNotFound(text="NFT pattern unavailable")
+    async with telegram_asset_semaphore:
+        async with get_ton_session().get(
+            pattern_url,
+            allow_redirects=True,
+            headers={"User-Agent": "Mozilla/5.0 AppleWebKit/605.1.15 TelegramMiniApp"},
+        ) as response:
+            content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
+            if response.status != 200 or content_type not in {"image/png", "image/webp", "image/svg+xml"}:
+                raise web.HTTPBadGateway(text=f"unexpected NFT pattern response: {response.status}")
+            data = await response.content.read(512 * 1024 + 1)
+    if not 16 <= len(data) <= 512 * 1024:
+        raise web.HTTPBadGateway(text="invalid NFT pattern payload")
+    nft_pattern_binary_cache[source_url] = (
+        time.monotonic() + NFT_PATTERN_BINARY_TTL,
+        content_type,
+        data,
+    )
+    nft_pattern_binary_cache.move_to_end(source_url)
+    while len(nft_pattern_binary_cache) > NFT_PATTERN_BINARY_CACHE_MAX:
+        nft_pattern_binary_cache.popitem(last=False)
+    return content_type, data
+
+
 async def handle_nft_tgs_asset(request):
-    source_url = parse_nft_asset_token(request.query.get("token", ""))
+    try:
+        item_id = int(request.query.get("item_id", "0"))
+    except (TypeError, ValueError):
+        item_id = 0
+    source_url = await get_item_nft_source(item_id) if item_id > 0 else ""
+    if not source_url:
+        source_url = parse_nft_asset_token(request.query.get("token", ""))
     if not source_url:
         raise web.HTTPForbidden(text="Invalid or expired NFT asset token")
     data = await fetch_telegram_tgs_bytes(source_url)
@@ -2789,6 +2875,23 @@ async def handle_nft_preview_asset(request):
     if not source_url:
         raise web.HTTPForbidden(text="Invalid or expired NFT preview token")
     content_type, data = await fetch_telegram_preview_bytes(source_url)
+    return web.Response(
+        body=data,
+        content_type=content_type,
+        headers={
+            "Access-Control-Allow-Origin": CORS_ORIGIN,
+            "Cache-Control": "public, max-age=21600, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+async def handle_nft_pattern_asset(request):
+    slug = str(request.query.get("slug", "")).strip()
+    source_url = canonical_telegram_nft_url(f"https://t.me/nft/{slug}") if slug else ""
+    if not source_url:
+        raise web.HTTPForbidden(text="Invalid NFT pattern slug")
+    content_type, data = await fetch_telegram_pattern_bytes(source_url)
     return web.Response(
         body=data,
         content_type=content_type,
@@ -2847,20 +2950,10 @@ async def warm_nft_media_cache_safely():
 
 
 async def get_item_nft_source(item_id: int) -> str:
-    now = time.monotonic()
-    cached = item_nft_source_cache.get(item_id)
-    if cached and cached[0] > now:
-        item_nft_source_cache.move_to_end(item_id)
-        return cached[1]
-    if cached:
-        item_nft_source_cache.pop(item_id, None)
+    # Always resolve the current DB row. A cached id -> link mapping made an
+    # edited/replaced NFT display the previous item's animation for a minute.
     nft_link = await get_pool().fetchval("SELECT nft_link FROM items WHERE id = $1", item_id)
-    source_url = canonical_telegram_nft_url(nft_link)
-    item_nft_source_cache[item_id] = (now + ITEM_SOURCE_CACHE_TTL, source_url)
-    item_nft_source_cache.move_to_end(item_id)
-    while len(item_nft_source_cache) > ITEM_SOURCE_CACHE_MAX:
-        item_nft_source_cache.popitem(last=False)
-    return source_url
+    return canonical_telegram_nft_url(nft_link)
 
 
 @require_auth
@@ -2891,8 +2984,7 @@ async def handle_get_inventory(request):
                 user_id,
             )
             rows = await conn.fetch(
-                """SELECT id, name, price,
-                          COALESCE(to_jsonb(items)->>'case_asset_url', to_jsonb(items)->>'image_url', '') AS image_url,
+                """SELECT id, name, price, case_asset_url,
                           nft_link, model, pattern, background, status, number,
                           acquisition_source, last_event, withdraw_requested_at, withdraw_expires_at,
                           disposed_at,
@@ -2913,6 +3005,13 @@ async def handle_get_inventory(request):
             )
             item['sell_value'] = item.get('price', 0)
             item['withdraw_remaining_seconds'] = int(item.get('withdraw_remaining_seconds') or 0)
+        media = await asyncio.gather(*(
+            fetch_telegram_nft_media(canonical_telegram_nft_url(item.get("nft_link")), int(item["id"]))
+            for item in items
+        ), return_exceptions=True)
+        for item, descriptor in zip(items, media):
+            if isinstance(descriptor, dict) and descriptor.get("animated"):
+                item["nft_media"] = descriptor
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get inventory error: {e}")
@@ -4151,6 +4250,7 @@ app.router.add_get('/admin/db-audit', handle_admin_db_audit)
 app.router.add_get('/nft/media', handle_nft_media)
 app.router.add_get('/nft/tgs', handle_nft_tgs_asset)
 app.router.add_get('/nft/preview', handle_nft_preview_asset)
+app.router.add_get('/nft/pattern', handle_nft_pattern_asset)
 app.router.add_get('/inventory', handle_get_inventory)
 app.router.add_get('/activity/history', handle_activity_history)
 app.router.add_post('/ton/deposit/create', handle_create_ton_deposit)
