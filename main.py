@@ -124,7 +124,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.54"
+API_RELEASE = "8.9-opt.55"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -136,13 +136,13 @@ GITHUB_CASE_COVER_BASE = os.getenv(
 PROCESS_INSTANCE_ID = uuid.uuid4()
 secure_random = random.SystemRandom()
 NFT_TGS_BINARY_TTL = 6 * 60 * 60
-NFT_TGS_BINARY_CACHE_MAX = 160
+NFT_TGS_BINARY_CACHE_MAX = 2048
 NFT_PREVIEW_BINARY_TTL = 6 * 60 * 60
-NFT_PREVIEW_BINARY_CACHE_MAX = 256
+NFT_PREVIEW_BINARY_CACHE_MAX = 4096
 NFT_PATTERN_BINARY_TTL = 6 * 60 * 60
-NFT_PATTERN_BINARY_CACHE_MAX = 256
+NFT_PATTERN_BINARY_CACHE_MAX = 4096
 NFT_THEME_BINARY_TTL = 6 * 60 * 60
-NFT_THEME_BINARY_CACHE_MAX = 256
+NFT_THEME_BINARY_CACHE_MAX = 4096
 NFT_ASSET_TOKEN_TTL = 15 * 60
 
 
@@ -1058,18 +1058,18 @@ def safe_telegram_media_url(value) -> str:
 
 
 def make_nft_asset_path(source_url: str, item_id: int = 0) -> str:
-    """Issue a short-lived, tamper-proof URL for the same-origin TGS proxy."""
+    """Return a stable TGS proxy URL tied to the Telegram collectible itself.
+
+    The old item_id/key route could disagree with a freshly edited database
+    row during a deploy/cache race. A strict public Telegram slug is already
+    immutable and cannot point at another collectible, so it is the correct
+    media identity for catalogue cards of any database id.
+    """
     source_url = canonical_telegram_nft_url(source_url)
     if not source_url:
         return ""
-    if item_id > 0:
-        source_key = hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:16]
-        return f"/nft/tgs?item_id={item_id}&key={source_key}"
-    expires = int(time.time()) + NFT_ASSET_TOKEN_TTL
-    payload = f"{expires}\n{source_url}".encode("utf-8")
-    encoded = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
-    signature = hmac.new(BOT_TOKEN.encode("utf-8"), encoded.encode("ascii"), hashlib.sha256).hexdigest()
-    return f"/nft/tgs?token={encoded}.{signature}"
+    slug = urlparse(source_url).path.removeprefix("/nft/").strip("/")
+    return f"/nft/tgs?slug={urlencode({'value': slug})[6:]}"
 
 
 def make_nft_preview_path(source_url: str) -> str:
@@ -2716,11 +2716,11 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
         if nft_media_requests.get(source_url) is request:
             nft_media_requests.pop(source_url, None)
 
-    if len(nft_media_cache) >= 512:
+    if len(nft_media_cache) >= 4096:
         expired = [key for key, (expires, _) in nft_media_cache.items() if expires <= time.monotonic()]
         for key in expired[:256]:
             nft_media_cache.pop(key, None)
-        if len(nft_media_cache) >= 512:
+        if len(nft_media_cache) >= 4096:
             nft_media_cache.pop(next(iter(nft_media_cache)), None)
     # A network/rate-limit failure is not proof that the NFT has no animation.
     # Keep it only briefly so the next card retry can recover immediately.
@@ -2976,11 +2976,14 @@ async def fetch_telegram_theme_bytes(source_url: str) -> bytes:
 
 
 async def handle_nft_tgs_asset(request):
+    slug = str(request.query.get("slug", "")).strip()
+    source_url = canonical_telegram_nft_url(f"https://t.me/nft/{slug}") if slug else ""
     try:
         item_id = int(request.query.get("item_id", "0"))
     except (TypeError, ValueError):
         item_id = 0
-    source_url = await get_item_nft_source(item_id) if item_id > 0 else ""
+    if not source_url:
+        source_url = await get_item_nft_source(item_id) if item_id > 0 else ""
     if source_url and item_id > 0:
         current_key = hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:16]
         if not hmac.compare_digest(str(request.query.get("key", "")), current_key):
@@ -3060,7 +3063,6 @@ async def warm_nft_media_cache():
         SELECT id, nft_link FROM items
         WHERE COALESCE(nft_link, '') <> '' AND status = 'Доступен'
         ORDER BY id
-        LIMIT 200
     """)
     sources: list[tuple[str, int]] = []
     seen_sources = set()

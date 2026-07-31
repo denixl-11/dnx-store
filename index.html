@@ -3221,6 +3221,10 @@
             transform: none !important;
             background: transparent !important;
         }
+        #nft-modal-media .nft-tgs-thumb {
+            visibility: hidden !important;
+            opacity: 0 !important;
+        }
         #nft-modal-media.has-current-frame > .nft-modal-zero-frame {
             opacity: 0;
         }
@@ -4428,7 +4432,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.54';
+        const EXPECTED_API_RELEASE = '8.9-opt.55';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -4641,7 +4645,9 @@
         // iOS Telegram WebView enforces a much smaller practical Worker/WASM
         // budget than desktop browsers. Poster jobs stay serial there; every
         // job still owns a fresh worker, so one heavy TGS cannot blank others.
-        const NFT_POSTER_JOB_CONCURRENCY = /iP(?:hone|ad|od)/i.test(navigator.userAgent) ? 1 : 3;
+        // This is throughput, not a catalogue-size cap. Every item is queued;
+        // a small worker pool prevents 1000 cards from exhausting WebView RAM.
+        const NFT_POSTER_JOB_CONCURRENCY = /iP(?:hone|ad|od)/i.test(navigator.userAgent) ? 2 : 4;
         let catalogRenderedSignature = '';
         let catalogLoadedAt = 0;
         let catalogRequest = null;
@@ -8608,7 +8614,9 @@
                             );
                     rawPlayer.loadFromUrl(tgsUrl);
                 } catch (_) { finish(''); }
-                stallRecoveryTimer = setTimeout(() => finish(''), 30000);
+                // One inaccessible/unsupported NFT must release its isolated
+                // worker promptly so the remaining catalogue queue proceeds.
+                stallRecoveryTimer = setTimeout(() => finish(''), 12000);
             }).finally(() => casePosterFrameRequests.delete(cacheKey));
             casePosterFrameRequests.set(cacheKey, request);
             return request;
@@ -8652,13 +8660,12 @@
             if (!itemIds.length) return;
             const ensureReady = async itemId => {
                 const cacheKey = `item:${itemId}`;
-                while (!safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) {
-                    await waitForModalMediaPriority();
-                    if (await ensureItemPoster(itemId, false)) return true;
-                    nftMediaCache.delete(itemId);
-                    await new Promise(resolve => setTimeout(resolve, 750));
-                }
-                return true;
+                if (safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey))) return true;
+                await waitForModalMediaPriority();
+                // A failed item schedules its own retry and yields this worker
+                // immediately. It can never block later ids in a 50/1000-item
+                // catalogue behind an infinite per-item loop.
+                return ensureItemPoster(itemId, true);
             };
             await runNftPosterJobs(itemIds, ensureReady);
         }
