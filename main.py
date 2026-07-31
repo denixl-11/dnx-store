@@ -119,14 +119,11 @@ telegram_asset_semaphore = asyncio.Semaphore(4)
 star_reconcile_attempts: dict[str, float] = {}
 auth_cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
 restriction_cache: OrderedDict[str, tuple[float, dict | None]] = OrderedDict()
-item_nft_source_cache: OrderedDict[int, tuple[float, str]] = OrderedDict()
 AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-ITEM_SOURCE_CACHE_TTL = 60
-ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.50"
+API_RELEASE = "8.9-opt.51"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1063,7 +1060,8 @@ def make_nft_asset_path(source_url: str, item_id: int = 0) -> str:
     if not source_url:
         return ""
     if item_id > 0:
-        return f"/nft/tgs?item_id={item_id}"
+        source_key = hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:16]
+        return f"/nft/tgs?item_id={item_id}&key={source_key}"
     expires = int(time.time()) + NFT_ASSET_TOKEN_TTL
     payload = f"{expires}\n{source_url}".encode("utf-8")
     encoded = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
@@ -1096,7 +1094,10 @@ def make_nft_pattern_path(source_url: str) -> str:
 
 def add_nft_preview_path(record: dict) -> dict:
     source_url = canonical_telegram_nft_url(record.get("nft_link"))
-    record["nft_preview_path"] = make_nft_preview_path(source_url) if source_url else ""
+    # Catalogue/inventory posters are rendered from the current TGS. Telegram's
+    # small raster preview can outlive a changed DB link in Safari's image
+    # cache, so it is deliberately not part of the item contract.
+    record["nft_preview_path"] = ""
     # The signed same-origin animation path is cheap to issue and does not
     # require scraping Telegram first.  Returning it with the item removes a
     # descriptor request from the modal and poster critical paths.
@@ -2612,12 +2613,19 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
     if not source_url:
         return {"animated": False, "transient": False}
     now = time.monotonic()
+    def bind_item_asset(media: dict) -> dict:
+        result = dict(media)
+        if result.get("animated"):
+            result["sourceKey"] = hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:16]
+            result["assetPath"] = make_nft_asset_path(source_url, item_id if item_id > 0 else 0)
+        return result
+
     cached = nft_media_cache.get(source_url)
     if cached and cached[0] > now:
-        return cached[1]
+        return bind_item_asset(cached[1])
     existing_request = nft_media_requests.get(source_url)
     if existing_request is not None:
-        return await asyncio.shield(existing_request)
+        return bind_item_asset(await asyncio.shield(existing_request))
 
     async def load() -> dict:
         last_error: Exception | None = None
@@ -2647,7 +2655,6 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
                 return {
                     "animated": True,
                     "tgsUrl": parser.tgs_url,
-                    "assetPath": make_nft_asset_path(source_url, item_id if item_id > 0 else 0),
                     "previewPath": make_nft_preview_path(source_url) if parser.preview_url else "",
                     "patternPath": make_nft_pattern_path(source_url) if parser.pattern_url else "",
                     "patternUrl": parser.pattern_url,
@@ -2686,7 +2693,7 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
     # Keep it only briefly so the next card retry can recover immediately.
     cache_ttl = 75 if result.get("animated") else (1 if result.get("transient") else 30)
     nft_media_cache[source_url] = (time.monotonic() + cache_ttl, result)
-    return result
+    return bind_item_asset(result)
 
 
 async def fetch_telegram_tgs_bytes(source_url: str) -> bytes:
@@ -2850,6 +2857,10 @@ async def handle_nft_tgs_asset(request):
     except (TypeError, ValueError):
         item_id = 0
     source_url = await get_item_nft_source(item_id) if item_id > 0 else ""
+    if source_url and item_id > 0:
+        current_key = hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:16]
+        if not hmac.compare_digest(str(request.query.get("key", "")), current_key):
+            raise web.HTTPConflict(text="NFT source changed; refresh item data")
     if not source_url:
         source_url = parse_nft_asset_token(request.query.get("token", ""))
     if not source_url:
@@ -2916,10 +2927,6 @@ async def warm_nft_media_cache():
         source_url = canonical_telegram_nft_url(row["nft_link"])
         if not source_url or source_url in seen_sources:
             continue
-        item_nft_source_cache[int(row["id"])] = (
-            time.monotonic() + ITEM_SOURCE_CACHE_TTL,
-            source_url,
-        )
         seen_sources.add(source_url)
         sources.append((source_url, int(row["id"])))
     if sources:
