@@ -12,6 +12,7 @@ import re
 import time
 import secrets
 import uuid
+import zlib
 from collections import OrderedDict, defaultdict, deque
 from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR
 from functools import wraps
@@ -124,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.57"
+API_RELEASE = "8.9-opt.58"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1069,7 +1070,7 @@ def make_nft_asset_path(source_url: str, item_id: int = 0) -> str:
     if not source_url:
         return ""
     slug = urlparse(source_url).path.removeprefix("/nft/").strip("/")
-    return f"/nft/tgs?slug={urlencode({'value': slug})[6:]}"
+    return f"/nft/tgs?slug={urlencode({'value': slug})[6:]}&v={urlencode({'value': API_RELEASE})[6:]}"
 
 
 def make_nft_preview_path(source_url: str) -> str:
@@ -2745,6 +2746,31 @@ async def read_response_body_limited(response: aiohttp.ClientResponse, max_bytes
     return b"".join(chunks)
 
 
+def validate_telegram_tgs_payload(data: bytes) -> bool:
+    """Reject truncated gzip streams before they reach any server/browser cache."""
+    if not 32 <= len(data) <= 4 * 1024 * 1024 or not data.startswith(b"\x1f\x8b"):
+        return False
+    try:
+        inflater = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        decoded = inflater.decompress(data, 8 * 1024 * 1024 + 1)
+        if len(decoded) > 8 * 1024 * 1024 or inflater.unconsumed_tail or not inflater.eof:
+            return False
+        decoded += inflater.flush()
+        if len(decoded) > 8 * 1024 * 1024:
+            return False
+        animation = json.loads(decoded)
+        return bool(
+            isinstance(animation, dict)
+            and 0 < float(animation.get("fr", 0)) <= 120
+            and float(animation.get("op", 0)) > float(animation.get("ip", 0))
+            and 0 < int(animation.get("w", 0)) <= 4096
+            and 0 < int(animation.get("h", 0)) <= 4096
+            and isinstance(animation.get("layers"), list)
+        )
+    except (ValueError, TypeError, OverflowError, zlib.error, json.JSONDecodeError):
+        return False
+
+
 async def fetch_telegram_tgs_bytes(source_url: str) -> bytes:
     """Fetch and retain the compact TGS once on the backend.
 
@@ -2758,8 +2784,10 @@ async def fetch_telegram_tgs_bytes(source_url: str) -> bytes:
     now = time.monotonic()
     cached = nft_tgs_binary_cache.get(source_url)
     if cached and cached[0] > now:
-        nft_tgs_binary_cache.move_to_end(source_url)
-        return cached[1]
+        if validate_telegram_tgs_payload(cached[1]):
+            nft_tgs_binary_cache.move_to_end(source_url)
+            return cached[1]
+        nft_tgs_binary_cache.pop(source_url, None)
     existing_request = nft_tgs_requests.get(source_url)
     if existing_request is not None:
         return await asyncio.shield(existing_request)
@@ -2784,7 +2812,7 @@ async def fetch_telegram_tgs_bytes(source_url: str) -> bytes:
                         if response.status != 200:
                             raise ValueError(f"unexpected TGS response: {response.status}")
                         data = await read_response_body_limited(response, 4 * 1024 * 1024)
-                if not 32 <= len(data) <= 4 * 1024 * 1024 or not data.startswith(b"\x1f\x8b"):
+                if not validate_telegram_tgs_payload(data):
                     raise ValueError("invalid TGS payload")
                 nft_tgs_binary_cache[source_url] = (time.monotonic() + NFT_TGS_BINARY_TTL, data)
                 nft_tgs_binary_cache.move_to_end(source_url)
@@ -3014,7 +3042,13 @@ async def handle_nft_tgs_asset(request):
         content_type="application/x-tgsticker",
         headers={
             "Access-Control-Allow-Origin": CORS_ORIGIN,
-            "Cache-Control": "public, max-age=21600, immutable",
+            # The backend already keeps a validated six-hour memory cache.
+            # Browser/CDN persistence made a previously truncated response
+            # survive a deploy under the same collectible slug.
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-DNX-TGS-SHA256": hashlib.sha256(data).hexdigest(),
             "X-Content-Type-Options": "nosniff",
         },
     )
