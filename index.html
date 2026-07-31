@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.47" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.48" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -3825,14 +3825,32 @@
             background: #242424 !important;
             background-image: none !important;
         }
-        .nft-case-static-shell > .nft-case-static-model {
+        #nft-modal-media.nft-case-static-shell > .nft-case-static-model {
             position: absolute !important;
-            inset: 12% !important;
-            width: 76% !important;
-            height: 76% !important;
+            inset: 5% !important;
+            width: 90% !important;
+            height: 90% !important;
             object-fit: contain !important;
             object-position: center !important;
             background: transparent !important;
+            transform: none !important;
+        }
+        /* Every case reward is a lossless 1024px transparent master. Keep the
+           same large viewport in the list, roulette, result and inventory;
+           older per-item transforms made some prizes tiny and others soft. */
+        #case-drop-list .drop-media-shell > img.static-case-reward,
+        #roulette-track .roulette-item:not(.case-loading-item) > img.case-roulette-poster,
+        #win-media-host.case-win-media-host > img.static-case-reward {
+            position: absolute !important;
+            inset: 5% !important;
+            width: 90% !important;
+            height: 90% !important;
+            margin: 0 !important;
+            object-fit: contain !important;
+            object-position: center !important;
+            background: transparent !important;
+            transform: none !important;
+            filter: none !important;
         }
     </style>
 </head>
@@ -4215,7 +4233,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.47"></script>
+    <script src="tgsticker.js?v=8.9-opt.48"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4337,7 +4355,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.47';
+        const EXPECTED_API_RELEASE = '8.9-opt.48';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -4527,8 +4545,8 @@
         const nftSynchronizedPlaybackBatches = new Map();
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v947';
-        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v947';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v948';
+        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v948';
         const NFT_ITEM_POSTER_RENDER_SIZE = 384;
         const NFT_CASE_POSTER_RENDER_SIZE = 1024;
         const nftPosterRetryTimers = new Map();
@@ -6223,7 +6241,7 @@
                 modalMedia.dataset.mediaWanted = 'false';
                 const mediaOpenedAt = Date.now();
                 modalMedia.dataset.mediaOpenedAt = String(mediaOpenedAt);
-                modalMedia.dataset.mediaStartAt = String(mediaOpenedAt + 300);
+                modalMedia.dataset.mediaStartAt = String(mediaOpenedAt + 500);
                 const nextKey = nftMediaDescriptorKey(modalMedia);
                 // The modal DOM node is reused. Remove every visual belonging
                 // to the previous NFT before the sheet becomes visible; a
@@ -8342,9 +8360,11 @@
             await waitForModalMediaPriority();
             const cacheKey = `item:${itemId}`;
             try {
-                const media = await getNftMedia(itemId);
+                // Do not compose a catalogue card from the cheap seed. The
+                // exact Telegram descriptor is shared with the modal, making
+                // their background colour and deterministic pattern identical.
+                const media = await getNftMedia(itemId, true);
                 applyItemMediaTheme(itemId, media);
-                refreshNftTheme(itemId).catch(() => {});
                 const cachedPoster = safeGeneratedPosterUrl(nftPosterFrameCache.get(cacheKey));
                 if (cachedPoster) {
                     applyItemPosterFrame(itemId, cachedPoster);
