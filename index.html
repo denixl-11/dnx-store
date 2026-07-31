@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.48" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.49" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -2032,7 +2032,10 @@
         .telegram-star,
         .main-star {
             background: url('main-star.png') center / auto 190% no-repeat !important;
-            mix-blend-mode: screen;
+            background-color: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            mix-blend-mode: normal;
             filter: none !important;
         }
         .bonus-star {
@@ -2042,8 +2045,11 @@
             height: 1.08em;
             margin: 0 .08em;
             vertical-align: -.15em;
-            background: url('bonus-star.webp') center / auto 190% no-repeat;
-            mix-blend-mode: screen;
+            background: url('bonus-star.png') center / auto 190% no-repeat;
+            background-color: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            mix-blend-mode: normal;
             filter: none;
         }
         .header-balances { display: grid; gap: 1px; min-width: 70px; }
@@ -2126,7 +2132,7 @@
 
         /* ===== V8: premium balances, searchable catalog and persistent inventory actions ===== */
         .bonus-star {
-            background: url('bonus-star.webp') center / 188% 188% no-repeat !important;
+            background: url('bonus-star.png') center / 188% 188% no-repeat !important;
             mix-blend-mode: screen;
             filter: none !important;
         }
@@ -3835,6 +3841,21 @@
             background: transparent !important;
             transform: none !important;
         }
+        /* Case prizes use large artwork in the case itself, but inventory
+           cards need a calmer 70% model area so cups, rings and diamonds do
+           not touch or escape the neutral square. */
+        .item-card .nft-case-static-shell > .nft-case-static-model,
+        .cart-item .nft-case-static-shell > .nft-case-static-model {
+            position: absolute !important;
+            inset: 15% !important;
+            width: 70% !important;
+            height: 70% !important;
+            margin: 0 !important;
+            object-fit: contain !important;
+            object-position: center !important;
+            background: transparent !important;
+            transform: none !important;
+        }
         /* Every case reward is a lossless 1024px transparent master. Keep the
            same large viewport in the list, roulette, result and inventory;
            older per-item transforms made some prizes tiny and others soft. */
@@ -4233,7 +4254,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.48"></script>
+    <script src="tgsticker.js?v=8.9-opt.49"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4355,7 +4376,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.48';
+        const EXPECTED_API_RELEASE = '8.9-opt.49';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -4545,8 +4566,8 @@
         const nftSynchronizedPlaybackBatches = new Map();
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v948';
-        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v948';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v949';
+        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v949';
         const NFT_ITEM_POSTER_RENDER_SIZE = 384;
         const NFT_CASE_POSTER_RENDER_SIZE = 1024;
         const nftPosterRetryTimers = new Map();
@@ -6241,7 +6262,7 @@
                 modalMedia.dataset.mediaWanted = 'false';
                 const mediaOpenedAt = Date.now();
                 modalMedia.dataset.mediaOpenedAt = String(mediaOpenedAt);
-                modalMedia.dataset.mediaStartAt = String(mediaOpenedAt + 500);
+                modalMedia.dataset.mediaStartAt = String(mediaOpenedAt + 400);
                 const nextKey = nftMediaDescriptorKey(modalMedia);
                 // The modal DOM node is reused. Remove every visual belonging
                 // to the previous NFT before the sheet becomes visible; a
@@ -6396,6 +6417,16 @@
             if (!localItem || (isInventoryContext && isSimpleInventoryNft(localItem))) return;
 
             nftTapFeedback();
+            // Resolve the authoritative Telegram palette and pattern before
+            // the sheet becomes visible. The catalogue/cart/inventory static
+            // surface and the first animation frame now use the same exact
+            // descriptor, so no colour or pattern swap can occur on opening.
+            let exactMedia = null;
+            try {
+                exactMedia = await getNftMedia(Number(id), true);
+                if (openToken !== nftModalOpenToken) return;
+                applyItemMediaTheme(Number(id), exactMedia);
+            } catch (_) {}
             nftModalPriorityActive = true;
             cancelBackgroundPosterRenders();
             // Always destroy the previous modal player before recycling its
@@ -6409,7 +6440,11 @@
             // cover stays visible. This makes every tap deterministic without
             // exposing worker startup as a blank or frozen animation frame.
             try { window.RLottie?.destroyWorkers?.(); } catch (_) {}
-            const immediateItem = { ...localItem, is_shop_item: !isInventoryContext && localItem.is_shop_item === true };
+            const immediateItem = {
+                ...localItem,
+                nft_media: exactMedia || localItem.nft_media,
+                is_shop_item: !isInventoryContext && localItem.is_shop_item === true
+            };
             // Reuse the fresh signed asset delivered with catalogue/inventory.
             // The player itself is still recreated for every opening, which
             // guarantees a new one-shot cycle without a metadata round trip.
