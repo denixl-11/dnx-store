@@ -125,7 +125,7 @@ RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
 ITEM_SOURCE_CACHE_TTL = 60
 ITEM_SOURCE_CACHE_MAX = 2048
-API_RELEASE = "8.9-opt.45"
+API_RELEASE = "8.9-opt.46"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -2431,8 +2431,9 @@ async def handle_get_items(request):
     try:
         rows = await get_pool().fetch(
             """SELECT id, name, price, status,
-                      COALESCE(to_jsonb(items)->>'case_asset_url', to_jsonb(items)->>'image_url', '') AS image_url,
-                      nft_link, number, model, pattern, background
+                      COALESCE(to_jsonb(items)->>'image_url', to_jsonb(items)->>'case_asset_url', '') AS image_url,
+                      nft_link, number, model, pattern, background,
+                      acquisition_source, last_event
                FROM items WHERE status = 'Доступен'""")
         items = normalize_records(rows)
         now = time.monotonic()
@@ -2469,7 +2470,10 @@ async def handle_get_item(request):
         row = await get_pool().fetchrow(
             """
             SELECT id, name, price, status,
-                   COALESCE(to_jsonb(items)->>'case_asset_url', to_jsonb(items)->>'image_url', '') AS image_url,
+                   CASE WHEN acquisition_source = 'case'
+                        THEN COALESCE(to_jsonb(items)->>'case_asset_url', to_jsonb(items)->>'image_url', '')
+                        ELSE COALESCE(to_jsonb(items)->>'image_url', to_jsonb(items)->>'case_asset_url', '')
+                   END AS image_url,
                    nft_link, number,
                    model, pattern, background, acquisition_source, last_event,
                    withdraw_requested_at, withdraw_expires_at, disposed_at,
