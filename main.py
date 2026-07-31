@@ -124,7 +124,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.53"
+API_RELEASE = "8.9-opt.54"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1151,6 +1151,7 @@ class TelegramNftMediaParser(HTMLParser):
         self.pattern_url = ""
         self.preview_url = ""
         self.description = ""
+        self.collection_name = ""
         self.gradient_colors: list[str] = []
         self.pattern_color = "#000000"
         self.pattern_layout: list[dict[str, float]] = []
@@ -1194,6 +1195,9 @@ class TelegramNftMediaParser(HTMLParser):
             self.preview_url = self.preview_url or safe_telegram_media_url(attributes.get("content", ""))
         elif tag == "meta" and attributes.get("property") == "og:description":
             self.description = str(attributes.get("content") or "")[:2048]
+        elif tag == "meta" and attributes.get("property") == "og:title":
+            raw_title = re.sub(r"\s+", " ", str(attributes.get("content") or "")).strip()
+            self.collection_name = re.sub(r"\s+#\d+\s*$", "", raw_title).strip()[:160]
         elif tag == "radialgradient" and attributes.get("id") == "giftGradient":
             self._inside_gift_gradient = True
         elif tag == "stop" and self._inside_gift_gradient:
@@ -2505,6 +2509,8 @@ async def handle_get_items(request):
         for item, descriptor in zip(items, media):
             if isinstance(descriptor, dict) and descriptor.get("animated"):
                 item["nft_media"] = descriptor
+                if descriptor.get("collectionName"):
+                    item["name"] = descriptor["collectionName"]
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get items error: {e}")
@@ -2688,6 +2694,7 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
                     "colors": colors if len(colors) == 2 else ["#3E245D", "#160D27"],
                     "patternColor": parser.pattern_color,
                     "traits": live_traits,
+                    "collectionName": parser.collection_name,
                     "transient": False,
                 }
             except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
@@ -3153,6 +3160,8 @@ async def handle_get_inventory(request):
         for item, descriptor in zip(items, media):
             if isinstance(descriptor, dict) and descriptor.get("animated"):
                 item["nft_media"] = descriptor
+                if descriptor.get("collectionName"):
+                    item["name"] = descriptor["collectionName"]
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get inventory error: {e}")
