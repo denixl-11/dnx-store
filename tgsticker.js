@@ -140,7 +140,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.46', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.47', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -661,13 +661,13 @@ var RLottie = (function () {
   RawPlayer.prototype._onFrame = function(playerId, frameNo, frame) {
     if (this.onFrame) this.onFrame(frameNo, frame);
   };
-  RawPlayer.prototype._onError = function() {
-    if (this.onFrame) this.onFrame(-1, null);
+  RawPlayer.prototype._onError = function(playerId, reason) {
+    if (this.onFrame) this.onFrame(-1, null, reason || 'worker_error');
   };
   RawPlayer.prototype.loadFromUrl = function(url) {
     if (this.worker) return;
     var self = this;
-    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.46', document.baseURI).href;
+    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.47', document.baseURI).href;
     this.worker = new Worker(workerUrl);
     this.worker.onmessage = function(event) {
       var data = event && event.data || {};
