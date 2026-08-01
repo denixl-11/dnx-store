@@ -125,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.63"
+API_RELEASE = "8.9-opt.64"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1151,6 +1151,21 @@ def apply_telegram_link_metadata(record: dict, descriptor: dict | None) -> dict:
             # descriptor.
             record.pop(key, None)
     record["traits_source"] = "telegram:nft_link" if traits_complete else "telegram:nft_link:pending"
+    return record
+
+
+def apply_case_inventory_presentation(record: dict) -> dict:
+    """Apply the public trait contract for Telegram rewards won from cases.
+
+    The Telegram descriptor remains intact for its model animation. Only the
+    two traits that are deliberately undisclosed for case rewards are replaced
+    in the item payload; SQL values are never used as a fallback.
+    """
+    if (record.get("acquisition_source") == "case"
+            and record.get("status") != "Доступен"
+            and canonical_telegram_nft_url(record.get("nft_link"))):
+        record["pattern"] = "Random"
+        record["background"] = "Random"
     return record
 
 
@@ -2588,6 +2603,7 @@ async def handle_get_item(request):
             canonical_telegram_nft_url(item.get("nft_link")), item_id
         )
         apply_telegram_link_metadata(item, descriptor)
+        apply_case_inventory_presentation(item)
         raw_status = item.get("status")
         item["is_shop_item"] = raw_status == "Доступен"
         if raw_status in ("Выведен", "withdrawn"):
@@ -3253,6 +3269,7 @@ async def handle_get_inventory(request):
         ), return_exceptions=True)
         for item, descriptor in zip(items, media):
             apply_telegram_link_metadata(item, descriptor if isinstance(descriptor, dict) else None)
+            apply_case_inventory_presentation(item)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get inventory error: {e}")

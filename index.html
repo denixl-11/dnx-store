@@ -3797,15 +3797,28 @@
             height: 76% !important;
         }
 
-        /* A case prize keeps normal Telegram characteristics after it reaches
-           inventory. Neutral #242424 styling is restricted to case/roulette
-           artwork and never overrides the reusable characteristics modal. */
+        /* A Telegram prize won from a case always keeps the same neutral art
+           direction in inventory and characteristics: one solid surface,
+           transparent model, no Telegram background or pattern. */
         #nft-modal-media[data-case-origin="true"] {
-            background: radial-gradient(circle at 50% 50%, var(--nft-bg-a) 0%, var(--nft-bg-b) 100%) !important;
-            box-shadow: inset 0 0 28px rgba(0,0,0,.24) !important;
+            --nft-bg-a: #242424 !important;
+            --nft-bg-b: #242424 !important;
+            background: #242424 !important;
+            background-image: none !important;
+            box-shadow: none !important;
         }
         #nft-modal-media[data-case-origin="true"] > .nft-live-pattern {
-            display: block !important;
+            display: none !important;
+        }
+        #nft-modal-media[data-case-origin="true"] > .nft-modal-theme-frame {
+            display: none !important;
+        }
+        .nft-case-nft-shell {
+            --nft-bg-a: #242424 !important;
+            --nft-bg-b: #242424 !important;
+            background: #242424 !important;
+            background-image: none !important;
+            box-shadow: none !important;
         }
 
         /* Catalogue starts with Telegram's instant raster and upgrades in
@@ -4437,7 +4450,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.63';
+        const EXPECTED_API_RELEASE = '8.9-opt.64';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -5464,9 +5477,8 @@
         function renderNftMedia(element, media, mediaToken) {
             const tgsUrl = safeNftAnimationUrl(media);
             if (!element?.isConnected || element.dataset.mediaToken !== mediaToken || !tgsUrl || !window.RLottie?.isSupported) return false;
-            // A case reward is neutral only inside the case/list artwork.
-            // Once it is opened from inventory, the reusable characteristics
-            // modal must render Telegram's normal gradient/pattern and motion.
+            // Case-origin media stays neutral both in case artwork and in the
+            // inventory characteristics modal; only its model is animated.
             const caseMode = media?.caseMode === true
                 || element.dataset.mediaKind === 'case';
             const colors = caseMode ? ['#242424', '#242424'] : (Array.isArray(media.colors) ? media.colors.filter(color => /^#[0-9a-fA-F]{6}$/.test(color)).slice(0, 2) : []);
@@ -6539,7 +6551,7 @@
                 .find(child => child.classList?.contains('nft-modal-zero-frame'));
             const telegramLink = safeTelegramUrl(item.nft_link);
             const immediateMedia = item?.nft_media || nftMediaCache.get(Number(item.id || 0))?.data;
-            if (telegramLink && immediateMedia) {
+            if (telegramLink && immediateMedia && !isCaseOrigin) {
                 const colors = Array.isArray(immediateMedia.colors)
                     ? immediateMedia.colors.filter(color => /^#[0-9a-fA-F]{6}$/.test(color)).slice(0, 2)
                     : [];
@@ -6557,6 +6569,11 @@
                         immediateMedia.patternColor
                     );
                 }
+            } else if (isCaseOrigin) {
+                modalMedia.style.setProperty('--nft-bg-a', '#242424');
+                modalMedia.style.setProperty('--nft-bg-b', '#242424');
+                installNftModalTheme(modalMedia, null);
+                renderSparseNftPattern(modalMedia.querySelector('.nft-live-pattern'), '', Number(item.id || 0));
             }
             const modalPoster = telegramLink
                 ? safeGeneratedPosterUrl(nftPosterFrameCache.get(`item:${Number(item.id || 0)}`))
@@ -6603,8 +6620,8 @@
             const linkedTrait = key => String(liveTraits[key] || (itemHasTelegramTraits ? item[key] : '') || '').trim() || 'Загрузка…';
             const traits = [
                 { label: 'Модель', value: telegramLink ? linkedTrait('model') : (item.model == null || String(item.model).trim() === '' ? 'None' : item.model) },
-                { label: 'Узор', value: telegramLink ? linkedTrait('pattern') : (item.pattern == null || String(item.pattern).trim() === '' ? 'None' : item.pattern) },
-                { label: 'Фон', value: telegramLink ? linkedTrait('background') : (item.background == null || String(item.background).trim() === '' ? 'None' : item.background) }
+                { label: 'Узор', value: isCaseOrigin ? 'Random' : (telegramLink ? linkedTrait('pattern') : (item.pattern == null || String(item.pattern).trim() === '' ? 'None' : item.pattern)) },
+                { label: 'Фон', value: isCaseOrigin ? 'Random' : (telegramLink ? linkedTrait('background') : (item.background == null || String(item.background).trim() === '' ? 'None' : item.background)) }
             ];
 
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
@@ -6733,7 +6750,7 @@
             // Reuse the fresh signed asset delivered with catalogue/inventory.
             // The player itself is still recreated for every opening, which
             // guarantees a new one-shot cycle without a metadata round trip.
-            seedItemNftMedia(immediateItem, false);
+            seedItemNftMedia(immediateItem, isInventoryContext && isCaseOriginItem(immediateItem));
             renderNftModalItem(immediateItem, isInventoryContext, true);
 
             // Refresh in the background. If a catalogue snapshot is stale,
@@ -6748,8 +6765,8 @@
                         currentNftItem.name = String(freshMedia.collectionName || '').trim()
                             || telegramCollectionNameFromUrl(currentNftItem.nft_link);
                         currentNftItem.model = freshMedia.traits.model;
-                        currentNftItem.pattern = freshMedia.traits.pattern;
-                        currentNftItem.background = freshMedia.traits.background;
+                        currentNftItem.pattern = isInventoryContext && isCaseOriginItem(currentNftItem) ? 'Random' : freshMedia.traits.pattern;
+                        currentNftItem.background = isInventoryContext && isCaseOriginItem(currentNftItem) ? 'Random' : freshMedia.traits.background;
                         currentNftItem.traits_source = 'telegram:nft_link';
                         document.getElementById('nft-modal-title').textContent = currentNftItem.name;
                         const values = document.querySelectorAll('#nft-modal-traits-container .trait-value');
@@ -6779,7 +6796,7 @@
                         authoritativeItem.nft_media
                     )
                 };
-                seedItemNftMedia(item, false);
+                seedItemNftMedia(item, isInventoryContext && isCaseOriginItem(item));
                 const catalogIndex = currentCatalog.findIndex(entry => String(entry.id) === String(id));
                 const inventoryIndex = inventoryData.findIndex(entry => String(entry.id) === String(id));
                 if (catalogIndex >= 0 && !isInventoryContext) currentCatalog[catalogIndex] = item;
@@ -6820,12 +6837,16 @@
                 }
                 return `<img src="${fallbackUrl}" class="item-image nft-static-${variant}" alt="${title}" loading="eager" decoding="async"${allowOpen && itemId ? ` onclick="openNftModal(${itemId}, '${modalContext}')"` : ''}>`;
             }
-            // Case rewards are deliberately static outside characteristics.
-            // The GitHub Pages reward PNG is authoritative for case-origin
-            // inventory cards; no Telegram preview or TGS worker is involved.
+            // A Telegram reward won from a case is a transparent TGS poster on
+            // one neutral surface. The old GitHub composite is intentionally
+            // never mounted: it was soft and baked a second background into
+            // the inventory card.
             if (caseOrigin) {
-                return `<${allowOpen ? 'button' : 'div'} class="item-image nft-case-static-shell" data-item-id="${itemId}" aria-label="${title}"${allowOpen ? ` type="button" onclick="openNftModal(${itemId}, 'inventory')"` : ''}>
-                    <img class="nft-case-static-model" src="${fallbackUrl}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high" onerror="retryGithubCaseImage(this)">
+                const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(`item:${itemId}`));
+                return `<${allowOpen ? 'button' : 'div'} class="item-image nft-aux-zero-media nft-aux-zero-media--inventory nft-case-nft-shell" data-item-id="${itemId}" aria-label="${title}"${allowOpen ? ` type="button" onclick="openNftModal(${itemId}, 'inventory')"` : ''}>
+                    ${poster
+                        ? `<img class="nft-aux-zero-frame" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high">`
+                        : `<span class="nft-aux-zero-frame-pending" data-item-id="${itemId}" aria-label="${title}"></span>`}
                 </${allowOpen ? 'button' : 'div'}>`;
             }
             // Telegram's small composite preview is deliberately never put in
@@ -7127,7 +7148,7 @@
             requestAnimationFrame(resumeAuxNftMedia);
         }
         function isSimpleInventoryNft(item) {
-            return ['ring', 'diamond', 'cup'].includes(String(item?.name || '').trim().toLowerCase());
+            return !safeTelegramUrl(item?.nft_link) && Boolean(staticRewardKey(item?.name));
         }
         async function loadInventory() {
             if (inventoryRequest) return inventoryRequest;
@@ -8525,17 +8546,31 @@
             }
         }
 
-        function caseDropMediaMarkup(drop) {
+        function caseDropMediaMarkup(drop, caseId = currentCase?.id) {
             const staticKey = staticRewardKey(drop?.model || drop?.name);
             const fallback = escapeHtml(caseStaticImageUrl(drop));
             const title = escapeHtml(drop?.model || drop?.name || 'NFT');
+            if (drop?.has_live_nft) {
+                const dropIndex = Number(drop?.drop_index ?? -1);
+                const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(`case:${Number(caseId)}:${dropIndex}`));
+                return poster
+                    ? `<img class="static-case-reward case-zero-frame case-zero-frame--transparent" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high">`
+                    : `<span class="case-zero-frame--pending" data-case-id="${Number(caseId)}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`;
+            }
             return `<img class="static-case-reward${staticKey ? ` nft-static-reward-model nft-static-reward-model--${staticKey}` : ''}" src="${fallback}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high" onerror="retryGithubCaseImage(this)">`;
         }
 
-        function caseDropPosterMarkup(drop) {
+        function caseDropPosterMarkup(drop, caseId = currentCase?.id) {
             const title = escapeHtml(drop?.model || drop?.name || 'NFT');
             const staticKey = staticRewardKey(drop?.model || drop?.name);
             const fallback = caseStaticImageUrl(drop);
+            if (drop?.has_live_nft) {
+                const dropIndex = Number(drop?.drop_index ?? -1);
+                const poster = safeGeneratedPosterUrl(nftPosterFrameCache.get(`case:${Number(caseId)}:${dropIndex}`));
+                return poster
+                    ? `<img class="case-roulette-poster case-roulette-poster--live" src="${escapeHtml(poster)}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high">`
+                    : `<span class="case-roulette-poster--pending" data-case-id="${Number(caseId)}" data-drop-index="${dropIndex}" aria-label="${title}"></span>`;
+            }
             return `<img class="case-roulette-poster case-roulette-poster--fallback${staticKey ? ` nft-static-reward-model nft-static-reward-model--${staticKey}` : ''}" src="${escapeHtml(fallback)}" alt="${title}" loading="eager" decoding="sync" fetchpriority="high" onerror="retryGithubCaseImage(this)">`;
         }
 
@@ -8554,7 +8589,7 @@
             });
             document.querySelectorAll(`.case-zero-frame--pending[data-case-id="${Number(caseId)}"][data-drop-index="${Number(dropIndex)}"]`).forEach(slot => {
                 const image = new Image();
-                image.className = 'case-zero-frame case-zero-frame--transparent';
+                image.className = 'static-case-reward case-zero-frame case-zero-frame--transparent';
                 image.alt = slot.getAttribute('aria-label') || '';
                 image.decoding = 'sync';
                 image.loading = 'eager';
@@ -8971,13 +9006,13 @@
                 dropList.innerHTML = sortedDrops.map(d => `
                     <div class="drop-row">
                         <span class="drop-media-shell${d.has_live_nft ? ' drop-media-shell--live' : ''}">
-                            ${caseDropMediaMarkup(d)}
+                            ${caseDropMediaMarkup(d, currentCase.id)}
                             <span class="drop-chance">${Number(d.chance)}%</span>
                         </span>
                         <span class="drop-name">${escapeHtml(d.model || d.name)}</span>
                     </div>
                 `).join('');
-                casePosterWarmupPromise = Promise.resolve();
+                casePosterWarmupPromise = scheduleCasePosterPrewarm(currentCase);
                 rouletteActive = false;
                 caseOpeningRequestActive = false;
                 currentWonItem = null;
@@ -9041,7 +9076,7 @@
                 items.forEach(drop => {
                     const div = document.createElement('div');
                     div.className = `roulette-item${drop?.has_live_nft ? ' roulette-item--live' : ''}`;
-                    div.innerHTML = caseDropPosterMarkup(drop);
+                    div.innerHTML = caseDropPosterMarkup(drop, currentCase?.id);
                     wrapper.appendChild(div);
                 });
                 return wrapper;
@@ -9077,7 +9112,7 @@
             items.forEach(drop => {
                 const div = document.createElement('div');
                 div.className = `roulette-item${drop?.has_live_nft ? ' roulette-item--live' : ''}`;
-                div.innerHTML = caseDropPosterMarkup(drop);
+                div.innerHTML = caseDropPosterMarkup(drop, currentCase?.id);
                 track.appendChild(div);
             });
 
@@ -9141,7 +9176,7 @@
             rouletteContainer.style.display = 'none';
             const winMediaHost = document.getElementById('win-media-host');
             winMediaHost.querySelectorAll('.nft-live-media').forEach(element => deactivateNftMedia(element));
-            winMediaHost.innerHTML = caseDropMediaMarkup(wonItem);
+            winMediaHost.innerHTML = caseDropMediaMarkup(wonItem, currentCase?.id);
             document.getElementById('win-name').innerText = wonItem.model || wonItem.name;
 
             document.getElementById('win-value').innerText = formatStars(wonItem.value);
