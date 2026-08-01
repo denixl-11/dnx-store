@@ -125,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.60"
+API_RELEASE = "8.9-opt.61"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1104,7 +1104,7 @@ def make_nft_theme_path(source_url: str) -> str:
     # Version the generated SVG separately from the NFT slug. Telegram's
     # in-app browser honors the immutable cache header very aggressively, so
     # a renderer/layout adjustment must never reuse an older theme bitmap.
-    return f"/nft/theme?slug={urlencode({'value': slug})[6:]}&v=opt60"
+    return f"/nft/theme?slug={urlencode({'value': slug})[6:]}&v=opt61"
 
 
 def add_nft_preview_path(record: dict) -> dict:
@@ -2992,7 +2992,7 @@ async def fetch_telegram_theme_bytes(source_url: str) -> bytes:
         pattern_definition = f'<image id="giftPattern" width="100" height="100" href="{pattern_uri}"/>'
         for slot in media.get("patternLayout") or []:
             try:
-                x = float(slot["x"]); y = float(slot["y"]) + 12.0
+                x = float(slot["x"]); raw_y = float(slot["y"]); y = raw_y + 12.0
                 scale = float(slot["scale"]); opacity = float(slot["opacity"])
             except (KeyError, TypeError, ValueError):
                 continue
@@ -3002,6 +3002,15 @@ async def fetch_telegram_theme_bytes(source_url: str) -> bytes:
                 f'<g transform="translate({x:g},{y:g})" opacity="{opacity:g}">'
                 f'<use href="#giftPattern" transform="scale({scale:g})"/></g>'
             )
+            # The 420x280 Telegram source layout leaves its final central row
+            # above the lower edge of our square crop. Wrap the clipped top
+            # row to the bottom instead of moving the whole pattern downward.
+            if raw_y <= 18.0:
+                wrapped_y = raw_y + 232.0
+                pattern_uses.append(
+                    f'<g transform="translate({x:g},{wrapped_y:g})" opacity="{opacity:g}">'
+                    f'<use href="#giftPattern" transform="scale({scale:g})"/></g>'
+                )
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="70 0 280 280" preserveAspectRatio="xMidYMid slice">'
         '<defs>'

@@ -145,7 +145,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.60', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.61', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -243,6 +243,7 @@ var RLottie = (function () {
     rlPlayer.findPosterFrame = !!options.findPosterFrame;
     rlPlayer.trackFrameVisibility = !!options.trackFrameVisibility;
     rlPlayer.forcePlayFrames = 0;
+    rlPlayer.queueUnderruns = 0;
     rlPlayer.times = [];
     rlPlayer.imageData = new ImageData(rlPlayer.width, rlPlayer.height);
     rlPlayer.workerProxy.loadFromData(urls, rlPlayer.width, rlPlayer.height);
@@ -335,6 +336,8 @@ var RLottie = (function () {
         rlPlayer.nextFrameNo = false;
         requestFrame(rlPlayer.reqId, nextFrameNo);
       }
+    } else if (!rlPlayer.paused && !rlPlayer.forceRender) {
+      rlPlayer.queueUnderruns = (rlPlayer.queueUnderruns || 0) + 1;
     }
 
     return true;
@@ -465,6 +468,16 @@ var RLottie = (function () {
       no: frameNo,
       frame: frame
     });
+    if (rlPlayer.pendingBufferedPlayOnce) {
+      var prebufferTarget = Math.max(1, Math.min(
+        rlPlayer.frameCount,
+        rlPlayer.frameQueue.maxLength,
+        Number(rlPlayer.options.playbackPrebufferFrames) || 1
+      ));
+      if (rlPlayer.frameQueue.queue.length >= prebufferTarget) {
+        beginBufferedPlayOnce(rlPlayer);
+      }
+    }
     var nextFrameNo = frameNo + frameStep;
     if (nextFrameNo >= rlPlayer.frameCount) {
       nextFrameNo = 0;
@@ -504,7 +517,13 @@ var RLottie = (function () {
     rlPlayer.frameThen = Date.now();
     rlPlayer.frameCount = frameCount;
     rlPlayer.forceRender = true;
-    rlPlayer.frameQueue = new FrameQueue(Math.max(2, Math.ceil((fps / rlPlayer.frameStep) / 4)));
+    var requestedPrebuffer = Math.max(0, Number(rlPlayer.options.playbackPrebufferFrames) || 0);
+    var queueLength = Math.max(
+      2,
+      Math.ceil((fps / rlPlayer.frameStep) / 4),
+      requestedPrebuffer ? requestedPrebuffer + 8 : 0
+    );
+    rlPlayer.frameQueue = new FrameQueue(Math.min(frameCount, queueLength));
     setupMainLoop();
     requestFrame(reqId, 0);
     triggerEvent(rlPlayer.el, 'tg:load');
@@ -551,6 +570,20 @@ var RLottie = (function () {
     destroyPlayer(el);
   }
 
+  function beginBufferedPlayOnce(rlPlayer) {
+    if (!rlPlayer || !rlPlayer.pendingBufferedPlayOnce || !rlPlayer.el) return;
+    rlPlayer.pendingBufferedPlayOnce = false;
+    rlPlayer.stopOnFirstFrame = true;
+    rlPlayer.stopOnLastFrame = false;
+    // If frame zero is still queued it is the opening frame, not the end of
+    // the cycle. If force-render already consumed it, the next zero is the end.
+    rlPlayer.waitForFirstFrame = rlPlayer.frameNo === false || rlPlayer.frameNo > 0;
+    rlPlayer.paused = false;
+    rlPlayer.isInViewport = undefined;
+    triggerEvent(rlPlayer.el, 'tg:play');
+    setupMainLoop();
+  }
+
   rlottie.playOnce = function(el, restart) {
     if (el && el.rlPlayer) {
       var rlPlayer = el.rlPlayer;
@@ -561,8 +594,12 @@ var RLottie = (function () {
           rlPlayer.nextFrameNo = false;
           rlPlayer.forceRender = true;
           rlPlayer.frameNo = false;
+          rlPlayer.stopOnFirstFrame = false;
+          rlPlayer.stopOnLastFrame = false;
+          rlPlayer.pendingBufferedPlayOnce = Number(rlPlayer.options.playbackPrebufferFrames) > 1;
           requestFrame(rlPlayer.reqId, 0);
           setupMainLoop();
+          if (rlPlayer.pendingBufferedPlayOnce) return;
         }
         rlPlayer.stopOnFirstFrame = true;
         rlPlayer.stopOnLastFrame = false;
@@ -682,7 +719,7 @@ var RLottie = (function () {
   RawPlayer.prototype.loadFromUrl = function(url) {
     if (this.worker) return;
     var self = this;
-    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.60', document.baseURI).href;
+    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.61', document.baseURI).href;
     this.worker = new Worker(workerUrl);
     this.worker.onmessage = function(event) {
       var data = event && event.data || {};

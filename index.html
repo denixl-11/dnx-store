@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DNX STORE</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.60" as="script">
+    <link rel="preload" href="tgsticker-worker.js?v=8.9-opt.61" as="script">
     <link rel="preload" href="rlottie-wasm.js" as="script">
     <link rel="preload" href="rlottie-wasm.wasm" as="fetch" type="application/wasm" crossorigin>
     <style>
@@ -4315,7 +4315,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/ui@3.0.0/dist/tonconnect-ui.min.js"></script>
-    <script src="tgsticker.js?v=8.9-opt.60"></script>
+    <script src="tgsticker.js?v=8.9-opt.61"></script>
     <script>
         // Keep the storefront testable in a regular browser as well. Telegram's
         // real WebApp object always wins; this tiny no-op adapter is used only
@@ -4437,7 +4437,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.60';
+        const EXPECTED_API_RELEASE = '8.9-opt.61';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -4628,8 +4628,8 @@
         let nftSynchronizedPlaybackSequence = 0;
         const nftPosterFrameCache = new Map();
         const nftItemSourceKeys = new Map();
-        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v960';
-        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v960';
+        const NFT_POSTER_STORAGE_KEY = 'dnx_nft_posters_v961';
+        const NFT_POSTER_DB_NAME = 'dnx-nft-posters-v961';
         const NFT_ITEM_POSTER_RENDER_SIZE = 384;
         const NFT_CASE_POSTER_RENDER_SIZE = 1024;
         const nftPosterRetryTimers = new Map();
@@ -4693,7 +4693,7 @@
         function restoreNftPosterCache() {
             // Item ids can be reused with another nft_link. Never restore an
             // old model poster without its source fingerprint.
-            const obsoleteKeys = ['dnx_nft_posters_v1', 'dnx_nft_posters_v2', 'dnx_nft_posters_v3', 'dnx_nft_posters_v940', 'dnx_nft_posters_v949', 'dnx_nft_posters_v950', 'dnx_nft_posters_v951', 'dnx_nft_posters_v958', 'dnx_nft_posters_v959'];
+            const obsoleteKeys = ['dnx_nft_posters_v1', 'dnx_nft_posters_v2', 'dnx_nft_posters_v3', 'dnx_nft_posters_v940', 'dnx_nft_posters_v949', 'dnx_nft_posters_v950', 'dnx_nft_posters_v951', 'dnx_nft_posters_v958', 'dnx_nft_posters_v959', 'dnx_nft_posters_v960'];
             obsoleteKeys.forEach(key => {
                 try { sessionStorage.removeItem(key); } catch (_) {}
                 try { localStorage.removeItem(key); } catch (_) {}
@@ -5674,6 +5674,11 @@
                     // characteristics modal animates, so one 320px player can
                     // use all original frames without catalogue-wide load.
                     maxPlaybackFps: 60,
+                    // Open the sheet immediately on its static frame, then
+                    // start motion only after the worker has a short reserve.
+                    // This absorbs an occasional iOS/WASM render spike without
+                    // dropping or visibly holding a frame mid-cycle.
+                    playbackPrebufferFrames: 24,
                     noAutoPlay: true,
                     findPosterFrame: true,
                     // Once the first real alpha frame is found, do not scan a
