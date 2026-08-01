@@ -125,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.62"
+API_RELEASE = "8.9-opt.63"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1139,10 +1139,18 @@ def apply_telegram_link_metadata(record: dict, descriptor: dict | None) -> dict:
     fallback_name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", slug_collection).strip() or "NFT"
     record["name"] = str(media.get("collectionName") or fallback_name).strip()[:160]
     live_traits = media.get("traits") if isinstance(media.get("traits"), dict) else {}
+    traits_complete = all(str(live_traits.get(key) or "").strip() for key in ("model", "pattern", "background"))
     for key in ("model", "pattern", "background"):
-        value = re.sub(r"\s+", " ", str(live_traits.get(key) or "")).strip()
-        record[key] = value[:160] if value else "None"
-    record["traits_source"] = "telegram:nft_link"
+        if traits_complete:
+            value = re.sub(r"\s+", " ", str(live_traits[key])).strip()
+            record[key] = value[:160]
+        else:
+            # Never expose or retain the SQL fallback for a Telegram NFT. An
+            # incomplete Telegram response is temporary, not three "None"
+            # values and not permission to overwrite the last valid client
+            # descriptor.
+            record.pop(key, None)
+    record["traits_source"] = "telegram:nft_link" if traits_complete else "telegram:nft_link:pending"
     return record
 
 
@@ -2704,6 +2712,8 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
                     trait_value = re.sub(r"\s+", " ", raw_value).strip()
                     if trait_key and trait_value:
                         live_traits[trait_key] = trait_value[:160]
+                if not all(live_traits.get(key) for key in ("model", "pattern", "background")):
+                    raise ValueError("Telegram NFT page has incomplete traits metadata")
                 return {
                     "animated": True,
                     "tgsUrl": parser.tgs_url,

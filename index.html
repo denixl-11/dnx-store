@@ -4437,7 +4437,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.62';
+        const EXPECTED_API_RELEASE = '8.9-opt.63';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -5695,6 +5695,28 @@
             return loadSlot;
         }
 
+        function hasCompleteTelegramTraits(media) {
+            const traits = media?.traits;
+            return traits && ['model', 'pattern', 'background']
+                .every(key => String(traits[key] || '').trim());
+        }
+
+        function mergeTelegramMediaDescriptor(seed, incoming) {
+            const previous = seed && typeof seed === 'object' ? seed : {};
+            const next = incoming && typeof incoming === 'object' ? incoming : {};
+            const merged = { ...previous, ...next };
+            // A response with animation URLs but without all three Telegram
+            // traits is not newer metadata. Keep the last complete link-derived
+            // block so an asynchronous refresh can never turn it into None.
+            if (!hasCompleteTelegramTraits(next) && hasCompleteTelegramTraits(previous)) {
+                merged.traits = { ...previous.traits };
+                if (!String(next.collectionName || '').trim()) {
+                    merged.collectionName = previous.collectionName;
+                }
+            }
+            return merged;
+        }
+
         async function getNftMedia(itemId, requireDescriptor = false, forceFresh = false) {
             const cached = nftMediaCache.get(itemId);
             if (!forceFresh && cached && cached.expires > Date.now()
@@ -5706,7 +5728,7 @@
                     const seed = nftMediaCache.get(itemId)?.data || {};
                     const merged = media?.transient
                         ? { ...seed, transient: true }
-                        : { ...seed, ...media, descriptorReady: true };
+                        : { ...mergeTelegramMediaDescriptor(seed, media), descriptorReady: true };
                     setNftMediaCache(itemId, {
                         data: merged,
                         // telesco.pe animation URLs are signed and short lived.
@@ -6170,8 +6192,7 @@
             syncItemMediaSource(itemId, sourceKey);
             const existing = nftMediaCache.get(itemId)?.data || {};
             const data = {
-                ...existing,
-                ...(item?.nft_media || {}),
+                ...mergeTelegramMediaDescriptor(existing, item?.nft_media),
                 animated: true,
                 assetPath,
                 previewPath: item?.nft_preview_path || item?.nft_media?.previewPath || existing.previewPath || ''
@@ -6578,10 +6599,12 @@
                 item.name = liveCollectionName;
                 document.getElementById('nft-modal-title').innerText = liveCollectionName;
             }
+            const itemHasTelegramTraits = item.traits_source === 'telegram:nft_link';
+            const linkedTrait = key => String(liveTraits[key] || (itemHasTelegramTraits ? item[key] : '') || '').trim() || 'Загрузка…';
             const traits = [
-                { label: 'Модель', value: telegramLink ? (liveTraits.model || 'None') : (item.model == null || String(item.model).trim() === '' ? 'None' : item.model) },
-                { label: 'Узор', value: telegramLink ? (liveTraits.pattern || 'None') : (item.pattern == null || String(item.pattern).trim() === '' ? 'None' : item.pattern) },
-                { label: 'Фон', value: telegramLink ? (liveTraits.background || 'None') : (item.background == null || String(item.background).trim() === '' ? 'None' : item.background) }
+                { label: 'Модель', value: telegramLink ? linkedTrait('model') : (item.model == null || String(item.model).trim() === '' ? 'None' : item.model) },
+                { label: 'Узор', value: telegramLink ? linkedTrait('pattern') : (item.pattern == null || String(item.pattern).trim() === '' ? 'None' : item.pattern) },
+                { label: 'Фон', value: telegramLink ? linkedTrait('background') : (item.background == null || String(item.background).trim() === '' ? 'None' : item.background) }
             ];
 
             document.getElementById('nft-modal-traits-container').innerHTML = traits.length ?
@@ -6719,7 +6742,21 @@
                 if (openToken !== nftModalOpenToken || !freshMedia?.descriptorReady) return;
                 syncItemMediaSource(Number(id), freshMedia.sourceKey);
                 applyItemMediaTheme(Number(id), freshMedia);
-                if (currentNftItem) currentNftItem.nft_media = freshMedia;
+                if (currentNftItem) {
+                    currentNftItem.nft_media = mergeTelegramMediaDescriptor(currentNftItem.nft_media, freshMedia);
+                    if (hasCompleteTelegramTraits(freshMedia)) {
+                        currentNftItem.name = String(freshMedia.collectionName || '').trim()
+                            || telegramCollectionNameFromUrl(currentNftItem.nft_link);
+                        currentNftItem.model = freshMedia.traits.model;
+                        currentNftItem.pattern = freshMedia.traits.pattern;
+                        currentNftItem.background = freshMedia.traits.background;
+                        currentNftItem.traits_source = 'telegram:nft_link';
+                        document.getElementById('nft-modal-title').textContent = currentNftItem.name;
+                        const values = document.querySelectorAll('#nft-modal-traits-container .trait-value');
+                        [currentNftItem.model, currentNftItem.pattern, currentNftItem.background]
+                            .forEach((value, index) => { if (values[index]) values[index].textContent = value; });
+                    }
+                }
             }).catch(() => {});
 
             try {
@@ -6736,7 +6773,11 @@
                 const item = {
                     ...immediateItem,
                     ...authoritativeItem,
-                    is_shop_item: isInventoryContext ? false : authoritativeItem.is_shop_item === true
+                    is_shop_item: isInventoryContext ? false : authoritativeItem.is_shop_item === true,
+                    nft_media: mergeTelegramMediaDescriptor(
+                        immediateItem.nft_media,
+                        authoritativeItem.nft_media
+                    )
                 };
                 seedItemNftMedia(item, false);
                 const catalogIndex = currentCatalog.findIndex(entry => String(entry.id) === String(id));
