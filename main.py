@@ -125,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.61"
+API_RELEASE = "8.9-opt.62"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1104,7 +1104,7 @@ def make_nft_theme_path(source_url: str) -> str:
     # Version the generated SVG separately from the NFT slug. Telegram's
     # in-app browser honors the immutable cache header very aggressively, so
     # a renderer/layout adjustment must never reuse an older theme bitmap.
-    return f"/nft/theme?slug={urlencode({'value': slug})[6:]}&v=opt61"
+    return f"/nft/theme?slug={urlencode({'value': slug})[6:]}&v=opt62"
 
 
 def add_nft_preview_path(record: dict) -> dict:
@@ -1119,6 +1119,30 @@ def add_nft_preview_path(record: dict) -> dict:
     # descriptor request from the modal and poster critical paths.
     record["nft_asset_path"] = make_nft_asset_path(source_url, int(record.get("id") or 0)) if source_url else ""
     record["nft_media_key"] = hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:16] if source_url else ""
+    return record
+
+
+def apply_telegram_link_metadata(record: dict, descriptor: dict | None) -> dict:
+    """Resolve all customer-facing NFT metadata exclusively from nft_link.
+
+    Database name/model/pattern/background values may still exist for legacy
+    admin workflows, but Telegram collectibles must never display them.
+    """
+    source_url = canonical_telegram_nft_url(record.get("nft_link"))
+    if not source_url:
+        return record
+    media = descriptor if isinstance(descriptor, dict) else {}
+    if media.get("animated"):
+        record["nft_media"] = media
+    slug = urlparse(source_url).path.removeprefix("/nft/").strip("/")
+    slug_collection = re.sub(r"-\d+$", "", slug)
+    fallback_name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", slug_collection).strip() or "NFT"
+    record["name"] = str(media.get("collectionName") or fallback_name).strip()[:160]
+    live_traits = media.get("traits") if isinstance(media.get("traits"), dict) else {}
+    for key in ("model", "pattern", "background"):
+        value = re.sub(r"\s+", " ", str(live_traits.get(key) or "")).strip()
+        record[key] = value[:160] if value else "None"
+    record["traits_source"] = "telegram:nft_link"
     return record
 
 
@@ -2511,10 +2535,7 @@ async def handle_get_items(request):
             for item in items
         ), return_exceptions=True)
         for item, descriptor in zip(items, media):
-            if isinstance(descriptor, dict) and descriptor.get("animated"):
-                item["nft_media"] = descriptor
-                if descriptor.get("collectionName"):
-                    item["name"] = descriptor["collectionName"]
+            apply_telegram_link_metadata(item, descriptor if isinstance(descriptor, dict) else None)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get items error: {e}")
@@ -2525,11 +2546,7 @@ async def handle_get_items(request):
 @require_auth
 @rate_limit(90, 60)
 async def handle_get_item(request):
-    """Return one authoritative item row for a catalogue/inventory modal.
-
-    The modal intentionally does not trust the catalogue snapshot: model,
-    pattern and background are always read from the current `items` row by id.
-    """
+    """Return an item whose visible NFT metadata comes only from nft_link."""
     try:
         item_id = int(request.query.get("id", "0"))
     except (TypeError, ValueError):
@@ -2559,6 +2576,10 @@ async def handle_get_item(request):
 
         item = normalize_records([row])[0]
         add_nft_preview_path(item)
+        descriptor = await fetch_telegram_nft_media(
+            canonical_telegram_nft_url(item.get("nft_link")), item_id
+        )
+        apply_telegram_link_metadata(item, descriptor)
         raw_status = item.get("status")
         item["is_shop_item"] = raw_status == "Доступен"
         if raw_status in ("Выведен", "withdrawn"):
@@ -2569,12 +2590,11 @@ async def handle_get_item(request):
         )
         item["sell_value"] = item.get("price", 0)
         item["withdraw_remaining_seconds"] = int(item.get("withdraw_remaining_seconds") or 0)
-        item["traits_source"] = "items.model/items.pattern/items.background"
         item["api_release"] = API_RELEASE
         item["row_digest"] = hashlib.sha256(
             "|".join(
                 str(item.get(key) if item.get(key) is not None else "NULL")
-                for key in ("id", "model", "pattern", "background")
+                for key in ("id", "nft_link", "name", "model", "pattern", "background")
             ).encode("utf-8")
         ).hexdigest()[:12]
         return web.json_response(
@@ -3222,10 +3242,7 @@ async def handle_get_inventory(request):
             for item in items
         ), return_exceptions=True)
         for item, descriptor in zip(items, media):
-            if isinstance(descriptor, dict) and descriptor.get("animated"):
-                item["nft_media"] = descriptor
-                if descriptor.get("collectionName"):
-                    item["name"] = descriptor["collectionName"]
+            apply_telegram_link_metadata(item, descriptor if isinstance(descriptor, dict) else None)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get inventory error: {e}")
