@@ -125,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.59"
+API_RELEASE = "8.9-opt.60"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1101,7 +1101,10 @@ def make_nft_theme_path(source_url: str) -> str:
     if not source_url:
         return ""
     slug = urlparse(source_url).path.removeprefix("/nft/").strip("/")
-    return f"/nft/theme?slug={urlencode({'value': slug})[6:]}"
+    # Version the generated SVG separately from the NFT slug. Telegram's
+    # in-app browser honors the immutable cache header very aggressively, so
+    # a renderer/layout adjustment must never reuse an older theme bitmap.
+    return f"/nft/theme?slug={urlencode({'value': slug})[6:]}&v=opt60"
 
 
 def add_nft_preview_path(record: dict) -> dict:
@@ -2989,7 +2992,7 @@ async def fetch_telegram_theme_bytes(source_url: str) -> bytes:
         pattern_definition = f'<image id="giftPattern" width="100" height="100" href="{pattern_uri}"/>'
         for slot in media.get("patternLayout") or []:
             try:
-                x = float(slot["x"]); y = float(slot["y"])
+                x = float(slot["x"]); y = float(slot["y"]) + 12.0
                 scale = float(slot["scale"]); opacity = float(slot["opacity"])
             except (KeyError, TypeError, ValueError):
                 continue

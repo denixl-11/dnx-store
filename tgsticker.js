@@ -77,7 +77,12 @@ var RLottie = (function () {
       if (playerNeedsLoop(rlPlayer)) {
         hasActivePlayer = true;
         delta = now - rlPlayer.frameThen;
-        if (delta > rlPlayer.frameInterval) {
+        // RAF timestamps and Date.now() are quantized differently in Telegram
+        // WebView. Requiring a strict `>` made a nominal 33.3 ms frame miss
+        // its 33 ms compositor tick and wait another 16.7 ms, producing an
+        // uneven ~20 FPS cadence. A one-millisecond tolerance keeps playback
+        // locked to the display refresh without ever running ahead.
+        if (delta >= Math.max(0, rlPlayer.frameInterval - 1)) {
           rendered = render(rlPlayer, checkViewport);
           if (rendered) {
             lastRenderDate = now;
@@ -140,7 +145,7 @@ var RLottie = (function () {
         // Version the worker URL as well: Telegram WebView caches workers
         // independently from the page and could otherwise keep an older,
         // already fixed animation loop for days.
-        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.59', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
+        QueryableWorkerProxy.init(new URL('tgsticker-worker.js?v=8.9-opt.60', document.baseURI).href, rlottie.WORKERS_LIMIT, function() {
           apiInited = true;
           for (var i = 0; i < initCallbacks.length; i++) {
             initCallbacks[i]();
@@ -490,12 +495,11 @@ var RLottie = (function () {
     rlPlayer.context = rlPlayer.canvas.getContext('2d');
 
     rlPlayer.fps = fps;
-    // Telegram NFTs are commonly authored at 60 FPS. Rendering every source
-    // frame through WASM makes several complex models take 10-20 seconds on
-    // iPhone. Preserve the source timing while drawing at most 30 FPS; skipped
-    // in-between frames are never visible and the complete cycle still ends
-    // on the model's frame zero exactly once.
-    rlPlayer.frameStep = Math.max(1, Math.ceil(rlPlayer.fps / 30));
+    // Preserve every source frame up to the worker/display limit. Telegram NFT
+    // animations are normally authored at 60 FPS; the previous 30 FPS cap
+    // discarded half of their motion and made rotations visibly step.
+    var playbackFpsLimit = Math.max(1, Math.min(60, Number(rlPlayer.options.maxPlaybackFps) || 60));
+    rlPlayer.frameStep = Math.max(1, Math.ceil(rlPlayer.fps / playbackFpsLimit));
     rlPlayer.frameInterval = 1000 * rlPlayer.frameStep / rlPlayer.fps;
     rlPlayer.frameThen = Date.now();
     rlPlayer.frameCount = frameCount;
@@ -678,7 +682,7 @@ var RLottie = (function () {
   RawPlayer.prototype.loadFromUrl = function(url) {
     if (this.worker) return;
     var self = this;
-    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.59', document.baseURI).href;
+    var workerUrl = new URL('tgsticker-worker.js?v=8.9-opt.60', document.baseURI).href;
     this.worker = new Worker(workerUrl);
     this.worker.onmessage = function(event) {
       var data = event && event.data || {};
