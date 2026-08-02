@@ -4158,6 +4158,95 @@
             #page-game .game-top-actions .elite-leaderboard-bar { height: 52px; min-height: 52px; }
             #page-game .game-top-actions .history-btn { width: 44px; height: 44px; min-height: 44px; }
         }
+
+        /* Full-width leaderboard artwork with a separate back control. */
+        .leaderboard-fullscreen .leaderboard-top {
+            position: relative;
+            display: block !important;
+            min-height: 0 !important;
+            height: auto;
+            margin: 0 0 14px !important;
+            padding: 48px 0 0 !important;
+            overflow: visible;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        .leaderboard-fullscreen .leaderboard-heading {
+            position: relative;
+            left: calc(-16px - var(--content-safe-left));
+            display: block;
+            width: 100vw;
+            height: auto;
+            aspect-ratio: 1916 / 370;
+            min-width: 0;
+            overflow: hidden;
+            background-color: #020104;
+            background-image: url('assets/reference-ui/leaderboard-screen-banner.png');
+            background-repeat: no-repeat;
+            background-size: 100% auto;
+            background-position: center 30%;
+        }
+        .leaderboard-fullscreen .leaderboard-heading::before {
+            content: "";
+            position: absolute;
+            z-index: 1;
+            inset: 0 0 auto;
+            height: 4px;
+            background: #020104;
+            pointer-events: none;
+        }
+        .leaderboard-fullscreen .leaderboard-heading::after {
+            content: none;
+        }
+        .leaderboard-fullscreen .leaderboard-heading .leaderboard-crown,
+        .leaderboard-fullscreen .leaderboard-heading .leaderboard-title {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            margin: -1px !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            clip: rect(0 0 0 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+        .leaderboard-fullscreen .leaderboard-close {
+            position: absolute;
+            z-index: 2;
+            top: 14px;
+            left: 0;
+            right: auto;
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px;
+            min-height: 40px;
+            margin: 0 !important;
+            padding: 0 !important;
+            transform: none;
+            border: 1px solid rgba(226, 81, 255, .48) !important;
+            border-radius: 50% !important;
+            background: linear-gradient(145deg, rgba(41, 11, 58, .94), rgba(8, 2, 14, .98)) !important;
+            color: #fff0ff !important;
+            box-shadow: inset 0 1px rgba(255,255,255,.10), 0 0 12px rgba(196, 57, 255, .20) !important;
+        }
+        .leaderboard-fullscreen .leaderboard-close svg {
+            width: 19px;
+            height: 19px;
+            stroke: currentColor;
+            filter: drop-shadow(0 0 4px rgba(244, 138, 255, .8));
+        }
+        @media (max-width: 360px) {
+            .leaderboard-fullscreen .leaderboard-top {
+                padding-top: 48px !important;
+            }
+        }
+        @media (max-width: 430px) {
+            .leaderboard-fullscreen .leaderboard-heading {
+                left: calc(-12px - var(--content-safe-left));
+            }
+        }
     </style>
 </head>
 <body>
@@ -4449,8 +4538,8 @@
                 </svg>
                 <h2 class="leaderboard-title">Лидеры сезона</h2>
             </div>
-            <button class="leaderboard-close" onclick="closeLeaderboardModal()" aria-label="Закрыть таблицу лидеров">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            <button class="leaderboard-close" onclick="closeLeaderboardModal()" aria-label="Назад к игре">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7M8 12h11"/></svg>
             </button>
         </div>
         <div class="season-timer" id="season-timer-display">
