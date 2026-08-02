@@ -2106,6 +2106,9 @@
         }
         .header-balances { display: grid; gap: 1px; min-width: 70px; }
         .header-balances .balance-text { justify-content: flex-end; line-height: 1.05; }
+        .header-balances .star-amount { column-gap: .28em; }
+        .header-balances .star-amount > .telegram-star,
+        .header-balances .star-amount > .bonus-star { flex-shrink: 0; }
         .header-balances .bonus-balance-text { color: #dca8ff; font-size: .66rem; }
         .balance-cards { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .balance-card-v7 {
@@ -3692,10 +3695,10 @@
             content: "";
             position: absolute;
             top: 50%;
-            left: calc(50% + 8px);
-            width: 17px;
-            height: 17px;
-            transform: translateY(-50%);
+            left: 57.7%;
+            width: clamp(13px, 4vw, 17px);
+            height: clamp(13px, 4vw, 17px);
+            transform: translate(-50%, -50%);
             background: url('main-star.png') center / auto 190% no-repeat;
             pointer-events: none;
         }
@@ -4123,14 +4126,14 @@
             content: "";
             position: absolute;
             top: 50%;
-            right: 20px;
-            width: 16px;
-            height: 16px;
-            transform: translateY(-50%);
+            left: 87.7%;
+            width: clamp(12px, 3.8vw, 16px);
+            height: clamp(12px, 3.8vw, 16px);
+            transform: translate(-50%, -50%);
             background: url('main-star.png') center / auto 190% no-repeat;
             pointer-events: none;
         }
-        #page-game .game-highlight-btn:last-child::after { right: 15px; }
+        #page-game .game-highlight-btn:last-child::after { left: 89.4%; }
         #page-game .game-highlight-btn small { display: none; }
 
         #page-game .game-bank-frame {
