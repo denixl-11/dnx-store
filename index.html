@@ -524,10 +524,10 @@
         .cart-fab:active { transform: scale(0.92); }
         .cart-fab.visible {
             display: flex;
-            opacity: .58;
+            opacity: .52;
             animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .cart-fab.visible:hover { opacity: .78; }
+        .cart-fab.visible:hover { opacity: .72; }
         .cart-fab svg {
             width: 30px;
             height: 30px;
@@ -1273,9 +1273,9 @@
         .cart-fab {
             right: max(calc(18px + var(--content-safe-right)), calc((100vw - 480px) / 2 + 18px));
             bottom: calc(80px + var(--content-safe-bottom));
-            width: 52px; height: 52px;
+            width: 60px; height: 60px;
         }
-        .cart-fab svg { width: 26px; height: 26px; }
+        .cart-fab svg { width: 30px; height: 30px; }
         .cart-fab .cart-badge { width: 20px; height: 20px; font-size: .65rem; }
         .game-container { width: 100%; padding: 0 14px 20px; align-items: stretch; }
         .elite-leaderboard-bar, .game-history-row, .game-canvas-wrap, .game-info-row,
@@ -4523,7 +4523,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.69';
+        const EXPECTED_API_RELEASE = '8.9-opt.70';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -5765,7 +5765,7 @@
                     // start motion only after the worker has a short reserve.
                     // This absorbs an occasional iOS/WASM render spike without
                     // dropping or visibly holding a frame mid-cycle.
-                    playbackPrebufferFrames: 36,
+                    playbackPrebufferFrames: 24,
                     noAutoPlay: true,
                     findPosterFrame: true,
                     // Once the first real alpha frame is found, do not scan a
@@ -5871,13 +5871,12 @@
             element.dataset.mediaState = 'loading';
             const mediaToken = element.dataset.mediaToken || '0';
             const caseDescriptor = element.dataset.mediaKind === 'case' && caseId > 0 && dropIndex >= 0;
-            // Case-origin inventory modals always use the neutral #242424
-            // shell and Random traits, so their animation must start from the
-            // signed asset seed immediately. Waiting for the full Telegram
-            // descriptor here caused the several-second frozen poster seen on
-            // the first tap. Catalogue modals still require the exact theme.
+            // Every inventory item already carries a signed model seed. Start
+            // that model immediately instead of blocking the first tap on a
+            // second Telegram metadata request. Shop modals still require the
+            // exact Telegram theme before playback.
             const requireExactTheme = element.classList.contains('nft-live-media--modal')
-                && element.dataset.caseOrigin !== 'true';
+                && element.dataset.inventoryContext !== 'true';
             const media = caseDescriptor
                 ? await getCaseNftMedia(caseId, dropIndex)
                 : await getNftMedia(itemId, requireExactTheme);
@@ -6631,6 +6630,7 @@
             currentNftItem = item;
             const modalMedia = document.getElementById('nft-modal-media');
             modalMedia.dataset.caseOrigin = isCaseOrigin ? 'true' : 'false';
+            modalMedia.dataset.inventoryContext = isInventoryContext ? 'true' : 'false';
             if (resetMedia) {
                 modalMedia.style.setProperty('--nft-bg-a', '#242424');
                 modalMedia.style.setProperty('--nft-bg-b', '#242424');

@@ -125,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.69"
+API_RELEASE = "8.9-opt.70"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -3186,8 +3186,10 @@ async def handle_nft_theme_asset(request):
 async def warm_nft_media_cache():
     rows = await get_pool().fetch("""
         SELECT id, nft_link FROM items
-        WHERE COALESCE(nft_link, '') <> '' AND status = 'Доступен'
-        ORDER BY id
+        WHERE COALESCE(nft_link, '') <> ''
+          AND status IN ('Доступен', 'Продан', 'pending_withdraw')
+        ORDER BY CASE WHEN status IN ('Продан', 'pending_withdraw') THEN 0 ELSE 1 END,
+                 id DESC
     """)
     sources: list[tuple[str, int]] = []
     seen_sources = set()
