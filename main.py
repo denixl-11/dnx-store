@@ -125,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.64"
+API_RELEASE = "8.9-opt.65"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -145,6 +145,7 @@ NFT_PATTERN_BINARY_CACHE_MAX = 4096
 NFT_THEME_BINARY_TTL = 6 * 60 * 60
 NFT_THEME_BINARY_CACHE_MAX = 4096
 NFT_ASSET_TOKEN_TTL = 15 * 60
+NFT_MEDIA_METADATA_TTL = 10 * 60
 
 
 def floor_stars(value) -> Decimal:
@@ -2553,12 +2554,15 @@ async def handle_get_items(request):
         items = normalize_records(rows)
         for item in items:
             add_nft_preview_path(item)
-        media = await asyncio.gather(*(
-            fetch_telegram_nft_media(canonical_telegram_nft_url(item.get("nft_link")), int(item["id"]))
-            for item in items
-        ), return_exceptions=True)
-        for item, descriptor in zip(items, media):
-            apply_telegram_link_metadata(item, descriptor if isinstance(descriptor, dict) else None)
+        # Telegram is never part of the catalogue response critical path. A
+        # warm descriptor is attached immediately; a cold/missing descriptor
+        # is left to the bounded startup/client poster queues while the client
+        # paints the stable card layout from the signed asset path above. This
+        # keeps even a 1000-item response from spawning 1000 request tasks.
+        for item in items:
+            source_url = canonical_telegram_nft_url(item.get("nft_link"))
+            descriptor = get_cached_telegram_nft_media(source_url, int(item["id"]))
+            apply_telegram_link_metadata(item, descriptor)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get items error: {e}")
@@ -2677,24 +2681,34 @@ async def handle_admin_db_audit(request):
     )
 
 
+def bind_nft_media_item_asset(source_url: str, item_id: int, media: dict) -> dict:
+    result = dict(media)
+    if result.get("animated"):
+        result["sourceKey"] = hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:16]
+        result["assetPath"] = make_nft_asset_path(source_url, item_id if item_id > 0 else 0)
+    return result
+
+
+def get_cached_telegram_nft_media(source_url: str, item_id: int) -> dict | None:
+    source_url = canonical_telegram_nft_url(source_url)
+    cached = nft_media_cache.get(source_url) if source_url else None
+    if not cached or cached[0] <= time.monotonic() or cached[1].get("transient"):
+        return None
+    return bind_nft_media_item_asset(source_url, item_id, cached[1])
+
+
 async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
     source_url = canonical_telegram_nft_url(source_url)
     if not source_url:
         return {"animated": False, "transient": False}
     now = time.monotonic()
-    def bind_item_asset(media: dict) -> dict:
-        result = dict(media)
-        if result.get("animated"):
-            result["sourceKey"] = hashlib.sha256(source_url.encode("utf-8")).hexdigest()[:16]
-            result["assetPath"] = make_nft_asset_path(source_url, item_id if item_id > 0 else 0)
-        return result
 
     cached = nft_media_cache.get(source_url)
     if cached and cached[0] > now:
-        return bind_item_asset(cached[1])
+        return bind_nft_media_item_asset(source_url, item_id, cached[1])
     existing_request = nft_media_requests.get(source_url)
     if existing_request is not None:
-        return bind_item_asset(await asyncio.shield(existing_request))
+        return bind_nft_media_item_asset(source_url, item_id, await asyncio.shield(existing_request))
 
     async def load() -> dict:
         last_error: Exception | None = None
@@ -2772,9 +2786,9 @@ async def fetch_telegram_nft_media(source_url: str, item_id: int) -> dict:
             nft_media_cache.pop(next(iter(nft_media_cache)), None)
     # A network/rate-limit failure is not proof that the NFT has no animation.
     # Keep it only briefly so the next card retry can recover immediately.
-    cache_ttl = 75 if result.get("animated") else (1 if result.get("transient") else 30)
+    cache_ttl = NFT_MEDIA_METADATA_TTL if result.get("animated") else (1 if result.get("transient") else 30)
     nft_media_cache[source_url] = (time.monotonic() + cache_ttl, result)
-    return bind_item_asset(result)
+    return bind_nft_media_item_asset(source_url, item_id, result)
 
 
 async def read_response_body_limited(response: aiohttp.ClientResponse, max_bytes: int) -> bytes:

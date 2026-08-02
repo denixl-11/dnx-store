@@ -3821,6 +3821,55 @@
             box-shadow: none !important;
         }
 
+        /* Cart layout is final before the tab becomes visible. Disabling the
+           generic page entrance animation avoids a transient containing block
+           for its fixed footer in Telegram WebView. */
+        #page-cart {
+            animation: none !important;
+            padding-bottom: calc(82px + var(--content-safe-bottom));
+        }
+        #page-cart .cart-list {
+            width: 100%;
+            padding: 12px;
+            box-sizing: border-box;
+        }
+        #page-cart .cart-item {
+            width: 100%;
+            min-height: 84px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            contain: layout paint;
+        }
+        #page-cart .cart-item > .item-image,
+        #page-cart .cart-item > .nft-static-cart {
+            flex: 0 0 58px !important;
+            width: 58px !important;
+            min-width: 58px !important;
+            max-width: 58px !important;
+            height: 58px !important;
+            min-height: 58px !important;
+            max-height: 58px !important;
+            aspect-ratio: 1 !important;
+            margin: 0 !important;
+        }
+        #pay-footer {
+            left: 50% !important;
+            right: auto !important;
+            bottom: calc(80px + var(--content-safe-bottom)) !important;
+            width: min(480px, calc(100% - var(--content-safe-left) - var(--content-safe-right) - 24px)) !important;
+            padding: 0 !important;
+            transform: translateX(-50%) !important;
+            box-sizing: border-box !important;
+        }
+        #pay-footer > .btn-main-action {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+        }
+
         /* Catalogue starts with Telegram's instant raster and upgrades in
            place to a transparent TGS model on the reconstructed vector
            background. The low-resolution raster is then fully removed. */
@@ -4450,7 +4499,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.64';
+        const EXPECTED_API_RELEASE = '8.9-opt.65';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -6032,6 +6081,10 @@
                 activateAccountRestriction(accountRestriction);
                 return;
             }
+            // Build the cart while its page is still hidden. Its fixed footer
+            // and media boxes therefore have their final geometry on the very
+            // first visible frame instead of jumping after page activation.
+            if (id === 'cart') renderCart();
             if (document.getElementById('nft-detail-overlay')?.classList.contains('active')) closeNftModal(true);
             if (id !== 'store') pauseCatalogNftMedia();
             pauseAuxNftMedia();
@@ -6054,7 +6107,6 @@
                 requestAnimationFrame(resumeCatalogNftMedia);
             }
             if(id === 'inventory') loadInventory();
-            if(id === 'cart') renderCart();
             requestAnimationFrame(resumeAuxNftMedia);
             updateCartFab();
         }
@@ -6265,10 +6317,10 @@
                 const cacheIsFresh = currentCatalog.length && Date.now() - catalogLoadedAt < 60000;
                 if (!force && cacheIsFresh) {
                     syncCatalogUi();
-                    await Promise.allSettled(currentCatalog.map(item => preloadNftPattern(item?.nft_media)));
-                    await warmInitialCatalogPosters(currentCatalog);
                     renderCatalogItems();
                     resumeCatalogNftMedia();
+                    Promise.allSettled(currentCatalog.map(item => preloadNftPattern(item?.nft_media))).catch(() => {});
+                    warmInitialCatalogPosters(currentCatalog).catch(() => {});
                     return;
                 }
                 if (!catalogRequest) {
@@ -6288,11 +6340,15 @@
                 }
                 await catalogRequest;
                 syncCatalogUi();
-                await Promise.allSettled(currentCatalog.map(item => preloadNftPattern(item?.nft_media)));
-                await warmInitialCatalogPosters(currentCatalog);
+                // Paint the complete catalogue layout as soon as its DB rows
+                // arrive. Exact Telegram themes/posters continue in parallel;
+                // they are no longer allowed to hold an empty grid for up to
+                // several seconds on a Render cold start.
                 renderCatalogItems();
                 updateCollectionFilterUi();
                 updateCartFab();
+                Promise.allSettled(currentCatalog.map(item => preloadNftPattern(item?.nft_media))).catch(() => {});
+                warmInitialCatalogPosters(currentCatalog).catch(() => {});
             } catch(e) { console.error(e); }
         }
 
@@ -6602,11 +6658,12 @@
 
             const modalTgBtn = document.getElementById('nft-tg-link-btn');
 
-            if (telegramLink) {
+            if (telegramLink && !isCaseOrigin) {
                 modalTgBtn.style.display = 'grid';
                 modalTgBtn.onclick = () => tg.openTelegramLink(telegramLink);
             } else {
                 modalTgBtn.style.display = 'none';
+                modalTgBtn.onclick = null;
             }
 
             const liveTraits = immediateMedia?.traits || {};
