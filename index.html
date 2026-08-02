@@ -4501,7 +4501,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.66';
+        const EXPECTED_API_RELEASE = '8.9-opt.67';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -8559,9 +8559,11 @@
         }
 
         function warmCaseImages(drops) {
-            // Every case reward is now a static asset from CASES_JSON. This is
-            // intentionally independent from Telegram/TGS availability.
+            // Telegram-linked rewards are rendered from their TGS zero frame
+            // and must never request obsolete CASES_JSON PNG files. Only the
+            // three deliberately static rewards still need image preloading.
             [...new Set((drops || [])
+                .filter(drop => !drop?.has_live_nft && Boolean(staticRewardKey(drop?.model || drop?.name)))
                 .map(drop => caseStaticImageUrl(drop))
                 .filter(Boolean))].forEach(url => {
                 if (warmedCaseImages.has(url)) return;
