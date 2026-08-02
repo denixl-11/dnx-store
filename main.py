@@ -125,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.67"
+API_RELEASE = "8.9-opt.68"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -3296,8 +3296,14 @@ async def handle_get_inventory(request):
         # the client exactly like the fast catalogue path.
         for item in items:
             source_url = canonical_telegram_nft_url(item.get("nft_link"))
+            case_model_fallback = item.get("model") if item.get("acquisition_source") == "case" else None
             descriptor = get_cached_telegram_nft_media(source_url, int(item["id"]))
             apply_telegram_link_metadata(item, descriptor)
+            # Case rows capture their Telegram-derived model when the prize is
+            # created. Preserve that one field only as an instant cold-cache
+            # fallback; a complete live descriptor above always overwrites it.
+            if source_url and case_model_fallback and not item.get("model"):
+                item["model"] = case_model_fallback
             apply_case_inventory_presentation(item)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:

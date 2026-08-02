@@ -524,10 +524,10 @@
         .cart-fab:active { transform: scale(0.92); }
         .cart-fab.visible {
             display: flex;
+            opacity: .58;
             animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .cart-fab.inventory-muted { opacity: .48; }
-        .cart-fab.inventory-muted:hover { opacity: .68; }
+        .cart-fab.visible:hover { opacity: .78; }
         .cart-fab svg {
             width: 30px;
             height: 30px;
@@ -4501,7 +4501,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.67';
+        const EXPECTED_API_RELEASE = '8.9-opt.68';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -5849,7 +5849,13 @@
             element.dataset.mediaState = 'loading';
             const mediaToken = element.dataset.mediaToken || '0';
             const caseDescriptor = element.dataset.mediaKind === 'case' && caseId > 0 && dropIndex >= 0;
-            const requireExactTheme = element.classList.contains('nft-live-media--modal');
+            // Case-origin inventory modals always use the neutral #242424
+            // shell and Random traits, so their animation must start from the
+            // signed asset seed immediately. Waiting for the full Telegram
+            // descriptor here caused the several-second frozen poster seen on
+            // the first tap. Catalogue modals still require the exact theme.
+            const requireExactTheme = element.classList.contains('nft-live-media--modal')
+                && element.dataset.caseOrigin !== 'true';
             const media = caseDescriptor
                 ? await getCaseNftMedia(caseId, dropIndex)
                 : await getNftMedia(itemId, requireExactTheme);
@@ -6123,12 +6129,9 @@
         function updateCartFab() {
             const fab = document.getElementById('cart-fab');
             const storePage = document.getElementById('page-store');
-            const inventoryPage = document.getElementById('page-inventory');
             const catalogActive = storePage && storePage.classList.contains('page-active') && document.getElementById('catalog-container').style.display !== 'none';
-            const inventoryActive = inventoryPage && inventoryPage.classList.contains('page-active');
             if (fab) {
-                fab.classList.toggle('visible', catalogActive || inventoryActive);
-                fab.classList.toggle('inventory-muted', inventoryActive);
+                fab.classList.toggle('visible', catalogActive);
             }
             const badge = document.getElementById('cart-badge');
             if (badge) badge.innerText = cart.length;
@@ -6688,7 +6691,14 @@
                 document.getElementById('nft-modal-title').innerText = liveCollectionName;
             }
             const itemHasTelegramTraits = item.traits_source === 'telegram:nft_link';
-            const linkedTrait = key => String(liveTraits[key] || (itemHasTelegramTraits ? item[key] : '') || '').trim() || 'Загрузка…';
+            // A case item stores the model selected from its Telegram link at
+            // win time. Use it as the instant first-frame value while the live
+            // descriptor refreshes; the refresh remains authoritative.
+            const linkedTrait = key => String(
+                liveTraits[key]
+                || ((itemHasTelegramTraits || (isCaseOrigin && key === 'model')) ? item[key] : '')
+                || ''
+            ).trim() || 'Загрузка…';
             const traits = [
                 { label: 'Модель', value: telegramLink ? linkedTrait('model') : (item.model == null || String(item.model).trim() === '' ? 'None' : item.model) },
                 { label: 'Узор', value: isCaseOrigin ? 'Random' : (telegramLink ? linkedTrait('pattern') : (item.pattern == null || String(item.pattern).trim() === '' ? 'None' : item.pattern)) },
