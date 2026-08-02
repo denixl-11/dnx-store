@@ -1275,7 +1275,7 @@
             bottom: calc(80px + var(--content-safe-bottom));
             width: 52px; height: 52px;
         }
-        .cart-fab svg { width: 23px; height: 23px; }
+        .cart-fab svg { width: 26px; height: 26px; }
         .cart-fab .cart-badge { width: 20px; height: 20px; font-size: .65rem; }
         .game-container { width: 100%; padding: 0 14px 20px; align-items: stretch; }
         .elite-leaderboard-bar, .game-history-row, .game-canvas-wrap, .game-info-row,
@@ -1389,6 +1389,19 @@
         .success-payment-card h3 { margin: 0 0 8px; color: #fff8ed; font-size: 1.05rem; letter-spacing: .06em; }
         .success-payment-card p { margin: 0 0 20px; color: #a99eab; font-size: .78rem; line-height: 1.55; }
         .success-payment-card strong { color: #ffd36a; font-size: 1rem; }
+        .case-action-success-modal { z-index: 1500 !important; }
+        .case-action-success-card {
+            overflow: hidden;
+            border-color: rgba(224, 78, 255, .58) !important;
+            background:
+                radial-gradient(circle at 50% 0, rgba(210, 59, 255, .19), transparent 48%),
+                linear-gradient(155deg, #16091f, #09050e 72%) !important;
+            box-shadow: 0 24px 70px rgba(0,0,0,.72), 0 0 34px rgba(207,55,255,.18);
+        }
+        .case-action-success-card h3 { margin: 0 0 10px; color: #fff5fb; font-size: 1.05rem; letter-spacing: .055em; }
+        .case-action-success-card p { margin: 0 0 20px; color: #c0b3c2; font-size: .8rem; line-height: 1.55; }
+        .case-action-success-card .star-amount { color: #ffd36a; font-weight: 800; }
+        .case-action-success-card .success-payment-icon svg { width: 29px; height: 29px; fill: none; stroke: currentColor; }
         .nft-live-media {
             --nft-bg-a: #3e245d;
             --nft-bg-b: #160d27;
@@ -4242,6 +4255,15 @@
         </div>
     </div>
 
+    <div id="case-action-success-modal" class="modal-overlay case-action-success-modal" role="dialog" aria-modal="true" aria-labelledby="case-action-success-title">
+        <div class="modal-content case-action-success-card" onclick="event.stopPropagation()">
+            <div class="success-payment-icon" id="case-action-success-icon" aria-hidden="true"></div>
+            <h3 id="case-action-success-title">ГОТОВО</h3>
+            <p id="case-action-success-message"></p>
+            <button class="btn-main-action" onclick="closeCaseActionSuccess()">ДАЛЕЕ</button>
+        </div>
+    </div>
+
     <div id="confirm-bet-modal" class="modal-overlay">
         <div class="modal-content"><h3 class="modal-title">Подтверждение</h3><p style="margin-bottom: 14px;">Сделать ставку <span class="star-amount"><span id="confirm-bet-amount" style="color:var(--accent-gold); font-weight:bold;">0</span><span class="telegram-star" aria-hidden="true"></span></span>?</p><div class="balance-choice" id="game-balance-choice"><button type="button" class="active" data-balance="main" onclick="selectBalanceType('game','main')">Основной <span class="telegram-star"></span></button><button type="button" data-balance="bonus" onclick="selectBalanceType('game','bonus')">Бонусный <span class="bonus-star"></span></button></div><button class="btn-main-action" id="btn-confirm-bet" onclick="executeBet()">Подтвердить</button><button class="btn-secondary" onclick="closeModal('confirm-bet-modal')">Отмена</button></div>
     </div>
@@ -4501,7 +4523,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.68';
+        const EXPECTED_API_RELEASE = '8.9-opt.69';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -5743,7 +5765,7 @@
                     // start motion only after the worker has a short reserve.
                     // This absorbs an occasional iOS/WASM render spike without
                     // dropping or visibly holding a frame mid-cycle.
-                    playbackPrebufferFrames: 24,
+                    playbackPrebufferFrames: 36,
                     noAutoPlay: true,
                     findPosterFrame: true,
                     // Once the first real alpha frame is found, do not scan a
@@ -6083,6 +6105,21 @@
             document.getElementById('payment-success-amount').innerHTML = `<span>${formatStars(stars)}</span>${telegramStarMarkup()}`;
             document.getElementById('payment-success-modal').classList.add('active');
             try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+        }
+        function showCaseActionSuccess(title, messageHtml, kind = 'claim') {
+            document.getElementById('case-action-success-title').innerText = title;
+            document.getElementById('case-action-success-message').innerHTML = messageHtml;
+            document.getElementById('case-action-success-icon').innerHTML = kind === 'sale'
+                ? telegramStarMarkup()
+                : '<svg viewBox="0 0 24 24" stroke-width="2"><path d="M4 8h16v13H4zM7 8V5h10v3M9 4h6M8 12h8M12 12v5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            document.getElementById('case-action-success-modal').classList.add('active');
+            try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
+        }
+        function closeCaseActionSuccess() {
+            closeModal('case-action-success-modal');
+            // The case stays mounted behind the confirmation and has already
+            // returned to its idle roulette, ready for another opening.
+            document.getElementById('case-detail-overlay')?.querySelector('.case-modal-content')?.focus?.({ preventScroll: true });
         }
         function closeModal(id) { const el = document.getElementById(id); if(el) el.classList.remove('active'); }
 
@@ -9297,40 +9334,9 @@
         }
 
         function claimItem() {
-            destroyAuxNftMedia(document.getElementById('case-detail-overlay'));
-            document.getElementById('case-detail-overlay').classList.remove('active');
-
-            const rouletteContainer = document.getElementById('roulette-container');
-            rouletteContainer.style.display = 'block';
-            rouletteContainer.classList.remove('is-charging', 'is-spinning');
-            const winDisplay = document.getElementById('win-display');
-            winDisplay.style.display = 'none';
-            winDisplay.classList.remove('is-revealed');
-            document.getElementById('case-actions').style.display = 'flex';
-            const openButton = document.getElementById('case-open-btn');
-            openButton.disabled = false;
-            openButton.style.opacity = '1';
-            refreshCaseOpenButton();
-            document.getElementById('case-back-btn').style.opacity = '1';
-            document.getElementById('case-back-btn').style.pointerEvents = 'auto';
-
-            document.getElementById('sell-btn-text').innerText = 'ПРОДАТЬ ЗА ';
-            document.getElementById('win-value').style.display = 'inline';
-            document.getElementById('win-currency').style.display = 'inline';
-            document.getElementById('sell-drop-btn').disabled = false;
-
-            const track = document.getElementById('roulette-track');
-            destroyAuxNftMedia(track);
-            track.innerHTML = '';
-            track.classList.remove('idle-scroll');
-            track.style.transition = 'none';
-            track.style.transform = 'translateX(0)';
-            track.style.paddingLeft = '0px';
-
-            rouletteActive = false;
-            caseOpeningRequestActive = false;
-            currentCase = null;
-            currentWonItem = null;
+            if (!currentCase || !currentWonItem) return;
+            continueCaseAfterSale();
+            showCaseActionSuccess('ПРЕДМЕТ ПОЛУЧЕН', 'Предмет перемещён в инвентарь.');
         }
 
         function continueCaseAfterSale() {
@@ -9381,7 +9387,11 @@
                 if (result && result.success) {
                     const credited = result.credited || 0;
                     continueCaseAfterSale();
-                    showAlert(`NFT продан. На основной баланс зачислено ${formatStars(credited)} звёзд.`);
+                    showCaseActionSuccess(
+                        'ПРОДАЖА УСПЕШНА',
+                        `На основной баланс зачислено <span class="star-amount"><span>${formatStars(credited)}</span>${telegramStarMarkup()}</span>.`,
+                        'sale'
+                    );
                     updateBalance().catch(() => {});
                 } else {
                     showAlert(result?.error || 'Ошибка продажи');
