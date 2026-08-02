@@ -526,6 +526,8 @@
             display: flex;
             animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        .cart-fab.inventory-muted { opacity: .48; }
+        .cart-fab.inventory-muted:hover { opacity: .68; }
         .cart-fab svg {
             width: 30px;
             height: 30px;
@@ -4499,7 +4501,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.65';
+        const EXPECTED_API_RELEASE = '8.9-opt.66';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -4643,6 +4645,8 @@
         let inventoryData = [];
         let activityNextBefore = null;
         let activityLoading = false;
+        let activityRequest = null;
+        let activityLoadedAt = 0;
         const inventoryActionsInFlight = new Set();
         let pendingTopupStars = 0;
         let pendingBuyItem = null;
@@ -6106,7 +6110,12 @@
                 updateCartFab();
                 requestAnimationFrame(resumeCatalogNftMedia);
             }
-            if(id === 'inventory') loadInventory();
+            if(id === 'inventory') {
+                loadInventory();
+                // Prefetch the hidden history tab in parallel so switching
+                // tabs never exposes a second loading screen.
+                loadActivityHistory(true);
+            }
             requestAnimationFrame(resumeAuxNftMedia);
             updateCartFab();
         }
@@ -6114,8 +6123,13 @@
         function updateCartFab() {
             const fab = document.getElementById('cart-fab');
             const storePage = document.getElementById('page-store');
+            const inventoryPage = document.getElementById('page-inventory');
             const catalogActive = storePage && storePage.classList.contains('page-active') && document.getElementById('catalog-container').style.display !== 'none';
-            if (fab) fab.classList.toggle('visible', catalogActive);
+            const inventoryActive = inventoryPage && inventoryPage.classList.contains('page-active');
+            if (fab) {
+                fab.classList.toggle('visible', catalogActive || inventoryActive);
+                fab.classList.toggle('inventory-muted', inventoryActive);
+            }
             const badge = document.getElementById('cart-badge');
             if (badge) badge.innerText = cart.length;
         }
@@ -7201,7 +7215,12 @@
             document.getElementById('inventory-active-container').style.display = type === 'active' ? 'grid' : 'none';
             document.getElementById('inventory-history-container').style.display = type === 'history' ? 'grid' : 'none';
             document.getElementById('page-inventory').classList.toggle('history-active', type === 'history');
-            if (type === 'history') loadActivityHistory(true);
+            if (type === 'history') {
+                const history = document.getElementById('inventory-history-container');
+                // Keep the cached strips visible instantly, then refresh them
+                // in place so a newly completed sale/opening is not stale.
+                loadActivityHistory(true, history.dataset.loaded === 'true');
+            }
             requestAnimationFrame(resumeAuxNftMedia);
         }
         function isSimpleInventoryNft(item) {
@@ -7217,8 +7236,6 @@
                     seedNftMediaFromItems(inventoryData);
                     const active = inventoryData.filter(i => !['withdrawn', 'disposed'].includes(i.status));
                 const activeContainer = document.getElementById('inventory-active-container');
-                activeContainer.innerHTML = '<div class="empty-state"><p>Подготавливаем модели инвентаря…</p></div>';
-                await warmItemNftPosters(active.filter(isCaseOriginItem));
                 destroyAuxNftMedia(activeContainer);
                 if (renderToken !== inventoryRenderToken) return;
                 activeContainer.innerHTML = active.length
@@ -7246,6 +7263,9 @@
                 const historyContainer = document.getElementById('inventory-history-container');
                 if (!historyContainer.dataset.loaded) historyContainer.innerHTML = '<div class="empty-state"><p>Загружаем историю…</p></div>';
                 startWithdrawCountdowns();
+                // Cards paint from signed asset seeds immediately. Poster
+                // decoding is a non-blocking progressive enhancement.
+                warmItemNftPosters(active.filter(isCaseOriginItem)).catch(() => {});
                 warmAuxNftPosters(activeContainer).catch(() => {});
                 } catch(e) { console.error(e); }
             })().finally(() => { inventoryRequest = null; });
@@ -7308,12 +7328,17 @@
                 <div class="activity-value">${amountMarkup}<time class="activity-time">${escapeHtml(activityTimestamp(event.created_at))}</time></div>
             </article>`;
         }
-        async function loadActivityHistory(reset = false) {
-            if (activityLoading) return;
+        async function loadActivityHistory(reset = false, force = false) {
             const container = document.getElementById('inventory-history-container');
-            if (reset) { activityNextBefore = null; container.innerHTML = '<div class="empty-state"><p>Загружаем историю…</p></div>'; }
+            const hasSnapshot = container.dataset.loaded === 'true';
+            if (reset && !force && hasSnapshot && Date.now() - activityLoadedAt < 60_000) return;
+            if (activityLoading) return activityRequest;
+            if (reset) {
+                activityNextBefore = null;
+                if (!hasSnapshot) container.innerHTML = '<div class="empty-state"><p>Загружаем историю…</p></div>';
+            }
             activityLoading = true;
-            try {
+            activityRequest = (async () => { try {
                 const query = activityNextBefore ? `?limit=80&before=${encodeURIComponent(activityNextBefore)}` : '?limit=80';
                 const data = await apiFetch(`${API_BASE}/activity/history${query}`);
                 const events = Array.isArray(data.events) ? data.events : [];
@@ -7328,9 +7353,14 @@
                 if (data.hasMore && activityNextBefore) container.insertAdjacentHTML('beforeend', '<button class="activity-load-more" onclick="loadActivityHistory(false)">ПОКАЗАТЬ ЕЩЁ</button>');
                 if (!container.innerHTML.trim()) container.innerHTML = '<div class="empty-state history-empty-state"><div class="empty-state-copy"><h3>ИСТОРИЯ ПУСТА</h3><p>Пополнения, покупки, ставки и кейсы появятся здесь.</p></div></div>';
                 container.dataset.loaded = 'true';
+                activityLoadedAt = Date.now();
             } catch (error) {
                 if (reset) container.innerHTML = '<div class="empty-state"><h3>НЕ УДАЛОСЬ ЗАГРУЗИТЬ</h3><button class="activity-load-more" onclick="loadActivityHistory(true)">ПОВТОРИТЬ</button></div>';
-            } finally { activityLoading = false; }
+            } finally {
+                activityLoading = false;
+                activityRequest = null;
+            } })();
+            return activityRequest;
         }
         let withdrawCountdownTimer = null;
         function formatWithdrawCountdown(seconds) {
@@ -8509,13 +8539,18 @@
 
         async function getCaseDetails(caseId, prewarm = false) {
             const key = Number(caseId);
-            if (caseDetailsCache.has(key)) return caseDetailsCache.get(key);
+            if (caseDetailsCache.has(key)) {
+                const cached = caseDetailsCache.get(key);
+                if (prewarm) scheduleCasePosterPrewarm(cached).catch(() => {});
+                return cached;
+            }
             if (caseDetailsRequests.has(key)) return caseDetailsRequests.get(key);
             const request = apiFetch(`${API_BASE}/case-details?id=${key}`)
                 .then(details => {
                     caseDetailsCache.set(key, details);
                     seedCaseNftMedia(details);
                     warmCaseImages(details?.drops || []);
+                    if (prewarm) scheduleCasePosterPrewarm(details).catch(() => {});
                     return details;
                 })
                 .finally(() => caseDetailsRequests.delete(key));
@@ -8580,7 +8615,7 @@
 
         function prefetchCaseDetails(cases) {
             const run = () => (cases || []).forEach(entry => {
-                getCaseDetails(entry.id, false).catch(() => {});
+                getCaseDetails(entry.id, true).catch(() => {});
             });
             if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 1400 });
             else setTimeout(run, 120);
@@ -9286,6 +9321,33 @@
             currentWonItem = null;
         }
 
+        function continueCaseAfterSale() {
+            if (!currentCase) return;
+            const rouletteContainer = document.getElementById('roulette-container');
+            rouletteContainer.style.display = 'block';
+            rouletteContainer.classList.remove('is-charging', 'is-spinning');
+            const winDisplay = document.getElementById('win-display');
+            winDisplay.style.display = 'none';
+            winDisplay.classList.remove('is-revealed');
+            document.getElementById('case-actions').style.display = 'flex';
+            const openButton = document.getElementById('case-open-btn');
+            openButton.disabled = false;
+            openButton.style.opacity = '1';
+            refreshCaseOpenButton();
+            document.getElementById('case-back-btn').style.opacity = '1';
+            document.getElementById('case-back-btn').style.pointerEvents = 'auto';
+            restoreSellBtn(
+                document.getElementById('sell-drop-btn'),
+                document.getElementById('sell-btn-text'),
+                document.getElementById('win-value'),
+                document.getElementById('win-currency')
+            );
+            rouletteActive = false;
+            caseOpeningRequestActive = false;
+            currentWonItem = null;
+            startIdleRoulette([...currentCase.drops].sort((a, b) => a.chance - b.chance));
+        }
+
         async function sellItem() {
             if (!currentWonItem || !currentWonItem.generated_item_id) return;
 
@@ -9305,8 +9367,10 @@
                     body: JSON.stringify({ itemId: currentWonItem.generated_item_id })
                 });
                 if (result && result.success) {
-                    await updateBalance();
-                    claimItem();
+                    const credited = result.credited || 0;
+                    continueCaseAfterSale();
+                    showAlert(`NFT продан. На основной баланс зачислено ${formatStars(credited)} звёзд.`);
+                    updateBalance().catch(() => {});
                 } else {
                     showAlert(result?.error || 'Ошибка продажи');
                     restoreSellBtn(btn, textSpan, valSpan, currencySpan);
@@ -9440,6 +9504,9 @@
         // Fetch case JSON and decode its static assets after catalogue paint.
         if ('requestIdleCallback' in window) requestIdleCallback(prewarmCasesInBackground, { timeout: 350 });
         else setTimeout(prewarmCasesInBackground, 100);
+        const prefetchHistoryInBackground = () => loadActivityHistory(true).catch(() => {});
+        if ('requestIdleCallback' in window) requestIdleCallback(prefetchHistoryInBackground, { timeout: 900 });
+        else setTimeout(prefetchHistoryInBackground, 250);
         loadPrizeItems();
         loadLeaderboardPreview();
         const pendingTonDeposit = localStorage.getItem('dnx_ton_deposit');

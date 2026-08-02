@@ -125,7 +125,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.65"
+API_RELEASE = "8.9-opt.66"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -1105,7 +1105,7 @@ def make_nft_theme_path(source_url: str) -> str:
     # Version the generated SVG separately from the NFT slug. Telegram's
     # in-app browser honors the immutable cache header very aggressively, so
     # a renderer/layout adjustment must never reuse an older theme bitmap.
-    return f"/nft/theme?slug={urlencode({'value': slug})[6:]}&v=opt62"
+    return f"/nft/theme?slug={urlencode({'value': slug})[6:]}&v=opt66"
 
 
 def add_nft_preview_path(record: dict) -> dict:
@@ -3066,7 +3066,10 @@ async def fetch_telegram_theme_bytes(source_url: str) -> bytes:
             # above the lower edge of our square crop. Wrap the clipped top
             # row to the bottom instead of moving the whole pattern downward.
             if raw_y <= 18.0:
-                wrapped_y = raw_y + 232.0
+                # Keep the wrapped bottom row, but leave a full glyph-sized
+                # gap from Telegram's last native row.  At +232 the two
+                # centre symbols nearly touched on every collectible.
+                wrapped_y = raw_y + 248.0
                 pattern_uses.append(
                     f'<g transform="translate({x:g},{wrapped_y:g})" opacity="{opacity:g}">'
                     f'<use href="#giftPattern" transform="scale({scale:g})"/></g>'
@@ -3194,6 +3197,16 @@ async def warm_nft_media_cache():
             continue
         seen_sources.add(source_url)
         sources.append((source_url, int(row["id"])))
+    # Case links are intentionally hidden from the public JSON, but their
+    # metadata/TGS bytes can still be warmed server-side.  This removes the
+    # first-open Telegram round trip without exposing a source URL.
+    for case_id, case in CASES_CACHE.items():
+        for drop_index, drop in enumerate(case.get("drops") or []):
+            source_url = canonical_telegram_nft_url(drop.get("nft_link"))
+            if not source_url or source_url in seen_sources:
+                continue
+            seen_sources.add(source_url)
+            sources.append((source_url, -(int(case_id) * 1000 + drop_index + 1)))
     if sources:
         # Render and Telegram both throttle large bursts. Warm in small batches
         # so startup never turns hundreds of valid gifts into cached failures.
@@ -3277,12 +3290,14 @@ async def handle_get_inventory(request):
             )
             item['sell_value'] = item.get('price', 0)
             item['withdraw_remaining_seconds'] = int(item.get('withdraw_remaining_seconds') or 0)
-        media = await asyncio.gather(*(
-            fetch_telegram_nft_media(canonical_telegram_nft_url(item.get("nft_link")), int(item["id"]))
-            for item in items
-        ), return_exceptions=True)
-        for item, descriptor in zip(items, media):
-            apply_telegram_link_metadata(item, descriptor if isinstance(descriptor, dict) else None)
+        # Inventory JSON must never wait for Telegram.  Signed same-origin
+        # asset paths are already present, while a warm descriptor is applied
+        # opportunistically and cold metadata upgrades in the background on
+        # the client exactly like the fast catalogue path.
+        for item in items:
+            source_url = canonical_telegram_nft_url(item.get("nft_link"))
+            descriptor = get_cached_telegram_nft_media(source_url, int(item["id"]))
+            apply_telegram_link_metadata(item, descriptor)
             apply_case_inventory_presentation(item)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
