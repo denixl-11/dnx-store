@@ -52,7 +52,8 @@ STAR_MIN_TOPUP = int(os.getenv("STAR_MIN_TOPUP", "10"))
 STAR_MAX_TOPUP = int(os.getenv("STAR_MAX_TOPUP", "10000"))
 STAR_MIN_BET = Decimal(os.getenv("STAR_MIN_BET", "10"))
 STAR_BET_STEP = Decimal(os.getenv("STAR_BET_STEP", "10"))
-REFERRAL_RATE = Decimal("0.10")
+STANDARD_REFERRAL_RATE = Decimal("0.10")
+PARTNER_REFERRAL_RATE = Decimal("0.20")
 REFERRAL_CODE_LENGTH = 25
 REFERRAL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 BOT_USERNAME = os.getenv("BOT_USERNAME", "").strip().lstrip("@")
@@ -125,7 +126,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.70"
+API_RELEASE = "8.9-opt.71"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -309,7 +310,7 @@ async def credit_main_deposit(
     source_type: str,
     source_id: str,
 ) -> Decimal:
-    """Credit a real deposit and award its one-time 10% referral bonus."""
+    """Credit a real deposit and award its referrer a one-time referral bonus."""
     deposit_amount = floor_stars(amount)
     result = await conn.execute(
         "UPDATE users SET balance = balance + $1 WHERE id = $2",
@@ -328,10 +329,23 @@ async def credit_main_deposit(
         metadata={"source": source_type, "source_id": source_id},
     )
 
-    referrer_id = await conn.fetchval("SELECT referred_by FROM users WHERE id = $1", user_id)
-    if not referrer_id:
+    referral = await conn.fetchrow(
+        """
+        SELECT referred_by AS referrer_id,
+               COALESCE(
+                   (SELECT reff FROM users referrer WHERE referrer.id = users.referred_by),
+                   FALSE
+               ) AS partner_referrer
+        FROM users
+        WHERE id = $1
+        """,
+        user_id,
+    )
+    if not referral or not referral["referrer_id"]:
         return Decimal("0")
-    reward = floor_stars(deposit_amount * REFERRAL_RATE)
+    referrer_id = referral["referrer_id"]
+    referral_rate = PARTNER_REFERRAL_RATE if referral["partner_referrer"] else STANDARD_REFERRAL_RATE
+    reward = floor_stars(deposit_amount * referral_rate)
     if reward <= 0:
         return Decimal("0")
     inserted = await conn.fetchval(
@@ -560,13 +574,27 @@ async def log_database_audit(pool: asyncpg.Pool) -> None:
                WHERE table_schema = current_schema() AND table_name = 'items'
                ORDER BY ordinal_position"""
         )
+        game_data = await conn.fetchrow(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM game_history) AS history_rows,
+                (SELECT COUNT(*) FROM leaderboard) AS leaderboard_rows,
+                (SELECT COUNT(*) FROM active_game_bets) AS wager_rows,
+                (SELECT last_game_number FROM game_counter WHERE id = 1) AS game_number
+            """
+        )
     names = [row["column_name"] for row in columns]
     logging.info(
-        "DNX database audit: release=%s database=%s schema=%s fingerprint=%s items_columns=%s",
+        "DNX database audit: release=%s database=%s schema=%s fingerprint=%s "
+        "game_history=%s leaderboard=%s wagers=%s game_number=%s items_columns=%s",
         API_RELEASE,
         identity["database"],
         identity["schema"],
         identity["fingerprint"],
+        game_data["history_rows"],
+        game_data["leaderboard_rows"],
+        game_data["wager_rows"],
+        game_data["game_number"],
         ",".join(names),
     )
     required = {"id", "name", "model", "pattern", "background"}
@@ -632,7 +660,7 @@ async def init_db():
                 # Keep the migration marker in sync with durable schema
                 # additions. Reusing the old opt.2 marker made upgraded
                 # databases return above before `active_game_bets` existed.
-                migration_version = "v8.9-opt.5-game-ledger"
+                migration_version = "v8.9-opt.71-partner-referrals"
                 if await conn.fetchval(
                     "SELECT 1 FROM dnx_schema_migrations WHERE version = $1",
                     migration_version,
@@ -652,6 +680,7 @@ async def init_db():
                         bonus_balance NUMERIC(20, 0) NOT NULL DEFAULT 0,
                         referral_code VARCHAR(25),
                         referred_by VARCHAR(255),
+                        reff BOOLEAN NOT NULL DEFAULT FALSE,
                         mut INTEGER,
                         ban BOOLEAN,
                         mut_until TIMESTAMPTZ
@@ -672,6 +701,10 @@ async def init_db():
                 await conn.execute("ALTER TABLE users ALTER COLUMN bonus_balance SET NOT NULL")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(25)")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by VARCHAR(255)")
+                await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reff BOOLEAN DEFAULT FALSE")
+                await conn.execute("UPDATE users SET reff = FALSE WHERE reff IS NULL")
+                await conn.execute("ALTER TABLE users ALTER COLUMN reff SET DEFAULT FALSE")
+                await conn.execute("ALTER TABLE users ALTER COLUMN reff SET NOT NULL")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS mut INTEGER")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS ban BOOLEAN")
                 await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS mut_until TIMESTAMPTZ")
@@ -2155,7 +2188,7 @@ async def handle_get_user(request):
                 await ensure_user(conn, user_id, username)
                 row = await conn.fetchrow(
                     """
-                    SELECT balance, bonus_balance, referral_code, mut, ban, mut_until,
+                    SELECT balance, bonus_balance, referral_code, reff, mut, ban, mut_until,
                            (SELECT COUNT(*) FROM users referred WHERE referred.referred_by = users.id) AS referrals_count,
                            (SELECT COALESCE(SUM(reward_amount), 0) FROM referral_rewards WHERE referrer_id = users.id) AS referral_earned
                     FROM users WHERE id = $1
@@ -2180,6 +2213,7 @@ async def handle_get_user(request):
         "referralLink": referral_link,
         "referralsCount": int(row["referrals_count"] or 0),
         "referralEarned": int(Decimal(str(row["referral_earned"] or 0)).to_integral_value(rounding=ROUND_FLOOR)),
+        "referralRate": 20 if row["reff"] else 10,
         "restriction": restriction,
     }, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 

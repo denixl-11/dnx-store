@@ -4371,8 +4371,8 @@
                 <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
             </div>
             <div class="referral-card">
-                <h3>РЕФЕРАЛЬНАЯ ПРОГРАММА · 10%</h3>
-                <p>Приглашайте новых пользователей и получайте 10% каждого их пополнения на бонусный баланс.</p>
+                <h3 id="referral-program-title">РЕФЕРАЛЬНАЯ ПРОГРАММА · 10%</h3>
+                <p id="referral-program-description">Приглашайте новых пользователей и получайте 10% каждого их пополнения на бонусный баланс.</p>
                 <div class="referral-stats">
                     <div class="referral-stat"><b id="referrals-count">0</b><span>РЕФЕРАЛОВ</span></div>
                     <div class="referral-stat"><b class="star-amount"><span id="referral-earned">0</span><span class="bonus-star" aria-hidden="true"></span></b><span>НАЧИСЛЕНО</span></div>
@@ -4759,7 +4759,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.70';
+        const EXPECTED_API_RELEASE = '8.9-opt.71';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -6419,6 +6419,9 @@
                     referralLink = data.referralLink || '';
                     document.getElementById('referrals-count').innerText = Number(data.referralsCount || 0).toLocaleString('ru-RU');
                     document.getElementById('referral-earned').innerText = formatStars(data.referralEarned || 0);
+                    const referralRate = Number(data.referralRate) === 20 ? 20 : 10;
+                    document.getElementById('referral-program-title').innerText = `РЕФЕРАЛЬНАЯ ПРОГРАММА · ${referralRate}%`;
+                    document.getElementById('referral-program-description').innerText = `Приглашайте новых пользователей и получайте ${referralRate}% каждого их пополнения на бонусный баланс.`;
                     if (data.restriction) activateAccountRestriction(data.restriction);
                     else if (accountRestriction) clearAccountRestriction();
                 } catch(e) { console.error('Balance update failed', e); }
