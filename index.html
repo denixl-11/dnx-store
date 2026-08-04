@@ -4073,8 +4073,8 @@
         }
         #page-game .game-top-actions .elite-leaderboard-bar {
             position: relative;
-            left: -4px;
-            width: calc(100% + 4px);
+            left: 0;
+            width: 100%;
             height: 56px;
             min-height: 56px;
             background-image: url('assets/reference-ui/leaderboard-crown-ranking.png') !important;
@@ -4136,7 +4136,7 @@
             height: 50px;
             min-height: 50px;
             border-radius: 14px;
-            transform: translateX(3px);
+            transform: none;
             background-image: url('assets/reference-ui/history-frame-rounded.png') !important;
             background-size: 112% 112% !important;
             background-position: center !important;
@@ -4241,6 +4241,46 @@
             #page-game .game-top-actions .history-btn { width: 44px; height: 44px; min-height: 44px; }
         }
 
+        /* Safe first-paint catalogue manifest: media only, never stale prices
+           or actionable controls. Fresh /items data replaces these cards. */
+        #catalog-container .catalog-visual-preview-card { pointer-events: none; }
+        #catalog-container .catalog-instant-frame {
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+            background: #242424;
+        }
+        #catalog-container .catalog-instant-frame > img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+        }
+        #catalog-container .catalog-instant-frame-placeholder {
+            width: 70%;
+            height: 70%;
+            border-radius: 18%;
+            background: linear-gradient(105deg, #2a2630 20%, #413548 48%, #2a2630 76%);
+            background-size: 220% 100%;
+            animation: catalogPreviewPulse 1.25s ease-in-out infinite;
+        }
+        #catalog-container .catalog-preview-actions {
+            display: grid;
+            grid-template-columns: 1fr 38px;
+            gap: 7px;
+        }
+        #catalog-container .catalog-preview-actions i {
+            display: block;
+            min-height: 36px;
+            border: 1px solid rgba(173, 75, 181, .20);
+            border-radius: 10px;
+            background: rgba(39, 23, 42, .55);
+        }
+        @keyframes catalogPreviewPulse {
+            0%,100% { background-position: 100% 0; opacity: .70; }
+            50% { background-position: 0 0; opacity: 1; }
+        }
+
         /* Full-width leaderboard artwork with a separate back control. */
         .leaderboard-fullscreen .leaderboard-top {
             position: relative;
@@ -4268,10 +4308,10 @@
             background-image: url('assets/reference-ui/leaderboard-screen-banner.png');
             background-repeat: no-repeat;
             background-size: 100% auto;
-            background-position: center 30%;
+            background-position: center 38%;
         }
         .leaderboard-fullscreen .leaderboard-heading::before {
-            content: "";
+            content: none;
             position: absolute;
             z-index: 1;
             inset: 0 0 auto;
@@ -4312,10 +4352,15 @@
             background: linear-gradient(145deg, rgba(41, 11, 58, .94), rgba(8, 2, 14, .98)) !important;
             color: #fff0ff !important;
             box-shadow: inset 0 1px rgba(255,255,255,.10), 0 0 12px rgba(196, 57, 255, .20) !important;
+            display: grid !important;
+            place-items: center !important;
+            line-height: 0;
         }
         .leaderboard-fullscreen .leaderboard-close svg {
+            display: block;
             width: 19px;
             height: 19px;
+            transform: translateX(-1.5px);
             stroke: currentColor;
             filter: drop-shadow(0 0 4px rgba(244, 138, 255, .8));
         }
@@ -4326,8 +4371,206 @@
         }
         @media (max-width: 430px) {
             .leaderboard-fullscreen .leaderboard-heading {
-                left: calc(-12px - var(--content-safe-left));
+                left: 0;
             }
+        }
+
+        /* ===== Premium season leaderboard, matched to the supplied reference ===== */
+        .leaderboard-fullscreen {
+            --leaderboard-visible-frame-left: 1.62%;
+            --leaderboard-visible-frame-right: 1.04%;
+            box-sizing: border-box;
+            padding: calc(14px + var(--content-safe-top)) calc(12px + var(--content-safe-right)) calc(24px + var(--content-safe-bottom)) calc(12px + var(--content-safe-left)) !important;
+            scrollbar-width: none;
+            background:
+                radial-gradient(circle at 52% 20%, rgba(104, 31, 133, .15), transparent 32%),
+                radial-gradient(circle at 88% 58%, rgba(153, 18, 100, .09), transparent 36%),
+                #020106 !important;
+        }
+        .leaderboard-fullscreen::-webkit-scrollbar { display: none; }
+        body.leaderboard-open { overflow: hidden !important; }
+        .leaderboard-fullscreen .leaderboard-top {
+            width: 100%;
+            margin-bottom: 18px !important;
+            padding-top: 50px !important;
+        }
+        .leaderboard-fullscreen .leaderboard-heading {
+            left: 0;
+            width: 100%;
+            aspect-ratio: 1916 / 370;
+            border-radius: 0;
+            background-position: center 38%;
+            filter: drop-shadow(0 0 9px rgba(232, 60, 255, .11));
+        }
+        .leaderboard-fullscreen .leaderboard-close {
+            top: 4px;
+            left: 0;
+            width: 42px !important;
+            height: 42px !important;
+            min-width: 42px;
+            min-height: 42px;
+            border-color: rgba(193, 75, 210, .42) !important;
+            background: radial-gradient(circle at 35% 30%, rgba(95, 35, 115, .72), rgba(13, 5, 21, .98) 72%) !important;
+            box-shadow: inset 0 1px rgba(255,255,255,.09), 0 0 16px rgba(181, 55, 229, .18) !important;
+        }
+        .leaderboard-fullscreen .season-timer {
+            position: relative;
+            isolation: isolate;
+            width: calc(100% - var(--leaderboard-visible-frame-left) - var(--leaderboard-visible-frame-right));
+            min-height: 58px;
+            box-sizing: border-box;
+            margin: 0 var(--leaderboard-visible-frame-right) 18px var(--leaderboard-visible-frame-left) !important;
+            padding: 9px 16px !important;
+            align-items: center;
+            justify-content: center;
+            gap: 11px;
+            overflow: hidden;
+            border: 1px solid rgba(220, 63, 179, .44) !important;
+            border-radius: 16px !important;
+            color: #fff1fb;
+            background:
+                linear-gradient(105deg, rgba(25, 7, 37, .82), rgba(46, 8, 33, .68)),
+                url('cosmic-bg.png') center 70% / 145% auto no-repeat !important;
+            box-shadow: inset 0 1px rgba(255,255,255,.07), 0 8px 22px rgba(0,0,0,.26), 0 0 16px rgba(222, 43, 177, .08) !important;
+        }
+        .leaderboard-fullscreen .season-timer::after {
+            content: "";
+            position: absolute;
+            z-index: -1;
+            inset: 0;
+            background: radial-gradient(circle at 12% 50%, rgba(220, 74, 255, .14), transparent 30%), radial-gradient(circle at 92% 70%, rgba(255, 25, 119, .12), transparent 34%);
+            pointer-events: none;
+        }
+        .season-timer-premium-icon {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            overflow: hidden;
+            border-radius: 50%;
+            background-image: url('assets/reference-ui/season-hourglass-transparent.png?v=3');
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: center;
+            filter: saturate(1.22) contrast(1.12) drop-shadow(0 0 7px rgba(237, 90, 255, .52));
+        }
+        .leaderboard-fullscreen .season-timer-text {
+            color: #fff0fb;
+            font-size: clamp(.72rem, 3.1vw, .88rem);
+            font-weight: 800;
+            letter-spacing: .01em;
+            text-shadow: 0 0 10px rgba(235, 92, 255, .22);
+        }
+        .leaderboard-fullscreen .leaderboard-list {
+            width: calc(100% - var(--leaderboard-visible-frame-left) - var(--leaderboard-visible-frame-right));
+            margin-left: var(--leaderboard-visible-frame-left);
+            margin-right: var(--leaderboard-visible-frame-right);
+            gap: 13px !important;
+        }
+        .leaderboard-fullscreen .leaderboard-row {
+            position: relative;
+            isolation: isolate;
+            width: 100%;
+            min-height: 82px !important;
+            box-sizing: border-box;
+            grid-template-columns: 68px minmax(0, 1fr) 50px 56px !important;
+            gap: 10px !important;
+            padding: 9px 12px 9px 8px !important;
+            overflow: hidden;
+            border: 1px solid rgba(220, 62, 184, .46) !important;
+            border-radius: 16px !important;
+            background:
+                linear-gradient(100deg, rgba(10, 4, 19, .74), rgba(26, 5, 29, .72)),
+                url('cosmic-bg.png') center 70% / 145% auto no-repeat !important;
+            box-shadow: inset 0 1px rgba(255,255,255,.05), 0 7px 20px rgba(0,0,0,.25) !important;
+        }
+        .leaderboard-fullscreen .leaderboard-row::before { content: none !important; }
+        #nft-detail-overlay { z-index: 3100; }
+        #nft-modal-actions[hidden] { display: none !important; }
+        .leaderboard-fullscreen .leaderboard-row::after {
+            content: "";
+            position: absolute;
+            z-index: -1;
+            inset: 0;
+            background: linear-gradient(90deg, transparent 40%, rgba(213, 47, 246, .05), rgba(255, 33, 130, .06));
+            pointer-events: none;
+        }
+        .leaderboard-fullscreen .leaderboard-rank {
+            grid-column: 1;
+            width: 66px !important;
+            height: 66px;
+            align-self: center;
+            background-image: none;
+            background-repeat: no-repeat;
+            background-size: contain;
+            background-position: center;
+            background-color: transparent;
+            border-radius: 50%;
+            mix-blend-mode: normal;
+            filter: drop-shadow(0 0 7px rgba(231, 66, 255, .27));
+        }
+        .leaderboard-fullscreen .rank-1 .leaderboard-rank { background-image: url('assets/reference-ui/leaderboard-rank-1-transparent.png?v=4'); }
+        .leaderboard-fullscreen .rank-2 .leaderboard-rank { background-image: url('assets/reference-ui/leaderboard-rank-2-transparent.png?v=4'); }
+        .leaderboard-fullscreen .rank-3 .leaderboard-rank { background-image: url('assets/reference-ui/leaderboard-rank-3-transparent.png?v=4'); }
+        .leaderboard-fullscreen .leaderboard-rank > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+        .leaderboard-fullscreen .leaderboard-person { grid-column: 2; gap: 5px; }
+        .leaderboard-fullscreen .leaderboard-name {
+            color: #fff8fd;
+            font-size: clamp(.82rem, 3.4vw, 1rem);
+            font-weight: 780;
+            text-shadow: 0 0 8px rgba(255,255,255,.08);
+        }
+        .leaderboard-fullscreen .leaderboard-wins {
+            grid-column: 3;
+            color: #e847dd !important;
+            font-size: clamp(1.12rem, 5.8vw, 1.55rem) !important;
+            font-weight: 500;
+            font-style: italic;
+            line-height: 1;
+            text-shadow: 0 0 10px rgba(238, 50, 218, .36);
+        }
+        .leaderboard-fullscreen .leaderboard-nft {
+            grid-column: 4;
+            width: 54px !important;
+            height: 54px !important;
+            border: 1px solid rgba(211, 76, 244, .34) !important;
+            border-radius: 12px !important;
+            background: #160b1d;
+            box-shadow: 0 0 12px rgba(209, 53, 239, .13);
+        }
+        .leaderboard-fullscreen .leaderboard-row.user-summary-row {
+            grid-template-columns: 48px minmax(0, 1fr) auto !important;
+        }
+        .leaderboard-fullscreen .leaderboard-row.user-summary-row .leaderboard-rank {
+            width: 44px !important;
+            height: auto;
+            display: grid;
+            place-items: center;
+            background: none;
+            mix-blend-mode: normal;
+            filter: none;
+            color: #ff69bd !important;
+        }
+        .leaderboard-fullscreen .leaderboard-row.user-summary-row .leaderboard-rank > span {
+            position: static;
+            width: auto;
+            height: auto;
+            overflow: visible;
+            clip: auto;
+        }
+        .leaderboard-fullscreen .leaderboard-row.user-summary-row .leaderboard-wins {
+            grid-column: 3;
+            color: #d9c5da !important;
+            font-size: .72rem !important;
+            font-style: normal;
+        }
+        @media (max-width: 360px) {
+            .leaderboard-fullscreen .leaderboard-row {
+                grid-template-columns: 58px minmax(0, 1fr) 42px 48px !important;
+                gap: 7px !important;
+                min-height: 74px !important;
+            }
+            .leaderboard-fullscreen .leaderboard-rank { width: 56px !important; height: 56px; }
+            .leaderboard-fullscreen .leaderboard-nft { width: 46px !important; height: 46px !important; }
         }
     </style>
 </head>
@@ -4625,14 +4868,7 @@
             </button>
         </div>
         <div class="season-timer" id="season-timer-display">
-            <svg class="season-timer-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <defs>
-                    <linearGradient id="seasonHourglassGradient" x1="5" y1="3" x2="19" y2="21"><stop stop-color="#f3a2ff"/><stop offset="1" stop-color="#b94bff"/></linearGradient>
-                    <linearGradient id="seasonSandGradient" x1="9" y1="7" x2="15" y2="18"><stop stop-color="#ffb2df"/><stop offset="1" stop-color="#c85cff"/></linearGradient>
-                </defs>
-                <path class="hourglass-frame" d="M7 3h10M7 21h10M8 4c0 4 1.7 5.3 4 7 2.3-1.7 4-3 4-7M8 20c0-4 1.7-5.3 4-7 2.3 1.7 4 3 4 7"/>
-                <path class="hourglass-sand" d="M9.5 7h5c-.45 1.25-1.28 2.07-2.5 3-1.22-.93-2.05-1.75-2.5-3Zm2.5 8.05c1.32.97 2.18 1.83 2.58 3.15H9.42c.4-1.32 1.26-2.18 2.58-3.15Z"/>
-            </svg>
+            <span class="season-timer-premium-icon" aria-hidden="true"></span>
             <span class="season-timer-text" id="season-timer-text">Загрузка...</span>
         </div>
         <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
@@ -4841,7 +5077,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.72';
+        const EXPECTED_API_RELEASE = '8.9-opt.73';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -5062,6 +5298,7 @@
         let catalogRenderedSignature = '';
         let catalogLoadedAt = 0;
         let catalogRequest = null;
+        const CATALOG_VISUAL_MANIFEST_KEY = 'dnx_catalog_visual_manifest_v1';
         let balanceRequest = null;
         let inventoryRequest = null;
         let cartRenderToken = 0;
@@ -6541,6 +6778,73 @@
             } catch (_) {}
         }
 
+        function catalogVisualManifestItem(item) {
+            const id = Number(item?.id || 0);
+            const nftLink = safeTelegramUrl(item?.nft_link);
+            if (!id || !nftLink) return null;
+            const media = item?.nft_media && typeof item.nft_media === 'object'
+                ? item.nft_media
+                : null;
+            return {
+                id,
+                name: String(item?.name || telegramCollectionNameFromUrl(nftLink) || 'NFT').slice(0, 160),
+                nft_link: nftLink,
+                nft_preview_path: String(item?.nft_preview_path || media?.previewPath || '').slice(0, 1024),
+                nft_asset_path: String(item?.nft_asset_path || media?.assetPath || '').slice(0, 1024),
+                nft_media_key: String(item?.nft_media_key || media?.sourceKey || '').slice(0, 64),
+                nft_media: media ? {
+                    animated: media.animated === true,
+                    assetPath: String(media.assetPath || item?.nft_asset_path || '').slice(0, 1024),
+                    previewPath: String(media.previewPath || item?.nft_preview_path || '').slice(0, 1024),
+                    themePath: String(media.themePath || '').slice(0, 1024),
+                    sourceKey: String(media.sourceKey || item?.nft_media_key || '').slice(0, 64),
+                    colors: Array.isArray(media.colors) ? media.colors.slice(0, 2) : undefined,
+                    descriptorReady: media.descriptorReady === true
+                } : undefined
+            };
+        }
+
+        function persistCatalogVisualManifest(items) {
+            try {
+                const safeItems = (Array.isArray(items) ? items : [])
+                    .map(catalogVisualManifestItem)
+                    .filter(Boolean)
+                    .slice(0, 2000);
+                localStorage.setItem(CATALOG_VISUAL_MANIFEST_KEY, JSON.stringify({
+                    savedAt: Date.now(),
+                    items: safeItems
+                }));
+            } catch (_) {}
+        }
+
+        function renderCatalogVisualManifest(items) {
+            const container = document.getElementById('catalog-container');
+            if (!container || currentCatalog.length || container.dataset.catalogRendered === 'true') return;
+            const safeItems = (Array.isArray(items) ? items : []).map(catalogVisualManifestItem).filter(Boolean);
+            if (!safeItems.length) return;
+            safeItems.forEach(item => seedItemNftMedia(item, false));
+            container.innerHTML = safeItems.map(item => {
+                const preview = safeNftPreviewUrl(item.nft_preview_path || item.nft_media?.previewPath);
+                const title = escapeHtml(item.name || 'NFT');
+                return `<div class="item-card catalog-visual-preview-card" data-item-id="${item.id}" aria-busy="true">
+                    <div class="item-image catalog-instant-frame" aria-label="${title}">
+                        ${preview ? `<img src="${escapeHtml(preview)}" alt="${title}" loading="eager" decoding="async" fetchpriority="high">` : '<span class="catalog-instant-frame-placeholder"></span>'}
+                    </div>
+                    <div class="item-name">${title}</div>
+                    <div class="catalog-preview-actions" aria-hidden="true"><i></i><i></i></div>
+                </div>`;
+            }).join('');
+            container.dataset.catalogPreview = 'true';
+        }
+
+        function restoreCatalogVisualManifest() {
+            try {
+                const cached = JSON.parse(localStorage.getItem(CATALOG_VISUAL_MANIFEST_KEY) || 'null');
+                if (!cached || !Array.isArray(cached.items)) return;
+                renderCatalogVisualManifest(cached.items);
+            } catch (_) {}
+        }
+
         function syncCatalogUi() {
             catalogCollectionNames = [...new Set(currentCatalog.map(item => String(item?.name || '').trim()).filter(Boolean))]
                 .sort((a, b) => a.localeCompare(b, 'ru'));
@@ -6702,6 +7006,7 @@
                         .then(items => {
                             currentCatalog = Array.isArray(items) ? items : [];
                             seedNftMediaFromItems(currentCatalog);
+                            persistCatalogVisualManifest(currentCatalog);
                             cart = cart.map(cartItem => {
                                 const freshItem = currentCatalog.find(item => Number(item.id) === Number(cartItem.id));
                                 return freshItem ? { ...cartItem, ...freshItem } : cartItem;
@@ -6775,6 +7080,7 @@
                 container.appendChild(empty);
                 catalogRenderedSignature = signature;
                 container.dataset.catalogRendered = 'true';
+                delete container.dataset.catalogPreview;
             }
             currentCatalog.forEach(item => {
                 const media = item?.nft_media || nftMediaCache.get(Number(item.id))?.data;
@@ -6942,11 +7248,11 @@
             } catch (_) {}
         }
 
-        function renderNftModalItem(item, isInventoryContext, resetMedia = false) {
+        function renderNftModalItem(item, isInventoryContext, resetMedia = false, previewOnly = false) {
             // The caller's explicit context is authoritative for controls.
             // Server data may arrive later, but it must never make controls
             // from the other mode flash for even a single rendered frame.
-            const isShopItem = !isInventoryContext;
+            const isShopItem = !isInventoryContext && !previewOnly;
             const isCaseOrigin = isInventoryContext && isCaseOriginItem(item);
             currentNftItem = item;
             const modalMedia = document.getElementById('nft-modal-media');
@@ -7072,8 +7378,25 @@
             const withdrawBtn = document.getElementById('nft-modal-btn-withdraw');
             const sellBtn = document.getElementById('nft-modal-btn-sell');
             const actions = document.getElementById('nft-modal-actions');
+            actions.hidden = previewOnly;
+            if (previewOnly) {
+                actions.dataset.mode = 'preview';
+                actions.classList.remove('inventory-actions');
+                buyBtn.hidden = true;
+                cartBtn.hidden = true;
+                withdrawBtn.hidden = true;
+                sellBtn.hidden = true;
+                buyBtn.style.display = 'none';
+                cartBtn.style.display = 'none';
+                withdrawBtn.style.display = 'none';
+                sellBtn.style.display = 'none';
+            } else {
+                actions.hidden = false;
+            }
             actions.dataset.mode = isShopItem ? 'catalog' : 'inventory';
-            if (isShopItem) {
+            if (previewOnly) {
+                actions.dataset.mode = 'preview';
+            } else if (isShopItem) {
                 actions.classList.remove('inventory-actions');
                 buyBtn.hidden = false;
                 cartBtn.hidden = false;
@@ -7932,33 +8255,63 @@
             } catch(e) { list.innerHTML = 'Ошибка загрузки'; }
         }
 
+        const PRIZE_MEDIA_ID_BASE = 900000000;
         let currentPrizeItems = [];
+        let currentPrizeItem = null;
+        function normalizePrizeItem(item) {
+            const prizeId = Number(item?.prize_id || item?.id || 0);
+            const mediaItem = {
+                ...item,
+                prize_id: prizeId,
+                id: PRIZE_MEDIA_ID_BASE + prizeId,
+                is_shop_item: false,
+                acquisition_source: 'leaderboard_prize'
+            };
+            if (mediaItem.nft_media?.animated) {
+                mediaItem.nft_media = { ...mediaItem.nft_media, descriptorReady: true };
+            }
+            return mediaItem;
+        }
         async function loadPrizeItems() {
             try {
-                currentPrizeItems = await apiFetch(`${API_BASE}/prize/items`);
+                const items = await apiFetch(`${API_BASE}/prize/items`);
+                currentPrizeItems = (Array.isArray(items) ? items : []).map(normalizePrizeItem);
+                currentPrizeItems.forEach(item => seedItemNftMedia(item, false));
             } catch(e) { currentPrizeItems = []; }
         }
-        function openPrizeModal() {
+        async function openPrizeModal() {
             if (!currentPrizeItem) return;
-            document.getElementById('prize-modal-img').src = safeImageUrl(currentPrizeItem.image_url);
-            document.getElementById('prize-modal-title').innerText = currentPrizeItem.name;
-            document.getElementById('prize-modal-number').innerText = currentPrizeItem.number ? `#${currentPrizeItem.number}` : '';
-            let traits = currentPrizeItem.traits || [];
-            if (typeof traits === 'string') { try { traits = JSON.parse(traits); } catch(e) { traits = []; } }
-            document.getElementById('prize-modal-traits').innerHTML = traits.length ?
-                `<div class="traits-table">${traits.map(t => `<div class="trait-row"><div class="trait-name">${escapeHtml(t.label || t.name || '—')}</div><div class="trait-value">${escapeHtml(t.value || '—')}</div></div>`).join('')}</div>` :
-                '<p style="color:var(--text-muted);">Нет характеристик</p>';
-            const tgBtn = document.getElementById('prize-tg-link-btn');
-            const prizeLink = safeTelegramUrl(currentPrizeItem.nft_link);
-            if (prizeLink) {
-                tgBtn.style.display = 'flex';
-                tgBtn.onclick = (e) => { e.stopPropagation(); tg.openTelegramLink(prizeLink); };
-            } else tgBtn.style.display = 'none';
-            document.getElementById('prize-detail-overlay').classList.add('active');
+            const openedPrizeId = Number(currentPrizeItem.prize_id || 0);
+            const immediateItem = { ...currentPrizeItem };
+            seedItemNftMedia(immediateItem, false);
+            document.getElementById('nft-detail-overlay').classList.add('active');
+            nftTapFeedback();
+            nftModalPriorityActive = true;
+            cancelBackgroundPosterRenders();
+            deactivateNftMedia(document.getElementById('nft-modal-media'));
+            try { window.RLottie?.destroyWorkers?.(); } catch (_) {}
+            renderNftModalItem(immediateItem, false, true, true);
+
+            try {
+                const fresh = normalizePrizeItem(await apiFetch(
+                    `${API_BASE}/prize/item?id=${encodeURIComponent(openedPrizeId)}&_=${Date.now()}`
+                ));
+                if (!document.getElementById('nft-detail-overlay')?.classList.contains('active')
+                    || Number(currentPrizeItem?.prize_id || 0) !== openedPrizeId) return;
+                const index = currentPrizeItems.findIndex(item => Number(item.prize_id) === openedPrizeId);
+                if (index >= 0) currentPrizeItems[index] = fresh;
+                currentPrizeItem = fresh;
+                seedItemNftMedia(fresh, false);
+                renderNftModalItem(fresh, false, false, true);
+            } catch (error) {
+                console.warn('Fresh leaderboard prize read failed; keeping cached Telegram data', error);
+            }
         }
         function closePrizeModal(event) {
             if (event && event.target !== document.getElementById('prize-detail-overlay') && event.target.id !== 'prize-detail-overlay') return;
             document.getElementById('prize-detail-overlay').classList.remove('active');
+            closeNftModal(true);
+            currentPrizeItem = null;
         }
 
         function formatLeaderboardRank(rank) {
@@ -7982,6 +8335,7 @@
         }
         let seasonTimerInterval = null;
         async function openLeaderboardModal() {
+            document.body.classList.add('leaderboard-open');
             document.getElementById('leaderboard-modal').classList.add('active');
             if (currentPrizeItems.length === 0) await loadPrizeItems();
             currentPrizeItem = currentPrizeItems.length > 0 ? currentPrizeItems[0] : null;
@@ -7994,13 +8348,13 @@
                         const prizeItem = currentPrizeItems[idx] || null;
                         html += `
                             <div class="leaderboard-row rank-${idx + 1}${p.isYou ? ' you-row' : ''}">
-                                <div class="leaderboard-rank">#${idx+1}</div>
+                                <div class="leaderboard-rank" aria-label="${idx + 1} место"><span>#${idx+1}</span></div>
                                 <div class="leaderboard-person">
                                     <div class="leaderboard-name">${escapeHtml(p.username)}</div>
                                     ${p.isYou ? '<span class="leaderboard-you">ВЫ</span>' : ''}
                                 </div>
-                                <div class="leaderboard-wins">${p.wins} поб.</div>
-                                ${prizeItem ? `<img class="leaderboard-nft" src="${escapeHtml(safeImageUrl(prizeItem.image_url))}" onclick="event.stopPropagation(); currentPrizeItem=currentPrizeItems[${idx}]; openPrizeModal()" />` : ''}
+                                <div class="leaderboard-wins" aria-label="${Number(p.wins) || 0} побед">#${idx+1}</div>
+                                ${prizeItem ? `<img class="leaderboard-nft" src="${escapeHtml(safeNftPreviewUrl(prizeItem.nft_preview_path || prizeItem.nft_media?.previewPath))}" alt="${escapeHtml(prizeItem.name || 'NFT')}" loading="eager" decoding="async" onclick="event.stopPropagation(); currentPrizeItem=currentPrizeItems[${idx}]; openPrizeModal()" onerror="this.style.visibility='hidden'" />` : ''}
                             </div>`;
                     });
                 }
@@ -8021,6 +8375,7 @@
             } catch(e) { document.getElementById('leaderboard-list').innerHTML = 'Ошибка загрузки'; }
         }
         function closeLeaderboardModal() {
+            document.body.classList.remove('leaderboard-open');
             document.getElementById('leaderboard-modal').classList.remove('active');
             if (seasonTimerInterval) { clearInterval(seasonTimerInterval); seasonTimerInterval = null; }
         }
@@ -9851,6 +10206,7 @@
         updateCartFab();
         updateBalance();
         clearLegacyCatalogSnapshots();
+        restoreCatalogVisualManifest();
         loadCatalog(true);
         const prewarmCasesInBackground = () => {
             getCases().then(cases => prefetchCaseDetails(cases)).catch(() => {});

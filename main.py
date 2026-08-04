@@ -16,6 +16,7 @@ import zlib
 from collections import OrderedDict, defaultdict, deque
 from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR
 from functools import wraps
+from html import escape as html_escape
 from html.parser import HTMLParser
 from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 from datetime import date, datetime, timezone
@@ -126,7 +127,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.72"
+API_RELEASE = "8.9-opt.73"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -3561,13 +3562,39 @@ async def handle_request_withdraw(request):
                     metadata={"item_id": item_id, "expires_at": item['withdraw_expires_at'].isoformat()},
                 )
         admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="❌ Отклонить", callback_data=f"with_no_{user_id}_{item_id}"),
-            InlineKeyboardButton(text="✅ Вывести", callback_data=f"with_yes_{user_id}_{item_id}")
+            InlineKeyboardButton(text="ОТКЛОНИТЬ", callback_data=f"with_no_{user_id}_{item_id}"),
+            InlineKeyboardButton(text="ПОДТВЕРДИТЬ", callback_data=f"with_yes_{user_id}_{item_id}")
         ]])
         try:
+            safe_username = html_escape(str(username or "").lstrip("@"))
+            user_label = f"@{safe_username}" if safe_username else "<i>username не указан</i>"
+            safe_item_name = html_escape(str(item['name'] or 'NFT'))
+            safe_nft_link = html_escape(canonical_telegram_nft_url(item['nft_link']), quote=True)
+            nft_line = (
+                f'<a href="{safe_nft_link}">{safe_item_name}</a>'
+                if safe_nft_link else safe_item_name
+            )
+            admin_message = (
+                "✨ <b>DNX STORE · ЗАПРОС НА ВЫВОД</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "\n"
+                "👤 <b>ПОЛЬЗОВАТЕЛЬ</b>\n"
+                f"{user_label}\n"
+                f"<code>ID: {int(user_id)}</code>\n"
+                "\n"
+                "🎁 <b>КОЛЛЕКЦИОННЫЙ NFT</b>\n"
+                f"{nft_line}\n"
+                f"<code>Item ID: {int(item['id'])}</code>\n"
+                "\n"
+                "⏳ <b>СТАТУС</b>\n"
+                "Ожидает решения · окно обработки 2 часа\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                "Выберите действие ниже"
+            )
             await bot.send_message(
                 ADMIN_ID,
-                f"📤 **Запрос на вывод**\n👤 @{username} (ID: {user_id})\n📦 {item['name']} (ID: {item['id']})\n🔗 {item['nft_link']}",
+                admin_message,
+                parse_mode="HTML",
                 reply_markup=admin_kb,
                 disable_web_page_preview=True,
             )
@@ -3933,12 +3960,74 @@ async def handle_season_state(request):
 @require_auth
 async def handle_get_prize_items(request):
     try:
-        rows = await get_pool().fetch("SELECT id, name, image_url, nft_link, traits FROM prize_items ORDER BY id")
+        # Prize presentation is derived exclusively from the Telegram NFT
+        # link.  image_url/name/traits may be empty or even removed from the
+        # table without breaking the leaderboard.
+        rows = await get_pool().fetch(
+            """SELECT id, nft_link
+               FROM prize_items
+               WHERE COALESCE(nft_link, '') <> ''
+               ORDER BY id
+               LIMIT 3"""
+        )
         items = normalize_records(rows)
+        media_results = await asyncio.gather(*(
+            fetch_telegram_nft_media(
+                canonical_telegram_nft_url(item.get("nft_link")),
+                -(100000 + int(item["id"])),
+            )
+            for item in items
+        ), return_exceptions=True)
+        for item, media in zip(items, media_results):
+            add_nft_preview_path(item)
+            descriptor = media if isinstance(media, dict) else None
+            apply_telegram_link_metadata(item, descriptor)
+            slug = urlparse(canonical_telegram_nft_url(item.get("nft_link"))).path.rsplit("/", 1)[-1]
+            number_match = re.search(r"-(\d+)$", slug)
+            item["number"] = int(number_match.group(1)) if number_match else None
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Prize items error: {e}")
         return web.json_response([], status=500, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+
+
+@require_auth
+async def handle_get_prize_item(request):
+    try:
+        prize_id = int(request.query.get("id", "0"))
+    except (TypeError, ValueError):
+        prize_id = 0
+    if prize_id <= 0:
+        return web.json_response({"error": "invalid_prize_id"}, status=400)
+    try:
+        row = await get_pool().fetchrow(
+            "SELECT id, nft_link FROM prize_items WHERE id = $1",
+            prize_id,
+        )
+        if not row:
+            return web.json_response({"error": "prize_not_found"}, status=404)
+        item = normalize_records([row])[0]
+        add_nft_preview_path(item)
+        descriptor = await fetch_telegram_nft_media(
+            canonical_telegram_nft_url(item.get("nft_link")),
+            -(100000 + prize_id),
+        )
+        apply_telegram_link_metadata(item, descriptor)
+        slug = urlparse(canonical_telegram_nft_url(item.get("nft_link"))).path.rsplit("/", 1)[-1]
+        number_match = re.search(r"-(\d+)$", slug)
+        item["number"] = int(number_match.group(1)) if number_match else None
+        item["api_release"] = API_RELEASE
+        return web.json_response(
+            item,
+            headers={
+                "Access-Control-Allow-Origin": CORS_ORIGIN,
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+            },
+        )
+    except Exception as exc:
+        logging.error("Prize item %s error: %s", prize_id, exc)
+        return web.json_response({"error": "database_unavailable"}, status=503,
+                                 headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
 
 # ------------------------------------------------------------
 #  НОВЫЕ ЭНДПОИНТЫ КЕЙСОВ (используют CASES_CACHE)
@@ -4270,6 +4359,17 @@ async def parse_withdraw_callback(callback: types.CallbackQuery):
     return uid, int(item_id_text)
 
 
+def withdraw_admin_result_message(message: types.Message, *, approved: bool) -> str:
+    base = str(getattr(message, "html_text", "") or "").strip()
+    if not base:
+        base = html_escape(str(getattr(message, "text", "") or "").strip())
+    if approved:
+        result = "✅ <b>ВЫВОД ПОДТВЕРЖДЁН</b>\nЗаявка закрыта администратором."
+    else:
+        result = "❌ <b>ВЫВОД ОТКЛОНЁН</b>\nNFT возвращён пользователю в инвентарь."
+    return f"{base}\n\n━━━━━━━━━━━━━━━━━━\n{result}"
+
+
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
     if not await is_admin_callback(callback):
@@ -4308,7 +4408,11 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
         )
         await callback.answer("Запрос уже обработан или двухчасовое окно истекло", show_alert=True)
         return
-    await callback.message.edit_text(f"{callback.message.text}\n\n✅ **ВЫВОД ПОДТВЕРЖДЕН**")
+    await callback.message.edit_text(
+        withdraw_admin_result_message(callback.message, approved=True),
+        parse_mode="HTML",
+    )
+    await callback.answer("Вывод подтверждён")
     try:
         await bot.send_message(int(uid), f"🎉 NFT (ID: {item_id}) выведен!")
     except Exception:
@@ -4344,7 +4448,11 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
     if result != "UPDATE 1":
         await callback.answer("Запрос уже обработан", show_alert=True)
         return
-    await callback.message.edit_text(f"{callback.message.text}\n\n❌ **ВЫВОД ОТКЛОНЕН**")
+    await callback.message.edit_text(
+        withdraw_admin_result_message(callback.message, approved=False),
+        parse_mode="HTML",
+    )
+    await callback.answer("Вывод отклонён")
     try:
         await bot.send_message(int(uid), f"❌ Вывод NFT (ID: {item_id}) отклонён.")
     except Exception:
@@ -4597,6 +4705,7 @@ app.router.add_get('/game/history', handle_game_history)
 app.router.add_get('/leaderboard', handle_leaderboard)
 app.router.add_get('/season/state', handle_season_state)
 app.router.add_get('/prize/items', handle_get_prize_items)
+app.router.add_get('/prize/item', handle_get_prize_item)
 app.router.add_get('/cases', handle_get_cases)
 app.router.add_get('/case-details', handle_get_case_details)
 app.router.add_get('/case/nft-media', handle_case_nft_media)
