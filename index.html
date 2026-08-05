@@ -656,7 +656,7 @@
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
         }
         .history-modal-list { width: 100%; max-height: 300px; overflow-y: auto; }
         .history-modal-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; }
@@ -2415,6 +2415,8 @@
         .activity-strip.negative { --event-color:#ff4f87; }
         .activity-strip.bonus { --event-color:#c34dff; }
         .activity-strip.neutral { --event-color:#6e8eff; }
+        .activity-strip.withdraw-success { --event-color:#8dff9f; }
+        .activity-strip.withdraw-rejected { --event-color:#ff4b62; }
         .activity-icon { width: 38px; height: 38px; display:grid; place-items:center; border:1px solid rgba(211,85,255,.42); border:1px solid color-mix(in srgb,var(--event-color) 48%,transparent); border-radius:12px; color:#fff0f7; background:rgba(40,12,54,.88); background:linear-gradient(145deg,color-mix(in srgb,var(--event-color) 24%,rgba(24,8,38,.94)),rgba(7,3,14,.96)); box-shadow:inset 0 1px rgba(255,255,255,.11),0 7px 18px color-mix(in srgb,var(--event-color) 13%,transparent); }
         .activity-icon svg { width:21px; height:21px; display:block; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; filter:drop-shadow(0 0 5px color-mix(in srgb,var(--event-color) 58%,transparent)); }
         .activity-copy { min-width:0; }
@@ -4078,7 +4080,7 @@
             height: 56px;
             min-height: 56px;
             background-image: url('assets/reference-ui/leaderboard-crown-ranking.png') !important;
-            background-size: 100% 100% !important;
+            background-size: calc(100% + 6px) 100% !important;
             background-position: center !important;
         }
         #page-game .game-top-actions .elite-leaderboard-bar::before {
@@ -4106,8 +4108,10 @@
             content: none;
         }
         #page-game .game-top-actions .elite-score {
-            position: relative;
+            position: absolute;
             z-index: 1;
+            top: 50%;
+            left: 50%;
             display: inline-flex;
             width: auto;
             min-width: 28px;
@@ -4126,6 +4130,7 @@
             line-height: 1;
             text-align: center;
             white-space: nowrap;
+            transform: translate(-50%, -50%);
         }
         #page-game .game-top-actions .elite-score br,
         #page-game .game-top-actions .elite-score small {
@@ -4138,7 +4143,7 @@
             border-radius: 14px;
             transform: none;
             background-image: url('assets/reference-ui/history-frame-rounded.png') !important;
-            background-size: 112% 112% !important;
+            background-size: 123% 123% !important;
             background-position: center !important;
             color: transparent;
             font-size: 0;
@@ -4235,6 +4240,68 @@
             font-weight: 500;
             line-height: 1;
         }
+        #page-game .game-top-actions,
+        #page-game .game-highlight-row,
+        #page-game .game-bank-frame,
+        #page-game .game-canvas-wrap,
+        #page-game .game-info-row,
+        #page-game .game-controls {
+            width: 100%;
+            margin-inline: 0;
+            box-sizing: border-box;
+        }
+        #page-game .game-controls {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        #page-game .game-controls .btn-gold-outline {
+            display: flex;
+            width: 100%;
+            height: 54px;
+            min-height: 54px;
+            padding: 0 10px;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid rgba(123, 38, 148, .64);
+            border-radius: 16px;
+            color: #fff;
+            background-image: none !important;
+            background-color: #05020a;
+            box-shadow: inset 0 0 18px rgba(133, 32, 165, .08);
+            font-size: clamp(.78rem, 3.45vw, .94rem);
+            font-weight: 650;
+            letter-spacing: .015em;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        #page-game .game-controls .btn-gold-outline:last-child {
+            border-color: rgba(255, 75, 160, .78);
+            background:
+                radial-gradient(circle at 78% 25%, rgba(255, 118, 183, .24), transparent 35%),
+                linear-gradient(105deg, rgba(94, 16, 105, .92), rgba(155, 31, 98, .96));
+            box-shadow: inset 0 1px rgba(255,255,255,.12), 0 0 13px rgba(255, 50, 142, .10);
+            text-transform: uppercase;
+        }
+        #page-game .game-controls .btn-gold-outline:first-child > .star-amount {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+            opacity: 1;
+            color: #fff;
+            font-size: inherit;
+            line-height: 1;
+        }
+        #page-game .game-controls .btn-gold-outline:first-child::after { content: none; }
+        #page-game .game-controls .btn-gold-outline .telegram-star {
+            width: 20px;
+            height: 20px;
+            flex: 0 0 20px;
+        }
+        #page-game .game-controls .btn-gold-outline:first-child .telegram-star {
+            transform: translateY(-1px);
+        }
         @media (max-width: 360px) {
             #page-game .game-top-actions { grid-template-columns: minmax(0, 1fr) 44px; }
             #page-game .game-top-actions .elite-leaderboard-bar { height: 52px; min-height: 52px; }
@@ -4301,14 +4368,14 @@
             display: block;
             width: 100vw;
             height: auto;
-            aspect-ratio: 1916 / 370;
+            aspect-ratio: 1916 / 354;
             min-width: 0;
             overflow: hidden;
             background-color: #020104;
-            background-image: url('assets/reference-ui/leaderboard-screen-banner.png');
+            background-image: url('assets/reference-ui/leaderboard-screen-banner-trimmed.png?v=5');
             background-repeat: no-repeat;
-            background-size: 100% auto;
-            background-position: center 38%;
+            background-size: 100% 100%;
+            background-position: center;
         }
         .leaderboard-fullscreen .leaderboard-heading::before {
             content: none;
@@ -4380,7 +4447,7 @@
             --leaderboard-visible-frame-left: 1.62%;
             --leaderboard-visible-frame-right: 1.04%;
             box-sizing: border-box;
-            padding: calc(14px + var(--content-safe-top)) calc(12px + var(--content-safe-right)) calc(24px + var(--content-safe-bottom)) calc(12px + var(--content-safe-left)) !important;
+            padding: calc(14px + var(--content-safe-top)) calc(8px + var(--content-safe-right)) calc(24px + var(--content-safe-bottom)) calc(8px + var(--content-safe-left)) !important;
             scrollbar-width: none;
             background:
                 radial-gradient(circle at 52% 20%, rgba(104, 31, 133, .15), transparent 32%),
@@ -4397,9 +4464,9 @@
         .leaderboard-fullscreen .leaderboard-heading {
             left: 0;
             width: 100%;
-            aspect-ratio: 1916 / 370;
+            aspect-ratio: 1916 / 354;
             border-radius: 0;
-            background-position: center 38%;
+            background-position: center;
             filter: drop-shadow(0 0 9px rgba(232, 60, 255, .11));
         }
         .leaderboard-fullscreen .leaderboard-close {
@@ -4417,10 +4484,10 @@
             position: relative;
             isolation: isolate;
             width: calc(100% - var(--leaderboard-visible-frame-left) - var(--leaderboard-visible-frame-right));
-            min-height: 58px;
+            min-height: 46px;
             box-sizing: border-box;
             margin: 0 var(--leaderboard-visible-frame-right) 18px var(--leaderboard-visible-frame-left) !important;
-            padding: 9px 16px !important;
+            padding: 5px 14px !important;
             align-items: center;
             justify-content: center;
             gap: 11px;
@@ -4442,9 +4509,9 @@
             pointer-events: none;
         }
         .season-timer-premium-icon {
-            width: 34px;
-            height: 34px;
-            flex: 0 0 34px;
+            width: 28px;
+            height: 28px;
+            flex: 0 0 28px;
             overflow: hidden;
             border-radius: 50%;
             background-image: url('assets/reference-ui/season-hourglass-transparent.png?v=3');
@@ -4796,7 +4863,7 @@
     </div>
 
     <div id="custom-bet-modal" class="modal-overlay">
-        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" min="10" step="10" inputmode="numeric" placeholder="10, 20, 30…"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
+        <div class="modal-content"><h3 class="modal-title">Своя ставка</h3><input type="number" id="custom-bet-input" class="input-dark" min="10" step="1" inputmode="numeric" placeholder="Любое целое число от 10"><button class="btn-main-action" onclick="submitCustomBet()">Сделать ставку</button><button class="btn-secondary" onclick="closeModal('custom-bet-modal')">Отмена</button></div>
     </div>
 
     <div id="custom-amount-modal" class="modal-overlay">
@@ -5077,7 +5144,7 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
-        const EXPECTED_API_RELEASE = '8.9-opt.73';
+        const EXPECTED_API_RELEASE = '8.9-opt.74';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -8006,12 +8073,18 @@
             if (event.event_type === 'case_prize' && meta.item_value != null) return `Оценка приза: ${formatStars(meta.item_value)}`;
             if (event.event_type === 'deposit') return meta.source === 'ton' ? 'Пополнение через TON' : 'Telegram Stars';
             if (event.event_type === 'withdraw_request') return 'Окно подтверждения: 2 часа';
+            if (event.event_type === 'withdraw_approved') return 'Успешно передан в Telegram';
+            if (event.event_type === 'withdraw_rejected') return 'Возвращён в инвентарь';
             return event.balance_type === 'bonus' ? 'Бонусный баланс' : (event.balance_type === 'main' ? 'Основной баланс' : 'Событие аккаунта');
         }
         function activityEventMarkup(event) {
             const amount = event.amount == null ? null : Number(event.amount);
             const [icon, fallback] = activityVisuals[event.event_type] || ['event', 'Событие'];
-            const tone = event.balance_type === 'bonus' ? 'bonus' : (amount > 0 ? 'positive' : (amount < 0 ? 'negative' : 'neutral'));
+            const tone = event.event_type === 'withdraw_approved'
+                ? 'withdraw-success'
+                : (event.event_type === 'withdraw_rejected'
+                    ? 'withdraw-rejected'
+                    : (event.balance_type === 'bonus' ? 'bonus' : (amount > 0 ? 'positive' : (amount < 0 ? 'negative' : 'neutral'))));
             const amountMarkup = amount == null ? '' : `<span class="activity-amount star-amount"><span>${amount > 0 ? '+' : '−'}${formatStars(Math.abs(amount))}</span>${event.balance_type === 'bonus' ? bonusStarMarkup() : telegramStarMarkup()}</span>`;
             return `<article class="activity-strip ${tone}">
                 <div class="activity-icon">${activityIconMarkup(icon)}</div>
@@ -9183,7 +9256,7 @@
             const inputVal = document.getElementById('custom-bet-input').value;
             const normalized = inputVal.trim();
             const v = Number(normalized);
-            if (!Number.isInteger(v) || v < 10 || v % 10 !== 0) { showAlert("Ставка должна быть кратна 10 звёздам"); return; }
+            if (!Number.isInteger(v) || v < 10) { showAlert("Введите целое число не меньше 10"); return; }
             closeModal('custom-bet-modal');
             openBetConfirm(v);
         }
@@ -9205,7 +9278,7 @@
                     else if (data.error === 'game_started') msg = "Игра уже началась!";
                     else if (data.error === 'room_full') msg = "Слишком много игроков!";
                     else if (data.error === 'min_bet') msg = "Минимальная ставка — 10 звёзд";
-                    else if (data.error === 'invalid_amount') msg = "Ставка должна быть кратна 10 звёздам";
+                    else if (data.error === 'invalid_amount') msg = "Ставка должна быть целым числом не меньше 10";
                     else if (data.error === 'balance_type_locked') msg = "В этом раунде продолжайте ставить с ранее выбранного баланса";
                     showAlert(msg);
                 }

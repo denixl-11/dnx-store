@@ -52,7 +52,6 @@ TON_STAR_RATE = Decimal(os.getenv("TON_STAR_RATE", "85"))
 STAR_MIN_TOPUP = int(os.getenv("STAR_MIN_TOPUP", "10"))
 STAR_MAX_TOPUP = int(os.getenv("STAR_MAX_TOPUP", "10000"))
 STAR_MIN_BET = Decimal(os.getenv("STAR_MIN_BET", "10"))
-STAR_BET_STEP = Decimal(os.getenv("STAR_BET_STEP", "10"))
 STANDARD_REFERRAL_RATE = Decimal("0.10")
 PARTNER_REFERRAL_RATE = Decimal("0.20")
 REFERRAL_CODE_LENGTH = 25
@@ -64,7 +63,7 @@ if TON_STAR_RATE <= 0:
     raise RuntimeError("TON_STAR_RATE must be positive")
 if STAR_MIN_TOPUP <= 0 or STAR_MAX_TOPUP < STAR_MIN_TOPUP:
     raise RuntimeError("Invalid Stars top-up limits")
-if STAR_MIN_BET <= 0 or STAR_BET_STEP <= 0:
+if STAR_MIN_BET <= 0:
     raise RuntimeError("Invalid Stars bet limits")
 
 
@@ -127,7 +126,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.73"
+API_RELEASE = "8.9-opt.74"
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -598,14 +597,15 @@ async def log_database_audit(pool: asyncpg.Pool) -> None:
         game_data["game_number"],
         ",".join(names),
     )
-    required = {"id", "name", "model", "pattern", "background"}
+    required = {"id", "price", "status", "nft_link", "case_asset_url"}
     missing = sorted(required.difference(names))
     if missing:
         raise RuntimeError(f"items table is missing required columns: {', '.join(missing)}")
-    if "traits" in names:
+    legacy_columns = sorted({"name", "model", "pattern", "background", "traits"}.intersection(names))
+    if legacy_columns:
         logging.warning(
-            "Legacy items.traits still exists in the connected database, but release %s never reads it",
-            API_RELEASE,
+            "Legacy item columns still exist but release %s never reads them: %s",
+            API_RELEASE, ", ".join(legacy_columns),
         )
 
 
@@ -752,21 +752,14 @@ async def init_db():
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS items (
                         id SERIAL PRIMARY KEY,
-                        name VARCHAR(255),
                         price NUMERIC DEFAULT 0.0,
                         status VARCHAR(50) DEFAULT 'Доступен',
                         nft_link TEXT DEFAULT '',
-                        model VARCHAR(255),
-                        pattern VARCHAR(255),
-                        background VARCHAR(255),
                         buyer_id VARCHAR(255),
                         number VARCHAR(20),
                         last_event VARCHAR(50)
                     )
                 """)
-                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS model VARCHAR(255)")
-                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS pattern VARCHAR(255)")
-                await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS background VARCHAR(255)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS buyer_id VARCHAR(255)")
                 await conn.execute("ALTER TABLE items ADD COLUMN IF NOT EXISTS nft_link TEXT DEFAULT ''")
                 # Catalog traits are authoritative only in these three columns.
@@ -861,10 +854,7 @@ async def init_db():
                 await conn.execute("""
                     CREATE TABLE IF NOT EXISTS prize_items (
                         id SERIAL PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        image_url TEXT NOT NULL,
-                        nft_link TEXT NOT NULL DEFAULT '',
-                        traits JSONB DEFAULT '[]'::jsonb
+                        nft_link TEXT NOT NULL DEFAULT ''
                     )
                 """)
                 await conn.execute("""
@@ -1160,8 +1150,8 @@ def add_nft_preview_path(record: dict) -> dict:
 def apply_telegram_link_metadata(record: dict, descriptor: dict | None) -> dict:
     """Resolve all customer-facing NFT metadata exclusively from nft_link.
 
-    Database name/model/pattern/background values may still exist for legacy
-    admin workflows, but Telegram collectibles must never display them.
+    Legacy database columns may still exist until the cleanup SQL is run, but
+    customer-facing metadata never reads them.
     """
     source_url = canonical_telegram_nft_url(record.get("nft_link"))
     if not source_url:
@@ -1186,6 +1176,39 @@ def apply_telegram_link_metadata(record: dict, descriptor: dict | None) -> dict:
             # descriptor.
             record.pop(key, None)
     record["traits_source"] = "telegram:nft_link" if traits_complete else "telegram:nft_link:pending"
+    return record
+
+
+def apply_static_item_metadata(record: dict) -> dict:
+    """Build a local case reward's public metadata without legacy SQL fields."""
+    if canonical_telegram_nft_url(record.get("nft_link")):
+        return record
+    asset_url = str(record.get("case_asset_url") or "")
+    filename = os.path.basename(urlparse(asset_url).path).rsplit(".", 1)[0]
+    normalized = re.sub(r"[^a-z0-9]+", " ", filename.lower()).strip()
+    known_names = {
+        "cup": "Cup",
+        "ring": "Ring",
+        "diamond": "Diamond",
+    }
+    name = known_names.get(normalized)
+    if not name and normalized:
+        name = " ".join(part.capitalize() for part in normalized.split())
+    record["name"] = (name or "Приз")[:160]
+    record.pop("model", None)
+    record.pop("pattern", None)
+    record.pop("background", None)
+    record["traits_source"] = "case_asset_url"
+    return record
+
+
+def apply_item_metadata(record: dict, descriptor: dict | None = None) -> dict:
+    """Single presentation contract after legacy product columns are dropped."""
+    if canonical_telegram_nft_url(record.get("nft_link")):
+        apply_telegram_link_metadata(record, descriptor)
+    else:
+        apply_static_item_metadata(record)
+    apply_case_inventory_presentation(record)
     return record
 
 
@@ -2582,9 +2605,8 @@ async def handle_star_payment_status(request):
 async def handle_get_items(request):
     try:
         rows = await get_pool().fetch(
-            """SELECT id, name, price, status,
-                      nft_link, number, model, pattern, background,
-                      acquisition_source, last_event
+            """SELECT id, price, status, case_asset_url,
+                      nft_link, number, acquisition_source, last_event
                FROM items WHERE status = 'Доступен'""")
         items = normalize_records(rows)
         for item in items:
@@ -2597,7 +2619,7 @@ async def handle_get_items(request):
         for item in items:
             source_url = canonical_telegram_nft_url(item.get("nft_link"))
             descriptor = get_cached_telegram_nft_media(source_url, int(item["id"]))
-            apply_telegram_link_metadata(item, descriptor)
+            apply_item_metadata(item, descriptor)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get items error: {e}")
@@ -2620,9 +2642,8 @@ async def handle_get_item(request):
     try:
         row = await get_pool().fetchrow(
             """
-            SELECT id, name, price, status, case_asset_url,
-                   nft_link, number,
-                   model, pattern, background, acquisition_source, last_event,
+            SELECT id, price, status, case_asset_url,
+                   nft_link, number, acquisition_source, last_event,
                    withdraw_requested_at, withdraw_expires_at, disposed_at,
                    GREATEST(0, EXTRACT(EPOCH FROM (withdraw_expires_at - NOW())))::BIGINT
                        AS withdraw_remaining_seconds
@@ -2641,8 +2662,7 @@ async def handle_get_item(request):
         descriptor = await fetch_telegram_nft_media(
             canonical_telegram_nft_url(item.get("nft_link")), item_id
         )
-        apply_telegram_link_metadata(item, descriptor)
-        apply_case_inventory_presentation(item)
+        apply_item_metadata(item, descriptor)
         raw_status = item.get("status")
         item["is_shop_item"] = raw_status == "Доступен"
         if raw_status in ("Выведен", "withdrawn"):
@@ -2698,18 +2718,21 @@ async def handle_admin_db_audit(request):
         item = None
         if item_id > 0:
             row = await conn.fetchrow(
-                """SELECT id, name, model, pattern, background, status, buyer_id,
+                """SELECT id, nft_link, case_asset_url, status, buyer_id,
                           acquisition_source, last_event
                    FROM items WHERE id = $1""",
                 item_id,
             )
-            item = dict(row) if row else None
+            item = apply_item_metadata(dict(row), None) if row else None
     return web.json_response(
         {
             "api_release": API_RELEASE,
             "database": identity,
             "items_columns": columns,
             "legacy_traits_present": "traits" in columns,
+            "legacy_product_columns": sorted(
+                {"name", "model", "pattern", "background"}.intersection(columns)
+            ),
             "item": item,
         },
         headers={"Cache-Control": "no-store"},
@@ -3306,8 +3329,8 @@ async def handle_get_inventory(request):
                 user_id,
             )
             rows = await conn.fetch(
-                """SELECT id, name, price, case_asset_url,
-                          nft_link, model, pattern, background, status, number,
+                """SELECT id, price, case_asset_url,
+                          nft_link, status, number,
                           acquisition_source, last_event, withdraw_requested_at, withdraw_expires_at,
                           disposed_at,
                           GREATEST(0, EXTRACT(EPOCH FROM (withdraw_expires_at - NOW())))::BIGINT
@@ -3333,15 +3356,8 @@ async def handle_get_inventory(request):
         # the client exactly like the fast catalogue path.
         for item in items:
             source_url = canonical_telegram_nft_url(item.get("nft_link"))
-            case_model_fallback = item.get("model") if item.get("acquisition_source") == "case" else None
             descriptor = get_cached_telegram_nft_media(source_url, int(item["id"]))
-            apply_telegram_link_metadata(item, descriptor)
-            # Case rows capture their Telegram-derived model when the prize is
-            # created. Preserve that one field only as an instant cold-cache
-            # fallback; a complete live descriptor above always overwrites it.
-            if source_url and case_model_fallback and not item.get("model"):
-                item["model"] = case_model_fallback
-            apply_case_inventory_presentation(item)
+            apply_item_metadata(item, descriptor)
         return web.json_response(items, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
     except Exception as e:
         logging.error(f"Get inventory error: {e}")
@@ -3532,7 +3548,7 @@ async def handle_request_withdraw(request):
                            withdraw_expires_at = NOW() + make_interval(secs => $3::int)
                        WHERE id = $1 AND buyer_id = $2 AND status = 'Продан'
                          AND (withdraw_expires_at IS NULL OR withdraw_expires_at <= NOW())
-                       RETURNING id, name, nft_link, withdraw_expires_at""",
+                       RETURNING id, nft_link, case_asset_url, withdraw_expires_at""",
                     item_id, user_id, WITHDRAW_WINDOW_SECONDS)
                 if not item:
                     remaining = await conn.fetchval(
@@ -3554,11 +3570,12 @@ async def handle_request_withdraw(request):
                     user_id,
                     json.dumps({"expires_at": item['withdraw_expires_at'].isoformat()}),
                 )
+                event_item = apply_item_metadata(dict(item), None)
                 await record_user_event(
                     conn,
                     user_id,
                     "withdraw_request",
-                    title=f"Запрос на вывод · {item['name']}",
+                    title=f"Запрос на вывод · {event_item.get('name') or 'NFT'}",
                     metadata={"item_id": item_id, "expires_at": item['withdraw_expires_at'].isoformat()},
                 )
         admin_kb = InlineKeyboardMarkup(inline_keyboard=[[
@@ -3568,7 +3585,7 @@ async def handle_request_withdraw(request):
         try:
             safe_username = html_escape(str(username or "").lstrip("@"))
             user_label = f"@{safe_username}" if safe_username else "<i>username не указан</i>"
-            safe_item_name = html_escape(str(item['name'] or 'NFT'))
+            safe_item_name = html_escape(str(event_item.get('name') or 'NFT'))
             safe_nft_link = html_escape(canonical_telegram_nft_url(item['nft_link']), quote=True)
             nft_line = (
                 f'<a href="{safe_nft_link}">{safe_item_name}</a>'
@@ -3665,10 +3682,10 @@ async def handle_game_bet(request):
         if parsed_amount is None:
             return web.json_response({"success": False, "error": "min_bet"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
-        parsed_amount = floor_stars(parsed_amount)
-        if parsed_amount < STAR_MIN_BET or parsed_amount % STAR_BET_STEP != 0:
+        if parsed_amount != parsed_amount.to_integral_value():
             return web.json_response({"success": False, "error": "invalid_amount"},
                                      headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
+        parsed_amount = parsed_amount.to_integral_value()
         amount = float(parsed_amount)
         async with game_lock:
             if game_state["status"] not in ("waiting", "counting"):
@@ -4226,13 +4243,12 @@ async def handle_open_case(request):
 
                 new_item_id = await conn.fetchval("""
                     INSERT INTO items (
-                        name, price, status, case_asset_url, model, pattern, background, buyer_id, nft_link, number,
+                        price, status, case_asset_url, buyer_id, nft_link, number,
                         acquisition_source, last_event
                     )
-                    VALUES ($1, $2, 'Продан', $3, $4, $5, $6, $7, $8, $9, 'case', 'case_drop') RETURNING id
-                """, str(won_drop['name'])[:255], drop_value,
-                      safe_https_url(case_drop_image_url(won_drop)), case_drop_attribute(won_drop, "model"),
-                      case_drop_attribute(won_drop, "pattern"), case_drop_attribute(won_drop, "background"), user_id,
+                    VALUES ($1, 'Продан', $2, $3, $4, $5, 'case', 'case_drop') RETURNING id
+                """, drop_value,
+                      safe_https_url(case_drop_image_url(won_drop)), user_id,
                       canonical_telegram_nft_url(won_drop.get('nft_link')),
                       str(won_drop.get('number') or '')[:20])
 
@@ -4302,7 +4318,7 @@ async def handle_sell_drop(request):
                        WHERE id = $1 AND buyer_id = $2 AND status = 'Продан'
                          AND acquisition_source = 'case'
                          AND (withdraw_expires_at IS NULL OR withdraw_expires_at <= NOW())
-                       RETURNING id, price, name""",
+                       RETURNING id, price, nft_link, case_asset_url""",
                     item_id, user_id)
                 if not item:
                     return web.json_response({"success": False, "error": "item_not_found"},
@@ -4323,13 +4339,14 @@ async def handle_sell_drop(request):
                     user_id,
                     sale_price,
                 )
+                sold_item = apply_item_metadata(dict(item), None)
                 await record_user_event(
                     conn,
                     user_id,
                     "case_sale",
                     amount=sale_price,
                     balance_type="main",
-                    title=f"Продажа приза · {item['name']}",
+                    title=f"Продажа приза · {sold_item.get('name') or 'Приз'}",
                     metadata={"item_id": item_id},
                 )
         return web.json_response({"success": True, "credited": int(sale_price)}, headers={"Access-Control-Allow-Origin": CORS_ORIGIN})
@@ -4370,6 +4387,54 @@ def withdraw_admin_result_message(message: types.Message, *, approved: bool) -> 
     return f"{base}\n\n━━━━━━━━━━━━━━━━━━\n{result}"
 
 
+async def withdraw_user_result_message(item: dict, *, approved: bool) -> str:
+    """Build the customer result from the Telegram link, never a SQL item id."""
+    record = {
+        "id": int(item.get("id") or 0),
+        "nft_link": canonical_telegram_nft_url(item.get("nft_link")),
+        "case_asset_url": str(item.get("case_asset_url") or ""),
+    }
+    descriptor = None
+    if record["nft_link"]:
+        try:
+            descriptor = await fetch_telegram_nft_media(
+                record["nft_link"],
+                -(300000 + record["id"]),
+            )
+        except Exception as exc:
+            logging.warning("Withdraw NFT metadata unavailable for item %s: %s", record["id"], exc)
+    apply_item_metadata(record, descriptor)
+    collection = html_escape(str(record.get("name") or "NFT"))
+    safe_link = html_escape(record["nft_link"], quote=True)
+    collection_line = f'<a href="{safe_link}">{collection}</a>' if safe_link else collection
+    live_traits = descriptor.get("traits") if isinstance(descriptor, dict) and isinstance(descriptor.get("traits"), dict) else {}
+    model = html_escape(str(live_traits.get("model") or record.get("model") or "—"))
+    pattern = html_escape(str(live_traits.get("pattern") or record.get("pattern") or "—"))
+    background = html_escape(str(live_traits.get("background") or record.get("background") or "—"))
+    if approved:
+        heading = "✅ <b>ВЫВОД УСПЕШНО ЗАВЕРШЁН</b>"
+        note = "Коллекционный NFT передан в ваш Telegram-аккаунт."
+        footer = "Спасибо, что выбираете DNX Store ✨"
+    else:
+        heading = "❌ <b>ВЫВОД ОТКЛОНЁН</b>"
+        note = "NFT безопасно возвращён в ваш инвентарь DNX Store."
+        footer = "Вы можете повторить запрос на вывод позже."
+    return (
+        "✨ <b>DNX STORE</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"{heading}\n"
+        f"{note}\n\n"
+        "🎁 <b>КОЛЛЕКЦИЯ</b>\n"
+        f"{collection_line}\n\n"
+        "💎 <b>ХАРАКТЕРИСТИКИ</b>\n"
+        f"Модель: <b>{model}</b>\n"
+        f"Узор: <b>{pattern}</b>\n"
+        f"Фон: <b>{background}</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"{footer}"
+    )
+
+
 @dp.callback_query(F.data.startswith("with_yes_"))
 async def admin_withdraw_approve(callback: types.CallbackQuery):
     if not await is_admin_callback(callback):
@@ -4384,7 +4449,7 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
                 """UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved'
                    WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
                      AND withdraw_expires_at > NOW()
-                   RETURNING name""",
+                   RETURNING id, nft_link, case_asset_url""",
                 item_id, uid)
             result = "UPDATE 1" if item else "UPDATE 0"
             if item:
@@ -4393,10 +4458,11 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
                        VALUES ($1, $2, 'withdraw_approved')""",
                     item_id, uid,
                 )
+                event_item = apply_item_metadata(dict(item), None)
                 await record_user_event(
                     conn, uid, "withdraw_approved",
-                    title=f"NFT выведен · {item['name']}",
-                    metadata={"item_id": item_id},
+                    title=f"NFT выведен · {event_item.get('name') or 'NFT'}",
+                    metadata={"item_id": item_id, "nft_link": event_item["nft_link"]},
                 )
     if result != "UPDATE 1":
         await get_pool().execute(
@@ -4414,7 +4480,12 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
     )
     await callback.answer("Вывод подтверждён")
     try:
-        await bot.send_message(int(uid), f"🎉 NFT (ID: {item_id}) выведен!")
+        await bot.send_message(
+            int(uid),
+            await withdraw_user_result_message(dict(item), approved=True),
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
     except Exception:
         pass
 
@@ -4431,7 +4502,7 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
             item = await conn.fetchrow(
                 """UPDATE items SET status = 'Продан', last_event = 'withdraw_rejected'
                    WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
-                   RETURNING name""",
+                   RETURNING id, nft_link, case_asset_url""",
                 item_id, uid)
             result = "UPDATE 1" if item else "UPDATE 0"
             if item:
@@ -4440,10 +4511,11 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
                        VALUES ($1, $2, 'withdraw_rejected')""",
                     item_id, uid,
                 )
+                event_item = apply_item_metadata(dict(item), None)
                 await record_user_event(
                     conn, uid, "withdraw_rejected",
-                    title=f"Вывод отклонён · {item['name']}",
-                    metadata={"item_id": item_id},
+                    title=f"Вывод отклонён · {event_item.get('name') or 'NFT'}",
+                    metadata={"item_id": item_id, "nft_link": event_item["nft_link"]},
                 )
     if result != "UPDATE 1":
         await callback.answer("Запрос уже обработан", show_alert=True)
@@ -4454,7 +4526,12 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
     )
     await callback.answer("Вывод отклонён")
     try:
-        await bot.send_message(int(uid), f"❌ Вывод NFT (ID: {item_id}) отклонён.")
+        await bot.send_message(
+            int(uid),
+            await withdraw_user_result_message(dict(item), approved=False),
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
     except Exception:
         pass
 
@@ -4630,7 +4707,7 @@ async def cmd_db_audit(message: types.Message):
         row = None
         if item_id > 0:
             row = await conn.fetchrow(
-                """SELECT id, name, model, pattern, background, status, buyer_id
+                """SELECT id, nft_link, case_asset_url, status, buyer_id
                    FROM items WHERE id = $1""",
                 item_id,
             )
@@ -4640,16 +4717,20 @@ async def cmd_db_audit(message: types.Message):
         f"Схема: {identity['schema']}",
         f"Fingerprint: {identity['fingerprint']}",
         f"traits column: {'ЕСТЬ (не читается)' if 'traits' in columns else 'НЕТ'}",
-        "Источник: items.model / items.pattern / items.background",
+        "legacy product columns: " + (
+            ", ".join(sorted({"name", "model", "pattern", "background"}.intersection(columns)))
+            or "НЕТ"
+        ),
+        "Источник: Telegram nft_link / items.case_asset_url",
     ]
     if item_id > 0:
         if row:
+            presentation = apply_item_metadata(dict(row), None)
             lines.extend([
                 "",
-                f"ID: {row['id']} · {row['name']}",
-                f"model = {row['model']!r}",
-                f"pattern = {row['pattern']!r}",
-                f"background = {row['background']!r}",
+                f"ID: {row['id']} · {presentation.get('name') or 'NFT'}",
+                f"nft_link = {row['nft_link']!r}",
+                f"case_asset_url = {row['case_asset_url']!r}",
                 f"status = {row['status']!r}",
             ])
         else:
