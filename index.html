@@ -1110,6 +1110,14 @@
         .payment-method-card:hover { border-color: #d84bff; box-shadow: 0 0 15px rgba(217,48,255,.2); }
         .payment-method-card > span:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 4px; }
         .payment-method-card small { color: #9f929f; font-size: .67rem; }
+        .payment-method-benefit {
+            color: #79efbd;
+            font-size: .54rem;
+            font-weight: 800;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            text-shadow: 0 0 9px rgba(77, 255, 181, .34);
+        }
         .payment-method-card i { color: #ff7baa; font-size: 1.4rem; font-style: normal; }
         .method-icon { width: 39px; height: 39px; display: grid; place-items: center; border: 1px solid #c94cff; border-radius: 10px; color: #ffc572; background: #1b0928; }
         .rub-method { opacity: .47; cursor: default; }
@@ -4639,9 +4647,217 @@
             .leaderboard-fullscreen .leaderboard-rank { width: 56px !important; height: 56px; }
             .leaderboard-fullscreen .leaderboard-nft { width: 46px !important; height: 46px !important; }
         }
+
+        /* ===== Render cold-start screen ===== */
+        body.app-booting {
+            overflow: hidden !important;
+        }
+        .render-loader {
+            position: fixed;
+            z-index: 10000;
+            inset: 0;
+            min-height: 100dvh;
+            display: grid;
+            place-items: center;
+            padding:
+                calc(28px + env(safe-area-inset-top, 0px))
+                calc(24px + env(safe-area-inset-right, 0px))
+                calc(30px + env(safe-area-inset-bottom, 0px))
+                calc(24px + env(safe-area-inset-left, 0px));
+            overflow: hidden;
+            opacity: 1;
+            visibility: visible;
+            background:
+                radial-gradient(circle at 50% 37%, rgba(166, 43, 214, .24), transparent 28%),
+                radial-gradient(circle at 88% 74%, rgba(229, 25, 118, .12), transparent 30%),
+                radial-gradient(circle at 8% 22%, rgba(97, 44, 185, .12), transparent 28%),
+                linear-gradient(180deg, rgba(2, 1, 7, .97), rgba(5, 1, 10, .99)),
+                url('cosmic-bg.png') center / cover no-repeat;
+            transition: opacity .46s ease, visibility .46s ease;
+        }
+        .render-loader::before,
+        .render-loader::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .render-loader::before {
+            width: min(94vw, 500px);
+            aspect-ratio: 1;
+            border: 1px solid rgba(205, 81, 255, .11);
+            box-shadow: inset 0 0 80px rgba(118, 28, 166, .06), 0 0 80px rgba(118, 28, 166, .05);
+            animation: render-loader-orbit 16s linear infinite;
+        }
+        .render-loader::after {
+            width: 7px;
+            height: 7px;
+            top: 21%;
+            left: 17%;
+            background: #ff7bda;
+            box-shadow:
+                55vw 9vh 0 -2px rgba(194, 89, 255, .9),
+                12vw 48vh 0 -2px rgba(255, 99, 193, .75),
+                67vw 55vh 0 -1px rgba(180, 116, 255, .7),
+                38vw 66vh 0 -2px rgba(255, 255, 255, .8);
+            filter: drop-shadow(0 0 7px #e55fff);
+            animation: render-loader-stars 2.8s ease-in-out infinite alternate;
+        }
+        .render-loader.is-complete {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        .render-loader-panel {
+            position: relative;
+            z-index: 1;
+            width: min(100%, 390px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .render-loader-emblem {
+            position: relative;
+            width: 116px;
+            height: 116px;
+            margin-bottom: 30px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(63, 17, 86, .72) 0 49%, rgba(8, 3, 14, .92) 70%);
+            box-shadow: 0 0 28px rgba(211, 73, 255, .25), inset 0 0 20px rgba(255, 94, 205, .10);
+        }
+        .render-loader-emblem::before,
+        .render-loader-emblem::after {
+            content: "";
+            position: absolute;
+            border-radius: inherit;
+            border: 1px solid rgba(228, 95, 255, .52);
+        }
+        .render-loader-emblem::before {
+            inset: -7px;
+            border-color: rgba(224, 86, 255, .36);
+            border-left-color: rgba(255, 87, 184, .95);
+            border-right-color: rgba(135, 69, 255, .85);
+            animation: render-loader-spin 2.2s linear infinite;
+        }
+        .render-loader-emblem::after {
+            inset: 7px;
+            border-color: rgba(228, 95, 255, .28);
+            border-top-color: rgba(255, 176, 236, .9);
+            animation: render-loader-spin 3.4s linear infinite reverse;
+        }
+        .render-loader-logo {
+            width: 84px;
+            height: 84px;
+            border-radius: 50%;
+            object-fit: cover;
+            filter: saturate(1.12) contrast(1.08) drop-shadow(0 0 12px rgba(235, 81, 255, .42));
+        }
+        .render-loader-percent {
+            min-width: 4ch;
+            color: #fff5ff;
+            font-size: clamp(2.55rem, 13vw, 3.55rem);
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -.055em;
+            text-shadow: 0 0 22px rgba(226, 78, 255, .34);
+            font-variant-numeric: tabular-nums;
+        }
+        .render-loader-title {
+            margin-top: 15px;
+            color: #fff0fb;
+            font-size: 1rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+        }
+        .render-loader-subtitle {
+            min-height: 2.6em;
+            margin-top: 7px;
+            color: rgba(218, 195, 220, .64);
+            font-size: .76rem;
+            font-weight: 500;
+            line-height: 1.45;
+        }
+        .render-loader-track {
+            position: relative;
+            width: 100%;
+            height: 8px;
+            margin-top: 24px;
+            padding: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(214, 83, 236, .32);
+            border-radius: 999px;
+            background: rgba(20, 6, 27, .82);
+            box-shadow: inset 0 1px 5px rgba(0,0,0,.75), 0 0 18px rgba(190, 55, 226, .09);
+        }
+        .render-loader-fill {
+            position: relative;
+            width: 4%;
+            height: 100%;
+            overflow: hidden;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #7f3cff, #d53ff2 58%, #ff4f9c);
+            box-shadow: 0 0 12px rgba(224, 67, 237, .7);
+            transition: width .22s ease-out;
+        }
+        .render-loader-fill::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            width: 45%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
+            transform: translateX(-120%);
+            animation: render-loader-shine 1.2s ease-in-out infinite;
+        }
+        .render-loader-retry {
+            display: none;
+            min-width: 168px;
+            height: 44px;
+            margin-top: 22px;
+            padding: 0 22px;
+            border: 1px solid rgba(237, 83, 196, .58);
+            border-radius: 14px;
+            color: #fff1fb;
+            background: linear-gradient(135deg, rgba(111, 25, 107, .85), rgba(50, 13, 72, .92));
+            box-shadow: 0 0 18px rgba(221, 55, 192, .14), inset 0 1px rgba(255,255,255,.08);
+            font: inherit;
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        .render-loader.has-timeout .render-loader-retry { display: inline-flex; align-items: center; justify-content: center; }
+        @keyframes render-loader-spin { to { transform: rotate(360deg); } }
+        @keyframes render-loader-orbit { to { transform: rotate(360deg); } }
+        @keyframes render-loader-stars { to { opacity: .34; transform: scale(.82); } }
+        @keyframes render-loader-shine { 70%, 100% { transform: translateX(310%); } }
+        @media (prefers-reduced-motion: reduce) {
+            .render-loader::before,
+            .render-loader::after,
+            .render-loader-emblem::before,
+            .render-loader-emblem::after,
+            .render-loader-fill::after { animation: none !important; }
+        }
     </style>
 </head>
-<body>
+<body class="app-booting">
+
+    <div class="render-loader" id="render-loader" role="status" aria-live="polite" aria-label="Загрузка приложения">
+        <div class="render-loader-panel">
+            <div class="render-loader-emblem" aria-hidden="true">
+                <img class="render-loader-logo" src="app-icon.png" alt="">
+            </div>
+            <div class="render-loader-percent" id="render-loader-percent">4%</div>
+            <div class="render-loader-title" id="render-loader-title">Подключаемся к DNX STORE</div>
+            <div class="render-loader-subtitle" id="render-loader-subtitle">Проверяем готовность игрового сервера</div>
+            <div class="render-loader-track" aria-hidden="true">
+                <div class="render-loader-fill" id="render-loader-fill"></div>
+            </div>
+            <button class="render-loader-retry" id="render-loader-retry" type="button">Повторить</button>
+        </div>
+    </div>
 
     <header>
         <div class="header-left">
@@ -4754,12 +4970,15 @@
             <h2 class="balance-title">ПОПОЛНИТЬ БАЛАНС</h2>
             <p class="balance-subtitle">Выберите количество звёзд, затем способ оплаты</p>
             <div class="topup-grid">
-                <button class="topup-btn" onclick="initTopup(85)"><span class="star-amount"><b>85</b><span class="telegram-star" aria-hidden="true"></span></span></button>
-                <button class="topup-btn" onclick="initTopup(255)"><span class="star-amount"><b>255</b><span class="telegram-star" aria-hidden="true"></span></span></button>
-                <button class="topup-btn" onclick="initTopup(425)"><span class="star-amount"><b>425</b><span class="telegram-star" aria-hidden="true"></span></span></button>
-                <button class="topup-btn" onclick="initTopup(850)"><span class="star-amount"><b>850</b><span class="telegram-star" aria-hidden="true"></span></span></button>
-                <button class="topup-btn" onclick="initTopup(1700)"><span class="star-amount"><b>1 700</b><span class="telegram-star" aria-hidden="true"></span></span></button>
-                <button class="topup-btn" onclick="initTopup(4250)"><span class="star-amount"><b>4 250</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(50)"><span class="star-amount"><b>50</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(100)"><span class="star-amount"><b>100</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(250)"><span class="star-amount"><b>250</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(500)"><span class="star-amount"><b>500</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(1000)"><span class="star-amount"><b>1 000</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(2500)"><span class="star-amount"><b>2 500</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(5000)"><span class="star-amount"><b>5 000</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(7500)"><span class="star-amount"><b>7 500</b><span class="telegram-star" aria-hidden="true"></span></span></button>
+                <button class="topup-btn" onclick="initTopup(10000)"><span class="star-amount"><b>10 000</b><span class="telegram-star" aria-hidden="true"></span></span></button>
                 <button class="topup-btn custom-btn" onclick="openCustomAmountModal()">Своя сумма</button>
             </div>
             <div class="referral-card">
@@ -4901,8 +5120,8 @@
             <div class="section-eyebrow">ПОПОЛНЕНИЕ</div>
             <h3 class="modal-title star-amount"><span id="method-stars-amount">0</span><span class="telegram-star" aria-hidden="true"></span></h3>
             <p class="ton-payment-note">Выберите способ оплаты</p>
+            <button class="payment-method-card ton-method" onclick="openTonPayment()"><span class="method-icon ton-method-icon"><span class="ton-logo" aria-hidden="true"><svg viewBox="0 0 48 48" role="img"><circle cx="24" cy="24" r="23"/><path d="M13.5 15.5h21c1.85 0 3 2 2.08 3.58L25.8 37.2a2.1 2.1 0 0 1-3.6 0L11.42 19.08c-.92-1.58.23-3.58 2.08-3.58Z"/><path d="M24 16.2v19.5M13.8 16.7 24 27.4l10.2-10.7"/></svg></span></span><span><b>Toncoin</b><small>1 TON = <span class="star-amount"><span>90</span><span class="telegram-star" aria-hidden="true"></span></span></small><span class="payment-method-benefit">Выгоднее всего</span></span><i>›</i></button>
             <button class="payment-method-card stars-method" onclick="payWithTelegramStars()"><span class="method-icon"><span class="telegram-star" aria-hidden="true"></span></span><span><b>Telegram Stars</b><small>Оплатить напрямую в Telegram</small></span><i>›</i></button>
-            <button class="payment-method-card ton-method" onclick="openTonPayment()"><span class="method-icon ton-method-icon"><span class="ton-logo" aria-hidden="true"><svg viewBox="0 0 48 48" role="img"><circle cx="24" cy="24" r="23"/><path d="M13.5 15.5h21c1.85 0 3 2 2.08 3.58L25.8 37.2a2.1 2.1 0 0 1-3.6 0L11.42 19.08c-.92-1.58.23-3.58 2.08-3.58Z"/><path d="M24 16.2v19.5M13.8 16.7 24 27.4l10.2-10.7"/></svg></span></span><span><b>Toncoin</b><small>1 TON = <span class="star-amount"><span>85</span><span class="telegram-star" aria-hidden="true"></span></span></small></span><i>›</i></button>
             <button class="payment-method-card rub-method" disabled><span class="method-icon">₽</span><span><b>Рубли</b><small>Скоро</small></span><em>СКОРО</em></button>
             <div class="ton-payment-status" id="stars-payment-status"></div>
             <button class="btn-secondary" onclick="closeModal('payment-method-modal')">Отмена</button>
@@ -4912,7 +5131,7 @@
     <div id="topup-modal" class="modal-overlay">
         <div class="modal-content ton-payment-modal"><h3 class="modal-title"><span class="star-amount"><span id="display-topup-stars">0</span><span class="telegram-star" aria-hidden="true"></span></span> ЗА TON</h3>
             <div class="ton-orb"><span class="ton-logo" aria-hidden="true"><svg viewBox="0 0 48 48" role="img"><circle cx="24" cy="24" r="23"/><path d="M13.5 15.5h21c1.85 0 3 2 2.08 3.58L25.8 37.2a2.1 2.1 0 0 1-3.6 0L11.42 19.08c-.92-1.58.23-3.58 2.08-3.58Z"/><path d="M24 16.2v19.5M13.8 16.7 24 27.4l10.2-10.7"/></svg></span></div>
-            <p class="ton-payment-note">К оплате: <strong id="display-topup-ton">0</strong> TON<br>Курс фиксирован: 1 TON = <span class="star-amount"><span>85</span><span class="telegram-star" aria-hidden="true"></span></span></p>
+            <p class="ton-payment-note">К оплате: <strong id="display-topup-ton">0</strong> TON<br>Курс фиксирован: 1 TON = <span class="star-amount"><span>90</span><span class="telegram-star" aria-hidden="true"></span></span></p>
             <div class="ton-payment-status" id="ton-payment-status">Кошелёк не подключён</div>
             <button class="btn-main-action" id="btn-send-topup" onclick="sendTopup()">ПОДКЛЮЧИТЬ КОШЕЛЁК</button>
             <button class="btn-secondary" onclick="closeModal('topup-modal')">Отмена</button>
@@ -5144,12 +5363,140 @@
         const API_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? location.origin
             : 'https://dnx-shop.onrender.com';
+
+        const renderLoaderElement = document.getElementById('render-loader');
+        const renderLoaderPercent = document.getElementById('render-loader-percent');
+        const renderLoaderTitle = document.getElementById('render-loader-title');
+        const renderLoaderSubtitle = document.getElementById('render-loader-subtitle');
+        const renderLoaderFill = document.getElementById('render-loader-fill');
+        const renderLoaderRetry = document.getElementById('render-loader-retry');
+        let renderLoaderValue = 4;
+        let renderLoaderTarget = 9;
+        let renderLoaderStartedAt = performance.now();
+        let renderLoaderBackendSeen = false;
+        let renderLoaderFinished = false;
+        let renderLoaderFinishResolve = null;
+
+        function setRenderLoaderStage(target, title, subtitle) {
+            renderLoaderTarget = Math.max(renderLoaderTarget, Math.min(100, Number(target) || 0));
+            if (title) renderLoaderTitle.textContent = title;
+            if (subtitle) renderLoaderSubtitle.textContent = subtitle;
+        }
+
+        function paintRenderLoader() {
+            if (renderLoaderFinished) return;
+            const elapsed = performance.now() - renderLoaderStartedAt;
+            if (!renderLoaderBackendSeen) {
+                const timedTarget = elapsed < 3500 ? 18
+                    : elapsed < 11000 ? 34
+                    : elapsed < 24000 ? 52
+                    : elapsed < 42000 ? 69
+                    : 82;
+                renderLoaderTarget = Math.max(renderLoaderTarget, timedTarget);
+            }
+
+            const gap = renderLoaderTarget - renderLoaderValue;
+            if (gap > 0.01) {
+                const step = renderLoaderTarget >= 100
+                    ? Math.max(1.25, gap * .22)
+                    : Math.min(.72, Math.max(.12, gap * .075));
+                renderLoaderValue = Math.min(renderLoaderTarget, renderLoaderValue + step);
+            }
+            const rounded = Math.min(100, Math.round(renderLoaderValue));
+            renderLoaderPercent.textContent = `${rounded}%`;
+            renderLoaderFill.style.width = `${Math.max(4, renderLoaderValue)}%`;
+
+            if (renderLoaderTarget >= 100 && renderLoaderValue >= 99.45) {
+                renderLoaderValue = 100;
+                renderLoaderPercent.textContent = '100%';
+                renderLoaderFill.style.width = '100%';
+                renderLoaderFinished = true;
+                setTimeout(() => {
+                    renderLoaderElement.classList.add('is-complete');
+                    document.body.classList.remove('app-booting');
+                    setTimeout(() => renderLoaderElement.setAttribute('hidden', ''), 480);
+                    if (renderLoaderFinishResolve) renderLoaderFinishResolve();
+                }, 260);
+                return;
+            }
+            requestAnimationFrame(paintRenderLoader);
+        }
+        requestAnimationFrame(paintRenderLoader);
+
+        function renderHealthStage(health) {
+            renderLoaderBackendSeen = true;
+            const phase = String(health?.phase || 'booting');
+            if (health?.ready) {
+                setRenderLoaderStage(92, 'Сервер готов', 'Загружаем ваш профиль и игровые данные');
+            } else if (phase === 'connecting_database') {
+                setRenderLoaderStage(86, 'Сервер уже проснулся', 'Подключаем базу данных');
+            } else if (phase === 'initializing_database') {
+                setRenderLoaderStage(89, 'Почти готово', 'Проверяем игровые данные');
+            } else if (phase === 'waiting_for_database') {
+                setRenderLoaderStage(84, 'Ожидаем базу данных', 'Соединение занимает чуть больше времени');
+            } else {
+                setRenderLoaderStage(83, 'Сервер запускается', 'Завершаем подготовку приложения');
+            }
+        }
+
+        async function requestRenderHealth() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 12000);
+            try {
+                const response = await fetch(`${API_BASE}/health`, {
+                    signal: controller.signal,
+                    cache: 'no-store',
+                    credentials: 'omit'
+                });
+                if (!response.ok) throw new Error(`health_${response.status}`);
+                return await response.json();
+            } finally {
+                clearTimeout(timeoutId);
+            }
+        }
+
+        async function waitForRenderReady() {
+            while (true) {
+                try {
+                    const health = await requestRenderHealth();
+                    renderHealthStage(health);
+                    if (health?.ready) return health;
+                } catch (_) {
+                    if (!renderLoaderBackendSeen) {
+                        setRenderLoaderStage(
+                            renderLoaderTarget,
+                            'Пробуждаем сервер',
+                            'Первый запуск может занять до минуты'
+                        );
+                    }
+                }
+
+                if (performance.now() - renderLoaderStartedAt > 90000) {
+                    renderLoaderElement.classList.add('has-timeout');
+                    renderLoaderSubtitle.textContent = 'Сервер отвечает дольше обычного. Попробуем ещё раз?';
+                }
+                await new Promise(resolve => setTimeout(resolve, 1400));
+            }
+        }
+
+        function finishRenderLoader() {
+            if (renderLoaderFinished) return Promise.resolve();
+            setRenderLoaderStage(100, 'Всё готово', 'Добро пожаловать в DNX STORE');
+            return new Promise(resolve => { renderLoaderFinishResolve = resolve; });
+        }
+
+        renderLoaderRetry.addEventListener('click', () => {
+            renderLoaderStartedAt = performance.now();
+            renderLoaderElement.classList.remove('has-timeout');
+            setRenderLoaderStage(renderLoaderTarget, 'Повторяем подключение', 'Проверяем готовность сервера');
+        });
+
         const EXPECTED_API_RELEASE = '8.9-opt.74';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
         const TON_MANIFEST_URL = 'https://denixl-11.github.io/dnx-store/tonconnect-manifest.json';
-        const TON_STAR_RATE = 85;
+        const TON_STAR_RATE = 90;
         const initData = tg.initData || '';
         const userDisplayName = tg.initDataUnsafe?.user?.username || "Guest";
         const userAvatar = tg.initDataUnsafe?.user?.photo_url || "";
@@ -10277,25 +10624,50 @@
         }
 
         updateCartFab();
-        updateBalance();
         clearLegacyCatalogSnapshots();
         restoreCatalogVisualManifest();
-        loadCatalog(true);
-        const prewarmCasesInBackground = () => {
-            getCases().then(cases => prefetchCaseDetails(cases)).catch(() => {});
-        };
-        // Fetch case JSON and decode its static assets after catalogue paint.
-        if ('requestIdleCallback' in window) requestIdleCallback(prewarmCasesInBackground, { timeout: 350 });
-        else setTimeout(prewarmCasesInBackground, 100);
-        const prefetchHistoryInBackground = () => loadActivityHistory(true).catch(() => {});
-        if ('requestIdleCallback' in window) requestIdleCallback(prefetchHistoryInBackground, { timeout: 900 });
-        else setTimeout(prefetchHistoryInBackground, 250);
-        loadPrizeItems();
-        loadLeaderboardPreview();
-        const pendingTonDeposit = localStorage.getItem('dnx_ton_deposit');
-        if (pendingTonDeposit) pollTonDeposit(pendingTonDeposit);
-        const pendingStarPayment = localStorage.getItem('dnx_star_payment');
-        if (pendingStarPayment) pollStarPayment(pendingStarPayment);
+
+        async function bootstrapApplication() {
+            await waitForRenderReady();
+            setRenderLoaderStage(94, 'Загружаем профиль', 'Получаем баланс и каталог');
+
+            const essentialData = Promise.allSettled([
+                updateBalance(),
+                loadCatalog(true)
+            ]);
+            // Never keep the full-screen cover solely because a Telegram NFT
+            // poster is slow. The unresolved work safely continues underneath.
+            await Promise.race([
+                essentialData,
+                new Promise(resolve => setTimeout(resolve, 2800))
+            ]);
+
+            loadPrizeItems();
+            loadLeaderboardPreview();
+            await finishRenderLoader();
+
+            const prewarmCasesInBackground = () => {
+                getCases().then(cases => prefetchCaseDetails(cases)).catch(() => {});
+            };
+            // Fetch case JSON and decode its static assets after catalogue paint.
+            if ('requestIdleCallback' in window) requestIdleCallback(prewarmCasesInBackground, { timeout: 350 });
+            else setTimeout(prewarmCasesInBackground, 100);
+            const prefetchHistoryInBackground = () => loadActivityHistory(true).catch(() => {});
+            if ('requestIdleCallback' in window) requestIdleCallback(prefetchHistoryInBackground, { timeout: 900 });
+            else setTimeout(prefetchHistoryInBackground, 250);
+
+            const pendingTonDeposit = localStorage.getItem('dnx_ton_deposit');
+            if (pendingTonDeposit) pollTonDeposit(pendingTonDeposit);
+            const pendingStarPayment = localStorage.getItem('dnx_star_payment');
+            if (pendingStarPayment) pollStarPayment(pendingStarPayment);
+        }
+
+        bootstrapApplication().catch(error => {
+            console.error('Application bootstrap failed', error);
+            renderLoaderElement.classList.add('has-timeout');
+            renderLoaderTitle.textContent = 'Не удалось загрузить приложение';
+            renderLoaderSubtitle.textContent = 'Проверьте соединение и нажмите «Повторить»';
+        });
     </script>
 </body>
 </html>
