@@ -7413,7 +7413,7 @@
                     resumeCatalogNftMedia();
                     Promise.allSettled(currentCatalog.map(item => preloadNftPattern(item?.nft_media))).catch(() => {});
                     warmInitialCatalogPosters(currentCatalog).catch(() => {});
-                    return;
+                    return currentCatalog;
                 }
                 if (!catalogRequest) {
                     catalogRequest = apiFetch(`${API_BASE}/items`)
@@ -7442,26 +7442,58 @@
                 updateCartFab();
                 Promise.allSettled(currentCatalog.map(item => preloadNftPattern(item?.nft_media))).catch(() => {});
                 warmInitialCatalogPosters(currentCatalog).catch(() => {});
+                return currentCatalog;
             } catch(e) { console.error(e); }
         }
 
         async function warmInitialCatalogPosters(items = []) {
             const initialItems = (Array.isArray(items) ? items : [])
                 .filter(item => safeTelegramUrl(item?.nft_link))
-                .slice(0, 6);
+                .slice(0, 9);
             if (!initialItems.length) return;
             const preparation = Promise.allSettled([
                 ...initialItems.map(item => preloadNftTheme(item?.nft_media)),
                 warmItemNftPosters(initialItems)
             ]);
             // Never hold an unusually large catalogue behind one slow NFT.
-            // If the first six posters are healthy they normally finish well
+            // If the first nine posters are healthy they normally finish well
             // inside this window; otherwise cards paint the exact clean theme
             // and the model joins later, with no low-resolution raster flash.
             await Promise.race([
                 preparation,
-                new Promise(resolve => setTimeout(resolve, 1800))
+                new Promise(resolve => setTimeout(resolve, 2400))
             ]);
+        }
+
+        async function decodeInitialCatalogStaticFrames(items = []) {
+            await warmInitialCatalogPosters(items);
+            const visibleCards = [...document.querySelectorAll('#catalog-container .item-card:not([hidden])')].slice(0, 9);
+            const images = visibleCards.flatMap(card => [...card.querySelectorAll(
+                '.nft-card-theme-frame, .nft-catalog-hires-frame, .catalog-instant-frame img'
+            )]);
+            if (!images.length) return 0;
+            const decodeImage = image => new Promise(resolve => {
+                let settled = false;
+                const timeoutId = setTimeout(() => finish(image.complete && image.naturalWidth > 0), 1200);
+                const finish = ready => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeoutId);
+                    image.removeEventListener('load', onLoad);
+                    image.removeEventListener('error', onError);
+                    resolve(Boolean(ready));
+                };
+                const onLoad = () => {
+                    if (typeof image.decode === 'function') image.decode().then(() => finish(true)).catch(() => finish(image.naturalWidth > 0));
+                    else finish(image.naturalWidth > 0);
+                };
+                const onError = () => finish(false);
+                if (image.complete) return onLoad();
+                image.addEventListener('load', onLoad, { once: true });
+                image.addEventListener('error', onError, { once: true });
+            });
+            const results = await Promise.allSettled(images.map(decodeImage));
+            return results.filter(result => result.status === 'fulfilled' && result.value).length;
         }
 
         function renderCatalogItems() {
@@ -10631,15 +10663,21 @@
             await waitForRenderReady();
             setRenderLoaderStage(94, 'Загружаем профиль', 'Получаем баланс и каталог');
 
+            const catalogData = loadCatalog(true);
             const essentialData = Promise.allSettled([
                 updateBalance(),
-                loadCatalog(true)
+                catalogData
             ]);
-            // Never keep the full-screen cover solely because a Telegram NFT
-            // poster is slow. The unresolved work safely continues underneath.
+            // Paint the catalogue rows first, then spend the remaining cover
+            // time decoding the static frames that will be visible on entry.
             await Promise.race([
                 essentialData,
-                new Promise(resolve => setTimeout(resolve, 2800))
+                new Promise(resolve => setTimeout(resolve, 2200))
+            ]);
+            setRenderLoaderStage(97, 'Готовим каталог', 'Заранее загружаем статичные кадры');
+            await Promise.race([
+                catalogData.then(items => decodeInitialCatalogStaticFrames(items)).catch(() => 0),
+                new Promise(resolve => setTimeout(resolve, 3200))
             ]);
 
             loadPrizeItems();
