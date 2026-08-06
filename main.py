@@ -126,7 +126,17 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.74"
+API_RELEASE = "8.9-opt.75"
+
+
+def versioned_webapp_url(url: str) -> str:
+    parts = urlsplit(url)
+    query = [(key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True) if key != "v"]
+    query.append(("v", API_RELEASE))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+WEBAPP_LAUNCH_URL = versioned_webapp_url(WEBAPP_URL)
 GITHUB_CASE_ASSET_BASE = os.getenv(
     "GITHUB_CASE_ASSET_BASE",
     "https://denixl-11.github.io/dnx-store/assets/case-rewards/",
@@ -4769,7 +4779,7 @@ async def cmd_start(message: types.Message):
         except Exception as exc:
             logging.error("Could not create user from /start: %s", exc)
     kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_URL))]])
+        inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_LAUNCH_URL))]])
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
 
 # ---------- Настройка сервера ----------
@@ -4866,6 +4876,18 @@ async def main():
                 BOT_USERNAME = me.username or ""
             except Exception as exc:
                 logging.warning("Could not prefetch bot username: %s", exc)
+        try:
+            await asyncio.wait_for(
+                bot.set_chat_menu_button(
+                    menu_button=types.MenuButtonWebApp(
+                        text="✨ Магазин",
+                        web_app=WebAppInfo(url=WEBAPP_LAUNCH_URL),
+                    )
+                ),
+                timeout=5,
+            )
+        except Exception as exc:
+            logging.warning("Could not refresh Telegram Mini App menu URL: %s", exc)
         game_task = asyncio.create_task(game_worker())
         ton_task = asyncio.create_task(ton_payment_worker())
         star_task = asyncio.create_task(star_reconciliation_worker())
