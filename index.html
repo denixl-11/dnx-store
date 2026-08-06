@@ -10713,7 +10713,7 @@
             // The cover stays in place until the authoritative profile and
             // catalogue are both loaded. Only static media gets a bounded
             // grace window because one malformed NFT must not block the app.
-            setRenderLoaderStage(97, 'Готовим каталог', 'Заранее загружаем статичные кадры');
+            setRenderLoaderStage(97, 'Загружаем каталог', 'Подготавливаем изображения товаров');
             await Promise.race([
                 decodeInitialCatalogStaticFrames(catalogItems).catch(() => 0),
                 new Promise(resolve => setTimeout(resolve, 3200))
