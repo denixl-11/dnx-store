@@ -4850,8 +4850,8 @@
                 <img class="render-loader-logo" src="app-icon.png" alt="">
             </div>
             <div class="render-loader-percent" id="render-loader-percent">4%</div>
-            <div class="render-loader-title" id="render-loader-title">Подключаемся к DNX STORE</div>
-            <div class="render-loader-subtitle" id="render-loader-subtitle">Проверяем готовность игрового сервера</div>
+                <div class="render-loader-title" id="render-loader-title">Запускаем приложение</div>
+                <div class="render-loader-subtitle" id="render-loader-subtitle">Проверяем соединение</div>
             <div class="render-loader-track" aria-hidden="true">
                 <div class="render-loader-fill" id="render-loader-fill"></div>
             </div>
@@ -4933,6 +4933,8 @@
         <div id="collection-filter" class="collection-filter">
             <div class="collection-combobox">
                 <input id="collection-filter-input" type="search" inputmode="search" autocomplete="off"
+                       autocorrect="off" autocapitalize="off" spellcheck="false"
+                       data-gramm="false" data-enable-grammarly="false"
                        aria-label="Поиск по названию NFT" aria-controls="collection-filter-options"
                        placeholder="Все NFT · начните вводить название"
                        oninput="handleCollectionFilterInput(this.value)"
@@ -5376,12 +5378,28 @@
         let renderLoaderBackendSeen = false;
         let renderLoaderFinished = false;
         let renderLoaderFinishResolve = null;
+        let renderLoaderCopyIndex = 0;
+        const renderLoaderCopySteps = [
+            ['Запускаем приложение', 'Проверяем соединение'],
+            ['Загружаем профиль', 'Получаем данные аккаунта'],
+            ['Загружаем каталог', 'Подготавливаем товары'],
+            ['Загружаем игровые данные', 'Синхронизируем прогресс'],
+            ['Подготавливаем интерфейс', 'Осталось совсем немного']
+        ];
 
         function setRenderLoaderStage(target, title, subtitle) {
             renderLoaderTarget = Math.max(renderLoaderTarget, Math.min(100, Number(target) || 0));
             if (title) renderLoaderTitle.textContent = title;
             if (subtitle) renderLoaderSubtitle.textContent = subtitle;
         }
+
+        const renderLoaderCopyTimer = setInterval(() => {
+            if (renderLoaderFinished || renderLoaderTarget >= 92) return;
+            renderLoaderCopyIndex = (renderLoaderCopyIndex + 1) % renderLoaderCopySteps.length;
+            const [title, subtitle] = renderLoaderCopySteps[renderLoaderCopyIndex];
+            renderLoaderTitle.textContent = title;
+            renderLoaderSubtitle.textContent = subtitle;
+        }, 2800);
 
         function paintRenderLoader() {
             if (renderLoaderFinished) return;
@@ -5411,6 +5429,7 @@
                 renderLoaderPercent.textContent = '100%';
                 renderLoaderFill.style.width = '100%';
                 renderLoaderFinished = true;
+                clearInterval(renderLoaderCopyTimer);
                 setTimeout(() => {
                     renderLoaderElement.classList.add('is-complete');
                     document.body.classList.remove('app-booting');
@@ -5427,15 +5446,15 @@
             renderLoaderBackendSeen = true;
             const phase = String(health?.phase || 'booting');
             if (health?.ready) {
-                setRenderLoaderStage(92, 'Сервер готов', 'Загружаем ваш профиль и игровые данные');
+                setRenderLoaderStage(92, 'Подключение установлено', 'Переходим к загрузке профиля');
             } else if (phase === 'connecting_database') {
-                setRenderLoaderStage(86, 'Сервер уже проснулся', 'Подключаем базу данных');
+                setRenderLoaderStage(86);
             } else if (phase === 'initializing_database') {
-                setRenderLoaderStage(89, 'Почти готово', 'Проверяем игровые данные');
+                setRenderLoaderStage(89);
             } else if (phase === 'waiting_for_database') {
-                setRenderLoaderStage(84, 'Ожидаем базу данных', 'Соединение занимает чуть больше времени');
+                setRenderLoaderStage(84);
             } else {
-                setRenderLoaderStage(83, 'Сервер запускается', 'Завершаем подготовку приложения');
+                setRenderLoaderStage(83);
             }
         }
 
@@ -5463,17 +5482,13 @@
                     if (health?.ready) return health;
                 } catch (_) {
                     if (!renderLoaderBackendSeen) {
-                        setRenderLoaderStage(
-                            renderLoaderTarget,
-                            'Пробуждаем сервер',
-                            'Первый запуск может занять до минуты'
-                        );
+                        setRenderLoaderStage(renderLoaderTarget);
                     }
                 }
 
                 if (performance.now() - renderLoaderStartedAt > 90000) {
                     renderLoaderElement.classList.add('has-timeout');
-                    renderLoaderSubtitle.textContent = 'Сервер отвечает дольше обычного. Попробуем ещё раз?';
+                    renderLoaderSubtitle.textContent = 'Загрузка занимает больше времени. Попробовать ещё раз?';
                 }
                 await new Promise(resolve => setTimeout(resolve, 1400));
             }
@@ -5488,7 +5503,7 @@
         renderLoaderRetry.addEventListener('click', () => {
             renderLoaderStartedAt = performance.now();
             renderLoaderElement.classList.remove('has-timeout');
-            setRenderLoaderStage(renderLoaderTarget, 'Повторяем подключение', 'Проверяем готовность сервера');
+            setRenderLoaderStage(renderLoaderTarget, 'Повторяем загрузку', 'Проверяем соединение');
         });
 
         const EXPECTED_API_RELEASE = '8.9-opt.74';
@@ -7145,10 +7160,15 @@
         async function updateBalance() {
             if (balanceRequest) return balanceRequest;
             balanceRequest = (async () => {
+                let loaded = false;
                 try {
                     const data = await apiFetch(`${API_BASE}/user`);
-                    userBalance = data.balance || 0;
-                    userBonusBalance = data.bonusBalance || 0;
+                    if (!data || data.balance == null || data.bonusBalance == null
+                        || !Number.isFinite(Number(data.balance)) || !Number.isFinite(Number(data.bonusBalance))) {
+                        throw new Error('invalid_profile_payload');
+                    }
+                    userBalance = Number(data.balance);
+                    userBonusBalance = Number(data.bonusBalance);
                     referralLink = data.referralLink || '';
                     document.getElementById('referrals-count').innerText = Number(data.referralsCount || 0).toLocaleString('ru-RU');
                     document.getElementById('referral-earned').innerText = formatStars(data.referralEarned || 0);
@@ -7157,7 +7177,9 @@
                     document.getElementById('referral-program-description').innerText = `Приглашайте новых пользователей и получайте ${referralRate}% каждого их пополнения на бонусный баланс.`;
                     if (data.restriction) activateAccountRestriction(data.restriction);
                     else if (accountRestriction) clearAccountRestriction();
+                    loaded = true;
                 } catch(e) { console.error('Balance update failed', e); }
+                if (!loaded) return false;
                 document.getElementById('header-balance').innerHTML = `<span>${formatStars(userBalance)}</span>${telegramStarMarkup()}`;
                 document.getElementById('header-bonus-balance').innerHTML = `<span>${formatStars(userBonusBalance)}</span>${bonusStarMarkup()}`;
                 document.getElementById('big-balance').innerText = formatStars(userBalance);
@@ -7168,6 +7190,7 @@
                     if (main) main.innerHTML = `Основной · ${formatStars(userBalance)} ${telegramStarMarkup()}`;
                     if (bonus) bonus.innerHTML = `Бонусный · ${formatStars(userBonusBalance)} ${bonusStarMarkup()}`;
                 });
+                return true;
             })().finally(() => { balanceRequest = null; });
             return balanceRequest;
         }
@@ -7418,7 +7441,8 @@
                 if (!catalogRequest) {
                     catalogRequest = apiFetch(`${API_BASE}/items`)
                         .then(items => {
-                            currentCatalog = Array.isArray(items) ? items : [];
+                            if (!Array.isArray(items)) throw new Error('invalid_catalog_payload');
+                            currentCatalog = items;
                             seedNftMediaFromItems(currentCatalog);
                             persistCatalogVisualManifest(currentCatalog);
                             cart = cart.map(cartItem => {
@@ -7443,7 +7467,10 @@
                 Promise.allSettled(currentCatalog.map(item => preloadNftPattern(item?.nft_media))).catch(() => {});
                 warmInitialCatalogPosters(currentCatalog).catch(() => {});
                 return currentCatalog;
-            } catch(e) { console.error(e); }
+            } catch(e) {
+                console.error('Catalog load failed', e);
+                return false;
+            }
         }
 
         async function warmInitialCatalogPosters(items = []) {
@@ -10663,20 +10690,32 @@
             await waitForRenderReady();
             setRenderLoaderStage(94, 'Загружаем профиль', 'Получаем баланс и каталог');
 
-            const catalogData = loadCatalog(true);
-            const essentialData = Promise.allSettled([
-                updateBalance(),
-                catalogData
-            ]);
-            // Paint the catalogue rows first, then spend the remaining cover
-            // time decoding the static frames that will be visible on entry.
-            await Promise.race([
-                essentialData,
-                new Promise(resolve => setTimeout(resolve, 2200))
-            ]);
+            let catalogItems = null;
+            while (true) {
+                const [profileResult, catalogResult] = await Promise.allSettled([
+                    updateBalance(),
+                    loadCatalog(true)
+                ]);
+                const profileReady = profileResult.status === 'fulfilled' && profileResult.value === true;
+                const catalogReady = catalogResult.status === 'fulfilled' && Array.isArray(catalogResult.value);
+                if (profileReady && catalogReady) {
+                    catalogItems = catalogResult.value;
+                    break;
+                }
+                setRenderLoaderStage(94, 'Загружаем данные', 'Повторяем загрузку профиля и каталога');
+                if (performance.now() - renderLoaderStartedAt > 90000) {
+                    renderLoaderElement.classList.add('has-timeout');
+                    renderLoaderSubtitle.textContent = 'Не удалось получить данные. Попробовать ещё раз?';
+                }
+                await new Promise(resolve => setTimeout(resolve, 1400));
+            }
+
+            // The cover stays in place until the authoritative profile and
+            // catalogue are both loaded. Only static media gets a bounded
+            // grace window because one malformed NFT must not block the app.
             setRenderLoaderStage(97, 'Готовим каталог', 'Заранее загружаем статичные кадры');
             await Promise.race([
-                catalogData.then(items => decodeInitialCatalogStaticFrames(items)).catch(() => 0),
+                decodeInitialCatalogStaticFrames(catalogItems).catch(() => 0),
                 new Promise(resolve => setTimeout(resolve, 3200))
             ]);
 

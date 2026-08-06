@@ -4391,6 +4391,7 @@ async def withdraw_user_result_message(item: dict, *, approved: bool) -> str:
     """Build the customer result from the Telegram link, never a SQL item id."""
     record = {
         "id": int(item.get("id") or 0),
+        "name": str(item.get("name") or ""),
         "nft_link": canonical_telegram_nft_url(item.get("nft_link")),
         "case_asset_url": str(item.get("case_asset_url") or ""),
     }
@@ -4407,18 +4408,34 @@ async def withdraw_user_result_message(item: dict, *, approved: bool) -> str:
     collection = html_escape(str(record.get("name") or "NFT"))
     safe_link = html_escape(record["nft_link"], quote=True)
     collection_line = f'<a href="{safe_link}">{collection}</a>' if safe_link else collection
+    is_collectible_nft = bool(record["nft_link"])
     live_traits = descriptor.get("traits") if isinstance(descriptor, dict) and isinstance(descriptor.get("traits"), dict) else {}
     model = html_escape(str(live_traits.get("model") or record.get("model") or "—"))
     pattern = html_escape(str(live_traits.get("pattern") or record.get("pattern") or "—"))
     background = html_escape(str(live_traits.get("background") or record.get("background") or "—"))
     if approved:
         heading = "✅ <b>ВЫВОД УСПЕШНО ЗАВЕРШЁН</b>"
-        note = "Коллекционный NFT передан в ваш Telegram-аккаунт."
+        note = (
+            "Коллекционный NFT передан в ваш Telegram-аккаунт."
+            if is_collectible_nft else
+            "Предмет успешно выведен из вашего инвентаря."
+        )
         footer = "Спасибо, что выбираете DNX Store ✨"
     else:
         heading = "❌ <b>ВЫВОД ОТКЛОНЁН</b>"
-        note = "NFT безопасно возвращён в ваш инвентарь DNX Store."
+        note = (
+            "NFT безопасно возвращён в ваш инвентарь DNX Store."
+            if is_collectible_nft else
+            "Предмет возвращён в ваш инвентарь DNX Store."
+        )
         footer = "Вы можете повторить запрос на вывод позже."
+    traits_block = (
+        "💎 <b>ХАРАКТЕРИСТИКИ</b>\n"
+        f"Модель: <b>{model}</b>\n"
+        f"Узор: <b>{pattern}</b>\n"
+        f"Фон: <b>{background}</b>\n\n"
+        if is_collectible_nft else ""
+    )
     return (
         "✨ <b>DNX STORE</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
@@ -4426,10 +4443,7 @@ async def withdraw_user_result_message(item: dict, *, approved: bool) -> str:
         f"{note}\n\n"
         "🎁 <b>КОЛЛЕКЦИЯ</b>\n"
         f"{collection_line}\n\n"
-        "💎 <b>ХАРАКТЕРИСТИКИ</b>\n"
-        f"Модель: <b>{model}</b>\n"
-        f"Узор: <b>{pattern}</b>\n"
-        f"Фон: <b>{background}</b>\n\n"
+        f"{traits_block}"
         "━━━━━━━━━━━━━━━━━━\n"
         f"{footer}"
     )
