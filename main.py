@@ -126,7 +126,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.78"
+API_RELEASE = "8.9-opt.79"
 
 
 def versioned_webapp_url(url: str) -> str:
@@ -1274,12 +1274,11 @@ def withdrawal_request_traits_message(descriptor: dict | None, item_kind: str) -
     return withdrawal_traits_message(descriptor)
 
 
-def withdrawal_link_keyboard(link: str) -> InlineKeyboardMarkup | None:
-    canonical_link = canonical_telegram_nft_url(link)
-    if not canonical_link:
+def withdrawal_link_keyboard(item_id: int) -> InlineKeyboardMarkup | None:
+    if int(item_id or 0) <= 0:
         return None
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="ОТКРЫТЬ NFT", url=canonical_link)
+        InlineKeyboardButton(text="ОТКРЫТЬ NFT", callback_data=f"open_nft_{int(item_id)}")
     ]])
 
 
@@ -4532,8 +4531,10 @@ async def withdraw_user_result_message(
         )
     traits_block = withdrawal_traits_message(descriptor) if is_collectible_nft else ""
     item_label = "КОЛЛЕКЦИЯ" if is_collectible_nft else "НЕКОЛЛЕКЦИОННЫЙ"
+    # The zero-width link keeps Telegram's rich NFT preview without adding a
+    # visible link caption above the button.
     link_block = (
-        f'\n🔗 <b><a href="{safe_link}">ОТКРЫТЬ NFT В TELEGRAM</a></b>\n'
+        f'<a href="{safe_link}">&#8291;</a>'
         if approved and is_collectible_nft and safe_link else ""
     )
     return (
@@ -4607,13 +4608,13 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
             ADMIN_ID,
             "🔗 <b>ССЫЛКА ДЛЯ ВЫВОДА</b>\n"
             "Ответьте на это сообщение полной ссылкой вида:\n"
-            "<code>https://t.me/nft/...</code>\n\n"
+            "<code>https://t.me/nft/NAME-123</code>\n\n"
             f"<code>Заявка: {uid}:{item_id}:{callback.message.message_id}</code>",
             parse_mode="HTML",
             reply_to_message_id=callback.message.message_id,
             reply_markup=types.ForceReply(
                 selective=True,
-                input_field_placeholder="https://t.me/nft/...",
+                input_field_placeholder="https://t.me/nft/NAME-123",
             ),
         )
         await callback.answer("Отправьте ссылку ответом на сообщение")
@@ -4640,7 +4641,7 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
             int(uid),
             await withdraw_user_result_message(dict(item), approved=True),
             parse_mode="HTML",
-            reply_markup=withdrawal_link_keyboard(item.get("nft_link")),
+            reply_markup=withdrawal_link_keyboard(item.get("id")),
             link_preview_options=types.LinkPreviewOptions(
                 is_disabled=False,
                 prefer_large_media=True,
@@ -4697,6 +4698,25 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
         pass
 
 
+@dp.callback_query(F.data.startswith("open_nft_"))
+async def open_withdrawn_nft(callback: types.CallbackQuery):
+    """Open a delivered NFT without Telegram's external-link badge on the button."""
+    item_id_text = str(callback.data or "").removeprefix("open_nft_")
+    if not item_id_text.isdigit():
+        await callback.answer("Ссылка недоступна", show_alert=True)
+        return
+    item = await get_pool().fetchrow(
+        """SELECT nft_link, buyer_id FROM items
+           WHERE id = $1 AND status = 'withdrawn'""",
+        int(item_id_text),
+    )
+    link = canonical_telegram_nft_url(item["nft_link"]) if item else ""
+    if not item or str(item["buyer_id"] or "") != str(callback.from_user.id) or not link:
+        await callback.answer("Ссылка недоступна", show_alert=True)
+        return
+    await callback.answer(url=link)
+
+
 @dp.message(F.from_user.id == ADMIN_ID, F.reply_to_message, F.text)
 async def admin_withdraw_transfer_link(message: types.Message):
     """Bind a delivered NFT URL to the exact request encoded in the replied prompt."""
@@ -4711,12 +4731,12 @@ async def admin_withdraw_transfer_link(message: types.Message):
     if not transfer_link:
         await message.reply(
             "Ссылка не распознана. Отправьте полную ссылку вида:\n"
-            "<code>https://t.me/nft/...</code>\n\n"
+            "<code>https://t.me/nft/NAME-123</code>\n\n"
             f"<code>Заявка: {uid}:{item_id}:{request_message_id}</code>",
             parse_mode="HTML",
             reply_markup=types.ForceReply(
                 selective=True,
-                input_field_placeholder="https://t.me/nft/...",
+                input_field_placeholder="https://t.me/nft/NAME-123",
             ),
         )
         return
@@ -4733,7 +4753,7 @@ async def admin_withdraw_transfer_link(message: types.Message):
             parse_mode="HTML",
             reply_markup=types.ForceReply(
                 selective=True,
-                input_field_placeholder="https://t.me/nft/...",
+                input_field_placeholder="https://t.me/nft/NAME-123",
             ),
         )
         return
@@ -4769,7 +4789,7 @@ async def admin_withdraw_transfer_link(message: types.Message):
             int(uid),
             await withdraw_user_result_message(dict(item), approved=True, transfer_link=transfer_link),
             parse_mode="HTML",
-            reply_markup=withdrawal_link_keyboard(transfer_link),
+            reply_markup=withdrawal_link_keyboard(item.get("id")),
             link_preview_options=types.LinkPreviewOptions(
                 is_disabled=False,
                 prefer_large_media=True,

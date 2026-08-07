@@ -1423,6 +1423,7 @@
                 linear-gradient(155deg, #16091f, #08040d 74%) !important;
             box-shadow: 0 24px 70px rgba(0,0,0,.72), 0 0 35px rgba(199, 53, 255, .16), inset 0 1px rgba(255,255,255,.06);
         }
+        #alert-modal { z-index: 12000 !important; }
         .premium-alert-icon {
             display: grid;
             place-items: center;
@@ -4970,7 +4971,7 @@
             </div>
             <div class="game-info-row">
                 <span id="game-players-count">Игроки: 0/20</span>
-                <span id="game-number-display">#...</span>
+                <span id="game-number-display">#—</span>
             </div>
             <div class="game-controls">
                 <button class="btn-gold-outline" onclick="openBetConfirm(10)"><span class="star-amount"><span>+10</span><span class="telegram-star" aria-hidden="true"></span></span></button>
@@ -5111,7 +5112,7 @@
     <div id="history-modal" class="modal-overlay" onclick="closeModal('history-modal')">
         <div class="modal-content premium-history-modal" onclick="event.stopPropagation()">
             <div class="premium-history-title"><span>ИСТОРИЯ ИГР</span><small>ПОСЛЕДНИЕ РАУНДЫ</small></div>
-            <div class="history-modal-list" id="history-modal-list-inner">Загрузка...</div>
+            <div class="history-modal-list" id="history-modal-list-inner">Загрузка</div>
             <button class="btn-secondary premium-history-close" onclick="closeModal('history-modal')">Закрыть</button>
         </div>
     </div>
@@ -5119,7 +5120,7 @@
     <div id="game-spotlight-modal" class="modal-overlay" onclick="closeModal('game-spotlight-modal')">
         <div class="modal-content premium-history-modal" onclick="event.stopPropagation()">
             <div class="premium-history-title"><span id="game-spotlight-title">ЛУЧШАЯ ИГРА</span><small id="game-spotlight-subtitle">ЗА ВСЁ ВРЕМЯ</small></div>
-            <div class="history-modal-list" id="game-spotlight-content">Загрузка...</div>
+            <div class="history-modal-list" id="game-spotlight-content">Загрузка</div>
             <button class="btn-secondary premium-history-close" onclick="closeModal('game-spotlight-modal')">Закрыть</button>
         </div>
     </div>
@@ -5221,9 +5222,9 @@
         </div>
         <div class="season-timer" id="season-timer-display">
             <span class="season-timer-premium-icon" aria-hidden="true"></span>
-            <span class="season-timer-text" id="season-timer-text">Загрузка...</span>
+            <span class="season-timer-text" id="season-timer-text">Загрузка</span>
         </div>
-        <div class="leaderboard-list" id="leaderboard-list">Загрузка...</div>
+        <div class="leaderboard-list" id="leaderboard-list">Загрузка</div>
     </div>
 
     <div id="account-restriction-modal" class="modal-overlay account-restriction-modal" role="alertdialog" aria-modal="true" aria-labelledby="restriction-title">
@@ -5575,7 +5576,7 @@
             setRenderLoaderStage(renderLoaderTarget);
         });
 
-        const EXPECTED_API_RELEASE = '8.9-opt.78';
+        const EXPECTED_API_RELEASE = '8.9-opt.79';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -7911,7 +7912,7 @@
                 liveTraits[key]
                 || ((itemHasTelegramTraits || (isCaseOrigin && key === 'model')) ? item[key] : '')
                 || ''
-            ).trim() || 'Загрузка…';
+            ).trim() || 'Загрузка';
             const traits = [
                 { label: 'Модель', value: telegramLink ? linkedTrait('model') : (item.model == null || String(item.model).trim() === '' ? 'None' : item.model) },
                 { label: 'Узор', value: isCaseOrigin ? 'Random' : (telegramLink ? linkedTrait('pattern') : (item.pattern == null || String(item.pattern).trim() === '' ? 'None' : item.pattern)) },
@@ -8245,11 +8246,11 @@
             purchaseInFlight = true;
             const button = document.getElementById('confirm-buy-btn');
             button.disabled = true;
-            button.textContent = 'ПОКУПКА…';
+            button.textContent = 'ПОКУПКА';
             try {
                 const data = await apiFetch(`${API_BASE}/buy`, { method: 'POST', timeoutMs: 30000, body: JSON.stringify({items: [id], requestId}) });
                 if(data.success) {
-                    showAlert("Успешная покупка! NFT добавлен в инвентарь.");
+                    showAlert("NFT добавлен в инвентарь", "ПОКУПКА УСПЕШНА", "success");
                     closeModal('confirm-buy-modal');
                     if (Number.isFinite(Number(data.balance))) userBalance = Number(data.balance);
                     await Promise.allSettled([updateBalance(), loadCatalog(true), loadInventory()]);
@@ -8286,7 +8287,7 @@
             try {
                 const data = await apiFetch(`${API_BASE}/buy`, { method: 'POST', timeoutMs: 30000, body: JSON.stringify({ items: itemIds, requestId }) });
                 if (data.success) {
-                    showAlert('Корзина оплачена!');
+                    showAlert('Все NFT добавлены в инвентарь', 'ПОКУПКА УСПЕШНА', 'success');
                     cart = [];
                     localStorage.removeItem('dnx_cart');
                     renderCart();
@@ -8322,7 +8323,7 @@
             const status = document.getElementById('stars-payment-status');
             if (!pendingTopupStars) return;
             try {
-                status.innerText = 'Создаём счёт Telegram…';
+                status.innerText = 'Создаём счёт Telegram';
                 const invoice = await apiFetch(`${API_BASE}/stars/invoice/create`, {
                     method: 'POST', body: JSON.stringify({ stars: pendingTopupStars })
                 });
@@ -8330,7 +8331,7 @@
                 if (typeof tg.openInvoice !== 'function') throw new Error('Обновите Telegram для оплаты Stars');
                 tg.openInvoice(invoice.invoiceLink, invoiceStatus => {
                     if (invoiceStatus === 'paid' || invoiceStatus === 'pending') {
-                        status.innerText = 'Платёж подтверждается…';
+                        status.innerText = 'Платёж подтверждается';
                         pollStarPayment(invoice.paymentId);
                     } else if (invoiceStatus === 'cancelled') {
                         status.innerText = 'Оплата отменена';
@@ -8380,7 +8381,7 @@
             }
             if (tonConnectUI.connected && tonConnectUI.account) {
                 const address = tonConnectUI.account.address;
-                status.innerText = `Кошелёк: ${address.slice(0, 6)}…${address.slice(-6)}`;
+                status.innerText = `Кошелёк: ${address.slice(0, 6)}·${address.slice(-6)}`;
                 button.innerText = `ОПЛАТИТЬ ≈ ${formatTon(pendingTopupStars / TON_STAR_RATE, 6)} TON`;
                 button.disabled = tonPaymentInProgress;
             } else {
@@ -8400,7 +8401,7 @@
             updateTonWalletUI();
             const status = document.getElementById('ton-payment-status');
             try {
-                status.innerText = 'Создаём защищённый платёж…';
+                status.innerText = 'Создаём защищённый платёж';
                 const deposit = await apiFetch(`${API_BASE}/ton/deposit/create`, {
                     method: 'POST',
                     body: JSON.stringify({
@@ -8418,7 +8419,7 @@
                     }]
                 });
                 localStorage.setItem('dnx_ton_deposit', deposit.depositId);
-                status.innerText = 'Транзакция отправлена. Ожидаем подтверждения…';
+                status.innerText = 'Транзакция отправлена. Ожидаем подтверждения';
                 pollTonDeposit(deposit.depositId);
             } catch(e) {
                 status.innerText = 'Платёж не завершён';
@@ -8523,7 +8524,7 @@
                     }).join('')
                     : `<div class="empty-state"><div class="empty-state-icon">◇</div><h3>ИНВЕНТАРЬ ПУСТ</h3><p>Купленные и выигранные NFT появятся здесь.</p></div>`;
                 const historyContainer = document.getElementById('inventory-history-container');
-                if (!historyContainer.dataset.loaded) historyContainer.innerHTML = '<div class="empty-state"><p>Загружаем историю…</p></div>';
+                if (!historyContainer.dataset.loaded) historyContainer.innerHTML = '<div class="empty-state"><p>Загружаем историю</p></div>';
                 startWithdrawCountdowns();
                 // Cards paint from signed asset seeds immediately. Poster
                 // decoding is a non-blocking progressive enhancement.
@@ -8604,7 +8605,7 @@
             if (activityLoading) return activityRequest;
             if (reset) {
                 activityNextBefore = null;
-                if (!hasSnapshot) container.innerHTML = '<div class="empty-state"><p>Загружаем историю…</p></div>';
+                if (!hasSnapshot) container.innerHTML = '<div class="empty-state"><p>Загружаем историю</p></div>';
             }
             activityLoading = true;
             activityRequest = (async () => { try {
@@ -8807,7 +8808,7 @@
             const isBest = kind === 'best';
             document.getElementById('game-spotlight-title').textContent = isBest ? 'ЛУЧШАЯ ИГРА' : 'ПОСЛЕДНЯЯ ИГРА';
             document.getElementById('game-spotlight-subtitle').textContent = isBest ? 'МАКСИМАЛЬНЫЙ ВЫИГРЫШ ЗА ВСЁ ВРЕМЯ' : 'ПОСЛЕДНИЙ ЗАВЕРШЁННЫЙ РАУНД';
-            content.innerHTML = 'Загрузка...';
+            content.innerHTML = 'Загрузка';
             modal.classList.add('active');
             try {
                 const data = await getGameHistory();
@@ -8824,7 +8825,7 @@
         async function openHistoryModal() {
             const modal = document.getElementById('history-modal');
             const list = document.getElementById('history-modal-list-inner');
-            list.innerHTML = 'Загрузка...';
+            list.innerHTML = 'Загрузка';
             modal.classList.add('active');
             try {
                 const data = await getGameHistory(true);
@@ -9771,7 +9772,7 @@
         }
         async function executeBet() {
             const btn = document.getElementById('btn-confirm-bet');
-            if (btn) { btn.disabled = true; btn.innerText = 'Загрузка...'; }
+            if (btn) { btn.disabled = true; btn.innerText = 'Загрузка'; }
             try {
                 const data = await apiFetch(`${API_BASE}/game/bet`, {
                     method: 'POST',
@@ -9946,7 +9947,7 @@
                 prefetchCaseDetails(casesCache);
                 return;
             }
-            if (!grid.children.length) grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #d788ff; padding: 40px 0;">Загрузка...</div>`;
+            if (!grid.children.length) grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #d788ff; padding: 40px 0;">Загрузка</div>`;
             try {
                 const cases = await getCases();
                 renderCases(cases);
@@ -10644,7 +10645,7 @@
             const currencySpan = document.getElementById('win-currency');
 
             btn.disabled = true;
-            textSpan.innerText = 'ПРОДАЖА...';
+            textSpan.innerText = 'ПРОДАЖА';
             valSpan.style.display = 'none';
             currencySpan.style.display = 'none';
 
@@ -10690,7 +10691,7 @@
             caseOpeningRequestActive = true;
             btn.disabled = true;
             const originalText = btn.innerHTML;
-            btn.innerHTML = 'ОТКРЫВАЕМ КЕЙС…';
+            btn.innerHTML = 'ОТКРЫВАЕМ КЕЙС';
             btn.style.opacity = '0.92';
 
             const rouletteContainer = document.getElementById('roulette-container');
