@@ -126,7 +126,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.77"
+API_RELEASE = "8.9-opt.78"
 
 
 def versioned_webapp_url(url: str) -> str:
@@ -1257,6 +1257,30 @@ def withdrawal_traits_message(descriptor: dict | None) -> str:
         f"Узор  ·  <b>{html_escape(traits['pattern'])}</b>\n"
         f"Фон  ·  <b>{html_escape(traits['background'])}</b>\n"
     )
+
+
+def withdrawal_request_traits_message(descriptor: dict | None, item_kind: str) -> str:
+    """Case requests disclose the model; their undisclosed traits stay Random."""
+    traits = withdrawal_live_traits(descriptor)
+    if not traits:
+        return ""
+    if item_kind == "case_collectible":
+        return (
+            "💎 <b>ХАРАКТЕРИСТИКИ</b>\n"
+            f"Модель  ·  <b>{html_escape(traits['model'])}</b>\n"
+            "Узор  ·  <b>Random</b>\n"
+            "Фон  ·  <b>Random</b>\n"
+        )
+    return withdrawal_traits_message(descriptor)
+
+
+def withdrawal_link_keyboard(link: str) -> InlineKeyboardMarkup | None:
+    canonical_link = canonical_telegram_nft_url(link)
+    if not canonical_link:
+        return None
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="ОТКРЫТЬ NFT", url=canonical_link)
+    ]])
 
 
 def apply_item_metadata(record: dict, descriptor: dict | None = None) -> dict:
@@ -3665,7 +3689,7 @@ async def handle_request_withdraw(request):
                 f"\n🔗 <b>TELEGRAM</b>\n{safe_nft_link}\n"
                 if safe_nft_link and item_kind == "catalog_collectible" else ""
             )
-            traits_block = withdrawal_traits_message(source_descriptor)
+            traits_block = withdrawal_request_traits_message(source_descriptor, item_kind)
             if item_kind != "non_collectible" and not traits_block:
                 raise RuntimeError("withdraw_traits_unavailable")
             admin_message = (
@@ -4509,7 +4533,7 @@ async def withdraw_user_result_message(
     traits_block = withdrawal_traits_message(descriptor) if is_collectible_nft else ""
     item_label = "КОЛЛЕКЦИЯ" if is_collectible_nft else "НЕКОЛЛЕКЦИОННЫЙ"
     link_block = (
-        f"\n🔗 <b>TELEGRAM</b>\n{safe_link}\n"
+        f'\n🔗 <b><a href="{safe_link}">ОТКРЫТЬ NFT В TELEGRAM</a></b>\n'
         if approved and is_collectible_nft and safe_link else ""
     )
     return (
@@ -4616,7 +4640,12 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
             int(uid),
             await withdraw_user_result_message(dict(item), approved=True),
             parse_mode="HTML",
-            disable_web_page_preview=True,
+            reply_markup=withdrawal_link_keyboard(item.get("nft_link")),
+            link_preview_options=types.LinkPreviewOptions(
+                is_disabled=False,
+                prefer_large_media=True,
+                show_above_text=False,
+            ),
         )
     except Exception:
         pass
@@ -4740,7 +4769,12 @@ async def admin_withdraw_transfer_link(message: types.Message):
             int(uid),
             await withdraw_user_result_message(dict(item), approved=True, transfer_link=transfer_link),
             parse_mode="HTML",
-            disable_web_page_preview=True,
+            reply_markup=withdrawal_link_keyboard(transfer_link),
+            link_preview_options=types.LinkPreviewOptions(
+                is_disabled=False,
+                prefer_large_media=True,
+                show_above_text=False,
+            ),
         )
     except Exception as exc:
         logging.warning("Unable to notify user %s about approved withdrawal: %s", uid, exc)
@@ -4965,7 +4999,7 @@ async def cmd_start(message: types.Message):
         except Exception as exc:
             logging.error("Could not create user from /start: %s", exc)
     kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="✨ Магазин", web_app=WebAppInfo(url=WEBAPP_LAUNCH_URL))]])
+        inline_keyboard=[[InlineKeyboardButton(text="MARKET", web_app=WebAppInfo(url=WEBAPP_LAUNCH_URL))]])
     await message.answer("Добро пожаловать в DNX Store!", reply_markup=kb)
 
 # ---------- Настройка сервера ----------
@@ -5066,7 +5100,7 @@ async def main():
             await asyncio.wait_for(
                 bot.set_chat_menu_button(
                     menu_button=types.MenuButtonWebApp(
-                        text="✨ Магазин",
+                        text="MARKET",
                         web_app=WebAppInfo(url=WEBAPP_LAUNCH_URL),
                     )
                 ),
