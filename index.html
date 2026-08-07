@@ -4805,11 +4805,13 @@
         .render-loader-fill::after {
             content: "";
             position: absolute;
-            inset: 0;
-            width: 45%;
+            top: 0;
+            bottom: 0;
+            left: -52%;
+            width: 52%;
+            opacity: 0;
             background: linear-gradient(90deg, transparent, rgba(255,255,255,.72), transparent);
-            transform: translateX(-120%);
-            animation: render-loader-shine 1.2s ease-in-out infinite;
+            animation: render-loader-shine 2.35s ease-in-out infinite;
         }
         .render-loader-retry {
             display: none;
@@ -4832,7 +4834,12 @@
         @keyframes render-loader-spin { to { transform: rotate(360deg); } }
         @keyframes render-loader-orbit { to { transform: rotate(360deg); } }
         @keyframes render-loader-stars { to { opacity: .34; transform: scale(.82); } }
-        @keyframes render-loader-shine { 70%, 100% { transform: translateX(310%); } }
+        @keyframes render-loader-shine {
+            0% { left: -52%; opacity: 0; }
+            12% { opacity: .72; }
+            82% { opacity: .72; }
+            100% { left: 100%; opacity: 0; }
+        }
         @media (prefers-reduced-motion: reduce) {
             .render-loader::before,
             .render-loader::after,
@@ -5383,23 +5390,28 @@
             ['Запускаем приложение', 'Проверяем соединение'],
             ['Загружаем профиль', 'Получаем данные аккаунта'],
             ['Загружаем каталог', 'Подготавливаем товары'],
-            ['Загружаем игровые данные', 'Синхронизируем прогресс'],
-            ['Подготавливаем интерфейс', 'Осталось совсем немного']
+            ['Подготавливаем интерфейс', 'Синхронизируем данные'],
+            ['Всё готово', 'Добро пожаловать в DNX STORE']
         ];
 
-        function setRenderLoaderStage(target, title, subtitle) {
+        function setRenderLoaderCopy(index) {
+            const nextIndex = Math.max(0, Math.min(renderLoaderCopySteps.length - 1, Number(index) || 0));
+            if (nextIndex <= renderLoaderCopyIndex) return;
+            renderLoaderCopyIndex = nextIndex;
+            const [title, subtitle] = renderLoaderCopySteps[nextIndex];
+            renderLoaderTitle.textContent = title;
+            renderLoaderSubtitle.textContent = subtitle;
+        }
+
+        function setRenderLoaderStage(target, copyIndex = null) {
             renderLoaderTarget = Math.max(renderLoaderTarget, Math.min(100, Number(target) || 0));
-            if (title) renderLoaderTitle.textContent = title;
-            if (subtitle) renderLoaderSubtitle.textContent = subtitle;
+            if (copyIndex !== null) setRenderLoaderCopy(copyIndex);
         }
 
         const renderLoaderCopyTimer = setInterval(() => {
-            if (renderLoaderFinished || renderLoaderTarget >= 92) return;
-            renderLoaderCopyIndex = (renderLoaderCopyIndex + 1) % renderLoaderCopySteps.length;
-            const [title, subtitle] = renderLoaderCopySteps[renderLoaderCopyIndex];
-            renderLoaderTitle.textContent = title;
-            renderLoaderSubtitle.textContent = subtitle;
-        }, 2800);
+            if (renderLoaderFinished || renderLoaderCopyIndex >= 3) return;
+            setRenderLoaderCopy(renderLoaderCopyIndex + 1);
+        }, 4200);
 
         function paintRenderLoader() {
             if (renderLoaderFinished) return;
@@ -5446,7 +5458,7 @@
             renderLoaderBackendSeen = true;
             const phase = String(health?.phase || 'booting');
             if (health?.ready) {
-                setRenderLoaderStage(92, 'Подключение установлено', 'Переходим к загрузке профиля');
+                setRenderLoaderStage(92, 1);
             } else if (phase === 'connecting_database') {
                 setRenderLoaderStage(86);
             } else if (phase === 'initializing_database') {
@@ -5496,17 +5508,17 @@
 
         function finishRenderLoader() {
             if (renderLoaderFinished) return Promise.resolve();
-            setRenderLoaderStage(100, 'Всё готово', 'Добро пожаловать в DNX STORE');
+            setRenderLoaderStage(100, 4);
             return new Promise(resolve => { renderLoaderFinishResolve = resolve; });
         }
 
         renderLoaderRetry.addEventListener('click', () => {
             renderLoaderStartedAt = performance.now();
             renderLoaderElement.classList.remove('has-timeout');
-            setRenderLoaderStage(renderLoaderTarget, 'Повторяем загрузку', 'Проверяем соединение');
+            setRenderLoaderStage(renderLoaderTarget);
         });
 
-        const EXPECTED_API_RELEASE = '8.9-opt.75';
+        const EXPECTED_API_RELEASE = '8.9-opt.76';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -5730,6 +5742,7 @@
         const CATALOG_VISUAL_MANIFEST_KEY = 'dnx_catalog_visual_manifest_v1';
         let balanceRequest = null;
         let inventoryRequest = null;
+        let pendingWithdrawSyncTimer = null;
         let cartRenderToken = 0;
         let inventoryRenderToken = 0;
 
@@ -8390,13 +8403,35 @@
         function isSimpleInventoryNft(item) {
             return !safeTelegramUrl(item?.nft_link) && Boolean(staticRewardKey(item?.name));
         }
-        async function loadInventory() {
+        function inventoryStatusSignature(items) {
+            return (items || [])
+                .map(item => `${Number(item.id) || 0}:${String(item.status || '')}`)
+                .sort()
+                .join('|');
+        }
+        function syncPendingWithdrawals() {
+            const hasPending = inventoryData.some(item => item.status === 'pending_withdraw');
+            if (hasPending && !pendingWithdrawSyncTimer) {
+                pendingWithdrawSyncTimer = setInterval(() => {
+                    if (!document.hidden) loadInventory(true);
+                }, 2000);
+            } else if (!hasPending && pendingWithdrawSyncTimer) {
+                clearInterval(pendingWithdrawSyncTimer);
+                pendingWithdrawSyncTimer = null;
+            }
+        }
+        async function loadInventory(silent = false) {
             if (inventoryRequest) return inventoryRequest;
             const renderToken = ++inventoryRenderToken;
             inventoryRequest = (async () => {
                 try {
                     const data = await apiFetch(`${API_BASE}/inventory`);
-                    inventoryData = Array.isArray(data) ? data : [];
+                    const nextInventory = Array.isArray(data) ? data : [];
+                    const previousSignature = inventoryStatusSignature(inventoryData);
+                    const nextSignature = inventoryStatusSignature(nextInventory);
+                    inventoryData = nextInventory;
+                    syncPendingWithdrawals();
+                    if (silent && previousSignature === nextSignature) return inventoryData;
                     seedNftMediaFromItems(inventoryData);
                     const active = inventoryData.filter(i => !['withdrawn', 'disposed'].includes(i.status));
                 const activeContainer = document.getElementById('inventory-active-container');
@@ -8431,7 +8466,8 @@
                 // decoding is a non-blocking progressive enhancement.
                 warmItemNftPosters(active.filter(isCaseOriginItem)).catch(() => {});
                 warmAuxNftPosters(activeContainer).catch(() => {});
-                } catch(e) { console.error(e); }
+                return inventoryData;
+                } catch(e) { console.error(e); return inventoryData; }
             })().finally(() => { inventoryRequest = null; });
             return inventoryRequest;
         }
@@ -10688,7 +10724,7 @@
 
         async function bootstrapApplication() {
             await waitForRenderReady();
-            setRenderLoaderStage(94, 'Загружаем профиль', 'Получаем баланс и каталог');
+            setRenderLoaderStage(94, 1);
 
             let catalogItems = null;
             while (true) {
@@ -10702,7 +10738,7 @@
                     catalogItems = catalogResult.value;
                     break;
                 }
-                setRenderLoaderStage(94, 'Загружаем данные', 'Повторяем загрузку профиля и каталога');
+                setRenderLoaderStage(94);
                 if (performance.now() - renderLoaderStartedAt > 90000) {
                     renderLoaderElement.classList.add('has-timeout');
                     renderLoaderSubtitle.textContent = 'Не удалось получить данные. Попробовать ещё раз?';
@@ -10713,7 +10749,7 @@
             // The cover stays in place until the authoritative profile and
             // catalogue are both loaded. Only static media gets a bounded
             // grace window because one malformed NFT must not block the app.
-            setRenderLoaderStage(97, 'Загружаем каталог', 'Подготавливаем изображения товаров');
+            setRenderLoaderStage(97, 2);
             await Promise.race([
                 decodeInitialCatalogStaticFrames(catalogItems).catch(() => 0),
                 new Promise(resolve => setTimeout(resolve, 3200))
@@ -10721,6 +10757,7 @@
 
             loadPrizeItems();
             loadLeaderboardPreview();
+            setRenderLoaderCopy(3);
             await finishRenderLoader();
 
             const prewarmCasesInBackground = () => {

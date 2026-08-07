@@ -126,7 +126,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.75"
+API_RELEASE = "8.9-opt.76"
 
 
 def versioned_webapp_url(url: str) -> str:
@@ -1210,6 +1210,29 @@ def apply_static_item_metadata(record: dict) -> dict:
     record.pop("background", None)
     record["traits_source"] = "case_asset_url"
     return record
+
+
+STATIC_REWARD_RUSSIAN_NAMES = {
+    "Cup": "Кубок",
+    "Ring": "Кольцо",
+    "Diamond": "Бриллиант",
+}
+
+
+def withdrawal_item_kind(record: dict) -> str:
+    """Return catalog NFT, case collectible, or a local non-collectible."""
+    has_link = bool(canonical_telegram_nft_url(record.get("nft_link")))
+    if not has_link:
+        return "non_collectible"
+    if str(record.get("acquisition_source") or "") == "case":
+        return "case_collectible"
+    return "catalog_collectible"
+
+
+def withdrawal_display_name(record: dict) -> str:
+    name = str(record.get("name") or "Приз").strip() or "Приз"
+    translated = STATIC_REWARD_RUSSIAN_NAMES.get(name)
+    return f"{name} ({translated})" if translated else name
 
 
 def apply_item_metadata(record: dict, descriptor: dict | None = None) -> dict:
@@ -3558,7 +3581,8 @@ async def handle_request_withdraw(request):
                            withdraw_expires_at = NOW() + make_interval(secs => $3::int)
                        WHERE id = $1 AND buyer_id = $2 AND status = 'Продан'
                          AND (withdraw_expires_at IS NULL OR withdraw_expires_at <= NOW())
-                       RETURNING id, nft_link, case_asset_url, withdraw_expires_at""",
+                       RETURNING id, nft_link, case_asset_url, acquisition_source,
+                                 withdraw_expires_at""",
                     item_id, user_id, WITHDRAW_WINDOW_SECONDS)
                 if not item:
                     remaining = await conn.fetchval(
@@ -3595,11 +3619,19 @@ async def handle_request_withdraw(request):
         try:
             safe_username = html_escape(str(username or "").lstrip("@"))
             user_label = f"@{safe_username}" if safe_username else "<i>username не указан</i>"
-            safe_item_name = html_escape(str(event_item.get('name') or 'NFT'))
-            safe_nft_link = html_escape(canonical_telegram_nft_url(item['nft_link']), quote=True)
-            nft_line = (
-                f'<a href="{safe_nft_link}">{safe_item_name}</a>'
-                if safe_nft_link else safe_item_name
+            item_kind = withdrawal_item_kind(event_item)
+            safe_item_name = html_escape(withdrawal_display_name(event_item))
+            safe_nft_link = html_escape(canonical_telegram_nft_url(item['nft_link']))
+            item_heading = (
+                "НЕКОЛЛЕКЦИОННЫЙ"
+                if item_kind == "non_collectible" else
+                "КОЛЛЕКЦИОННЫЙ NFT ИЗ КЕЙСА"
+                if item_kind == "case_collectible" else
+                "КОЛЛЕКЦИОННЫЙ NFT"
+            )
+            source_link_block = (
+                f"\n🔗 <b>TELEGRAM</b>\n{safe_nft_link}\n"
+                if safe_nft_link and item_kind == "catalog_collectible" else ""
             )
             admin_message = (
                 "✨ <b>DNX STORE · ЗАПРОС НА ВЫВОД</b>\n"
@@ -3609,9 +3641,10 @@ async def handle_request_withdraw(request):
                 f"{user_label}\n"
                 f"<code>ID: {int(user_id)}</code>\n"
                 "\n"
-                "🎁 <b>КОЛЛЕКЦИОННЫЙ NFT</b>\n"
-                f"{nft_line}\n"
+                f"🎁 <b>{item_heading}</b>\n"
+                f"{safe_item_name}\n"
                 f"<code>Item ID: {int(item['id'])}</code>\n"
+                f"{source_link_block}"
                 "\n"
                 "⏳ <b>СТАТУС</b>\n"
                 "Ожидает решения · окно обработки 2 часа\n"
@@ -4393,17 +4426,25 @@ def withdraw_admin_result_message(message: types.Message, *, approved: bool) -> 
     if approved:
         result = "✅ <b>ВЫВОД ПОДТВЕРЖДЁН</b>\nЗаявка закрыта администратором."
     else:
-        result = "❌ <b>ВЫВОД ОТКЛОНЁН</b>\nNFT возвращён пользователю в инвентарь."
+        result = "❌ <b>ВЫВОД ОТКЛОНЁН</b>\nПредмет возвращён пользователю в инвентарь."
     return f"{base}\n\n━━━━━━━━━━━━━━━━━━\n{result}"
 
 
-async def withdraw_user_result_message(item: dict, *, approved: bool) -> str:
+async def withdraw_user_result_message(
+    item: dict,
+    *,
+    approved: bool,
+    transfer_link: str = "",
+) -> str:
     """Build the customer result from the Telegram link, never a SQL item id."""
+    resolved_link = canonical_telegram_nft_url(transfer_link) or canonical_telegram_nft_url(item.get("nft_link"))
     record = {
         "id": int(item.get("id") or 0),
         "name": str(item.get("name") or ""),
-        "nft_link": canonical_telegram_nft_url(item.get("nft_link")),
+        "nft_link": resolved_link,
         "case_asset_url": str(item.get("case_asset_url") or ""),
+        "acquisition_source": str(item.get("acquisition_source") or "catalog"),
+        "status": str(item.get("status") or "withdrawn"),
     }
     descriptor = None
     if record["nft_link"]:
@@ -4415,10 +4456,10 @@ async def withdraw_user_result_message(item: dict, *, approved: bool) -> str:
         except Exception as exc:
             logging.warning("Withdraw NFT metadata unavailable for item %s: %s", record["id"], exc)
     apply_item_metadata(record, descriptor)
-    collection = html_escape(str(record.get("name") or "NFT"))
-    safe_link = html_escape(record["nft_link"], quote=True)
-    collection_line = f'<a href="{safe_link}">{collection}</a>' if safe_link else collection
-    is_collectible_nft = bool(record["nft_link"])
+    item_kind = withdrawal_item_kind(record)
+    collection = html_escape(withdrawal_display_name(record))
+    safe_link = html_escape(record["nft_link"])
+    is_collectible_nft = item_kind != "non_collectible"
     live_traits = descriptor.get("traits") if isinstance(descriptor, dict) and isinstance(descriptor.get("traits"), dict) else {}
     model = html_escape(str(live_traits.get("model") or record.get("model") or "—"))
     pattern = html_escape(str(live_traits.get("pattern") or record.get("pattern") or "—"))
@@ -4439,24 +4480,68 @@ async def withdraw_user_result_message(item: dict, *, approved: bool) -> str:
             "Предмет возвращён в ваш инвентарь DNX Store."
         )
         footer = "Вы можете повторить запрос на вывод позже."
+    traits_complete = all(str(live_traits.get(key) or record.get(key) or "").strip() for key in ("model", "pattern", "background"))
+    show_traits = item_kind == "catalog_collectible" and traits_complete
     traits_block = (
         "💎 <b>ХАРАКТЕРИСТИКИ</b>\n"
         f"Модель: <b>{model}</b>\n"
         f"Узор: <b>{pattern}</b>\n"
         f"Фон: <b>{background}</b>\n\n"
-        if is_collectible_nft else ""
+        if show_traits else ""
+    )
+    item_label = "КОЛЛЕКЦИЯ" if is_collectible_nft else "НЕКОЛЛЕКЦИОННЫЙ"
+    link_block = (
+        f"\n🔗 <b>TELEGRAM</b>\n{safe_link}\n"
+        if approved and is_collectible_nft and safe_link else ""
     )
     return (
         "✨ <b>DNX STORE</b>\n"
         "━━━━━━━━━━━━━━━━━━\n\n"
         f"{heading}\n"
         f"{note}\n\n"
-        "🎁 <b>КОЛЛЕКЦИЯ</b>\n"
-        f"{collection_line}\n\n"
+        f"🎁 <b>{item_label}</b>\n"
+        f"{collection}\n\n"
         f"{traits_block}"
+        f"{link_block}"
         "━━━━━━━━━━━━━━━━━━\n"
         f"{footer}"
     )
+
+
+async def complete_withdraw_approval(uid: str, item_id: int, transfer_link: str = "") -> dict | None:
+    """Atomically close one pending request, optionally storing its delivered Telegram link."""
+    canonical_transfer = canonical_telegram_nft_url(transfer_link)
+    async with get_pool().acquire() as conn:
+        async with conn.transaction():
+            item = await conn.fetchrow(
+                """UPDATE items
+                   SET status = 'withdrawn', last_event = 'withdraw_approved',
+                       nft_link = CASE WHEN $3 = '' THEN nft_link ELSE $3 END,
+                       withdraw_expires_at = NULL
+                   WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
+                     AND withdraw_expires_at > NOW()
+                   RETURNING id, nft_link, case_asset_url, acquisition_source, status""",
+                item_id, uid, canonical_transfer,
+            )
+            if not item:
+                return None
+            await conn.execute(
+                """INSERT INTO item_events (item_id, user_id, event_type, metadata)
+                   VALUES ($1, $2, 'withdraw_approved', $3::jsonb)""",
+                item_id,
+                uid,
+                json.dumps({"transfer_link": canonical_transfer} if canonical_transfer else {}),
+            )
+            event_item = apply_item_metadata(dict(item), None)
+            event_label = "Предмет выведен" if withdrawal_item_kind(event_item) == "non_collectible" else "NFT выведен"
+            await record_user_event(
+                conn,
+                uid,
+                "withdraw_approved",
+                title=f"{event_label} · {event_item.get('name') or 'Приз'}",
+                metadata={"item_id": item_id, "nft_link": event_item.get("nft_link") or ""},
+            )
+            return dict(item)
 
 
 @dp.callback_query(F.data.startswith("with_yes_"))
@@ -4467,28 +4552,37 @@ async def admin_withdraw_approve(callback: types.CallbackQuery):
     if not parsed:
         return
     uid, item_id = parsed
-    async with get_pool().acquire() as conn:
-        async with conn.transaction():
-            item = await conn.fetchrow(
-                """UPDATE items SET status = 'withdrawn', last_event = 'withdraw_approved'
-                   WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
-                     AND withdraw_expires_at > NOW()
-                   RETURNING id, nft_link, case_asset_url""",
-                item_id, uid)
-            result = "UPDATE 1" if item else "UPDATE 0"
-            if item:
-                await conn.execute(
-                    """INSERT INTO item_events (item_id, user_id, event_type)
-                       VALUES ($1, $2, 'withdraw_approved')""",
-                    item_id, uid,
-                )
-                event_item = apply_item_metadata(dict(item), None)
-                await record_user_event(
-                    conn, uid, "withdraw_approved",
-                    title=f"NFT выведен · {event_item.get('name') or 'NFT'}",
-                    metadata={"item_id": item_id, "nft_link": event_item["nft_link"]},
-                )
-    if result != "UPDATE 1":
+    pending_item = await get_pool().fetchrow(
+        """SELECT id, nft_link, case_asset_url, acquisition_source
+           FROM items
+           WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
+             AND withdraw_expires_at > NOW()""",
+        item_id,
+        uid,
+    )
+    if pending_item and withdrawal_item_kind(dict(pending_item)) == "case_collectible":
+        reject_only = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="ОТКЛОНИТЬ", callback_data=f"with_no_{uid}_{item_id}")
+        ]])
+        await callback.message.edit_reply_markup(reply_markup=reject_only)
+        await bot.send_message(
+            ADMIN_ID,
+            "🔗 <b>ССЫЛКА ДЛЯ ВЫВОДА</b>\n"
+            "Ответьте на это сообщение полной ссылкой вида:\n"
+            "<code>https://t.me/nft/...</code>\n\n"
+            f"<code>Заявка: {uid}:{item_id}:{callback.message.message_id}</code>",
+            parse_mode="HTML",
+            reply_to_message_id=callback.message.message_id,
+            reply_markup=types.ForceReply(
+                selective=True,
+                input_field_placeholder="https://t.me/nft/...",
+            ),
+        )
+        await callback.answer("Отправьте ссылку ответом на сообщение")
+        return
+
+    item = await complete_withdraw_approval(uid, item_id)
+    if not item:
         await get_pool().execute(
             """UPDATE items SET status = 'Продан', last_event = 'withdraw_expired'
                WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
@@ -4526,7 +4620,7 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
             item = await conn.fetchrow(
                 """UPDATE items SET status = 'Продан', last_event = 'withdraw_rejected'
                    WHERE id = $1 AND buyer_id = $2 AND status = 'pending_withdraw'
-                   RETURNING id, nft_link, case_asset_url""",
+                   RETURNING id, nft_link, case_asset_url, acquisition_source, status""",
                 item_id, uid)
             result = "UPDATE 1" if item else "UPDATE 0"
             if item:
@@ -4558,6 +4652,66 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
         )
     except Exception:
         pass
+
+
+@dp.message(F.from_user.id == ADMIN_ID, F.reply_to_message, F.text)
+async def admin_withdraw_transfer_link(message: types.Message):
+    """Bind a delivered NFT URL to the exact request encoded in the replied prompt."""
+    prompt_text = str(message.reply_to_message.text or message.reply_to_message.caption or "")
+    marker = re.search(r"Заявка:\s*(\d+):(\d+):(\d+)", prompt_text)
+    if not marker:
+        return
+    uid, item_id_text, request_message_id_text = marker.groups()
+    item_id = int(item_id_text)
+    request_message_id = int(request_message_id_text)
+    transfer_link = canonical_telegram_nft_url(str(message.text or "").strip())
+    if not transfer_link:
+        await message.reply(
+            "Ссылка не распознана. Отправьте полную ссылку вида:\n"
+            "<code>https://t.me/nft/...</code>\n\n"
+            f"<code>Заявка: {uid}:{item_id}:{request_message_id}</code>",
+            parse_mode="HTML",
+            reply_markup=types.ForceReply(
+                selective=True,
+                input_field_placeholder="https://t.me/nft/...",
+            ),
+        )
+        return
+
+    item = await complete_withdraw_approval(uid, item_id, transfer_link)
+    if not item:
+        await message.reply("Эта заявка уже обработана или срок подтверждения истёк.")
+        return
+
+    safe_name_record = apply_item_metadata(dict(item), None)
+    safe_name = html_escape(withdrawal_display_name(safe_name_record))
+    safe_link = html_escape(transfer_link)
+    try:
+        await bot.edit_message_text(
+            chat_id=ADMIN_ID,
+            message_id=request_message_id,
+            text=(
+                "✅ <b>ВЫВОД ПОДТВЕРЖДЁН</b>\n"
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"🎁 {safe_name}\n"
+                f"🔗 {safe_link}\n"
+                f"<code>Item ID: {item_id}</code>"
+            ),
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+    except Exception as exc:
+        logging.warning("Unable to update withdrawal request message %s: %s", request_message_id, exc)
+    await message.reply("✅ Ссылка принята. Вывод подтверждён для нужной заявки.")
+    try:
+        await bot.send_message(
+            int(uid),
+            await withdraw_user_result_message(dict(item), approved=True, transfer_link=transfer_link),
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+    except Exception as exc:
+        logging.warning("Unable to notify user %s about approved withdrawal: %s", uid, exc)
 
 
 @dp.pre_checkout_query()
