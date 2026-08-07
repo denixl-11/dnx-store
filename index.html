@@ -1410,6 +1410,58 @@
         .case-action-success-card p { margin: 0 0 20px; color: #c0b3c2; font-size: .8rem; line-height: 1.55; }
         .case-action-success-card .star-amount { color: #ffd36a; font-weight: 800; }
         .case-action-success-card .success-payment-icon svg { width: 29px; height: 29px; fill: none; stroke: currentColor; }
+        .premium-alert-card {
+            position: relative;
+            max-width: 360px;
+            padding: 28px 22px 22px;
+            overflow: hidden;
+            text-align: center;
+            border: 1px solid rgba(213, 67, 255, .48) !important;
+            background:
+                radial-gradient(circle at 50% -12%, rgba(218, 61, 255, .24), transparent 48%),
+                radial-gradient(circle at 100% 100%, rgba(255, 49, 106, .13), transparent 40%),
+                linear-gradient(155deg, #16091f, #08040d 74%) !important;
+            box-shadow: 0 24px 70px rgba(0,0,0,.72), 0 0 35px rgba(199, 53, 255, .16), inset 0 1px rgba(255,255,255,.06);
+        }
+        .premium-alert-icon {
+            display: grid;
+            place-items: center;
+            width: 62px;
+            height: 62px;
+            margin: 0 auto 16px;
+            border: 1px solid rgba(231, 101, 255, .65);
+            border-radius: 50%;
+            color: #fff4ff;
+            font-size: 1.55rem;
+            font-weight: 800;
+            background: radial-gradient(circle at 36% 28%, rgba(246, 137, 255, .38), rgba(104, 26, 159, .44) 48%, rgba(15, 5, 25, .95) 74%);
+            box-shadow: 0 0 24px rgba(210, 67, 255, .28), inset 0 0 20px rgba(255,255,255,.07);
+        }
+        .premium-alert-card.is-success .premium-alert-icon {
+            border-color: rgba(103, 242, 185, .68);
+            color: #baffdd;
+            background: radial-gradient(circle at 36% 28%, rgba(109, 255, 195, .30), rgba(34, 130, 105, .32) 50%, rgba(8, 25, 23, .96) 76%);
+            box-shadow: 0 0 25px rgba(74, 231, 176, .22), inset 0 0 20px rgba(255,255,255,.06);
+        }
+        .premium-alert-card h3 {
+            margin: 0 0 9px;
+            color: #fff6fd;
+            font-size: 1rem;
+            font-weight: 800;
+            letter-spacing: .055em;
+        }
+        .premium-alert-card p {
+            margin: 0 0 21px;
+            color: #b9adbc;
+            font-size: .79rem;
+            line-height: 1.55;
+        }
+        .premium-alert-card .btn-main-action {
+            height: 48px;
+            border-radius: 13px;
+            font-size: .8rem;
+            letter-spacing: .045em;
+        }
         .nft-live-media {
             --nft-bg-a: #3e245d;
             --nft-bg-b: #160d27;
@@ -5099,7 +5151,12 @@
     </div>
 
     <div id="alert-modal" class="modal-overlay">
-        <div class="modal-content" style="padding-top: 32px;"><div id="alert-msg" style="margin-bottom: 24px; font-weight: 500;"></div><button class="btn-main-action" style="height: 44px;" onclick="closeModal('alert-modal')">Понятно</button></div>
+        <div class="modal-content premium-alert-card" id="alert-card" onclick="event.stopPropagation()">
+            <div class="premium-alert-icon" id="alert-icon" aria-hidden="true">!</div>
+            <h3 id="alert-title">УВЕДОМЛЕНИЕ</h3>
+            <p id="alert-msg"></p>
+            <button class="btn-main-action" onclick="closeModal('alert-modal')">ПРОДОЛЖИТЬ</button>
+        </div>
     </div>
 
     <div id="payment-success-modal" class="modal-overlay">
@@ -5518,7 +5575,7 @@
             setRenderLoaderStage(renderLoaderTarget);
         });
 
-        const EXPECTED_API_RELEASE = '8.9-opt.76';
+        const EXPECTED_API_RELEASE = '8.9-opt.77';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -7092,10 +7149,16 @@
             }
         });
 
-        function showAlert(msg) {
+        function showAlert(msg, title = 'УВЕДОМЛЕНИЕ', kind = 'info') {
             document.getElementById('alert-msg').innerText = msg;
+            document.getElementById('alert-title').innerText = title;
+            document.getElementById('alert-icon').innerText = kind === 'success' ? '✓' : '!';
+            document.getElementById('alert-card').classList.toggle('is-success', kind === 'success');
             document.getElementById('alert-modal').classList.add('active');
-            try { tg.HapticFeedback.impactOccurred('light'); } catch(e) {}
+            try {
+                if (kind === 'success') tg.HapticFeedback.notificationOccurred('success');
+                else tg.HapticFeedback.impactOccurred('light');
+            } catch(e) {}
         }
         function showPaymentSuccess(stars) {
             document.getElementById('payment-success-amount').innerHTML = `<span>${formatStars(stars)}</span>${telegramStarMarkup()}`;
@@ -8658,7 +8721,11 @@
             try {
                 const result = await apiFetch(`${API_BASE}/request-withdraw`, { method: 'POST', body: JSON.stringify({itemId: id}) });
                 applyWithdrawCountdown(id, result);
-                showAlert("Запрос отправлен. У продавца есть 2 часа для вывода NFT.");
+                showAlert(
+                    "Заявка отправлена администратору. На обработку отведено до 2 часов.",
+                    "ЗАПРОС ОТПРАВЛЕН",
+                    "success"
+                );
                 await loadInventory();
             } catch (error) {
                 showAlert(error.code === 'withdraw_locked' ? 'Запрос уже активен. Дождитесь окончания таймера.' : 'Не удалось отправить запрос на вывод. Попробуйте ещё раз.');

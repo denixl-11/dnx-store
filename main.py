@@ -126,7 +126,7 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.76"
+API_RELEASE = "8.9-opt.77"
 
 
 def versioned_webapp_url(url: str) -> str:
@@ -1233,6 +1233,30 @@ def withdrawal_display_name(record: dict) -> str:
     name = str(record.get("name") or "Приз").strip() or "Приз"
     translated = STATIC_REWARD_RUSSIAN_NAMES.get(name)
     return f"{name} ({translated})" if translated else name
+
+
+def withdrawal_live_traits(descriptor: dict | None) -> dict[str, str]:
+    """Return only a complete live Telegram trait set; never placeholders."""
+    raw_traits = descriptor.get("traits") if isinstance(descriptor, dict) else None
+    if not isinstance(raw_traits, dict):
+        return {}
+    traits = {
+        key: re.sub(r"\s+", " ", str(raw_traits.get(key) or "")).strip()[:160]
+        for key in ("model", "pattern", "background")
+    }
+    return traits if all(traits.values()) else {}
+
+
+def withdrawal_traits_message(descriptor: dict | None) -> str:
+    traits = withdrawal_live_traits(descriptor)
+    if not traits:
+        return ""
+    return (
+        "💎 <b>ХАРАКТЕРИСТИКИ</b>\n"
+        f"Модель  ·  <b>{html_escape(traits['model'])}</b>\n"
+        f"Узор  ·  <b>{html_escape(traits['pattern'])}</b>\n"
+        f"Фон  ·  <b>{html_escape(traits['background'])}</b>\n"
+    )
 
 
 def apply_item_metadata(record: dict, descriptor: dict | None = None) -> dict:
@@ -3617,11 +3641,19 @@ async def handle_request_withdraw(request):
             InlineKeyboardButton(text="ПОДТВЕРДИТЬ", callback_data=f"with_yes_{user_id}_{item_id}")
         ]])
         try:
+            source_descriptor = None
+            source_nft_link = canonical_telegram_nft_url(item['nft_link'])
+            if source_nft_link:
+                source_descriptor = await fetch_telegram_nft_media(
+                    source_nft_link,
+                    -(200000 + int(item['id'])),
+                )
+                event_item = apply_item_metadata(dict(item), source_descriptor)
             safe_username = html_escape(str(username or "").lstrip("@"))
             user_label = f"@{safe_username}" if safe_username else "<i>username не указан</i>"
             item_kind = withdrawal_item_kind(event_item)
             safe_item_name = html_escape(withdrawal_display_name(event_item))
-            safe_nft_link = html_escape(canonical_telegram_nft_url(item['nft_link']))
+            safe_nft_link = html_escape(source_nft_link)
             item_heading = (
                 "НЕКОЛЛЕКЦИОННЫЙ"
                 if item_kind == "non_collectible" else
@@ -3633,23 +3665,23 @@ async def handle_request_withdraw(request):
                 f"\n🔗 <b>TELEGRAM</b>\n{safe_nft_link}\n"
                 if safe_nft_link and item_kind == "catalog_collectible" else ""
             )
+            traits_block = withdrawal_traits_message(source_descriptor)
+            if item_kind != "non_collectible" and not traits_block:
+                raise RuntimeError("withdraw_traits_unavailable")
             admin_message = (
-                "✨ <b>DNX STORE · ЗАПРОС НА ВЫВОД</b>\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                "\n"
+                "📤 <b>ЗАПРОС НА ВЫВОД</b>\n\n"
                 "👤 <b>ПОЛЬЗОВАТЕЛЬ</b>\n"
                 f"{user_label}\n"
-                f"<code>ID: {int(user_id)}</code>\n"
+                f"<code>ID {int(user_id)}</code>\n"
                 "\n"
                 f"🎁 <b>{item_heading}</b>\n"
                 f"{safe_item_name}\n"
-                f"<code>Item ID: {int(item['id'])}</code>\n"
+                f"<code>Заявка #{int(item['id'])}</code>\n\n"
+                f"{traits_block}"
                 f"{source_link_block}"
                 "\n"
-                "⏳ <b>СТАТУС</b>\n"
-                "Ожидает решения · окно обработки 2 часа\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                "Выберите действие ниже"
+                "⏳ <b>ОЖИДАЕТ ПОДТВЕРЖДЕНИЯ</b>\n"
+                "Решение доступно в течение 2 часов"
             )
             await bot.send_message(
                 ADMIN_ID,
@@ -4424,10 +4456,10 @@ def withdraw_admin_result_message(message: types.Message, *, approved: bool) -> 
     if not base:
         base = html_escape(str(getattr(message, "text", "") or "").strip())
     if approved:
-        result = "✅ <b>ВЫВОД ПОДТВЕРЖДЁН</b>\nЗаявка закрыта администратором."
+        result = "✅ <b>УСПЕШНЫЙ ВЫВОД</b>\nЗаявка подтверждена администратором."
     else:
         result = "❌ <b>ВЫВОД ОТКЛОНЁН</b>\nПредмет возвращён пользователю в инвентарь."
-    return f"{base}\n\n━━━━━━━━━━━━━━━━━━\n{result}"
+    return f"{base}\n\n{result}"
 
 
 async def withdraw_user_result_message(
@@ -4460,51 +4492,33 @@ async def withdraw_user_result_message(
     collection = html_escape(withdrawal_display_name(record))
     safe_link = html_escape(record["nft_link"])
     is_collectible_nft = item_kind != "non_collectible"
-    live_traits = descriptor.get("traits") if isinstance(descriptor, dict) and isinstance(descriptor.get("traits"), dict) else {}
-    model = html_escape(str(live_traits.get("model") or record.get("model") or "—"))
-    pattern = html_escape(str(live_traits.get("pattern") or record.get("pattern") or "—"))
-    background = html_escape(str(live_traits.get("background") or record.get("background") or "—"))
     if approved:
-        heading = "✅ <b>ВЫВОД УСПЕШНО ЗАВЕРШЁН</b>"
+        heading = "✅ <b>УСПЕШНЫЙ ВЫВОД</b>"
         note = (
             "Коллекционный NFT передан в ваш Telegram-аккаунт."
             if is_collectible_nft else
             "Предмет успешно выведен из вашего инвентаря."
         )
-        footer = "Спасибо, что выбираете DNX Store ✨"
     else:
         heading = "❌ <b>ВЫВОД ОТКЛОНЁН</b>"
         note = (
-            "NFT безопасно возвращён в ваш инвентарь DNX Store."
+            "NFT безопасно возвращён в ваш инвентарь."
             if is_collectible_nft else
-            "Предмет возвращён в ваш инвентарь DNX Store."
+            "Предмет возвращён в ваш инвентарь."
         )
-        footer = "Вы можете повторить запрос на вывод позже."
-    traits_complete = all(str(live_traits.get(key) or record.get(key) or "").strip() for key in ("model", "pattern", "background"))
-    show_traits = item_kind == "catalog_collectible" and traits_complete
-    traits_block = (
-        "💎 <b>ХАРАКТЕРИСТИКИ</b>\n"
-        f"Модель: <b>{model}</b>\n"
-        f"Узор: <b>{pattern}</b>\n"
-        f"Фон: <b>{background}</b>\n\n"
-        if show_traits else ""
-    )
+    traits_block = withdrawal_traits_message(descriptor) if is_collectible_nft else ""
     item_label = "КОЛЛЕКЦИЯ" if is_collectible_nft else "НЕКОЛЛЕКЦИОННЫЙ"
     link_block = (
         f"\n🔗 <b>TELEGRAM</b>\n{safe_link}\n"
         if approved and is_collectible_nft and safe_link else ""
     )
     return (
-        "✨ <b>DNX STORE</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
         f"{heading}\n"
         f"{note}\n\n"
         f"🎁 <b>{item_label}</b>\n"
         f"{collection}\n\n"
         f"{traits_block}"
         f"{link_block}"
-        "━━━━━━━━━━━━━━━━━━\n"
-        f"{footer}"
     )
 
 
@@ -4678,24 +4692,42 @@ async def admin_withdraw_transfer_link(message: types.Message):
         )
         return
 
+    delivered_descriptor = await fetch_telegram_nft_media(
+        transfer_link,
+        -(400000 + item_id),
+    )
+    if not withdrawal_live_traits(delivered_descriptor):
+        await message.reply(
+            "Не удалось получить характеристики по этой ссылке. "
+            "Проверьте ссылку и отправьте её ещё раз ответом на это сообщение.\n\n"
+            f"<code>Заявка: {uid}:{item_id}:{request_message_id}</code>",
+            parse_mode="HTML",
+            reply_markup=types.ForceReply(
+                selective=True,
+                input_field_placeholder="https://t.me/nft/...",
+            ),
+        )
+        return
+
     item = await complete_withdraw_approval(uid, item_id, transfer_link)
     if not item:
         await message.reply("Эта заявка уже обработана или срок подтверждения истёк.")
         return
 
-    safe_name_record = apply_item_metadata(dict(item), None)
+    safe_name_record = apply_item_metadata(dict(item), delivered_descriptor)
     safe_name = html_escape(withdrawal_display_name(safe_name_record))
     safe_link = html_escape(transfer_link)
+    traits_block = withdrawal_traits_message(delivered_descriptor)
     try:
         await bot.edit_message_text(
             chat_id=ADMIN_ID,
             message_id=request_message_id,
             text=(
-                "✅ <b>ВЫВОД ПОДТВЕРЖДЁН</b>\n"
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"🎁 {safe_name}\n"
-                f"🔗 {safe_link}\n"
-                f"<code>Item ID: {item_id}</code>"
+                "✅ <b>УСПЕШНЫЙ ВЫВОД</b>\n\n"
+                f"🎁 <b>КОЛЛЕКЦИЯ</b>\n{safe_name}\n\n"
+                f"{traits_block}\n"
+                f"🔗 <b>TELEGRAM</b>\n{safe_link}\n\n"
+                f"<code>Заявка #{item_id}</code>"
             ),
             parse_mode="HTML",
             disable_web_page_preview=True,
