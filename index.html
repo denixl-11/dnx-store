@@ -5570,13 +5570,9 @@
             return new Promise(resolve => { renderLoaderFinishResolve = resolve; });
         }
 
-        renderLoaderRetry.addEventListener('click', () => {
-            renderLoaderStartedAt = performance.now();
-            renderLoaderElement.classList.remove('has-timeout');
-            setRenderLoaderStage(renderLoaderTarget);
-        });
+        renderLoaderRetry.addEventListener('click', () => location.reload());
 
-        const EXPECTED_API_RELEASE = '8.9-opt.79';
+        const EXPECTED_API_RELEASE = '8.9-opt.80';
         const GITHUB_CASE_ASSET_BASE = ['127.0.0.1', 'localhost'].includes(location.hostname)
             ? new URL('assets/case-rewards/', document.baseURI).href
             : 'https://denixl-11.github.io/dnx-store/assets/case-rewards/';
@@ -7239,7 +7235,7 @@
             balanceRequest = (async () => {
                 let loaded = false;
                 try {
-                    const data = await apiFetch(`${API_BASE}/user`);
+                    const data = await apiFetch(`${API_BASE}/user`, { timeoutMs: 20000 });
                     if (!data || data.balance == null || data.bonusBalance == null
                         || !Number.isFinite(Number(data.balance)) || !Number.isFinite(Number(data.bonusBalance))) {
                         throw new Error('invalid_profile_payload');
@@ -7516,7 +7512,7 @@
                     return currentCatalog;
                 }
                 if (!catalogRequest) {
-                    catalogRequest = apiFetch(`${API_BASE}/items`)
+                    catalogRequest = apiFetch(`${API_BASE}/items`, { timeoutMs: 20000 })
                         .then(items => {
                             if (!Array.isArray(items)) throw new Error('invalid_catalog_payload');
                             currentCatalog = items;
@@ -10792,9 +10788,10 @@
 
         async function bootstrapApplication() {
             await waitForRenderReady();
-            setRenderLoaderStage(94, 1);
+            setRenderLoaderStage(95, 1);
 
             let catalogItems = null;
+            let startupDataFailures = 0;
             while (true) {
                 const [profileResult, catalogResult] = await Promise.allSettled([
                     updateBalance(),
@@ -10804,9 +10801,26 @@
                 const catalogReady = catalogResult.status === 'fulfilled' && Array.isArray(catalogResult.value);
                 if (profileReady && catalogReady) {
                     catalogItems = catalogResult.value;
+                    try { sessionStorage.removeItem('dnx_startup_recovery'); } catch (_) {}
                     break;
                 }
-                setRenderLoaderStage(94);
+                startupDataFailures += 1;
+                setRenderLoaderStage(startupDataFailures > 1 ? 97 : 96);
+                if (startupDataFailures >= 2) {
+                    let recoveryAlreadyUsed = false;
+                    try {
+                        const previousRecovery = Number(sessionStorage.getItem('dnx_startup_recovery') || 0);
+                        recoveryAlreadyUsed = Date.now() - previousRecovery < 120000;
+                        if (!recoveryAlreadyUsed) sessionStorage.setItem('dnx_startup_recovery', String(Date.now()));
+                    } catch (_) {}
+                    if (!recoveryAlreadyUsed) {
+                        location.reload();
+                        return;
+                    }
+                    renderLoaderElement.classList.add('has-timeout');
+                    renderLoaderTitle.textContent = 'Не удалось загрузить данные';
+                    renderLoaderSubtitle.textContent = 'Нажмите «Повторить»';
+                }
                 if (performance.now() - renderLoaderStartedAt > 90000) {
                     renderLoaderElement.classList.add('has-timeout');
                     renderLoaderSubtitle.textContent = 'Не удалось получить данные. Попробовать ещё раз?';
