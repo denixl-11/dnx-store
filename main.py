@@ -52,6 +52,7 @@ TON_STAR_RATE = Decimal(os.getenv("TON_STAR_RATE", "90"))
 STAR_MIN_TOPUP = int(os.getenv("STAR_MIN_TOPUP", "10"))
 STAR_MAX_TOPUP = int(os.getenv("STAR_MAX_TOPUP", "10000"))
 STAR_MIN_BET = Decimal(os.getenv("STAR_MIN_BET", "10"))
+ADMIN_MANUAL_CREDIT_MAX = int(os.getenv("ADMIN_MANUAL_CREDIT_MAX", "1000000"))
 STANDARD_REFERRAL_RATE = Decimal("0.10")
 PARTNER_REFERRAL_RATE = Decimal("0.20")
 REFERRAL_CODE_LENGTH = 25
@@ -65,6 +66,8 @@ if STAR_MIN_TOPUP <= 0 or STAR_MAX_TOPUP < STAR_MIN_TOPUP:
     raise RuntimeError("Invalid Stars top-up limits")
 if STAR_MIN_BET <= 0:
     raise RuntimeError("Invalid Stars bet limits")
+if ADMIN_MANUAL_CREDIT_MAX <= 0:
+    raise RuntimeError("ADMIN_MANUAL_CREDIT_MAX must be positive")
 
 
 def _require_https_url(name: str, value: str, *, origin_only: bool = False) -> None:
@@ -120,13 +123,15 @@ nft_preview_requests: dict[str, asyncio.Task] = {}
 telegram_page_semaphore = asyncio.Semaphore(3)
 telegram_asset_semaphore = asyncio.Semaphore(4)
 star_reconcile_attempts: dict[str, float] = {}
+pending_admin_actions: dict[str, dict] = {}
+admin_action_lock = asyncio.Lock()
 auth_cache: OrderedDict[str, tuple[float, dict]] = OrderedDict()
 restriction_cache: OrderedDict[str, tuple[float, dict | None]] = OrderedDict()
 AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.80"
+API_RELEASE = "8.9-opt.81"
 
 
 def versioned_webapp_url(url: str) -> str:
@@ -4697,6 +4702,325 @@ async def admin_withdraw_reject(callback: types.CallbackQuery):
         )
     except Exception:
         pass
+
+
+ADMIN_FLOW_MARKER = "DNX_ADMIN_FLOW"
+ADMIN_ACTION_TTL = 10 * 60
+
+
+def admin_panel_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="➕ Начислить звёзды", callback_data="admin:credit")],
+        [
+            InlineKeyboardButton(text="🔒 Заблокировать", callback_data="admin:block"),
+            InlineKeyboardButton(text="🔓 Разблокировать", callback_data="admin:unblock"),
+        ],
+    ])
+
+
+def admin_flow_prompt(operation: str, step: str, user_id: str = "0", amount: int = 0) -> str:
+    marker = f"{ADMIN_FLOW_MARKER}|{operation}|{step}|{user_id}|{amount}"
+    if step == "user":
+        instruction = "Введите числовой Telegram ID пользователя."
+    elif step == "amount":
+        instruction = (
+            "Введите целое количество звёзд для начисления "
+            f"(от 1 до {ADMIN_MANUAL_CREDIT_MAX:,})."
+        )
+    return (
+        "🛠 <b>DNX ADMIN</b>\n\n"
+        f"{instruction}\n\n"
+        "Ответьте именно на это сообщение.\n"
+        f"<code>{marker}</code>"
+    )
+
+
+def purge_expired_admin_actions() -> None:
+    now = time.monotonic()
+    for nonce, action in list(pending_admin_actions.items()):
+        if action["expires_at"] <= now:
+            pending_admin_actions.pop(nonce, None)
+
+
+async def admin_user_row(user_id: str):
+    return await get_pool().fetchrow(
+        "SELECT id, username, balance, COALESCE(ban, FALSE) AS ban FROM users WHERE id = $1",
+        user_id,
+    )
+
+
+async def send_admin_confirmation(
+    message: types.Message,
+    operation: str,
+    user,
+    user_id: str,
+    amount: int = 0,
+) -> None:
+    nonce = secrets.token_hex(12)
+    purge_expired_admin_actions()
+    pending_admin_actions[nonce] = {
+        "operation": operation,
+        "user_id": user_id,
+        "amount": amount,
+        "admin_id": message.from_user.id,
+        "expires_at": time.monotonic() + ADMIN_ACTION_TTL,
+    }
+    safe_username = html_escape(str(user["username"] or "без username"))
+    operation_label = {
+        "credit": f"Начислить <b>{amount:,} ⭐</b>",
+        "block": "Заблокировать пользователя",
+        "unblock": "Разблокировать пользователя",
+    }[operation]
+    await message.answer(
+        "⚠️ <b>ПОДТВЕРЖДЕНИЕ</b>\n\n"
+        f"Действие: {operation_label}\n"
+        f"Пользователь: {safe_username}\n"
+        f"Telegram ID: <code>{user_id}</code>\n"
+        f"Текущий баланс: {int(user['balance'] or 0):,} ⭐\n\n"
+        "Подтверждение действительно 10 минут.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"admin_apply:{nonce}"),
+            InlineKeyboardButton(text="❌ Отмена", callback_data=f"admin_cancel:{nonce}"),
+        ]]),
+    )
+
+
+async def send_admin_panel(target) -> None:
+    await target.answer(
+        "🛠 <b>АДМИН-ПАНЕЛЬ DNX</b>\n\n"
+        "Все действия выполняются только по числовому Telegram ID "
+        "и записываются в историю пользователя.",
+        parse_mode="HTML",
+        reply_markup=admin_panel_keyboard(),
+    )
+
+
+@dp.message(Command("admin"))
+async def cmd_admin(message: types.Message):
+    if not message.from_user or message.from_user.id != ADMIN_ID:
+        if message.from_user:
+            logging.warning("Unauthorized /admin request from Telegram user %s", message.from_user.id)
+        return
+    await send_admin_panel(message)
+
+
+@dp.callback_query(F.data == "admin:panel")
+async def admin_panel_callback(callback: types.CallbackQuery):
+    if not await is_admin_callback(callback):
+        return
+    await callback.answer()
+    if callback.message:
+        await send_admin_panel(callback.message)
+
+
+@dp.callback_query(F.data.in_({"admin:credit", "admin:block", "admin:unblock"}))
+async def admin_action_start(callback: types.CallbackQuery):
+    if not await is_admin_callback(callback):
+        return
+    operation = str(callback.data).split(":", 1)[1]
+    labels = {
+        "credit": "ручное начисление",
+        "block": "блокировка",
+        "unblock": "разблокировка",
+    }
+    if callback.message:
+        await callback.message.answer(
+            admin_flow_prompt(operation, "user"),
+            parse_mode="HTML",
+            reply_markup=types.ForceReply(
+                selective=True,
+                input_field_placeholder="Числовой Telegram ID",
+            ),
+        )
+    await callback.answer(f"Начата операция: {labels[operation]}")
+
+
+@dp.message(
+    F.from_user.id == ADMIN_ID,
+    F.reply_to_message,
+    F.reply_to_message.text.contains(ADMIN_FLOW_MARKER),
+    F.text,
+)
+async def admin_action_reply(message: types.Message):
+    """Continue a private admin operation encoded in the ForceReply prompt."""
+    prompt = str(message.reply_to_message.text or "")
+    marker = re.search(
+        rf"{ADMIN_FLOW_MARKER}\|(credit|block|unblock)\|(user|amount)\|(\d+)\|(\d+)",
+        prompt,
+    )
+    if not marker:
+        await message.answer("Служебная метка операции повреждена. Начните заново: /admin")
+        return
+    operation, step, user_id, amount_text = marker.groups()
+    value = str(message.text or "").strip()
+
+    if step == "user":
+        if not re.fullmatch(r"[1-9]\d{0,19}", value):
+            await message.answer(
+                "Нужен положительный числовой Telegram ID без @username.\n\n"
+                + admin_flow_prompt(operation, "user"),
+                parse_mode="HTML",
+                reply_markup=types.ForceReply(
+                    selective=True,
+                    input_field_placeholder="Например: 123456789",
+                ),
+            )
+            return
+        user = await admin_user_row(value)
+        if not user:
+            await message.answer(
+                "Пользователь с таким ID не найден в базе. Он должен хотя бы один раз открыть бота."
+            )
+            return
+        if operation == "block" and user["ban"]:
+            await message.answer("Этот пользователь уже заблокирован.")
+            return
+        if operation == "unblock" and not user["ban"]:
+            await message.answer("Этот пользователь уже разблокирован.")
+            return
+        if operation != "credit":
+            await send_admin_confirmation(message, operation, user, value)
+            return
+        await message.answer(
+            admin_flow_prompt(operation, "amount", value),
+            parse_mode="HTML",
+            reply_markup=types.ForceReply(
+                selective=True,
+                input_field_placeholder="Количество звёзд",
+            ),
+        )
+        return
+
+    user = await admin_user_row(user_id)
+    if not user:
+        await message.answer("Пользователь больше не найден в базе. Начните заново: /admin")
+        return
+
+    if step == "amount":
+        if not value.isdigit() or not (1 <= int(value) <= ADMIN_MANUAL_CREDIT_MAX):
+            await message.answer(
+                f"Введите целое число от 1 до {ADMIN_MANUAL_CREDIT_MAX:,}.\n\n"
+                + admin_flow_prompt(operation, "amount", user_id),
+                parse_mode="HTML",
+                reply_markup=types.ForceReply(
+                    selective=True,
+                    input_field_placeholder="Количество звёзд",
+                ),
+            )
+            return
+        await send_admin_confirmation(message, operation, user, user_id, int(value))
+        return
+
+
+@dp.callback_query(F.data.startswith("admin_cancel:"))
+async def admin_action_cancel(callback: types.CallbackQuery):
+    if not await is_admin_callback(callback):
+        return
+    nonce = str(callback.data).split(":", 1)[1]
+    pending_admin_actions.pop(nonce, None)
+    if callback.message:
+        await callback.message.edit_text("❌ Операция отменена.")
+    await callback.answer("Отменено")
+
+
+@dp.callback_query(F.data.startswith("admin_apply:"))
+async def admin_action_apply(callback: types.CallbackQuery):
+    if not await is_admin_callback(callback):
+        return
+    nonce = str(callback.data).split(":", 1)[1]
+    async with admin_action_lock:
+        purge_expired_admin_actions()
+        action = pending_admin_actions.get(nonce)
+        if not action or action["admin_id"] != callback.from_user.id:
+            await callback.answer("Операция истекла или уже выполнена", show_alert=True)
+            return
+
+        operation = action["operation"]
+        user_id = action["user_id"]
+        amount = action["amount"]
+        try:
+            async with get_pool().acquire() as conn:
+                async with conn.transaction():
+                    user = await conn.fetchrow(
+                        "SELECT username, balance, COALESCE(ban, FALSE) AS ban "
+                        "FROM users WHERE id = $1 FOR UPDATE",
+                        user_id,
+                    )
+                    if not user:
+                        raise ValueError("Пользователь не найден")
+                    old_balance = int(user["balance"] or 0)
+                    if operation == "credit":
+                        new_balance = await conn.fetchval(
+                            "UPDATE users SET balance = balance + $1 WHERE id = $2 RETURNING balance",
+                            amount,
+                            user_id,
+                        )
+                        await record_user_event(
+                            conn,
+                            user_id,
+                            "admin_credit",
+                            amount=amount,
+                            balance_type="main",
+                            title="Ручное начисление администратором",
+                            metadata={
+                                "admin_id": callback.from_user.id,
+                                "balance_before": old_balance,
+                                "balance_after": int(new_balance),
+                            },
+                        )
+                    else:
+                        desired_ban = operation == "block"
+                        if bool(user["ban"]) == desired_ban:
+                            state = "заблокирован" if desired_ban else "разблокирован"
+                            raise ValueError(f"Пользователь уже {state}")
+                        await conn.execute("UPDATE users SET ban = $1 WHERE id = $2", desired_ban, user_id)
+                        await record_user_event(
+                            conn,
+                            user_id,
+                            "admin_block" if desired_ban else "admin_unblock",
+                            title="Блокировка администратором" if desired_ban else "Разблокировка администратором",
+                            metadata={
+                                "admin_id": callback.from_user.id,
+                            },
+                        )
+                        new_balance = old_balance
+            pending_admin_actions.pop(nonce, None)
+            restriction_cache.pop(str(user_id), None)
+        except ValueError as exc:
+            pending_admin_actions.pop(nonce, None)
+            await callback.answer(str(exc), show_alert=True)
+            return
+        except Exception as exc:
+            logging.exception("Admin action %s failed for user %s: %s", operation, user_id, exc)
+            await callback.answer("Ошибка базы данных. Операция не выполнена.", show_alert=True)
+            return
+
+    result_text = {
+        "credit": (
+            "✅ <b>ЗВЁЗДЫ НАЧИСЛЕНЫ</b>\n\n"
+            f"Telegram ID: <code>{user_id}</code>\n"
+            f"Начислено: {amount:,} ⭐\n"
+            f"Новый баланс: {int(new_balance):,} ⭐"
+        ),
+        "block": (
+            "🔒 <b>ПОЛЬЗОВАТЕЛЬ ЗАБЛОКИРОВАН</b>\n\n"
+            f"Telegram ID: <code>{user_id}</code>"
+        ),
+        "unblock": (
+            "🔓 <b>ПОЛЬЗОВАТЕЛЬ РАЗБЛОКИРОВАН</b>\n\n"
+            f"Telegram ID: <code>{user_id}</code>"
+        ),
+    }[operation]
+    if callback.message:
+        await callback.message.edit_text(
+            result_text,
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="Вернуться в админ-панель", callback_data="admin:panel")
+            ]]),
+        )
+    await callback.answer("Готово")
 
 
 @dp.message(F.from_user.id == ADMIN_ID, F.reply_to_message, F.text)
