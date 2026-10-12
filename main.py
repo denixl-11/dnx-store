@@ -131,7 +131,30 @@ AUTH_CACHE_TTL = 300
 AUTH_CACHE_MAX = 2048
 RESTRICTION_CACHE_TTL = 3
 RESTRICTION_CACHE_MAX = 4096
-API_RELEASE = "8.9-opt.81"
+API_RELEASE = "8.9-opt.82"
+
+
+async def configure_bot_commands() -> None:
+    """Publish public commands and a complete private list for the administrator."""
+    public_commands = [
+        types.BotCommand(command="start", description="Открыть DNX Store"),
+        types.BotCommand(command="paysupport", description="Помощь по платежам"),
+    ]
+    admin_commands = [
+        types.BotCommand(command="admin", description="Начисление, блокировка и разблокировка"),
+        types.BotCommand(command="stars_balance", description="Баланс Stars и последние операции бота"),
+        types.BotCommand(command="stars_reconcile", description="Найти пропущенные пополнения Stars"),
+        types.BotCommand(command="db_audit", description="Проверить подключённую базу данных"),
+        *public_commands,
+    ]
+    await bot.set_my_commands(
+        public_commands,
+        scope=types.BotCommandScopeDefault(),
+    )
+    await bot.set_my_commands(
+        admin_commands,
+        scope=types.BotCommandScopeChat(chat_id=ADMIN_ID),
+    )
 
 
 def versioned_webapp_url(url: str) -> str:
@@ -5422,6 +5445,10 @@ async def main():
                 BOT_USERNAME = me.username or ""
             except Exception as exc:
                 logging.warning("Could not prefetch bot username: %s", exc)
+        try:
+            await asyncio.wait_for(configure_bot_commands(), timeout=10)
+        except Exception as exc:
+            logging.warning("Could not refresh Telegram command menu: %s", exc)
         try:
             await asyncio.wait_for(
                 bot.set_chat_menu_button(
